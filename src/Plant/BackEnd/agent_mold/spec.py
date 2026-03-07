@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Mapping, Optional
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, PrivateAttr, root_validator
 
 
 class ApprovalMode(str, Enum):
@@ -111,18 +111,30 @@ class AgentSpec(BaseModel):
         description="Attached dimensions (explicit present or null/void)",
     )
 
-    # Construct bindings (PLANT-MOULD-1): typed pipeline class references.
-    # Excluded from serialization — class references are not JSON-serialisable.
-    bindings: Optional[ConstructBindings] = Field(
-        default=None, exclude=True, description="Pipeline construct class bindings"
-    )
-    # Mould-level guardrails. Excluded from JSON serialisation (dataclass with Enum fields).
-    constraint_policy: ConstraintPolicy = Field(
-        default_factory=ConstraintPolicy, exclude=True, description="Mould-level guardrails"
-    )
+    # Construct bindings (PLANT-MOULD-1): stored as private attrs so Pydantic
+    # never tries to generate JSON schema for them (pydantic==2.5.0 has no
+    # SkipJsonSchema; PrivateAttr is the portable alternative).
+    _bindings: Optional[ConstructBindings] = PrivateAttr(default=None)
+    _constraint_policy: ConstraintPolicy = PrivateAttr(default_factory=ConstraintPolicy)
+
+    def __init__(self, **data: Any) -> None:  # type: ignore[override]
+        bindings: Optional[ConstructBindings] = data.pop("bindings", None)
+        constraint_policy: Optional[ConstraintPolicy] = data.pop("constraint_policy", None)
+        super().__init__(**data)
+        if bindings is not None:
+            self._bindings = bindings
+        if constraint_policy is not None:
+            self._constraint_policy = constraint_policy
+
+    @property
+    def bindings(self) -> Optional[ConstructBindings]:
+        return self._bindings
+
+    @property
+    def constraint_policy(self) -> ConstraintPolicy:
+        return self._constraint_policy
 
     class Config:
-        arbitrary_types_allowed = True
         json_schema_extra = {
             "example": {
                 "agent_id": "AGT-MARKETING-001",
