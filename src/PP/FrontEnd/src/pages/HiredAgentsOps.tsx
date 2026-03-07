@@ -17,6 +17,9 @@ import {
 } from '@fluentui/react-components'
 
 import ApiErrorPanel from '../components/ApiErrorPanel'
+import ConstructHealthPanel from '../components/ConstructHealthPanel'
+import SchedulerDiagnosticsPanel from '../components/SchedulerDiagnosticsPanel'
+import HookTracePanel from '../components/HookTracePanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
 
 type Subscription = {
@@ -126,6 +129,8 @@ export default function HiredAgentsOps() {
   const [isLoading, setIsLoading] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
+  const [healthPanelAgentId, setHealthPanelAgentId] = useState<string | null>(null)
+  const [detailTab, setDetailTab] = useState<'overview' | 'scheduler' | 'hooks'>('overview')
 
   const normalizedAsOf = useMemo(() => (asOf || '').trim() || undefined, [asOf])
 
@@ -279,6 +284,7 @@ export default function HiredAgentsOps() {
               <TableHeaderCell>Trial</TableHeaderCell>
               <TableHeaderCell>Configured</TableHeaderCell>
               <TableHeaderCell>Goals</TableHeaderCell>
+              <TableHeaderCell>Actions</TableHeaderCell>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -298,17 +304,39 @@ export default function HiredAgentsOps() {
                 <TableCell>{r.hired.trial_status || '—'}</TableCell>
                 <TableCell>{r.hired.configured ? 'yes' : 'no'}</TableCell>
                 <TableCell>{goalSummary(r.goals)}</TableCell>
+                <TableCell>
+                  <Button
+                    appearance="subtle"
+                    size="small"
+                    title="View construct health"
+                    aria-label="Construct health"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setHealthPanelAgentId(r.hired.hired_instance_id)
+                    }}
+                  >
+                    🩺 Health
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
 
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6}><Text>No hired agent instances loaded.</Text></TableCell>
+                <TableCell colSpan={7}><Text>No hired agent instances loaded.</Text></TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </Card>
+
+      {healthPanelAgentId && (
+        <ConstructHealthPanel
+          hiredAgentId={healthPanelAgentId}
+          isOpen={true}
+          onClose={() => setHealthPanelAgentId(null)}
+        />
+      )}
 
       {selected && (
         <>
@@ -357,6 +385,44 @@ export default function HiredAgentsOps() {
             </div>
           )}
 
+          <div style={{ marginTop: 16, display: 'flex', gap: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 8 }}>
+            <Button
+              appearance={detailTab === 'overview' ? 'primary' : 'subtle'}
+              onClick={() => setDetailTab('overview')}
+            >
+              Overview
+            </Button>
+            <Button
+              appearance={detailTab === 'scheduler' ? 'primary' : 'subtle'}
+              onClick={() => setDetailTab('scheduler')}
+            >
+              Scheduler
+            </Button>
+            <Button
+              appearance={detailTab === 'hooks' ? 'primary' : 'subtle'}
+              onClick={() => setDetailTab('hooks')}
+            >
+              Hook Trace
+            </Button>
+          </div>
+
+          {detailTab === 'scheduler' && (
+            <div style={{ marginTop: 16 }}>
+              <SchedulerDiagnosticsPanel
+                hiredAgentId={selected.hired.hired_instance_id}
+                isAdmin={false}
+              />
+            </div>
+          )}
+
+          {detailTab === 'hooks' && (
+            <div style={{ marginTop: 16 }}>
+              <HookTracePanel hiredAgentId={selected.hired.hired_instance_id} />
+            </div>
+          )}
+
+          {detailTab === 'overview' && (
+            <>
           <Card style={{ marginTop: 16 }}>
             <CardHeader header={<Text weight="semibold">Config</Text>} />
             <div style={{ padding: 16 }}>
@@ -501,6 +567,8 @@ export default function HiredAgentsOps() {
                 </pre>
               </div>
             </Card>
+          )}
+            </>
           )}
         </>
       )}
