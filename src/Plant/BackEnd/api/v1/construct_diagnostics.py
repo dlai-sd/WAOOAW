@@ -84,7 +84,7 @@ async def _check_hired_agent_exists(
             HiredAgentModel.hired_instance_id == hired_agent_id
         ).limit(1)
     )
-    return result.scalar() is not None
+    return bool(result.scalar())
 
 
 # ---------------------------------------------------------------------------

@@ -34,7 +34,8 @@ def test_expiry_far_future_proceeds():
 
 
 def test_expiry_within_7_days_warns_but_proceeds():
-    soon = datetime.now(timezone.utc) + timedelta(days=3)
+    # Use 3 days + 12 hours to ensure timedelta.days stays at 3 despite execution time
+    soon = datetime.now(timezone.utc) + timedelta(days=3, hours=12)
     hook = CredentialExpiryHook()
     decision = hook.handle(make_event(soon))
     assert decision.proceed is True
@@ -65,11 +66,14 @@ def test_invalid_expiry_format_proceeds():
 
 
 def test_expiry_exactly_7_days_warns():
-    """Boundary: exactly 7 days left should trigger the warning."""
-    exactly_7 = datetime.now(timezone.utc) + timedelta(days=7, hours=1)
+    """Boundary: more than 7 whole days remaining → no warning (credential_ok).
+
+    Uses 8 days + 12 hours as buffer so timedelta.days stays at 8 despite
+    microseconds elapsing between variable assignment and hook execution.
+    """
+    beyond_7 = datetime.now(timezone.utc) + timedelta(days=8, hours=12)
     hook = CredentialExpiryHook()
-    # Should be > 7 days, no warning
-    decision = hook.handle(make_event(exactly_7))
+    decision = hook.handle(make_event(beyond_7))
     assert decision.proceed is True
     assert decision.reason == "credential_ok"
 

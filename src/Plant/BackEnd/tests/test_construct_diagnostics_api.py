@@ -56,11 +56,10 @@ def test_construct_health_returns_200_for_known_hire():
         mock_session = AsyncMock()
 
         def _execute_side_effect(query):
-            # Check if the query is for hired_agent existence
-            # Return a mock that has a scalar() that returns "hire-001"
+            # _check_hired_agent_exists uses bool(scalar()); return truthy string to signal existence
             mock_result = MagicMock()
             mock_result.scalar.return_value = "hire-001"
-            mock_result.scalar_one_or_none.return_value = None
+            mock_result.scalar_one_or_none.return_value = None  # model queries return None gracefully
             mock_result.scalars.return_value.all.return_value = []
             return mock_result
 
@@ -120,8 +119,8 @@ def test_scheduler_diagnostics_returns_200_for_known():
     async def _fake_db_hire():
         mock_session = AsyncMock()
         mock_result = MagicMock()
-        mock_result.scalar.return_value = "hire-002"
-        mock_result.scalar_one_or_none.return_value = None
+        mock_result.scalar.return_value = "hire-002"  # truthy → hire exists
+        mock_result.scalar_one_or_none.return_value = None  # model queries return None gracefully
         mock_result.scalars.return_value.all.return_value = []
         mock_session.execute = AsyncMock(return_value=mock_result)
         yield mock_session
