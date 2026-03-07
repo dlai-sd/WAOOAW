@@ -123,12 +123,14 @@ describe('HireWizardScreen — 4-step wizard (CP-MOULD-1 E4-S1)', () => {
   });
 
   it('navigates to step 2 (Connect Platform) from step 1', async () => {
-    const { getByText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
+    const { getByText, getAllByText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(getByText('Continue to Connect Platform'));
 
     await waitFor(() => {
-      expect(getByText('Connect Platform')).toBeTruthy();
+      // "Connect Platform" appears as step label AND as step 2 title
+      const connectTexts = getAllByText('Connect Platform');
+      expect(connectTexts.length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -140,8 +142,8 @@ describe('HireWizardScreen — 4-step wizard (CP-MOULD-1 E4-S1)', () => {
     await waitFor(() => {
       // ConnectorSetupCard should show "Not connected" for marketing agent
       expect(getByText('Not connected')).toBeTruthy();
-      // Should show one of the required credentials
-      expect(getByText('You\'ll need:')).toBeTruthy();
+      // Should show credentials label
+      expect(getByText("You'll need:")).toBeTruthy();
     });
   });
 
@@ -164,7 +166,7 @@ describe('HireWizardScreen — 4-step wizard (CP-MOULD-1 E4-S1)', () => {
     const { getByText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(getByText('Continue to Connect Platform'));
-    await waitFor(() => expect(getByText('Connect Platform')).toBeTruthy());
+    await waitFor(() => expect(getByText('Not connected')).toBeTruthy());
 
     fireEvent.press(getByText('Continue to Set Goals'));
 
@@ -174,7 +176,7 @@ describe('HireWizardScreen — 4-step wizard (CP-MOULD-1 E4-S1)', () => {
   });
 
   it('navigates to step 4 (Start Trial) from step 3', async () => {
-    const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+    const { getByText, getAllByText, getByPlaceholderText } = render(<HireWizardScreen />, {
       wrapper: createWrapper(),
     });
 
@@ -201,7 +203,9 @@ describe('HireWizardScreen — 4-step wizard (CP-MOULD-1 E4-S1)', () => {
     fireEvent.press(getByText('Continue to Start Trial'));
 
     await waitFor(() => {
-      expect(getByText('Start Trial')).toBeTruthy();
+      // 'Start Trial' appears in step labels (always) and as step title (step 4)
+      const allStartTrialTexts = getAllByText('Start Trial');
+      expect(allStartTrialTexts.length).toBeGreaterThanOrEqual(1);
       expect(getByText(/Add a payment method/)).toBeTruthy();
     });
   });

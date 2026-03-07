@@ -22,6 +22,20 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('@/hooks/useHiredAgents');
 
+jest.mock('@/hooks/usePerformanceMonitoring', () => ({
+  usePerformanceMonitoring: jest.fn(),
+}));
+
+jest.mock('@/components/voice/VoiceControl', () => {
+  const React = require('react');
+  return { VoiceControl: () => React.createElement(React.Fragment, null) };
+});
+
+jest.mock('@/components/voice/VoiceHelpModal', () => {
+  const React = require('react');
+  return { VoiceHelpModal: () => React.createElement(React.Fragment, null) };
+});
+
 jest.mock('@/hooks/useTheme', () => ({
   useTheme: () => ({
     colors: {
