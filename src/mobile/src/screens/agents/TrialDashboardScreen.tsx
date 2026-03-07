@@ -19,6 +19,9 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgent } from '@/hooks/useHiredAgents';
 import { useDeliverables } from '@/hooks/useHiredAgents';
+import { useApprovalQueue } from '@/hooks/useApprovalQueue';
+import { TradePlanApprovalCard } from '@/components/TradePlanApprovalCard';
+import { ContentDraftApprovalCard } from '@/components/ContentDraftApprovalCard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
@@ -74,6 +77,13 @@ export const TrialDashboardScreen = ({ navigation, route }: Props) => {
 
   // Mock deliverables data (TODO: Replace with API call when backend is ready)
     const { data: deliverables = [], isLoading: delivLoading } = useDeliverables(trialId);
+
+  // Approval queue — pending deliverables awaiting customer action
+  const {
+    deliverables: pendingApprovals,
+    approve: approveDeliverable,
+    reject: rejectDeliverable,
+  } = useApprovalQueue(trialId);
 
   // Get deliverable icon based on type
   const getDeliverableIcon = (type: DeliverableType): string => {
@@ -513,6 +523,42 @@ export const TrialDashboardScreen = ({ navigation, route }: Props) => {
             </View>
           )}
         </View>
+
+        {/* Pending Approvals Section (CP-MOULD-1 E5-S2) */}
+        {pendingApprovals.length > 0 && (
+          <View
+            style={[{
+              margin: spacing.screenPadding.horizontal,
+              marginTop: spacing.lg,
+            }]}
+          >
+            <Text
+              style={{
+                color: colors.textPrimary,
+                fontSize: 20,
+                fontFamily: typography.fontFamily.bodyBold,
+                marginBottom: spacing.md,
+              }}
+            >
+              Needs Your Approval ({pendingApprovals.length})
+            </Text>
+            {pendingApprovals.map((item) =>
+              item.type === 'trade_plan'
+                ? <TradePlanApprovalCard
+                    key={item.id}
+                    deliverable={item}
+                    onApprove={approveDeliverable}
+                    onReject={rejectDeliverable}
+                  />
+                : <ContentDraftApprovalCard
+                    key={item.id}
+                    deliverable={item}
+                    onApprove={approveDeliverable}
+                    onReject={rejectDeliverable}
+                  />
+            )}
+          </View>
+        )}
 
         {/* Deliverables Section (Story 2.14) */}
         <View

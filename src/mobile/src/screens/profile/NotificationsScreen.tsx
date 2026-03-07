@@ -3,6 +3,10 @@
  *
  * Push notification preferences — UI-only placeholder.
  * FCM token registration is wired in S8b (Iteration 3).
+ *
+ * CP-MOULD-1 E6-S1: Added agent-aware notification deep-links.
+ * Tapping an agent notification navigates to AgentOperationsScreen
+ * with the relevant focusSection pre-selected.
  */
 
 import React, { useState } from 'react';
@@ -17,11 +21,74 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { registerPushToken } from '../../services/notifications/pushNotifications.service';
 import type { ProfileStackScreenProps } from '@/navigation/types';
+import { useNavigation } from '@react-navigation/native';
 
 type Props = ProfileStackScreenProps<'Notifications'>;
 
+// ─── Notification types & deep-link resolver ──────────────────────────────────
+
+export type NotificationType =
+  | 'approval_required'    // → AgentOperationsScreen, section: "approvals"
+  | 'credential_expiring'  // → AgentOperationsScreen, section: "health"
+  | 'agent_paused'         // → AgentOperationsScreen, section: "scheduler"
+  | 'trial_ending'         // → AgentOperationsScreen, section: "spend"
+  | 'goal_run_failed'      // → AgentOperationsScreen, section: "activity"
+  | 'generic';             // → no navigation
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  hired_agent_id?: string;
+  read?: boolean;
+  created_at?: string;
+}
+
+/**
+ * Resolves a notification to a navigation target.
+ * Returns null for generic notifications or those without hired_agent_id.
+ */
+export function resolveNavigationTarget(
+  notification: Notification
+): { screen: string; params: object } | null {
+  if (!notification.hired_agent_id) return null;
+  switch (notification.type) {
+    case 'approval_required':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'approvals' },
+      };
+    case 'credential_expiring':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'health' },
+      };
+    case 'agent_paused':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'scheduler' },
+      };
+    case 'trial_ending':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'spend' },
+      };
+    case 'goal_run_failed':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'activity' },
+      };
+    default:
+      return null;
+  }
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export const NotificationsScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
+  const rootNavigation = useNavigation<any>();
   const [pushEnabled, setPushEnabled] = useState(false);
   const [trialUpdates, setTrialUpdates] = useState(true);
   const [deliverableAlerts, setDeliverableAlerts] = useState(true);
@@ -30,8 +97,17 @@ export const NotificationsScreen = ({ navigation }: Props) => {
   const handlePushToggle = (value: boolean) => {
     setPushEnabled(value);
     if (value) {
-      // Register (or re-register) push token when user enables notifications
       registerPushToken().catch(() => {});
+    }
+  };
+
+  const handleNotificationPress = (notification: Notification) => {
+    const target = resolveNavigationTarget(notification);
+    if (target) {
+      rootNavigation.navigate('MyAgentsTab', {
+        screen: target.screen,
+        params: target.params,
+      });
     }
   };
 
@@ -174,3 +250,4 @@ export const NotificationsScreen = ({ navigation }: Props) => {
     </SafeAreaView>
   );
 };
+

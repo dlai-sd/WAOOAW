@@ -23,7 +23,7 @@ import { View, Text } from "react-native";
 import { HomeScreen } from "../screens/home/HomeScreen";
 import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
 import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
-import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen } from "../screens/agents";
+import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
 import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen, PaymentMethodsScreen, SubscriptionManagementScreen } from "../screens/profile";
@@ -95,6 +95,7 @@ const MyAgentsNavigator = () => {
       />
       <MyAgentsStack.Screen name="ActiveTrialsList" component={ActiveTrialsListScreen} />
       <MyAgentsStack.Screen name="HiredAgentsList" component={HiredAgentsListScreen} />
+      <MyAgentsStack.Screen name="AgentOperations" component={AgentOperationsScreen} />
     </MyAgentsStack.Navigator>
   );
 };
