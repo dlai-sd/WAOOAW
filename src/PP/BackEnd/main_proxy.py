@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 
 from api import agents, audit, auth, genesis, db_updates, metering_debug, agent_setups, exchange_credentials, approvals, agent_types, ops_subscriptions, ops_hired_agents
+from api.ops_dlq import router as ops_dlq_router
 from clients import close_plant_client
 from core.config import get_settings as _get_settings, get_settings, Settings  # E6: single config source
 from core.dependencies import require_correlation_id  # P-2: global correlation ID
@@ -156,6 +157,7 @@ app.include_router(metering_debug.router, prefix="/api/pp")
 app.include_router(db_updates.router, prefix="/api/pp")
 app.include_router(ops_subscriptions.router, prefix="/api/pp")
 app.include_router(ops_hired_agents.router, prefix="/api/pp")
+app.include_router(ops_dlq_router, prefix="/api/pp")
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])

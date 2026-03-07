@@ -16,7 +16,7 @@ import os
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, Field
@@ -47,6 +47,7 @@ class AgentSetup(BaseModel):
     posting_identity: Optional[str] = None
 
     credential_refs: Dict[str, str] = Field(default_factory=dict)
+    constraint_policy: Optional[Dict[str, Any]] = None
 
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
@@ -60,6 +61,7 @@ class _AgentSetupRecord(BaseModel):
     posting_identity: Optional[str] = None
 
     credential_refs_enc: str
+    constraint_policy: Optional[Dict[str, Any]] = None
 
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
@@ -95,6 +97,7 @@ class FileAgentSetupStore:
             channels=list(setup.channels or []),
             posting_identity=setup.posting_identity,
             credential_refs_enc=self._encrypt_refs(setup.credential_refs or {}),
+            constraint_policy=setup.constraint_policy,
             created_at=setup.created_at,
             updated_at=now,
         )
@@ -136,6 +139,7 @@ class FileAgentSetupStore:
             channels=list(rec.channels or []),
             posting_identity=rec.posting_identity,
             credential_refs=self._decrypt_refs(rec.credential_refs_enc),
+            constraint_policy=rec.constraint_policy,
             created_at=rec.created_at,
             updated_at=rec.updated_at,
         )
@@ -160,6 +164,46 @@ class FileAgentSetupStore:
             for row in rows:
                 f.write(row.model_dump_json())
                 f.write("\n")
+
+    def get_by_composite_id(self, agent_setup_id: str) -> Optional[AgentSetup]:
+        """Look up an AgentSetup by composite ID '{customer_id}:{agent_id}'."""
+        parts = agent_setup_id.split(":", 1)
+        if len(parts) != 2:
+            return None
+        customer_id, agent_id = parts
+        return self.get(customer_id=customer_id, agent_id=agent_id)
+
+    def patch_constraint_policy(
+        self, agent_setup_id: str, patch_data: Dict[str, Any]
+    ) -> Optional[AgentSetup]:
+        """Merge patch_data into the constraint_policy of the identified AgentSetup.
+
+        Returns the updated AgentSetup, or None if not found.
+        """
+        parts = agent_setup_id.split(":", 1)
+        if len(parts) != 2:
+            return None
+        customer_id, agent_id = parts
+
+        records = self._load_records()
+        now = _utcnow()
+        for idx, rec in enumerate(records):
+            if rec.customer_id == customer_id and rec.agent_id == agent_id:
+                existing_policy: Dict[str, Any] = rec.constraint_policy or {}
+                updated_policy = {**existing_policy, **patch_data}
+                records[idx] = _AgentSetupRecord(
+                    customer_id=rec.customer_id,
+                    agent_id=rec.agent_id,
+                    channels=rec.channels,
+                    posting_identity=rec.posting_identity,
+                    credential_refs_enc=rec.credential_refs_enc,
+                    constraint_policy=updated_policy,
+                    created_at=rec.created_at,
+                    updated_at=now,
+                )
+                self._write_records(records)
+                return self._to_model(records[idx])
+        return None
 
 
 @lru_cache(maxsize=1)
