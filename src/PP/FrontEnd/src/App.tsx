@@ -20,6 +20,8 @@ import PolicyDenials from './pages/PolicyDenials'
 import AgentSpecTools from './pages/AgentSpecTools'
 import DbUpdates from './pages/DbUpdates'
 import AgentSetup from './pages/AgentSetup'
+import AgentTypeSetupScreen from './pages/AgentTypeSetupScreen'
+import ApprovalsQueueScreen from './pages/ApprovalsQueueScreen'
 import ReviewQueue from './pages/ReviewQueue'
 import HiredAgentsOps from './pages/HiredAgentsOps'
 import config from './config/oauth.config'
@@ -183,6 +185,8 @@ function AppShell() {
               <Route path="/agents/data" element={<AgentData />} />
               <Route path="/customers" element={<CustomerManagement />} />
               <Route path="/agent-setup" element={<AgentSetup />} />
+              <Route path="/agent-type-setup" element={<AgentTypeSetupScreen />} />
+              <Route path="/approvals-queue" element={<ApprovalsQueueScreen />} />
               <Route path="/review-queue" element={<ReviewQueue />} />
               <Route path="/hired-agents" element={<HiredAgentsOps />} />
               <Route path="/billing" element={<Billing />} />

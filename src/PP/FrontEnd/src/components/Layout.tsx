@@ -30,6 +30,8 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
     { path: '/', label: 'Dashboard', icon: <Home24Regular /> },
     { path: '/agents', label: 'Agent Management', icon: <Bot24Regular /> },
     { path: '/agent-setup', label: 'Agent Setup', icon: <Bot24Regular /> },
+    { path: '/agent-type-setup', label: 'Agent Type Setup', icon: <Bot24Regular /> },
+    { path: '/approvals-queue', label: 'Approvals Queue', icon: <ShieldTask24Regular /> },
     { path: '/review-queue', label: 'Review Queue', icon: <ShieldTask24Regular /> },
     { path: '/hired-agents', label: 'Hired Agents', icon: <People24Regular /> },
     { path: '/customers', label: 'Customers', icon: <People24Regular /> },
