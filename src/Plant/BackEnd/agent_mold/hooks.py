@@ -66,6 +66,8 @@ class HookDecision:
     details: Optional[Dict[str, Any]] = None
     # `proceed` mirrors `allowed` — new name used by PLANT-MOULD-1 stories.
     proceed: Optional[bool] = None
+    # `metadata` carries arbitrary data back to the caller (e.g., days_left for expiry hooks).
+    metadata: Optional[Dict[str, Any]] = None
 
     def __post_init__(self) -> None:
         # Sync allowed ↔ proceed so both names always work.
