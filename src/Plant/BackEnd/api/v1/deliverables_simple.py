@@ -10,6 +10,7 @@ Phase-1 scope: in-memory store intended to unblock CP review UX.
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +23,8 @@ from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from agent_mold.enforcement import default_hook_bus
-from agent_mold.hooks import HookEvent, HookStage
+from agent_mold.hooks import HookEvent, HookStage, LifecycleContext, NullLifecycleHooks
+from agent_mold.registry import AgentSpecRegistry
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import load_playbook
 from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
@@ -512,6 +514,28 @@ async def review_deliverable(deliverable_id: str, body: ReviewDeliverableRequest
     instance_map = _deliverables_by_hired_instance.setdefault(d.hired_instance_id, {})
     instance_map[d.deliverable_id] = d
     _deliverables_by_id[d.deliverable_id] = d
+
+    # Fire on_deliverable_approved lifecycle hook (best-effort, non-blocking)
+    if decision == "approved":
+        _dlhooks_logger = logging.getLogger(__name__)
+        try:
+            spec = AgentSpecRegistry.instance().get_spec(record.agent_type_id or "")
+            bindings = spec.bindings if spec else None
+            hooks_cls = (bindings.lifecycle_hooks_class if bindings else None) or NullLifecycleHooks
+        except Exception:
+            hooks_cls = NullLifecycleHooks
+
+        hooks = hooks_cls()
+        ctx = LifecycleContext(
+            hired_instance_id=d.hired_instance_id,
+            agent_type_id=record.agent_type_id or "",
+            customer_id=record.customer_id or "",
+            deliverable_id=deliverable_id,
+        )
+        try:
+            await hooks.on_deliverable_approved(ctx)
+        except Exception as exc:  # noqa: BLE001
+            _dlhooks_logger.warning("on_deliverable_approved hook error: %s", exc)
 
     return ReviewDeliverableResponse(
         deliverable_id=d.deliverable_id,

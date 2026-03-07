@@ -13,6 +13,7 @@ This is an in-memory implementation intended to unblock CP Hire wizard flows in 
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncGenerator, Literal
@@ -1120,6 +1121,43 @@ async def delete_goal(
         return {"deleted": True, "goal_instance_id": goal_id}
     return {"deleted": False, "goal_instance_id": goal_id}
 
+_lifecycle_logger = logging.getLogger(__name__)
+
+
+async def _fire_lifecycle_hire_hooks(record: "_HiredAgentRecord", *, trial_start_at: "datetime | None") -> None:
+    """Fire on_hire (and on_trial_start when a trial was started) lifecycle hooks.
+
+    Errors are caught and logged — hook failures must NOT fail the hire response.
+    """
+    from agent_mold.hooks import LifecycleContext, NullLifecycleHooks
+    from agent_mold.registry import AgentSpecRegistry
+
+    try:
+        spec = AgentSpecRegistry.instance().get_spec(record.agent_type_id or "")
+        bindings = spec.bindings if spec else None
+        hooks_cls = (bindings.lifecycle_hooks_class if bindings else None) or NullLifecycleHooks
+    except Exception:
+        hooks_cls = NullLifecycleHooks
+
+    hooks = hooks_cls()
+    ctx = LifecycleContext(
+        hired_instance_id=record.hired_instance_id,
+        agent_type_id=record.agent_type_id or "",
+        customer_id=record.customer_id or "",
+        agent_id=record.agent_id,
+    )
+
+    async def _fire(coro):  # type: ignore[no-untyped-def]
+        try:
+            await coro
+        except Exception as exc:  # noqa: BLE001
+            _lifecycle_logger.warning("lifecycle hook error: %s", exc)
+
+    await _fire(hooks.on_hire(ctx))
+    if trial_start_at is not None:
+        await _fire(hooks.on_trial_start(ctx))
+
+
 @router.post("/{hired_instance_id}/finalize", response_model=HiredAgentInstanceResponse)
 async def finalize(
     hired_instance_id: str,
@@ -1216,6 +1254,7 @@ async def finalize(
 
         await db.commit()
         persisted_record = _db_model_to_record(persisted)
+        await _fire_lifecycle_hire_hooks(record, trial_start_at=trial_start_at)
         return _to_response(
             persisted_record,
             subscription_status=subscription_status,
@@ -1223,6 +1262,7 @@ async def finalize(
         )
 
     _by_id[hired_instance_id] = updated
+    await _fire_lifecycle_hire_hooks(record, trial_start_at=trial_start_at)
     return _to_response(updated, subscription_status=subscription_status, ended_at=subscription_ended_at)
 
 def _process_trial_end(now: datetime) -> int:

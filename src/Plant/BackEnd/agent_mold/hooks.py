@@ -12,6 +12,7 @@ concepts behind a message bus/queue.
 
 from __future__ import annotations
 
+from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -89,11 +90,31 @@ class HookBus:
     def register(self, stage: HookStage, hook: Hook) -> None:
         self._hooks[stage].append(hook)
 
-    def emit(self, event: HookEvent) -> HookDecision:
-        """Run hooks in order; first deny stops the chain."""
+    def emit(self, stage_or_event: Any, event: Any = None) -> "HookDecision":
+        """Run hooks in order; first deny stops the chain.
 
-        for hook in self._hooks.get(event.stage, []):
-            decision = hook.handle(event)
+        Supports two call forms:
+          - emit(HookEvent)            — original form; stage comes from event.stage
+          - emit(HookStage, event)     — new form; stage is explicit, event can be any object
+        """
+        if event is None:
+            # Called as emit(HookEvent)
+            hook_event = stage_or_event
+            stage = hook_event.stage
+        else:
+            # Called as emit(HookStage, event)
+            stage = stage_or_event
+            hook_event = event
+
+        for hook in self._hooks.get(stage, []):
+            # Support Protocol hooks with handle() and callable hooks with __call__()
+            if hasattr(hook, "handle"):
+                decision = hook.handle(hook_event)
+            elif callable(hook):
+                decision = hook(hook_event)
+            else:
+                continue
+
             if decision is None:
                 continue
             # allowed=False or proceed=False means deny (both are synced in __post_init__)
@@ -108,6 +129,81 @@ class HookBus:
                 )
 
         return HookDecision(allowed=True, reason="allowed", decision_id=str(uuid4()))
+
+
+class LifecycleContext:
+    """Minimal context passed to every lifecycle event.
+
+    Keeps hooks decoupled from DB session — they receive only what they need.
+    Never log ctx.customer_id raw (PIIMaskingFilter handles it at logger level).
+    """
+
+    def __init__(
+        self,
+        hired_instance_id: str,
+        agent_type_id: str,
+        customer_id: str,
+        agent_id: Optional[str] = None,
+        deliverable_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ):
+        self.hired_instance_id = hired_instance_id
+        self.agent_type_id = agent_type_id
+        self.customer_id = customer_id
+        self.agent_id = agent_id
+        self.deliverable_id = deliverable_id
+        self.extra: Dict[str, Any] = extra or {}
+
+
+class AgentLifecycleHooks(ABC):
+    """Base class for agent-type-specific lifecycle event handlers.
+
+    Agent types override only the events they care about.
+    All methods are async and non-blocking — a failure must NOT raise to caller.
+    Default implementations are silent no-ops (safe to leave unoverridden).
+    """
+
+    async def on_hire(self, ctx: LifecycleContext) -> None:
+        """Called when a hired agent is finalised (trial or direct hire)."""
+
+    async def on_trial_start(self, ctx: LifecycleContext) -> None:
+        """Called when trial_start_at is set on the hired agent."""
+
+    async def on_trial_end(self, ctx: LifecycleContext) -> None:
+        """Called when trial period expires (scheduler detects trial_end_date passed)."""
+
+    async def on_trial_day_N(self, ctx: LifecycleContext, day: int) -> None:
+        """Called once per trial day N (day=1 on first full day, etc.)."""
+
+    async def on_deliverable_pending_review(self, ctx: LifecycleContext) -> None:
+        """Called when a deliverable lands in pending_review status."""
+
+    async def on_deliverable_approved(self, ctx: LifecycleContext) -> None:
+        """Called when a customer approves a deliverable.
+
+        For trading agents: triggers DeltaTradeAdapter.execute_approved_order().
+        For content agents: triggers Publisher.publish() for approved posts.
+        Subclass MUST override if agent has an approval side-effect.
+        """
+
+    async def on_deliverable_rejected(self, ctx: LifecycleContext) -> None:
+        """Called when a customer rejects a deliverable."""
+
+    async def on_goal_run_start(self, ctx: LifecycleContext) -> None:
+        """Called at the start of each goal run (Scheduler fires)."""
+
+    async def on_goal_run_complete(self, ctx: LifecycleContext) -> None:
+        """Called when a goal run finishes successfully."""
+
+    async def on_cancel(self, ctx: LifecycleContext) -> None:
+        """Called when subscription is cancelled."""
+
+    async def on_quota_exhausted(self, ctx: LifecycleContext) -> None:
+        """Called when trial_task_limit is reached."""
+
+
+class NullLifecycleHooks(AgentLifecycleHooks):
+    """No-op lifecycle hooks. Used as default when agent type has no overrides."""
 
 
 class ApprovalRequiredHook:
