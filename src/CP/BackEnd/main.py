@@ -113,6 +113,14 @@ app.include_router(cp_skills_router, prefix="/api")
 from api.campaigns import router as campaigns_router  # noqa: E402
 app.include_router(campaigns_router, prefix="/api")
 
+# CP-MOULD-1 It-1 E1: Scheduler summary, trial budget, pause/resume proxy routes
+from api.cp_scheduler import router as cp_scheduler_router  # noqa: E402
+app.include_router(cp_scheduler_router, prefix="/api")
+
+# CP-MOULD-1 It-1 E2: Approval queue proxy routes
+from api.cp_approvals_proxy import router as cp_approvals_proxy_router  # noqa: E402
+app.include_router(cp_approvals_proxy_router, prefix="/api")
+
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")
 
