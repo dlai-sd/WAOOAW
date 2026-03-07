@@ -156,7 +156,7 @@ export default function ConstructHealthPanel({
           }}
         >
           {CONSTRUCT_CARDS.map(({ key, label, icon }) => {
-            const construct = (data as Record<string, unknown>)[key] as
+            const construct = (data as unknown as Record<string, unknown>)[key] as
               | (ConstructStatus & { secret_ref?: string })
               | undefined
             if (!construct) return null
