@@ -28,6 +28,7 @@ from agent_mold.skills.content_models import (
     PostGeneratorOutput,
     estimate_cost,
 )
+from agent_mold.processor import BaseProcessor, ProcessorInput, ProcessorOutput
 from agent_mold.skills.playbook import CanonicalMessage
 
 # Channel → adapter map (add new channels here when adapters are created)
@@ -50,10 +51,29 @@ def _executor_backend() -> str:
     return os.getenv("EXECUTOR_BACKEND", "deterministic").lower()
 
 
-class ContentCreatorSkill:
+class ContentCreatorSkill(BaseProcessor):
     """Plug-and-play skill. Register against any agent that needs content creation."""
 
     SKILL_ID = "content.creator.v1"
+
+    async def process(self, input_data: ProcessorInput, hook_bus: "HookBus") -> ProcessorOutput:  # type: ignore[name-defined]
+        """BaseProcessor ABC implementation — adapter shim for content creation.
+
+        Unpacks ProcessorInput.goal_config and returns a ProcessorOutput.
+        Full content creation (theme lists, posts) is driven by generate_theme_list()
+        and generate_posts_for_theme(); this shim enables the typed
+        GoalSchedulerService dispatch path when construct bindings are wired.
+        """
+        cfg = input_data.goal_config
+        return ProcessorOutput(
+            result={
+                "status": "content_creation_dispatched",
+                "processor": self.processor_type(),
+                "goal_config_keys": sorted(cfg.keys()),
+            },
+            metadata={"processor_type": self.processor_type()},
+            correlation_id=input_data.correlation_id,
+        )
 
     def generate_theme_list(self, campaign: Campaign) -> ContentCreatorOutput:
         """Step 1: Generate DailyThemeItems for the full campaign duration."""

@@ -15,11 +15,13 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from services.scheduler_dlq_service import DLQService
     from services.idempotency_service import IdempotencyService
+    from agent_mold.spec import AgentSpec
+    from agent_mold.hooks import HookBus
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,7 @@ class GoalSchedulerService:
         backoff_multiplier: float = 2.0,
         dlq_service: Optional["DLQService"] = None,
         idempotency_service: Optional["IdempotencyService"] = None,
+        hook_bus: Optional["HookBus"] = None,
     ):
         """Initialize goal scheduler service.
         
@@ -96,6 +99,7 @@ class GoalSchedulerService:
             backoff_multiplier: Multiplier for exponential backoff
             dlq_service: Dead letter queue service for failed goals (optional)
             idempotency_service: Idempotency service to prevent duplicate runs (optional)
+            hook_bus: Hook bus for PRE/POST hook dispatch; defaults to process-wide bus
         """
         self.max_retries = max_retries
         self.initial_backoff_seconds = initial_backoff_seconds
@@ -103,6 +107,8 @@ class GoalSchedulerService:
         self.dlq_service = dlq_service
         self.idempotency_service = idempotency_service
         self._consecutive_failures: dict[str, int] = {}
+        # Lazily resolved on first use to avoid circular imports at module load
+        self._hook_bus = hook_bus
     
     async def run_goal_with_retry(
         self,
@@ -399,19 +405,34 @@ class GoalSchedulerService:
         # Should never reach here
         raise RuntimeError("Unexpected code path in run_goal_with_retry")
     
+    @property
+    def hook_bus(self) -> "HookBus":
+        """Return the hook bus, lazily resolving the process-wide default."""
+        if self._hook_bus is None:
+            from agent_mold.enforcement import default_hook_bus
+            self._hook_bus = default_hook_bus()
+        return self._hook_bus
+
     async def _execute_goal(
         self,
         goal_instance_id: str,
         correlation_id: Optional[str] = None,
+        hired_agent_id: Optional[str] = None,
+        goal_config: Optional[dict] = None,
+        agent_spec: Optional["AgentSpec"] = None,
     ) -> str:
         """Execute a single goal instance.
-        
-        This is a stub that will be implemented with actual goal execution logic.
-        Subclasses or dependency injection can provide the real implementation.
+
+        When agent_spec has construct bindings, dispatches through the typed
+        pump → processor pipeline (PLANT-MOULD-1).  Falls back to the legacy
+        stub path when bindings are absent.
         
         Args:
             goal_instance_id: Unique identifier for the goal instance
             correlation_id: Request correlation ID for tracing
+            hired_agent_id: Hired agent instance ID (used by typed path)
+            goal_config: Goal configuration dict (used by typed path)
+            agent_spec: AgentSpec with optional construct bindings
             
         Returns:
             Deliverable ID for the created deliverable
@@ -420,6 +441,55 @@ class GoalSchedulerService:
             TransientError: For temporary failures (network, rate limit, etc.)
             PermanentError: For non-recoverable failures (invalid config, etc.)
         """
+        if agent_spec is not None and agent_spec.bindings is not None:
+            # --- New typed path (PLANT-MOULD-1) ---
+            from agent_mold.hooks import HookEvent, HookStage
+            from agent_mold.processor import ProcessorInput
+
+            _goal_config: dict[str, Any] = goal_config or {}
+            _hired_agent_id: str = hired_agent_id or goal_instance_id
+
+            # 1. Emit PRE_PUMP hook
+            self.hook_bus.emit(HookEvent(
+                stage=HookStage.PRE_PUMP,
+                hired_agent_id=_hired_agent_id,
+                agent_type=agent_spec.agent_type,
+                payload={},
+            ))
+            # 2. Pull data via pump
+            pump = agent_spec.bindings.pump_class()
+            raw_data = await pump.pull(goal_config=_goal_config, hired_agent_id=_hired_agent_id)
+
+            # 3. Emit PRE_PROCESSOR hook
+            self.hook_bus.emit(HookEvent(
+                stage=HookStage.PRE_PROCESSOR,
+                hired_agent_id=_hired_agent_id,
+                agent_type=agent_spec.agent_type,
+                payload={},
+            ))
+            # 4. Process
+            processor = agent_spec.bindings.processor_class()
+            inp = ProcessorInput(
+                goal_config=_goal_config,
+                raw_data=raw_data,
+                correlation_id=correlation_id or goal_instance_id,
+                hired_agent_id=_hired_agent_id,
+            )
+            output = await processor.process(inp, self.hook_bus)
+
+            # 5. Emit POST_PROCESSOR hook
+            self.hook_bus.emit(HookEvent(
+                stage=HookStage.POST_PROCESSOR,
+                hired_agent_id=_hired_agent_id,
+                agent_type=agent_spec.agent_type,
+                payload={"result": str(output.result)[:200]},
+            ))
+
+            # Return correlation_id as deliverable_id placeholder until
+            # the persistence layer is wired (Iteration 2).
+            return output.correlation_id
+
+        # --- Legacy path: no bindings present ---
         # TODO: Implement actual goal execution logic
         # This should:
         # 1. Load goal instance from database
