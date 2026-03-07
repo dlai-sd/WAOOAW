@@ -9,10 +9,18 @@ They run through the same hook/policy plane and metering.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Any, Dict, List, Optional
 
-from agent_mold.spec import AgentSpec, DimensionName
+from agent_mold.pump import GoalConfigPump
+from agent_mold.skills.content_creator import ContentCreatorSkill
+from agent_mold.skills.trading_executor import TradingExecutor
+from agent_mold.skills.tutor_executor import TutorSkill
+from agent_mold.spec import AgentSpec, ConstructBindings, ConstraintPolicy, DimensionName
+
+
+class _DefaultScheduler:
+    """Placeholder scheduler class until BaseScheduler ABC is defined in Iteration 2."""
 
 
 @dataclass(frozen=True)
@@ -24,6 +32,10 @@ class ReferenceAgent:
 
     # Minimal configuration payload used by the demo runner.
     defaults: Dict[str, Any]
+
+    # Construct bindings (PLANT-MOULD-1): pipeline stage class references.
+    bindings: Optional[ConstructBindings] = None
+    constraint_policy: ConstraintPolicy = dc_field(default_factory=ConstraintPolicy)
 
 
 def _marketing_spec(agent_id: str, *, industry: str, brand_name: str) -> AgentSpec:
@@ -47,6 +59,12 @@ def _marketing_spec(agent_id: str, *, industry: str, brand_name: str) -> AgentSp
             DimensionName.TRIAL: {"present": True, "config": {}},
             DimensionName.BUDGET: {"present": True, "config": {}},
         },
+        bindings=ConstructBindings(
+            processor_class=ContentCreatorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     )
 
 
@@ -77,6 +95,12 @@ def _tutor_spec(agent_id: str, *, subject: str, level: str) -> AgentSpec:
             DimensionName.TRIAL: {"present": True, "config": {}},
             DimensionName.BUDGET: {"present": True, "config": {}},
         },
+        bindings=ConstructBindings(
+            processor_class=TutorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     )
 
 
@@ -107,6 +131,12 @@ def _trading_spec(agent_id: str) -> AgentSpec:
             DimensionName.TRIAL: {"present": True, "config": {}},
             DimensionName.BUDGET: {"present": True, "config": {}},
         },
+        bindings=ConstructBindings(
+            processor_class=TradingExecutor,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     )
 
 
@@ -126,6 +156,12 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             "audience": "Brides-to-be and working professionals",
             "tone": "confident, friendly",
         },
+        bindings=ConstructBindings(
+            processor_class=ContentCreatorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     ),
     ReferenceAgent(
         agent_id="AGT-MKT-CAKE-001",
@@ -142,6 +178,12 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             "audience": "Families, birthday planners",
             "tone": "warm, joyful",
         },
+        bindings=ConstructBindings(
+            processor_class=ContentCreatorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     ),
     ReferenceAgent(
         agent_id="AGT-MKT-HEALTH-001",
@@ -159,6 +201,12 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             "tone": "clear, caring, professional",
             "language": "en",
         },
+        bindings=ConstructBindings(
+            processor_class=ContentCreatorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     ),
     ReferenceAgent(
         agent_id="AGT-TUTOR-WB-001",
@@ -175,6 +223,12 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             "topic": "Linear equations in two variables",
             "language": "en",
         },
+        bindings=ConstructBindings(
+            processor_class=TutorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     ),
     ReferenceAgent(
         agent_id="AGT-TRD-DELTA-001",
@@ -189,6 +243,12 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             "action": "enter",
             "market": True,
         },
+        bindings=ConstructBindings(
+            processor_class=TradingExecutor,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
     ),
 ]
 
@@ -198,3 +258,10 @@ def get_reference_agent(agent_id: str) -> Optional[ReferenceAgent]:
         if agent.agent_id == agent_id:
             return agent
     return None
+
+
+# Module-level aliases for direct import in tests and plan references
+marketing_agent: ReferenceAgent = next(a for a in REFERENCE_AGENTS if a.agent_type == "marketing")
+tutor_agent: ReferenceAgent = next(a for a in REFERENCE_AGENTS if a.agent_type == "tutor")
+trading_agent: ReferenceAgent = next(a for a in REFERENCE_AGENTS if a.agent_type == "trading")
+

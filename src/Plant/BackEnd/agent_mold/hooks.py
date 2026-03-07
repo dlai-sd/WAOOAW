@@ -20,24 +20,36 @@ from typing import Any, Dict, List, Optional, Protocol
 
 
 class HookStage(str, Enum):
-    SESSION_START = "session_start"
-    PRE_SKILL = "pre_skill"
-    PRE_TOOL_USE = "pre_tool_use"
-    POST_TOOL_USE = "post_tool_use"
-    POST_SKILL = "post_skill"
-    SESSION_END = "session_end"
+    # --- existing stages (do not remove) ---
+    SESSION_START  = "session_start"
+    PRE_SKILL      = "pre_skill"
+    PRE_TOOL_USE   = "pre_tool_use"
+    POST_TOOL_USE  = "post_tool_use"
+    POST_SKILL     = "post_skill"
+    SESSION_END    = "session_end"
+    # --- new stages added by PLANT-MOULD-1 ---
+    PRE_PROCESSOR  = "pre_processor"
+    POST_PROCESSOR = "post_processor"
+    PRE_PUMP       = "pre_pump"
+    POST_PUMP      = "post_pump"
+    PRE_PUBLISH    = "pre_publish"
+    POST_PUBLISH   = "post_publish"
 
 
 @dataclass(frozen=True)
 class HookEvent:
     stage: HookStage
-    correlation_id: str
-    agent_id: str
+    # Legacy fields (keep for backward compatibility)
+    correlation_id: str = ""
+    agent_id: str = ""
     customer_id: Optional[str] = None
     purpose: Optional[str] = None
     action: Optional[str] = None
     payload: Dict[str, Any] = None  # type: ignore[assignment]
     created_at: datetime = None  # type: ignore[assignment]
+    # New fields added by PLANT-MOULD-1
+    hired_agent_id: Optional[str] = None
+    agent_type: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.payload is None:
@@ -48,10 +60,19 @@ class HookEvent:
 
 @dataclass(frozen=True)
 class HookDecision:
-    allowed: bool
     reason: str
+    allowed: Optional[bool] = None
     decision_id: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
+    # `proceed` mirrors `allowed` — new name used by PLANT-MOULD-1 stories.
+    proceed: Optional[bool] = None
+
+    def __post_init__(self) -> None:
+        # Sync allowed ↔ proceed so both names always work.
+        if self.allowed is None and self.proceed is not None:
+            object.__setattr__(self, "allowed", self.proceed)
+        elif self.proceed is None and self.allowed is not None:
+            object.__setattr__(self, "proceed", self.allowed)
 
 
 class Hook(Protocol):
@@ -73,7 +94,8 @@ class HookBus:
             decision = hook.handle(event)
             if decision is None:
                 continue
-            if not decision.allowed:
+            # allowed=False or proceed=False means deny (both are synced in __post_init__)
+            if decision.allowed is False:
                 if decision.decision_id:
                     return decision
                 return HookDecision(

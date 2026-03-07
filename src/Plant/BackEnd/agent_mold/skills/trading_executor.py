@@ -9,11 +9,15 @@ External side effects are expected to be approval-gated by hooks in later storie
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Protocol
+from typing import TYPE_CHECKING, Any, Dict, Optional, Protocol
 
 from pydantic import BaseModel, Field
 
+from agent_mold.processor import BaseProcessor, ProcessorInput, ProcessorOutput
 from agent_mold.skills.playbook import SkillPlaybook
+
+if TYPE_CHECKING:
+    from agent_mold.hooks import HookBus
 
 
 class TradingIntentAction(str):
@@ -129,3 +133,54 @@ def execute_trading_delta_futures_manual_v1(
         execution=execution,
         debug={"mode": "executed", "intent_action": ctx.intent_action},
     )
+
+
+class TradingExecutor(BaseProcessor):
+    """BaseProcessor implementation for trading agents.
+
+    Adapter shim: unpacks ProcessorInput.goal_config and delegates to
+    execute_trading_delta_futures_manual_v1 in draft-only mode (no approval_id
+    present means draft). Returns ProcessorOutput wrapping TradingExecutionResult.
+    """
+
+    async def process(self, input_data: ProcessorInput, hook_bus: "HookBus") -> ProcessorOutput:
+        """Execute trading logic from goal_config. Draft-only unless approval_id provided.
+
+        Adapter shim: unpacks ProcessorInput.goal_config to build a TradingExecutionContext.
+        Actual execution is delegated to execute_trading_delta_futures_manual_v1.
+        """
+        cfg = input_data.goal_config
+
+        ctx = TradingExecutionContext(
+            intent_action=cfg.get("intent_action"),
+            approval_id=cfg.get("approval_id"),
+        )
+
+        # Build a minimal duck-typed playbook container for the legacy function
+        playbook_id = cfg.get("playbook_id", "TRADING.DELTA.FUTURES.MANUAL.V1")
+
+        class _PlaybookRef:
+            class metadata:
+                pass
+        _PlaybookRef.metadata.playbook_id = playbook_id  # type: ignore[attr-defined]
+
+        result = execute_trading_delta_futures_manual_v1(
+            playbook=_PlaybookRef(),  # type: ignore[arg-type]
+            exchange_provider=cfg.get("exchange_provider", "delta_exchange_india"),
+            exchange_account_id=cfg.get("exchange_account_id", "default"),
+            coin=cfg.get("coin", "BTC"),
+            units=float(cfg.get("units", 1)),
+            side=cfg.get("side", "long"),
+            action=cfg.get("action", "enter"),
+            market=bool(cfg.get("market", True)),
+            limit_price=cfg.get("limit_price"),
+            ctx=ctx,
+            delta_client=cfg.get("delta_client"),
+        )
+
+        return ProcessorOutput(
+            result=result,
+            metadata={"processor_type": self.processor_type()},
+            correlation_id=input_data.correlation_id,
+        )
+

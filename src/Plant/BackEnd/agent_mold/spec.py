@@ -11,10 +11,57 @@ and compilation steps.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Mapping, Optional
 
 from pydantic import BaseModel, Field, root_validator
+
+
+class ApprovalMode(str, Enum):
+    MANUAL = "manual"     # Every deliverable waits for customer review
+    AUTO   = "auto"       # Deliver immediately when within ConstraintPolicy limits
+
+
+@dataclass
+class ConstructBindings:
+    """Declares which construct class to use for each pipeline stage.
+
+    All fields accept a class reference (not an instance). GoalSchedulerService
+    instantiates them fresh per goal run using these references.
+    scheduler_class and processor_class are mandatory.
+    pump_class defaults to GoalConfigPump; connector_class + publisher_class are optional.
+    """
+
+    processor_class: type          # must be subclass of BaseProcessor
+    scheduler_class: type          # must be subclass of BaseScheduler (existing)
+    pump_class: type               # must be subclass of BasePump; default GoalConfigPump
+    connector_class: Optional[type] = None   # None = no credential required
+    publisher_class: Optional[type] = None   # None = no publish step
+
+    def validate(self) -> None:
+        from agent_mold.processor import BaseProcessor
+        from agent_mold.pump import BasePump
+        if not issubclass(self.processor_class, BaseProcessor):
+            raise TypeError(f"{self.processor_class} must inherit BaseProcessor")
+        if not issubclass(self.pump_class, BasePump):
+            raise TypeError(f"{self.pump_class} must inherit BasePump")
+
+
+@dataclass
+class ConstraintPolicy:
+    """Mould-level guardrails. Applied before every execution cycle.
+
+    approval_mode: MANUAL → deliverable waits in pending_review; AUTO → publish immediately.
+    max_tasks_per_day: hard ceiling on Scheduler triggers. 0 = no limit.
+    max_position_size_inr: trading-only limit in INR. Ignored for non-trading agents.
+    trial_task_limit: tasks allowed during trial period (default 10).
+    """
+
+    approval_mode: ApprovalMode = ApprovalMode.MANUAL
+    max_tasks_per_day: int = 0
+    max_position_size_inr: float = 0.0
+    trial_task_limit: int = 10
 
 
 class DimensionName(str, Enum):
@@ -64,7 +111,18 @@ class AgentSpec(BaseModel):
         description="Attached dimensions (explicit present or null/void)",
     )
 
+    # Construct bindings (PLANT-MOULD-1): typed pipeline class references.
+    # Excluded from serialization — class references are not JSON-serialisable.
+    bindings: Optional[ConstructBindings] = Field(
+        default=None, exclude=True, description="Pipeline construct class bindings"
+    )
+    # Mould-level guardrails. Excluded from JSON serialisation (dataclass with Enum fields).
+    constraint_policy: ConstraintPolicy = Field(
+        default_factory=ConstraintPolicy, exclude=True, description="Mould-level guardrails"
+    )
+
     class Config:
+        arbitrary_types_allowed = True
         json_schema_extra = {
             "example": {
                 "agent_id": "AGT-MARKETING-001",
