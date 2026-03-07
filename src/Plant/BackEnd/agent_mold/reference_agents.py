@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Dict, List, Optional
 
+from agent_mold.contracts import TrialDimension, BudgetDimension, DimensionContract
 from agent_mold.pump import GoalConfigPump
 from agent_mold.skills.content_creator import ContentCreatorSkill
 from agent_mold.skills.trading_executor import TradingExecutor
@@ -36,6 +37,9 @@ class ReferenceAgent:
     # Construct bindings (PLANT-MOULD-1): pipeline stage class references.
     bindings: Optional[ConstructBindings] = None
     constraint_policy: ConstraintPolicy = dc_field(default_factory=ConstraintPolicy)
+    # Dimension contract instances for lifecycle/enforcement wiring (MOULD-GAP-1).
+    # Maps DimensionName → DimensionContract (e.g. TrialDimension, BudgetDimension).
+    dimensions: Dict[DimensionName, DimensionContract] = dc_field(default_factory=dict)
 
 
 def _marketing_spec(agent_id: str, *, industry: str, brand_name: str) -> AgentSpec:
@@ -162,6 +166,10 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             pump_class=GoalConfigPump,
         ),
         constraint_policy=ConstraintPolicy(),
+        dimensions={
+            DimensionName.TRIAL: TrialDimension(trial_task_limit=10),
+            DimensionName.BUDGET: BudgetDimension(max_tasks_per_day=3),
+        },
     ),
     ReferenceAgent(
         agent_id="AGT-MKT-CAKE-001",
@@ -184,6 +192,10 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             pump_class=GoalConfigPump,
         ),
         constraint_policy=ConstraintPolicy(),
+        dimensions={
+            DimensionName.TRIAL: TrialDimension(trial_task_limit=10),
+            DimensionName.BUDGET: BudgetDimension(max_tasks_per_day=3),
+        },
     ),
     ReferenceAgent(
         agent_id="AGT-MKT-HEALTH-001",
@@ -207,6 +219,10 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             pump_class=GoalConfigPump,
         ),
         constraint_policy=ConstraintPolicy(),
+        dimensions={
+            DimensionName.TRIAL: TrialDimension(trial_task_limit=10),
+            DimensionName.BUDGET: BudgetDimension(max_tasks_per_day=3),
+        },
     ),
     ReferenceAgent(
         agent_id="AGT-TUTOR-WB-001",
@@ -229,6 +245,10 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             pump_class=GoalConfigPump,
         ),
         constraint_policy=ConstraintPolicy(),
+        dimensions={
+            DimensionName.TRIAL: TrialDimension(trial_task_limit=10),
+            DimensionName.BUDGET: BudgetDimension(max_tasks_per_day=3),
+        },
     ),
     ReferenceAgent(
         agent_id="AGT-TRD-DELTA-001",
@@ -249,6 +269,10 @@ REFERENCE_AGENTS: List[ReferenceAgent] = [
             pump_class=GoalConfigPump,
         ),
         constraint_policy=ConstraintPolicy(),
+        dimensions={
+            DimensionName.TRIAL: TrialDimension(trial_task_limit=10),
+            DimensionName.BUDGET: BudgetDimension(max_tasks_per_day=3),
+        },
     ),
 ]
 
@@ -258,6 +282,11 @@ def get_reference_agent(agent_id: str) -> Optional[ReferenceAgent]:
         if agent.agent_id == agent_id:
             return agent
     return None
+
+
+def get_all_reference_agents() -> List[ReferenceAgent]:
+    """Return all reference agents. Used by integration tests and AgentSpecRegistry."""
+    return list(REFERENCE_AGENTS)
 
 
 # Module-level aliases for direct import in tests and plan references

@@ -148,3 +148,40 @@ skill_registry.register(SkillRegistryEntry(
     required_config_keys=[],
     optional_config_keys=["destination_type", "credential_ref"],
 ))
+
+
+# ── Agent Spec Registry ───────────────────────────────────────────────────────
+# Maps agent_type_id (e.g. "marketing", "trading") → AgentSpec.
+# Populated from REFERENCE_AGENTS on first access.
+
+class AgentSpecRegistry:
+    """Singleton registry mapping agent_type_id → AgentSpec.
+
+    Used by lifecycle hook wiring to resolve ConstructBindings at runtime.
+    Populated lazily from reference_agents.REFERENCE_AGENTS on first instance() call.
+    """
+
+    _instance: Optional["AgentSpecRegistry"] = None
+
+    def __init__(self) -> None:
+        self._specs: Dict[str, "AgentSpec"] = {}
+
+    @classmethod
+    def instance(cls) -> "AgentSpecRegistry":
+        if cls._instance is None:
+            cls._instance = cls._build_default()
+        return cls._instance
+
+    def register(self, agent_type_id: str, spec: "AgentSpec") -> None:
+        self._specs[agent_type_id] = spec
+
+    def get_spec(self, agent_type_id: str) -> Optional["AgentSpec"]:
+        return self._specs.get(agent_type_id)
+
+    @classmethod
+    def _build_default(cls) -> "AgentSpecRegistry":
+        from agent_mold.reference_agents import REFERENCE_AGENTS
+        reg = cls()
+        for ref_agent in REFERENCE_AGENTS:
+            reg.register(ref_agent.spec.agent_type, ref_agent.spec)
+        return reg
