@@ -1,9 +1,10 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.1  
-**Date**: 2026-03-06  
+**Version**: 2.2  
+**Date**: 2026-03-07  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
-**Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.
+**Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
+**Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
 
 ---
 
@@ -13,6 +14,7 @@
 2. [Solution Hypothesis](#2-solution-hypothesis)
 3. [Constitutional Design Pattern](#3-constitutional-design-pattern)
 4. [Four Major Components](#4-four-major-components)
+   - [4.6 Agent Construct Architecture](#46-agent-construct-architecture)
 5. [Architecture & Technical Stack](#5-architecture--technical-stack)
    - [5.6 Platform NFR Standards — Mandatory Patterns for Every New Route](#56-platform-nfr-standards--mandatory-patterns-for-every-new-route)
 6. [Service Communication & Data Flow](#6-service-communication--data-flow)
@@ -35,6 +37,7 @@
 23. [Mobile Application — CP Mobile](#23-mobile-application--cp-mobile)
 24. [Skills & Capabilities for World-Class Platform](#24-skills--capabilities-for-world-class-platform)
 25. [Session Commentary Protocol — Context Recovery](#25-session-commentary-protocol--context-recovery)
+26. [Agent Construct Design — Quick Reference](#26-agent-construct-design--quick-reference)
 
 ---
 
@@ -141,7 +144,7 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 | **ML** | `src/Plant/BackEnd/ml/` — inference_client.py, embedding_cache/quality |
 | **DB migrations** | `src/Plant/BackEnd/database/migrations/` (Alembic) |
 | **Seeds** | `src/Plant/BackEnd/database/seeds/` — agent_type_definitions_seed.py |
-| **Agent mold** | `src/Plant/BackEnd/agent_mold/` — playbooks for marketing/trading/content; skill registry + skills library |
+| **Agent mold** | `src/Plant/BackEnd/agent_mold/` — in-memory BlueprintRegistry for all agent types (`AgentSpec` + `ConstructBindings` + `ConstraintPolicy` + `LifecycleHooks`); Pump/Processor/Publisher ABCs; `DimensionContract` enforcement; `HookBus` at construct pipeline boundaries. Full design: `docs/PP/AGENT-CONSTRUCT-DESIGN.md` |
 
 ### 4.2 Plant Gateway
 
@@ -155,6 +158,118 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 | **OPA policies** | `src/Plant/Gateway/opa/` — 5 Rego policy files + unit tests; OPA called over HTTPS from `rbac.py`, `policy.py`, `budget.py` middleware |
 | **Infrastructure** | `src/Plant/Gateway/infrastructure/` — feature_flags/ |
 | **Pattern** | Receives requests from CP/PP → validates JWT → queries OPA for RBAC/policy/budget decisions → proxies to Plant Backend at port 8001 |
+
+### 4.6 Agent Construct Architecture
+
+> **Full spec**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) (v2, 2179 lines). This section is the quick-reference summary — read the full doc before editing any construct pipeline code.
+
+#### Platform Hierarchy
+
+```
+Customer
+  └── HiredAgent          (one hire of one agent type)
+        └── Skill          (capability declared on the agent type)
+              └── GoalRun  (one execution triggered by Scheduler)
+                    └── Deliverable  (the output — one per GoalRun)
+```
+
+**Constructs** are internal building blocks. Customers never interact with them — only with the Skill API surface (configure → run → approve → receive deliverable).
+
+**The mould is in-memory.** `AgentSpec` objects are created at process startup from `agent_mold/reference_agents.py` and held in `DimensionRegistry` + `SkillRegistry` in RAM. No DB persistence of the mould — only hired instances and runtime artefacts are persisted.
+
+#### Construct Hierarchy
+
+```
+AgentSpec (blueprint — in-memory)
+  ├── Dimensions          (Skill, Industry, Team, Integrations, Budget, Trial, UI, L10n)
+  ├── ConstructBindings   (which Pump / Processor / Publisher / Connector to use)
+  ├── ConstraintPolicy    (risk limits, rate limits, cost gates)
+  └── LifecycleHooks      (on_hire, on_trial_end, on_cancel … — all defined, agents override)
+        └── Skill
+              ├── CONSTRUCT: Scheduler  ← PLATFORM CORE — when to run
+              ├── CONSTRUCT: Pump       ← PLATFORM CORE — what data flows in
+              ├── CONSTRUCT: Processor  ← AGENT-SPECIFIC — the AI brain
+              ├── CONSTRUCT: Connector  ← PLATFORM CORE — credentials + protocol
+              └── CONSTRUCT: Publisher  ← PLATFORM CORE — where results go out
+```
+
+#### Platform Core vs Agent-Specific
+
+| Construct | Owner | Rationale |
+|---|---|---|
+| Scheduler | **Platform Core** | Cadence, retry, DLQ identical across all agents |
+| Pump | **Platform Core** | Data assembly from DB + config is identical; schema only differs |
+| Connector | **Platform Core** | Credential lifecycle, Secret Manager — never agent-specific |
+| Publisher | **Platform Core** | Destination adapter registry is common |
+| **Processor** | **Agent-Specific** | The AI reasoning, LLM calls, domain logic — only this varies |
+
+**Invariant:** Constructs are stateless. State lives in the database. A construct reads from DB on entry, writes on exit.
+
+#### Key Agent Mold Files
+
+| File | Purpose |
+|---|---|
+| `agent_mold/spec.py` | `AgentSpec`, `CompiledAgentSpec`, `ConstructBindings`, `ConstraintPolicy`, `DimensionSpec`, `DimensionName` |
+| `agent_mold/contracts.py` | `DimensionContract` ABC — `validate()` / `materialize()` / `register_hooks()` / `observe()` |
+| `agent_mold/hooks.py` | `AgentLifecycleHooks` ABC — all platform lifecycle events (on_hire, on_trial_start, on_deliverable_approved, on_cancel …) |
+| `agent_mold/enforcement.py` | `default_hook_bus()` singleton — builds the platform `HookBus` with platform-default hooks registered |
+| `agent_mold/registry.py` | `DimensionRegistry`, `SkillRegistry` — startup wiring; `register("content.creator.v1", …)` |
+| `agent_mold/reference_agents.py` | Marketing, tutor, trading reference `AgentSpec` definitions |
+| `agent_mold/skills/content_creator.py` | `ContentCreatorProcessor` — generates `DailyThemeList` + `ContentPost` objects |
+| `agent_mold/skills/trading_executor.py` | `TradingProcessor` — produces `TradingOrderIntent` in draft mode; never places real orders |
+| `agent_mold/skills/publisher_engine.py` | `DestinationAdapter` ABC + `DestinationRegistry` + `PublisherEngine` |
+| `agent_mold/skills/adapters_publish.py` | `SimulatedAdapter` (Phase 1 publisher) |
+| `integrations/delta_exchange/` | Delta Exchange client, order placement, risk engine |
+| `integrations/social/` | LinkedIn / social credential resolver |
+
+#### Construct Execution Flow (v2)
+
+```
+Scheduler → HookBus(PRE_PUMP) → Pump.pull() → HookBus(PRE_PROCESSOR)
+  → Processor.execute() → HookBus(PRE_PUBLISH) → [ApprovalGate]
+  → Connector.resolve() → Publisher.publish() → HookBus(POST_PUBLISH)
+  → Deliverable persisted → LifecycleHook: on_goal_run_complete
+```
+
+#### ConstraintPolicy — mould-level guardrails
+
+```python
+class ConstraintPolicy(BaseModel):
+    max_goal_runs_per_day:      Optional[int]   = None
+    max_cost_per_run_usd:       Optional[float] = None
+    max_position_size_usd:      Optional[float] = None   # trading
+    max_concurrent_positions:   Optional[int]   = None   # trading
+    allowed_exchanges:          List[str]       = []     # ["delta_exchange_india"]
+    max_posts_per_day:          Optional[int]   = None   # content
+    allowed_channels:           List[str]       = []     # ["linkedin", "instagram"]
+    approval_required_before_publish: bool      = True
+    max_cost_per_month_usd:     Optional[float] = None
+    budget_alert_threshold_pct: float           = 0.8
+```
+
+#### HookBus stages
+
+| Stage | Hook registered | Enforces |
+|---|---|---|
+| `PRE_PUMP` | `QuotaGateHook` | `quota_remaining > 0` |
+| `PRE_PUMP` | `SchedulerPauseHook` | `scheduler_state.is_paused = false` |
+| `PRE_PROCESSOR` | `ConstraintPolicyHook` | `max_goal_runs_per_day` not exceeded |
+| `PRE_TOOL_USE` | `ApprovalRequiredHook` | External actions need approval_id |
+| `PRE_PUBLISH` | `ApprovalGateHook` | `approval_mode != auto` requires approval |
+| `POST_PUBLISH` | `CostAuditHook` | Log cost to metering service |
+
+#### Agent profiles quick reference
+
+| | Share Trader (`AGT-TRADING-001`) | Content Creator (`AGT-MKT-*`) |
+|---|---|---|
+| `processor_class` | `TradingProcessor` | `ContentCreatorProcessor` |
+| `pump_class` | `TradingPump` (custom — live positions) | `GoalConfigPump` (platform default) |
+| `publisher_class` | `DestinationPublisher` (→ `DeltaTradeAdapter`) | `DestinationPublisher` (→ `LinkedInAdapter`) |
+| `max_goal_runs_per_day` | 10 | 3 |
+| `approval_required` | Yes | Yes |
+| Key hook override | `on_deliverable_approved` → place real order | `on_deliverable_approved` → trigger Publisher |
+
+---
 
 ### 4.5 Plant OPA (Policy Engine)
 
@@ -180,7 +295,8 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 | **Frontend** | React 18 + TypeScript + Vite on port 3002→8080; dark-themed marketplace UI |
 | **Key paths** | `src/CP/BackEnd/`, `src/CP/FrontEnd/` |
 | **BE entry** | `src/CP/BackEnd/main.py` (245 lines) — thin proxy to Plant Gateway |
-| **BE routes** | `src/CP/BackEnd/api/` — auth/, cp_registration.py, cp_otp.py, hire_wizard.py, payments_razorpay.py, trading.py, exchange_setup.py, subscriptions.py, invoices.py, receipts.py |
+| **BE routes** | `src/CP/BackEnd/api/` — auth/, cp_registration.py, cp_otp.py, hire_wizard.py, payments_razorpay.py, trading.py, exchange_setup.py, subscriptions.py, invoices.py, receipts.py, cp_scheduler.py |
+| **Construct-facing routes** | `GET /cp/hired-agents/{id}/scheduler-summary`, `GET /cp/hired-agents/{id}/trial-budget`, `GET /cp/hired-agents/{id}/approval-queue`, `GET /cp/hired-agents/{id}/notifications-config`, `POST /cp/hired-agents/{id}/pause` — proposed in AGENT-CONSTRUCT-DESIGN §13.4; partially implemented in MOULD-GAP-1 |
 | **BE services** | `src/CP/BackEnd/services/` — auth_service.py, cp_registrations.py, cp_2fa.py, cp_otp.py, plant_gateway_client.py, trading_strategy.py |
 | **FE pages** | `src/CP/FrontEnd/src/pages/` — LandingPage, AgentDiscovery, AgentDetail, SignIn, SignUp, HireSetupWizard, TrialDashboard, AuthenticatedPortal, HireReceipt |
 | **FE services** | `src/CP/FrontEnd/src/services/` — 23 service files (auth, agents, trading, payments, subscriptions, etc.) |
@@ -195,7 +311,9 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 | **Frontend** | React/Vite on port 3001→8080 |
 | **Key paths** | `src/PP/BackEnd/`, `src/PP/FrontEnd/` |
 | **BE entry** | `src/PP/BackEnd/main.py` → `main_proxy.py` |
-| **BE routes** | `src/PP/BackEnd/api/` — genesis.py, agents.py, agent_types.py, agent_setups.py, approvals.py, audit.py, auth.py, db_updates.py, exchange_credentials.py, metering_debug.py, security.py |
+| **BE routes** | `src/PP/BackEnd/api/` — genesis.py, agents.py, agent_types.py, agent_setups.py, approvals.py, audit.py, auth.py, db_updates.py, exchange_credentials.py, metering_debug.py, security.py, ops_hired_agents.py, ops_dlq.py |
+| **Diagnostic routes** | `GET /pp/ops/hired-agents/{id}/construct-health`, `GET /pp/ops/hired-agents/{id}/scheduler-diagnostics`, `GET /pp/ops/hired-agents/{id}/hook-trace`, `GET /pp/ops/dlq`, `POST /pp/ops/dlq/{id}/requeue`, `PATCH /pp/agent-setups/{id}/constraint-policy` — PP service-centre diagnostic toolkit (§14 of AGENT-CONSTRUCT-DESIGN.md) |
+| **RBAC** | 7-role hierarchy (`admin > customer_admin > developer > manager > analyst > support > viewer`) enforced via OPA. Diagnostic routes require `admin` or `developer`. DLQ requeue requires `admin`. |
 | **FE pages** | `src/PP/FrontEnd/src/pages/` — Dashboard, GovernorConsole, GenesisConsole, AgentManagement, CustomerManagement, ReviewQueue, AuditConsole, PolicyDenials, HiredAgentsOps, AgentSetup, ReferenceAgents, etc. |
 
 ---
@@ -411,6 +529,35 @@ User browser → CP Frontend (React)
       → Plant Backend (FastAPI :8001) [business logic, DB access]
         → PostgreSQL / Redis / External APIs
 ```
+
+### CP Gateway → Plant Route Architecture (Construct-facing)
+
+```
+Customer App (mobile)
+        │  JWT
+        ▼
+CP BackEnd ──── PlantGatewayClient ────► Plant Gateway
+                                                │
+                              ┌─────────────────┤
+                              │  OPA checks:    │
+                              │  trial_mode     │ → caps tasks_used ≤ 10
+                              │  governor_role  │ → 5 sensitive actions need approval token
+                              │  sandbox_routing│ → trial hires → Plant sandbox
+                              └─────────────────┤
+                                                │
+                                                ▼
+                                      Plant BackEnd
+```
+
+**Governor-gated CP routes** (require an approval token from `POST /pp/approvals`):
+
+| CP Route | Governor reason |
+|---|---|
+| `POST /cp/trading/approve-execute` | Financial action — irreversible |
+| `POST /cp/hired-agents/{id}/platform-connections` | OAuth credential storage |
+| `DELETE /cp/hired-agents/{id}/platform-connections/{conn_id}` | Credential removal |
+| `POST /cp/hire/wizard/finalize` | Subscription commitment |
+| `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` | Goal override in production |
 
 ### Key communication patterns
 
@@ -1152,7 +1299,15 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `main` (PLANT-CONTENT-1 content creator+publisher + MOBILE-FUNC-1 + MOBILE-NFR-1 merged 2026-03-06)
+### Current branch: `main` (PP-MOULD-1 construct diagnostic toolkit + MOULD-GAP-1 docs merged — 2026-03-07)
+
+### Recently merged — 2026-03-07
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#885** | `docs/mould-gap-1-plan` | **MOULD-GAP-1 iteration plan** — `docs/PP/iterations/MOULD-GAP-1-construct-hardening.md`; covers E1 (LifecycleHooks), E2 (ConstraintPolicy enforcement), E3 (HiredAgentsListScreen discriminator), E4 (mobile notifications per agent), E5 (DeltaTradeAdapter), E6 (PP HiredAgentsOps deep-links); skeleton + all 6 epics committed incrementally. | `docs/PP/iterations/MOULD-GAP-1-construct-hardening.md` |
+| **#884** | `copilot/execute-iteration-2-epics-e4-e5` | **PP-MOULD-1 Iteration 2: ConstructHealthPanel, SchedulerDiagnosticsPanel, HookTracePanel** — PP FrontEnd diagnostic trio: 6-card construct health drawer, scheduler detail tab (cron + lag + DLQ), hook trace table (last 50 events); PP Backend `ops_hired_agents.py` with `GET /pp/ops/hired-agents/{id}/construct-health`, `.../scheduler-diagnostics`, `.../hook-trace`; ConstraintPolicyLiveTuneDrawer + `PATCH .../constraint-policy`; React Query hooks for all 3 endpoints. | `src/PP/BackEnd/api/ops_hired_agents.py`, `src/PP/FrontEnd/src/components/ConstructHealthPanel.tsx`, `src/PP/FrontEnd/src/components/SchedulerDiagnosticsPanel.tsx`, `src/PP/FrontEnd/src/components/HookTracePanel.tsx`, `src/PP/FrontEnd/src/components/ConstraintPolicyLiveTuneDrawer.tsx` |
+| **#883** | `copilot/execute-iteration-1-epics-pp-mould` | **PP-MOULD-1 Iteration 1: DLQ console + RBAC** — `ops_dlq.py` routes (`GET /pp/ops/dlq`, `POST .../requeue`); `core/authorization.py` with 7-role hierarchy + `require_role(min_role)` FastAPI dependency. | `src/PP/BackEnd/api/ops_dlq.py`, `src/PP/BackEnd/core/authorization.py` |
 
 ### Recently merged — 2026-03-06
 
@@ -1423,14 +1578,26 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 |------|---------|
 | `feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — 404 if flag off |
 
+#### Agent Mold Core (`agent_mold/`)
+| File | Purpose |
+|------|---------|
+| `spec.py` | `AgentSpec`, `CompiledAgentSpec`, `ConstructBindings`, `ConstraintPolicy`, `DimensionSpec`, `DimensionName` — the full v2 mould blueprint |
+| `contracts.py` | `DimensionContract` ABC — `validate()` / `materialize()` / `register_hooks()` / `observe()`; `TrialDimension`, `BudgetDimension` (MOULD-GAP-1) |
+| `hooks.py` | `AgentLifecycleHooks` ABC — all lifecycle events: `on_hire`, `on_trial_start`, `on_trial_day_N`, `on_trial_end`, `on_cancel`, `on_deliverable_approved`, `on_quota_exhausted` etc. Default = no-op. (MOULD-GAP-1) |
+| `enforcement.py` | `default_hook_bus()` singleton — registers platform default hooks (`QuotaGateHook`, `SchedulerPauseHook`, `ConstraintPolicyHook`, `ApprovalGateHook`, `CostAuditHook`) |
+| `registry.py` | `DimensionRegistry`, `SkillRegistry` — startup wiring; `register("content.creator.v1", …)` |
+| `reference_agents.py` | Marketing, tutor, trading reference `AgentSpec` definitions with `ConstructBindings` + `ConstraintPolicy` |
+
 #### Agent Mold Skills (`agent_mold/skills/`)
 | File | Purpose |
 |------|---------|
 | `content_models.py` | All Pydantic models for the content pipeline: `Campaign`, `DailyThemeItem`, `ContentPost`, `CampaignBrief`, `CostEstimate`, `DestinationRef`, `ReviewStatus` enum, `CampaignStatus` enum, `PublishStatus` enum, `PublishInput`, `PublishReceipt`; also pure-function `estimate_cost(brief) → CostEstimate` (PLANT-CONTENT-1 It1 #869). |
-| `content_creator.py` | `ContentCreatorSkill` — reads `EXECUTOR_BACKEND` env var; if `"grok"` calls Grok API via `grok_client.py`; otherwise uses deterministic templates (zero-cost, zero-dependency fallback). Methods: `generate_theme_list(campaign_brief) → list[DailyThemeItem]`, `generate_posts_for_theme(PostGeneratorInput) → list[ContentPost]`. Registered as `content.creator.v1` in `registry.py` (PLANT-CONTENT-1 It1+It4 #869, #872). |
-| `grok_client.py` | Thin Grok API client — OpenAI-SDK-compatible interface; reads `XAI_API_KEY` from env; used by `ContentCreatorSkill` when `EXECUTOR_BACKEND=grok` (PLANT-CONTENT-1 It1 #869). |
-| `publisher_engine.py` | `DestinationAdapter` ABC (abstract `publish(post, campaign) → PublishReceipt`); `DestinationRegistry` plug-and-play dict; `PublisherEngine.publish(post, campaign, destination) → PublishReceipt`; `build_default_registry()` initialises registry with `SimulatedAdapter`. Registered as `content.publisher.v1` in `registry.py` (PLANT-CONTENT-1 It3+It4 #871, #872). |
-| `adapters_publish.py` | `SimulatedAdapter(DestinationAdapter)` — Phase 1 publisher that marks post `published` and returns a fake receipt. **Extension point**: add real adapters (e.g. `adapters_linkedin.py`, `adapters_twitter.py`) and register them in `publisher_engine.build_default_registry()` (PLANT-CONTENT-1 It3 #871). |
+| `content_creator.py` | `ContentCreatorProcessor` (was `ContentCreatorSkill`) — reads `EXECUTOR_BACKEND` env var; if `"grok"` calls Grok API via `grok_client.py`; otherwise uses deterministic templates. Implements `BaseProcessor.execute()`. Registered as `content.creator.v1`. (PLANT-CONTENT-1 #869, MOULD-GAP-1) |
+| `trading_executor.py` | `TradingProcessor` — given `TradingProcessorInput` (with live position state from `TradingPump`), produces `TradingProcessorOutput(draft_only=True)`. **Never places a real order** — that only happens in `on_deliverable_approved`. |
+| `grok_client.py` | Thin Grok API client — OpenAI-SDK-compatible interface; reads `XAI_API_KEY` from env; used by `ContentCreatorProcessor` when `EXECUTOR_BACKEND=grok` (PLANT-CONTENT-1 It1 #869). |
+| `publisher_engine.py` | `DestinationAdapter` ABC (abstract `publish(PublishInput) → PublishReceipt`); `DestinationRegistry` plug-and-play dict; `PublisherEngine`; `build_default_registry()` with `SimulatedAdapter`. Registered as `content.publisher.v1` (PLANT-CONTENT-1 It3+It4 #871, #872). |
+| `adapters_publish.py` | `SimulatedAdapter(DestinationAdapter)` — Phase 1 publisher. **Extension point**: add `DeltaTradeAdapter`, `LinkedInAdapter` etc. and register in `build_default_registry()` (PLANT-CONTENT-1 #871). |
+| `adapters.py` | Channel adapters for social posting: LinkedIn, Instagram, YouTube, Facebook, WhatsApp |
 
 #### Repositories (`repositories/`)
 | File | Purpose |
@@ -1593,7 +1760,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `BackEnd/api/genesis.py` | Genesis certification endpoints — audit wired |
 | `BackEnd/api/agents.py` | Agent management — audit wired |
 | `BackEnd/api/agent_types.py` | Agent type management endpoints |
-| `BackEnd/api/agent_setups.py` | Agent setup/configuration endpoints |
+| `BackEnd/api/agent_setups.py` | Agent setup/configuration endpoints — `PUT /pp/agent-setups` defines ConstructBindings + ConstraintPolicy defaults |
 | `BackEnd/api/approvals.py` | Approval workflows — audit wired |
 | `BackEnd/api/audit.py` | Audit log access |
 | `BackEnd/api/auth.py` | PP authentication |
@@ -1602,6 +1769,9 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `BackEnd/api/exchange_credentials.py` | Exchange credential management |
 | `BackEnd/api/metering_debug.py` | Metering debug/inspection endpoints |
 | `BackEnd/api/security.py` | Security audit and management endpoints |
+| `BackEnd/api/ops_hired_agents.py` | Construct health + scheduler diagnostics + hook trace per hired agent — `GET /pp/ops/hired-agents/{id}/construct-health`, `GET .../scheduler-diagnostics`, `GET .../hook-trace` (PP-MOULD-1 It2 #884) |
+| `BackEnd/api/ops_dlq.py` | DLQ console — `GET /pp/ops/dlq`, `POST /pp/ops/dlq/{id}/requeue` (PP-MOULD-1 It1 #883) |
+| `BackEnd/core/authorization.py` | RBAC enforcement — `require_role(min_role)` dependency; 7-role hierarchy (PP-MOULD-1 It1 #883) |
 | `BackEnd/clients/plant_client.py` | `PlantAPIClient` — httpx client to Plant Gateway with class-level `_PlantCircuitBreaker` (PP-N1) |
 | `BackEnd/core/routing.py` | `waooaw_router()` factory for PP — same pattern as CP/Plant |
 | `BackEnd/core/dependencies.py` | `require_correlation_id` |
@@ -1621,10 +1791,20 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `FrontEnd/src/pages/ReviewQueue.tsx` | Review/approval queue |
 | `FrontEnd/src/pages/AuditConsole.tsx` | Audit log viewer |
 | `FrontEnd/src/pages/PolicyDenials.tsx` | Policy denial viewer |
-| `FrontEnd/src/pages/HiredAgentsOps.tsx` | Hired agent operations view |
+| `FrontEnd/src/pages/HiredAgentsOps.tsx` | Hired agent operations view — includes agent-type-specific construct diagnostic panels (trader + content) (PP-MOULD-1 It2 MOULD-GAP-1 E6) |
 | `FrontEnd/src/pages/ReferenceAgents.tsx` | Reference agent catalog management |
 | `FrontEnd/src/pages/Billing.tsx` | Platform billing view |
 | `FrontEnd/src/pages/DbUpdates.tsx` | Database update management UI |
+| `FrontEnd/src/pages/AgentTypeSetupScreen.tsx` | Agent type setup form — ConstructBindings + ConstraintPolicy defaults + lifecycle hook checklist (PP-MOULD-1 It2 #884) |
+| `FrontEnd/src/pages/ApprovalsQueueScreen.tsx` | Approvals queue with type badge + expiry countdown (PP-MOULD-1 It2 #884) |
+| `FrontEnd/src/components/ConstructHealthPanel.tsx` | 6-card construct health drawer — Scheduler / Pump / Processor / Connector / Publisher / Policy; per-card inline actions (PP-MOULD-1 It2 #884) |
+| `FrontEnd/src/components/SchedulerDiagnosticsPanel.tsx` | Scheduler detail tab — cron, lag, DLQ inline table, pause/resume (PP-MOULD-1 It2 #884) |
+| `FrontEnd/src/components/HookTracePanel.tsx` | Hook trace log — last 50 events, stage + result + hook class (PP-MOULD-1 It2 #884) |
+| `FrontEnd/src/components/ConstraintPolicyLiveTuneDrawer.tsx` | Live-tune approval_mode + max_tasks_per_day with audit acknowledgement (PP-MOULD-1 It2 #884) |
+| `FrontEnd/src/services/useConstructHealth.ts` | React hook for `/pp/ops/hired-agents/{id}/construct-health` |
+| `FrontEnd/src/services/useSchedulerDiagnostics.ts` | React hook for scheduler diagnostics endpoint |
+| `FrontEnd/src/services/useHookTrace.ts` | React hook for hook trace endpoint |
+| `FrontEnd/src/services/useAgentTypeSetup.ts` | React hook for agent setup CRUD |
 
 ### .github/ — CI/CD & ALM
 
@@ -1704,7 +1884,11 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `GCP_PROJECT_ID` | Terraform, Plant, CP BackEnd | GCP project identifier — required when `SECRET_MANAGER_BACKEND=gcp` |
 | `SECRET_MANAGER_BACKEND` | CP BackEnd | `gcp` (demo/uat/prod via Terraform) or `local` (default for CI and local dev) — switches between `GcpSecretManagerAdapter` and `LocalSecretManagerAdapter` |
 | `XAI_API_KEY` | Plant BackEnd | Grok API key (from [console.x.ai](https://console.x.ai)) — enables live AI content generation in `ContentCreatorSkill` and `ContentPublisherSkill`; absent (or `EXECUTOR_BACKEND` not `"grok"`) means deterministic template mode (zero API cost, zero dependency) (PLANT-CONTENT-1 #869). |
-| `EXECUTOR_BACKEND` | Plant BackEnd | `"grok"` → use Grok API for content generation; any other value (or absent) → deterministic templates. Read by `ContentCreatorSkill` at call time (PLANT-CONTENT-1 #869). |
+| `EXECUTOR_BACKEND` | Plant BackEnd | `"grok"` → use Grok API for content generation; any other value (or absent) → deterministic templates. Per-agent default — can be overridden via `ConstructBindings.processor_config` in future phases. (PLANT-CONTENT-1 #869). |
+| `CAMPAIGN_PERSISTENCE_MODE` | Plant BackEnd | `"memory"` (default) → in-memory campaign dict; `"db"` → Processor writes to PostgreSQL. |
+| `SCHEDULER_ENABLED` | Plant BackEnd | `"true"` (default) → all Scheduler firing is active; `"false"` → disable firing (test only). |
+| `APPROVAL_GATE_ENABLED` | Plant BackEnd | `"true"` (default) → `ApprovalGateHook` active at `PRE_PUBLISH`; `"false"` → bypass gate in dev/demo. |
+| `CIRCUIT_BREAKER_ENABLED` | Plant BackEnd | `"true"` (default); set `"false"` in unit tests only to avoid CB interference. |
 
 ---
 
@@ -1794,7 +1978,13 @@ http://localhost:8020/docs   # CP Backend Swagger
 | pgvector | Database uses `pgvector/pgvector:pg15` image. Extensions auto-load on first connection. |
 | Scale to zero | Demo/UAT Cloud Run services scale to 0 instances. First request has cold start (~5s). |
 | Constitutional validators | Every entity MUST pass `validate_self()` before persistence. Violations raise `ConstitutionalAlignmentError`. |
-| Agent mold playbooks | Agent behavior templates in `src/Plant/BackEnd/agent_mold/playbooks/`. Currently: `marketing/multichannel_post_v1.md`, `trading/delta_futures_manual_v1.md`. Skills library: `agent_mold/skills/` — content_models, ContentCreatorSkill, grok_client, PublisherEngine, SimulatedAdapter; skill registry in `agent_mold/registry.py` registers `content.creator.v1` and `content.publisher.v1` (PLANT-CONTENT-1 #869–#872). |
+| Agent mold playbooks | Agent behavior templates in `src/Plant/BackEnd/agent_mold/playbooks/`. Currently: `marketing/multichannel_post_v1.md`, `trading/delta_futures_manual_v1.md`. Skills library: `agent_mold/skills/` — see §4.6 for full index. |
+| AgentSpec is in-memory only | `AgentSpec` / `ConstructBindings` / `ConstraintPolicy` / `LifecycleHooks` are created at startup from `reference_agents.py` and held in RAM. **There is no DB table for AgentSpec.** Only `agent_type_entity` (reference data) and `hired_agents` (customer instance) are persisted. |
+| Processor constitutional rule | `BaseProcessor.execute()` **must NOT** access the database, manage credentials, or call the Publisher. It is purely computational. This makes every Processor unit-testable without mocking external APIs. |
+| secret_ref is write-only | `platform_connections.secret_ref` is stored but **never returned in any GET response**. Only `CredentialResolver` can resolve it at runtime. Any GET of `/platform-connections` deliberately omits `secret_ref`. |
+| TradingProcessor is always draft-only | `TradingProcessorOutput(draft_only=True)` always. Real order placement only happens inside `on_deliverable_approved` hook → `DeltaTradeAdapter.publish()`. Never short-circuit this. |
+| ConstructBindings.processor_class is required | Every `AgentSpec` must declare its `processor_class`. An agent with no Processor cannot fire — Scheduler will raise `PermanentError` on the first attempt and DLQ it. |
+| DimensionContract.register_hooks() | Each dimension's `register_hooks()` is called at mould compilation. Currently `BasicDimension` is a no-op — `TrialDimension` and `BudgetDimension` are being wired in MOULD-GAP-1. Do not add quota / budget enforcement inside service code — it belongs in the mould. |
 | GitHub Actions concurrency | ALM workflow uses concurrency groups (vg-$issue, ba-sa-$issue, testing-$epic, deploy-$epic) to prevent duplicates. |
 | go-coding label | Governor must manually apply `go-coding` label to an epic before Code Agent can run — this is a deliberate human gate. |
 | Docker compose profiles | Use `docker-compose.local.yml` for full local dev. No separate test/prod compose currently. |
@@ -2660,7 +2850,7 @@ START: User reports an issue
 > **Full reference**: `docs/mobile/mobile_approach.md`  
 > **Current status**: Active — Android (Play Store internal testing) + iOS (EAS profile added, Apple Sign-In wired — MOBILE-NFR-1 #868).  
 > **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.  
-> **Last updated**: 2026-03-06
+> **Last updated**: 2026-03-07
 
 ---
 
@@ -3754,3 +3944,38 @@ PR #852 was all CI-green. User confirmed intent to merge.
 ---
 
 *End of Context & Indexing Document (updated)*
+
+---
+
+## 26. Agent Construct Design — Quick Reference
+
+> **Full document**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — v2, 2179 lines, 2026-03-07.
+
+This document is the **single source of truth** for all construct-pipeline design decisions. Read it in full before modifying `agent_mold/`, any Scheduler/Pump/Processor/Connector/Publisher code, or the HookBus.
+
+| § | Topic | Quick pointer |
+|---|---|---|
+| §1 | Platform hierarchy — Customer→HiredAgent→Skill→GoalRun→Deliverable | `src/Plant/BackEnd/models/` |
+| §2 | Construct hierarchy + ownership diagram | `agent_mold/spec.py` (ConstructBindings) |
+| §3 | Full mould interface: `AgentSpec`, `ConstructBindings`, `LifecycleHooks` ABC, `ConstraintPolicy` | `agent_mold/spec.py`, `agent_mold/hooks.py` |
+| §4 | Platform Core: Scheduler, Pump/GoalConfigPump/TradingPump, Connector, Publisher | `agent_mold/skills/`, Scheduler in `core/scheduler.py` |
+| §5 | Agent-Specific Processor: `BaseProcessor`, `ContentCreatorProcessor`, `TradingProcessor` | `agent_mold/skills/content_creator.py`, `trading_executor.py` |
+| §6 | HookBus stage wiring — PRE_PUMP through POST_PUBLISH | `agent_mold/enforcement.py` |
+| §7 | Agent profile validation (Share Trader + Content Creator sample `AgentSpec` definitions) | `agent_mold/reference_agents.py` |
+| §8 | End-to-end execution flow diagram | — |
+| §9 | NFR requirements per construct | See §17 (Gotchas) |
+| §10 | Environment flags: `CAMPAIGN_PERSISTENCE_MODE`, `CIRCUIT_BREAKER_ENABLED`, `SCHEDULER_ENABLED`, `APPROVAL_GATE_ENABLED` | See §14 |
+| §11 | Gap register (G1–G13) | `docs/PP/iterations/MOULD-GAP-1-construct-hardening.md` |
+| §13 | CP UX — construct surfaces in Customer Portal; 5 missing CP routes; screen-by-screen changes | See §4.3 |
+| §14 | PP Service-Centre vision; 7-role RBAC; 10 missing PP routes; 7 new PP screens | See §4.4 |
+| §15 | Key DB tables quick reference (12 tables) | See §10 |
+| §16 | Suggested improvements requiring user sign-off (WebSocket, swipe-to-approve, OAuth expiry UI) | — |
+
+**When to read this doc:**
+- Before implementing any new GoalRun, Deliverable, or approval flow
+- Before adding a new agent type to `reference_agents.py`
+- Before modifying `ConstraintPolicy` fields or `LifecycleHooks` signatures
+- Before adding PP diagnostic routes or PP FrontEnd construct-health screens
+- Before changing how TradingProcessor produces output (always `draft_only=True`)
+
+**Parent context in this file:** §4.6 (construct architecture quick-reference), §4.3 (CP), §4.4 (PP), §13 (code file index), §14 (env vars), §17 (gotchas).
