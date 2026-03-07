@@ -42,12 +42,11 @@ def test_processor_input_fields():
     assert inp.hired_agent_id == "ha-1"
 
 
-def test_goal_config_pump_returns_goal_config():
+@pytest.mark.asyncio
+async def test_goal_config_pump_returns_goal_config():
     pump = GoalConfigPump()
     cfg = {"x": 1}
-    result = asyncio.get_event_loop().run_until_complete(
-        pump.pull(goal_config=cfg, hired_agent_id="ha-1")
-    )
+    result = await pump.pull(goal_config=cfg, hired_agent_id="ha-1")
     assert result == cfg
 
 
