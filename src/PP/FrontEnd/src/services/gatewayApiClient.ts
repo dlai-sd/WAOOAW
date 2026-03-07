@@ -444,6 +444,24 @@ export const gatewayApiClient = {
       { method: 'POST' }
     ),
 
+  patchConstraintPolicy: (
+    agentSetupId: string,
+    patch: {
+      approval_mode?: string
+      max_tasks_per_day?: number
+      max_position_size_inr?: number
+      trial_task_limit?: number
+    }
+  ) =>
+    gatewayRequestJson<{ agent_setup_id: string; constraint_policy: Record<string, unknown> }>(
+      `/pp/agent-setups/${encodeURIComponent(agentSetupId)}/constraint-policy`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }
+    ),
+
   // Marketing draft review (Plant proxied via PP)
   listMarketingDraftBatches: (query?: { agent_id?: string; customer_id?: string; status?: string; limit?: number }) =>
     gatewayRequestJson<any[]>(withQuery('/v1/marketing/draft-batches', query)),
