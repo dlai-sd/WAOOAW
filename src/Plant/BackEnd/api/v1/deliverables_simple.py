@@ -513,6 +513,31 @@ async def review_deliverable(deliverable_id: str, body: ReviewDeliverableRequest
     instance_map[d.deliverable_id] = d
     _deliverables_by_id[d.deliverable_id] = d
 
+    # Fire on_deliverable_approved lifecycle hook (best-effort, non-blocking)
+    if decision == "approved":
+        import logging as _logging
+        from agent_mold.hooks import LifecycleContext, NullLifecycleHooks
+        from agent_mold.registry import AgentSpecRegistry
+        _dlhooks_logger = _logging.getLogger(__name__)
+        try:
+            spec = AgentSpecRegistry.instance().get_spec(record.agent_type_id or "")
+            bindings = spec.bindings if spec else None
+            hooks_cls = (bindings.lifecycle_hooks_class if bindings else None) or NullLifecycleHooks
+        except Exception:
+            hooks_cls = NullLifecycleHooks
+
+        hooks = hooks_cls()
+        ctx = LifecycleContext(
+            hired_instance_id=d.hired_instance_id,
+            agent_type_id=record.agent_type_id or "",
+            customer_id=record.customer_id or "",
+            deliverable_id=deliverable_id,
+        )
+        try:
+            await hooks.on_deliverable_approved(ctx)
+        except Exception as exc:  # noqa: BLE001
+            _dlhooks_logger.warning("on_deliverable_approved hook error: %s", exc)
+
     return ReviewDeliverableResponse(
         deliverable_id=d.deliverable_id,
         review_status=d.review_status,

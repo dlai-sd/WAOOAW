@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Type
 
 from pydantic import BaseModel, Field, PrivateAttr, root_validator
 
@@ -38,14 +38,21 @@ class ConstructBindings:
     pump_class: type               # must be subclass of BasePump; default GoalConfigPump
     connector_class: Optional[type] = None   # None = no credential required
     publisher_class: Optional[type] = None   # None = no publish step
+    lifecycle_hooks_class: Optional[Type] = None  # None → platform uses NullLifecycleHooks
 
     def validate(self) -> None:
         from agent_mold.processor import BaseProcessor
         from agent_mold.pump import BasePump
+        from agent_mold.hooks import AgentLifecycleHooks
         if not issubclass(self.processor_class, BaseProcessor):
             raise TypeError(f"{self.processor_class} must inherit BaseProcessor")
         if not issubclass(self.pump_class, BasePump):
             raise TypeError(f"{self.pump_class} must inherit BasePump")
+        if self.lifecycle_hooks_class is not None:
+            if not issubclass(self.lifecycle_hooks_class, AgentLifecycleHooks):
+                raise TypeError(
+                    f"{self.lifecycle_hooks_class} must inherit AgentLifecycleHooks"
+                )
 
 
 @dataclass
