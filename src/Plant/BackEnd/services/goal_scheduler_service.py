@@ -485,9 +485,34 @@ class GoalSchedulerService:
                 payload={"result": str(output.result)[:200]},
             ))
 
-            # Return correlation_id as deliverable_id placeholder until
-            # the persistence layer is wired (Iteration 2).
-            return output.correlation_id
+            # 6. Approval gate (PLANT-MOULD-1 E3-S1): skip for AUTO mode
+            from agent_mold.spec import ApprovalMode
+            deliverable_id = output.correlation_id
+            skip_approval = (
+                agent_spec.constraint_policy.approval_mode == ApprovalMode.AUTO
+            )
+            if not skip_approval:
+                # MANUAL mode: emit PRE_PUBLISH — a registered hook may halt delivery
+                decision = self.hook_bus.emit(HookEvent(
+                    stage=HookStage.PRE_PUBLISH,
+                    hired_agent_id=_hired_agent_id,
+                    agent_type=agent_spec.agent_type,
+                    payload={"deliverable_id": deliverable_id},
+                ))
+                if not decision.proceed:
+                    logger.info(
+                        "delivery_halted approval_required",
+                        extra={"hired_agent_id": _hired_agent_id},
+                    )
+                    return "pending_review"
+            # AUTO mode or approved: emit PRE_PUBLISH without blocking, proceed to publish
+            self.hook_bus.emit(HookEvent(
+                stage=HookStage.PRE_PUBLISH,
+                hired_agent_id=_hired_agent_id,
+                agent_type=agent_spec.agent_type,
+                payload={"deliverable_id": deliverable_id, "auto_mode": skip_approval},
+            ))
+            return deliverable_id
 
         # --- Legacy path: no bindings present ---
         # TODO: Implement actual goal execution logic
