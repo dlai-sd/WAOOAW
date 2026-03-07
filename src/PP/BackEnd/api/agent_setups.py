@@ -10,12 +10,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from services.agent_setups import AgentSetup, FileAgentSetupStore, get_agent_setup_store
 
 
+from core.authorization import require_role
 from core.routing import waooaw_router  # PP-N3b
 from services.audit_dependency import AuditLogger, get_audit_logger  # PP-N4
 
@@ -91,3 +92,69 @@ async def list_agent_setups(
 ) -> AgentSetupListResponse:
     setups = store.list(customer_id=customer_id, agent_id=agent_id, limit=limit)
     return AgentSetupListResponse(count=len(setups), setups=[_to_response(s).model_dump(mode="json") for s in setups])
+
+
+class ConstraintPolicyPatch(BaseModel):
+    """Partial update for ConstraintPolicy — all fields optional."""
+
+    approval_mode: Optional[str] = None
+    max_tasks_per_day: Optional[int] = None
+    max_position_size_inr: Optional[float] = None
+    trial_task_limit: Optional[int] = None
+
+
+@router.patch("/{agent_setup_id}/constraint-policy", response_model=dict)
+async def update_constraint_policy(
+    agent_setup_id: str,
+    patch: ConstraintPolicyPatch,
+    _auth=Depends(require_role("admin")),
+    audit: AuditLogger = Depends(get_audit_logger),
+    store: FileAgentSetupStore = Depends(get_agent_setup_store),
+) -> dict:
+    """Update ConstraintPolicy fields for an agent setup.
+
+    Uses partial update (PATCH semantics) — only provided fields are changed.
+    Writes mandatory audit record including agent_setup_id and changed fields.
+    Requires admin role.
+    """
+    patch_data = patch.model_dump(exclude_none=True)
+    if not patch_data:
+        raise HTTPException(status_code=422, detail="No fields provided to update")
+
+    updated = store.patch_constraint_policy(agent_setup_id, patch_data)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="AgentSetup not found")
+
+    await audit.log(
+        screen="agent_setups",
+        action="constraint_policy_patch",
+        outcome="success",
+        metadata={
+            "agent_setup_id": agent_setup_id,
+            "changed_fields": list(patch_data.keys()),
+        },
+    )
+    return {
+        "agent_setup_id": agent_setup_id,
+        "constraint_policy": updated.constraint_policy or {},
+    }
+
+
+@router.get("/{agent_setup_id}/constraint-policy", response_model=dict)
+async def get_constraint_policy(
+    agent_setup_id: str,
+    _auth=Depends(require_role("developer")),
+    store: FileAgentSetupStore = Depends(get_agent_setup_store),
+) -> dict:
+    """Returns current ConstraintPolicy for the given agent type setup.
+
+    developer+ can READ; admin required to PATCH.
+    agent_setup_id must be in '{customer_id}:{agent_id}' format.
+    """
+    setup = store.get_by_composite_id(agent_setup_id)
+    if setup is None:
+        raise HTTPException(status_code=404, detail="AgentSetup not found")
+    return {
+        "agent_setup_id": agent_setup_id,
+        "constraint_policy": setup.constraint_policy or {},
+    }
