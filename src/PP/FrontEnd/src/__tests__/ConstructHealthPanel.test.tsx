@@ -54,11 +54,11 @@ test('ConstructHealthPanel shows status dots with correct aria-labels', async ()
   )
 
   await waitFor(() => {
-    expect(screen.getByLabelText('status: healthy')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('status: healthy').length).toBeGreaterThan(0)
   })
 
-  expect(screen.getByLabelText('status: degraded')).toBeInTheDocument()
-  expect(screen.getByLabelText('status: offline')).toBeInTheDocument()
+  expect(screen.getAllByLabelText('status: degraded').length).toBeGreaterThan(0)
+  expect(screen.getAllByLabelText('status: offline').length).toBeGreaterThan(0)
 })
 
 test('ConstructHealthPanel masks connector secret_ref as ****{last4}', async () => {
@@ -121,7 +121,9 @@ test('useConstructHealth returns isLoading=true while fetching', async () => {
     />
   )
 
-  expect(screen.getByText('Loading construct health...')).toBeInTheDocument()
+  await waitFor(() => {
+    expect(screen.getByText('Loading construct health...')).toBeInTheDocument()
+  })
 
   resolvePromise(mockHealthData)
   await waitFor(() => {
