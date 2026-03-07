@@ -94,6 +94,7 @@ export type MyAgentsStackParamList = {
   TrialDashboard: { trialId: string };
   ActiveTrialsList: undefined;
   HiredAgentsList: undefined;
+  AgentOperations: { hiredAgentId: string; focusSection?: string };
 };
 
 export type MyAgentsStackScreenProps<T extends keyof MyAgentsStackParamList> =
@@ -207,6 +208,7 @@ export const linking: any = {
               TrialDashboard: 'my-agents/trial/:trialId',
               ActiveTrialsList: 'trials/active',
               HiredAgentsList: 'agents/hired',
+              AgentOperations: 'my-agents/operations/:hiredAgentId',
             },
           },
           ProfileTab: {

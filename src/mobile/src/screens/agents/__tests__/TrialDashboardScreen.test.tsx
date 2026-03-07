@@ -10,6 +10,15 @@ import type { HiredAgentInstance } from '@/types/hiredAgents.types';
 
 // Mock hooks
 jest.mock('@/hooks/useHiredAgents');
+jest.mock('@/hooks/useApprovalQueue', () => ({
+  useApprovalQueue: jest.fn(() => ({
+    deliverables: [],
+    isLoading: false,
+    error: null,
+    approve: jest.fn(),
+    reject: jest.fn(),
+  })),
+}));
 jest.mock('@/hooks/useTheme', () => ({
   useTheme: () => ({
     colors: {
