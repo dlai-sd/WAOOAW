@@ -10,6 +10,7 @@ Phase-1 scope: in-memory store intended to unblock CP review UX.
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +23,8 @@ from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
 from agent_mold.enforcement import default_hook_bus
-from agent_mold.hooks import HookEvent, HookStage
+from agent_mold.hooks import HookEvent, HookStage, LifecycleContext, NullLifecycleHooks
+from agent_mold.registry import AgentSpecRegistry
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import load_playbook
 from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
@@ -515,10 +517,7 @@ async def review_deliverable(deliverable_id: str, body: ReviewDeliverableRequest
 
     # Fire on_deliverable_approved lifecycle hook (best-effort, non-blocking)
     if decision == "approved":
-        import logging as _logging
-        from agent_mold.hooks import LifecycleContext, NullLifecycleHooks
-        from agent_mold.registry import AgentSpecRegistry
-        _dlhooks_logger = _logging.getLogger(__name__)
+        _dlhooks_logger = logging.getLogger(__name__)
         try:
             spec = AgentSpecRegistry.instance().get_spec(record.agent_type_id or "")
             bindings = spec.bindings if spec else None
