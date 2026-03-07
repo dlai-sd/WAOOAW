@@ -19,6 +19,11 @@ import type { Agent } from '../types/agent.types';
 
 interface AgentCardProps {
   agent: Agent;
+  healthStatus?: 'healthy' | 'degraded' | 'offline';
+  cadenceLabel?: string;
+  trialTasksUsed?: number;
+  trialTaskLimit?: number;
+  approvalQueueCount?: number;
 }
 
 /**
@@ -87,7 +92,14 @@ const RatingStars = ({ rating }: { rating?: number }) => {
 /**
  * Agent Card Component
  */
-export const AgentCard = React.memo(({ agent }: AgentCardProps) => {
+export const AgentCard = React.memo(({
+  agent,
+  healthStatus,
+  cadenceLabel,
+  trialTasksUsed,
+  trialTaskLimit,
+  approvalQueueCount,
+}: AgentCardProps) => {
   const navigation = useNavigation();
   const { colors, spacing, typography } = useTheme();
 
@@ -220,6 +232,49 @@ export const AgentCard = React.memo(({ agent }: AgentCardProps) => {
             >
               {agent.description}
             </Text>
+          )}
+
+          {/* Health dot row */}
+          {healthStatus && (
+            <View style={styles.healthRow}>
+              <View style={[
+                styles.healthDot,
+                healthStatus === 'healthy' ? styles.dotGreen
+                : healthStatus === 'degraded' ? styles.dotYellow
+                : styles.dotRed,
+              ]} />
+              <Text style={[styles.healthLabel, { color: colors.textSecondary }]}>
+                {healthStatus}
+              </Text>
+              {cadenceLabel && (
+                <Text style={[styles.cadenceLabel, { color: colors.textSecondary }]}>
+                  {cadenceLabel}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Trial gauge */}
+          {trialTaskLimit != null && trialTaskLimit > 0 && (
+            <View style={styles.trialGaugeRow}>
+              <View style={styles.trialGaugeBar}>
+                <View style={[styles.trialGaugeFill, {
+                  width: `${Math.min(100, ((trialTasksUsed ?? 0) / trialTaskLimit) * 100)}%` as any,
+                }]} />
+              </View>
+              <Text style={[styles.trialGaugeLabel, { color: colors.textSecondary }]}>
+                {trialTasksUsed ?? 0}/{trialTaskLimit} trial tasks used
+              </Text>
+            </View>
+          )}
+
+          {/* Approval badge */}
+          {(approvalQueueCount ?? 0) > 0 && (
+            <View style={styles.approvalBadge}>
+              <Text style={styles.approvalBadgeText}>
+                {approvalQueueCount} pending
+              </Text>
+            </View>
           )}
         </View>
       </View>
@@ -374,4 +429,24 @@ const styles = StyleSheet.create({
   trial: {},
   ctaButton: {},
   ctaText: {},
+  healthRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  healthDot: { width: 8, height: 8, borderRadius: 4 },
+  dotGreen: { backgroundColor: '#10b981' },
+  dotYellow: { backgroundColor: '#f59e0b' },
+  dotRed: { backgroundColor: '#ef4444' },
+  healthLabel: { fontSize: 12 },
+  cadenceLabel: { fontSize: 12, marginLeft: 4 },
+  trialGaugeRow: { marginTop: 6 },
+  trialGaugeBar: { height: 4, backgroundColor: '#27272a', borderRadius: 2 },
+  trialGaugeFill: { height: 4, backgroundColor: '#00f2fe', borderRadius: 2 },
+  trialGaugeLabel: { fontSize: 11, marginTop: 2 },
+  approvalBadge: {
+    backgroundColor: '#f59e0b22',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  approvalBadgeText: { color: '#f59e0b', fontSize: 12 },
 });

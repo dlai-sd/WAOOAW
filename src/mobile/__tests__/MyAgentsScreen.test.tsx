@@ -275,8 +275,8 @@ describe('MyAgentsScreen', () => {
       const hiredTab = getByText(/Hired \(\d+\)/);
       fireEvent.press(hiredTab);
 
-      expect(getByText('No Hired Agents Yet')).toBeTruthy();
-      expect(getByText('Hire agents after successful trials or direct from discovery')).toBeTruthy();
+      expect(getByText('No agents hired yet')).toBeTruthy();
+      expect(getByText('Your agents will appear here once you hire one. Try a 7-day free trial — keep everything they build.')).toBeTruthy();
     });
 
     it('navigates to Discover screen when CTA is pressed', async () => {

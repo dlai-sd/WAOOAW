@@ -29,10 +29,39 @@ import type { MyAgentsStackScreenProps } from '@/navigation/types';
 
 type Props = MyAgentsStackScreenProps<'MyAgents'>;
 
+// ─── Sort options for hired agents list ───────────────────────────────────────
+
+type SortOption = 'attention' | 'alphabetical' | 'recent';
+
+const SORT_OPTIONS: { key: SortOption; label: string }[] = [
+  { key: 'attention', label: 'Needs attention' },
+  { key: 'alphabetical', label: 'A–Z' },
+  { key: 'recent', label: 'Recently active' },
+];
+
+function sortAgents(agents: MyAgentInstanceSummary[], sort: SortOption): MyAgentInstanceSummary[] {
+  if (sort === 'attention') {
+    return [...agents].sort((a, b) => {
+      const aScore =
+        ((a as any).approvalQueueCount ?? 0) +
+        ((a as any).healthStatus === 'degraded' ? 10 : 0);
+      const bScore =
+        ((b as any).approvalQueueCount ?? 0) +
+        ((b as any).healthStatus === 'degraded' ? 10 : 0);
+      return bScore - aScore;
+    });
+  }
+  if (sort === 'alphabetical') {
+    return [...agents].sort((a, b) => a.agent_id.localeCompare(b.agent_id));
+  }
+  return agents; // 'recent' = existing order
+}
+
 export const MyAgentsScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
   const [activeTab, setActiveTab] = React.useState<'trials' | 'hired'>('trials');
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
+  const [sortOption, setSortOption] = React.useState<SortOption>('attention');
 
   // Performance monitoring
   usePerformanceMonitoring('MyAgents');
@@ -63,7 +92,9 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
     return allAgents.filter(agent => agent.trial_status !== 'active');
   }, [allAgents]);
 
-  const agents = activeTab === 'trials' ? (trialAgents || []) : hiredAgents;
+  const agents = activeTab === 'trials'
+    ? (trialAgents || [])
+    : sortAgents(hiredAgents, sortOption);
   const count = agents.length;
 
   // Pull-to-refresh handler
@@ -260,7 +291,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
             ]}
           >
             <Text style={{ fontSize: 64, marginBottom: spacing.md }}>
-              {activeTab === 'trials' ? '⏳' : '🤝'}
+              {activeTab === 'trials' ? '⏳' : '🤖'}
             </Text>
             <Text
               style={[
@@ -276,7 +307,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
             >
               {activeTab === 'trials'
                 ? 'No Active Trials'
-                : 'No Hired Agents Yet'}
+                : 'No agents hired yet'}
             </Text>
             <Text
               style={[
@@ -292,7 +323,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
             >
               {activeTab === 'trials'
                 ? 'Start a 7-day trial to see results before hiring'
-                : 'Hire agents after successful trials or direct from discovery'}
+                : 'Your agents will appear here once you hire one. Try a 7-day free trial — keep everything they build.'}
             </Text>
             <TouchableOpacity
               style={[
@@ -316,7 +347,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
                   },
                 ]}
               >
-                Discover Agents
+                {activeTab === 'trials' ? 'Discover Agents' : 'Browse agents'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -415,29 +446,83 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
           </View>
         </ScrollView>
       ) : (
-        <FlatList
-          data={agents}
-          keyExtractor={(item: MyAgentInstanceSummary) => item.subscription_id}
-          renderItem={({ item }: { item: MyAgentInstanceSummary }) => (
-            <HiredAgentCard
-              agent={item}
-              onPress={() => handleAgentPress(item)}
-            />
+        <>
+          {/* Sort chips — hired tab only */}
+          {activeTab === 'hired' && (
+            <View
+              style={[
+                styles.sortBar,
+                {
+                  paddingHorizontal: spacing.screenPadding.horizontal,
+                  paddingBottom: spacing.sm,
+                },
+              ]}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.key}
+                  testID={`sort-chip-${option.key}`}
+                  onPress={() => setSortOption(option.key)}
+                  style={[
+                    styles.sortChip,
+                    {
+                      backgroundColor:
+                        sortOption === option.key
+                          ? colors.neonCyan + '30'
+                          : colors.card,
+                      borderColor:
+                        sortOption === option.key
+                          ? colors.neonCyan
+                          : colors.textSecondary + '40',
+                      borderWidth: 1,
+                      borderRadius: spacing.md,
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.xs,
+                      marginRight: spacing.sm,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color:
+                        sortOption === option.key
+                          ? colors.neonCyan
+                          : colors.textSecondary,
+                      fontSize: 13,
+                      fontFamily: typography.fontFamily.body,
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           )}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.screenPadding.horizontal,
-            paddingTop: 0,
-            paddingBottom: spacing.xl,
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.neonCyan}
-              colors={[colors.neonCyan]}
-            />
-          }
-        />
+
+          <FlatList
+            data={agents}
+            keyExtractor={(item: MyAgentInstanceSummary) => item.subscription_id}
+            renderItem={({ item }: { item: MyAgentInstanceSummary }) => (
+              <HiredAgentCard
+                agent={item}
+                onPress={() => handleAgentPress(item)}
+              />
+            )}
+            contentContainerStyle={{
+              paddingHorizontal: spacing.screenPadding.horizontal,
+              paddingTop: 0,
+              paddingBottom: spacing.xl,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.neonCyan}
+                colors={[colors.neonCyan]}
+              />
+            }
+          />
+        </>
       )}
 
       {/* Voice Control */}
@@ -731,4 +816,6 @@ const styles = StyleSheet.create({
   infoLabel: {},
   infoValue: {},
   ctaHint: {},
+  sortBar: { flexDirection: 'row', flexWrap: 'wrap' },
+  sortChip: {},
 });

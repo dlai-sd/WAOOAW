@@ -1,10 +1,11 @@
 /**
  * Hire Wizard Screen - Multi-step agent hiring flow
- * 
+ *
  * Steps:
- * 1. Confirm Agent Selection
- * 2. Trial Details (start date, goals)
- * 3. Payment Details (Razorpay)
+ * 1. Choose Agent
+ * 2. Connect Platform
+ * 3. Set Goals
+ * 4. Start Trial
  */
 
 import React, { useState } from 'react';
@@ -24,6 +25,7 @@ import { useAgentDetail } from '@/hooks/useAgentDetail';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
 import { useRazorpay } from '@/hooks/useRazorpay';
+import { ConnectorSetupCard } from '@/components/ConnectorSetupCard';
 
 // Navigation types
 type HireWizardParams = {
@@ -31,8 +33,18 @@ type HireWizardParams = {
 };
 type HireWizardRouteProp = RouteProp<{ HireWizard: HireWizardParams }, 'HireWizard'>;
 
-// Step components
-const Step1ConfirmAgent = ({ agent, onNext, onCancel }: any) => {
+// ─── Step definitions ─────────────────────────────────────────────────────────
+
+const STEPS = [
+  { key: 'choose', label: 'Choose Agent', description: 'Pick the agent type' },
+  { key: 'connect', label: 'Connect Platform', description: 'Link your account' },
+  { key: 'goals', label: 'Set Goals', description: 'Configure what the agent does' },
+  { key: 'trial', label: 'Start Trial', description: 'Begin your 7-day free trial' },
+] as const;
+
+// ─── Step components ──────────────────────────────────────────────────────────
+
+const Step1ChooseAgent = ({ agent, onNext, onCancel }: any) => {
   const { colors, spacing } = useTheme();
 
   return (
@@ -119,7 +131,7 @@ const Step1ConfirmAgent = ({ agent, onNext, onCancel }: any) => {
           onPress={onNext}
         >
           <Text style={[styles.primaryButtonText, { color: colors.black }]}>
-            Continue to Trial Details
+            Continue to Connect Platform
           </Text>
         </TouchableOpacity>
 
@@ -136,7 +148,82 @@ const Step1ConfirmAgent = ({ agent, onNext, onCancel }: any) => {
   );
 };
 
-const Step2TrialDetails = ({ 
+// Step 2: Connect Platform
+const Step2ConnectPlatform = ({ agent, onNext, onBack }: any) => {
+  const { colors, spacing } = useTheme();
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Derive required credentials from agent industry
+  const getPlatformConfig = () => {
+    switch (agent?.industry) {
+      case 'marketing':
+        return {
+          platformName: 'Twitter / X',
+          requiredCredentials: ['API Key', 'API Secret', 'Access Token'],
+        };
+      case 'sales':
+        return {
+          platformName: 'LinkedIn',
+          requiredCredentials: ['Client ID', 'Client Secret'],
+        };
+      case 'education':
+        return {
+          platformName: 'Google Classroom',
+          requiredCredentials: ['OAuth Client ID', 'OAuth Client Secret'],
+        };
+      default:
+        return {
+          platformName: 'Platform',
+          requiredCredentials: ['API Key'],
+        };
+    }
+  };
+
+  const { platformName, requiredCredentials } = getPlatformConfig();
+
+  return (
+    <View style={{ padding: spacing.lg }}>
+      <Text style={[styles.stepTitle, { color: colors.textPrimary }]}>
+        Connect Platform
+      </Text>
+      <Text style={[styles.stepSubtitle, { color: colors.textSecondary, marginTop: spacing.sm }]}>
+        Link your account so the agent can get to work
+      </Text>
+
+      <View style={{ marginTop: spacing.lg }}>
+        <ConnectorSetupCard
+          platformName={platformName}
+          requiredCredentials={requiredCredentials}
+          isConnected={isConnected}
+          onConnect={() => setIsConnected(true)}
+          onDisconnect={() => setIsConnected(false)}
+        />
+      </View>
+
+      <View style={{ marginTop: spacing.xl }}>
+        <TouchableOpacity
+          style={[styles.primaryButton, { backgroundColor: colors.neonCyan }]}
+          onPress={onNext}
+        >
+          <Text style={[styles.primaryButtonText, { color: colors.black }]}>
+            Continue to Set Goals
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.secondaryButton, { marginTop: spacing.md }]}
+          onPress={onBack}
+        >
+          <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
+            Back
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+const Step3SetGoals = ({ 
   trialData, 
   onTrialDataChange, 
   onNext, 
@@ -309,7 +396,7 @@ const Step2TrialDetails = ({
           onPress={handleNext}
         >
           <Text style={[styles.primaryButtonText, { color: colors.black }]}>
-            Continue to Payment
+            Continue to Start Trial
           </Text>
         </TouchableOpacity>
 
@@ -326,7 +413,7 @@ const Step2TrialDetails = ({
   );
 };
 
-const Step3Payment = ({
+const Step4Trial = ({
   agent,
   paymentData,
   onPaymentDataChange,
@@ -384,7 +471,7 @@ const Step3Payment = ({
   return (
     <View style={{ padding: spacing.lg }}>
       <Text style={[styles.stepTitle, { color: colors.textPrimary }]}>
-        Payment Details
+        Start Trial
       </Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary, marginTop: spacing.sm }]}>
         Add a payment method (no charge during trial)
@@ -823,26 +910,37 @@ export const HireWizardScreen = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.black }]}>
-      {/* Progress Indicator */}
+      {/* Progress Indicator — 4 named steps */}
       <View style={[styles.progressContainer, { backgroundColor: colors.card }]}>
-        {[1, 2, 3].map((step) => (
-          <View key={step} style={styles.progressStep}>
+        {STEPS.map((step, idx) => (
+          <View key={step.key} style={styles.progressStep}>
             <View
               style={[
                 styles.progressDot,
                 {
                   backgroundColor:
-                    currentStep >= step ? colors.neonCyan : colors.textSecondary,
+                    currentStep > idx + 1
+                      ? colors.neonCyan
+                      : currentStep === idx + 1
+                      ? colors.neonCyan
+                      : colors.textSecondary,
                 },
               ]}
-            />
-            {step < 3 && (
+            >
+              <Text style={[
+                styles.stepDotText,
+                { color: currentStep >= idx + 1 ? colors.black : colors.textSecondary },
+              ]}>
+                {idx + 1}
+              </Text>
+            </View>
+            {idx < STEPS.length - 1 && (
               <View
                 style={[
                   styles.progressLine,
                   {
                     backgroundColor:
-                      currentStep > step ? colors.neonCyan : colors.textSecondary,
+                      currentStep > idx + 1 ? colors.neonCyan : colors.textSecondary,
                   },
                 ]}
               />
@@ -853,56 +951,50 @@ export const HireWizardScreen = () => {
 
       {/* Step Labels */}
       <View style={styles.stepLabelsContainer}>
-        <Text
-          style={[
-            styles.stepLabel,
-            { color: currentStep === 1 ? colors.neonCyan : colors.textSecondary },
-          ]}
-        >
-          Confirm
-        </Text>
-        <Text
-          style={[
-            styles.stepLabel,
-            { color: currentStep === 2 ? colors.neonCyan : colors.textSecondary },
-          ]}
-        >
-          Trial Details
-        </Text>
-        <Text
-          style={[
-            styles.stepLabel,
-            { color: currentStep === 3 ? colors.neonCyan : colors.textSecondary },
-          ]}
-        >
-          Payment
-        </Text>
+        {STEPS.map((step, idx) => (
+          <Text
+            key={step.key}
+            style={[
+              styles.stepLabel,
+              { color: currentStep === idx + 1 ? colors.neonCyan : colors.textSecondary },
+            ]}
+          >
+            {step.label}
+          </Text>
+        ))}
       </View>
 
       {/* Step Content */}
       <ScrollView style={styles.content}>
         {currentStep === 1 && (
-          <Step1ConfirmAgent
+          <Step1ChooseAgent
             agent={agent}
             onNext={() => setCurrentStep(2)}
             onCancel={handleCancel}
           />
         )}
         {currentStep === 2 && (
-          <Step2TrialDetails
-            trialData={trialData}
-            onTrialDataChange={handleTrialDataChange}
+          <Step2ConnectPlatform
+            agent={agent}
             onNext={() => setCurrentStep(3)}
             onBack={() => setCurrentStep(1)}
           />
         )}
         {currentStep === 3 && (
-          <Step3Payment
+          <Step3SetGoals
+            trialData={trialData}
+            onTrialDataChange={handleTrialDataChange}
+            onNext={() => setCurrentStep(4)}
+            onBack={() => setCurrentStep(2)}
+          />
+        )}
+        {currentStep === 4 && (
+          <Step4Trial
             agent={agent}
             paymentData={paymentData}
             onPaymentDataChange={handlePaymentDataChange}
             onComplete={handleComplete}
-            onBack={() => setCurrentStep(2)}
+            onBack={() => setCurrentStep(3)}
             isProcessingPayment={isProcessingPayment}
           />
         )}
@@ -927,12 +1019,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepDotText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   progressLine: {
-    width: 50,
+    width: 30,
     height: 2,
   },
   stepLabelsContainer: {
