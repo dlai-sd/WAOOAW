@@ -1570,6 +1570,124 @@ Data: GET /cp/hired-agents/{id}/deliverables → `deliverable.publish_receipt` J
 - Post preview must render exact character count + hashtags visible (not truncated)
 - Token expiry warning (≤ 7 days) shown inline on connection card, not buried in settings
 
+### 13.7 CP Mobile — Screen-by-Screen UI Changes
+
+> Each entry is: **Screen file → Current state → Required change → Construct driving it → Data source**.
+
+---
+
+#### AgentCard.tsx
+`src/mobile/src/components/AgentCard.tsx`
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | No health indicator | Add 8px dot (🟢 / 🟡 / 🔴) top-right corner. 🟡 = DLQ > 0 OR lag > 30s OR connector expiry ≤ 7d. 🔴 = DLQ > 5 OR connector expired. | Scheduler + Connector | `GET /cp/hired-agents/{id}/scheduler-summary` (proposed) |
+| 2 | Static "Active" label | Replace with live cadence label: "3×/day · Next 2:00 PM" (human-readable — never show cron) | Scheduler | `scheduler-summary.next_run_human` |
+| 3 | No trial gauge | Add horizontal progress bar under agent name: "Trial: 7 / 10 tasks" in amber when > 70% | ConstraintPolicy | `GET /cp/hired-agents/{id}/trial-budget` (proposed) |
+| 4 | No approval badge | Add orange badge count "3 pending" when `approval_queue_depth > 0` | LifecycleHook → `POST_PROCESSOR` | `approval_queue_depth` in `scheduler-summary` (proposed) |
+
+```
+BEFORE:
+┌──────────────────────────────────┐
+│  🤖  Share Trader   🟡 Working   │
+│  Algo trading · NSE/BSE          │
+└──────────────────────────────────┘
+
+AFTER:
+┌──────────────────────────────────┬──┐
+│  🤖  Share Trader   🟡 Working   │🟢│
+│  Market hours · Next: 9:00 AM    │  │
+│  ████████░░ Trial: 7/10 tasks    │  │
+│  ⚠️ 1 trade plan needs approval  │  │
+└──────────────────────────────────┴──┘
+```
+
+---
+
+#### MyAgentsScreen.tsx
+`src/mobile/src/screens/agents/MyAgentsScreen.tsx`
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | Two tabs: "Trials / Hired" | Keep tabs. Add empty-state copy per tab: "No active trials — [Browse agents]" | — | — |
+| 2 | `handleAgentPress` goes to TrialDashboard or AgentDetail | Add routing to new `AgentOperationsScreen` for hired (non-trial) agents | — | navigation |
+| 3 | No sort/filter | Add sort: "Needs attention first" — sorts by `health_dot = red → yellow → green` | Scheduler + Connector | `scheduler-summary` health field |
+| 4 | Pull-to-refresh only | Keep pull-to-refresh. Add WebSocket listener subscription per visible agent card (Phase 2 — see §16.1). | LifecycleHook | WS `DRAFT_READY` event |
+
+---
+
+#### HireWizardScreen.tsx
+`src/mobile/src/screens/hire/HireWizardScreen.tsx`
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | Unknown wizard steps (generic) | Structure into exactly 4 named steps with progress stepper: (1) Connect · (2) Risk profile · (3) Schedule · (4) Review & confirm | ConstructBindings | `GET /cp/hire/wizard/by-subscription/{id}` |
+| 2 | No agent-type-aware step rendering | Steps 1–3 must render different UI per `agent_type_code`: trading → Delta Exchange + risk params; content → OAuth + campaign brief | ConstructBindings | `binding.connector_type`, `binding.pump_config` |
+| 3 | No governor gate UX | Step 4 (finalize) must show: "This action requires a one-time approval code" → trigger `POST /pp/approvals` flow (OTP-style confirmation) visible to user before `POST /cp/hire/wizard/finalize` | Governor (OPA) | approval token |
+| 4 | Save-progress not visible | Show "Draft saved" toast after each step on `PUT /cp/hire/wizard/draft` | — | HTTP 200 response |
+| 5 | No connector status validation | After OAuth redirect, show inline ✅ / ❌ per platform — do not allow Step 4 until all required connectors are valid | Connector | `GET /cp/hired-agents/{id}/platform-connections` response `status` field |
+
+**New component required**: `ConnectorSetupCard` — renders platform logo, OAuth button, status badge (`VALID / PENDING / EXPIRED`), days-until-expiry countdown (amber ≤ 7d, red = expired).
+
+---
+
+#### TrialDashboardScreen.tsx
+`src/mobile/src/screens/agents/TrialDashboardScreen.tsx`
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | Unknown — likely generic | Add **Trial Budget gauge** at top: circular progress, `used / limit`, resets countdown | ConstraintPolicy | `GET /cp/hired-agents/{id}/trial-budget` |
+| 2 | Unknown | Add **Cadence block**: "Runs market hours · Next execution: Mon 9am" — humanised, no cron | Scheduler | `scheduler-summary` |
+| 3 | Unknown | Add **Approval Queue section** — scrollable list of pending items with type-aware card: `TRADE_PLAN` card vs `CONTENT_DRAFT` card (see below) | LifecycleHooks | `GET /cp/hired-agents/{id}/approval-queue` (proposed) |
+| 4 | Unknown | Trade approval card: instrument, qty, entry, SL, estimated risk in ₹ and %. Non-dismissable modal. [Reject] / [Approve & Execute] buttons. | TradingProcessor | `POST /cp/trading/draft-plan` response |
+| 5 | Unknown | Approval mode toggle (⚙️ gear): "Review each trade / Auto-execute within risk limits". Writes to `goal_config.approval_mode` via `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` | ConstraintPolicy | PATCH response |
+| 6 | Unknown | Add **Deliverables feed** below approval queue: last 5 outcomes with result (✅ executed / ✅ posted / ❌ failed) | Publisher | `GET /cp/hired-agents/{id}/deliverables?limit=5` |
+
+**New component required**: `TradePlanApprovalCard` — displays trade plan details + risk metrics. Swipe-right to approve after hold gesture (see §16.2 — needs sign-off before implementing gesture variant).
+
+**New component required**: `ContentDraftApprovalCard` — theme header + per-platform post preview tile grid. [Approve All] and [Reject Theme] CTAs at bottom.
+
+---
+
+#### NEW: AgentOperationsScreen (does not exist today)
+`src/mobile/src/screens/agents/AgentOperationsScreen.tsx` — **new file**
+
+This screen is for **hired (non-trial)** agents and replaces the current `AgentDetail` navigation destination. It is the day-to-day operations hub for a customer managing an active hired agent.
+
+**Sections:**
+
+| Section | Content | Data source |
+|---|---|---|
+| **Status bar** | Agent name, health dot, "Active · 3×/day · Next: 2pm" | `scheduler-summary` |
+| **Approval queue** | Pending items with count badge — same cards as TrialDashboardScreen | `approval-queue` |
+| **Deliverables feed** | Last 10 outcomes, filterable by result (all / success / failed) | `GET /cp/hired-agents/{id}/deliverables` |
+| **Connection health** | Per-platform tile: platform logo, status badge, expiry countdown | `GET /cp/hired-agents/{id}/platform-connections` |
+| **Campaign brief** (content only) | Current brief summary + [Edit] → `PATCH .../goal-config` | `GET /cp/hired-agents/{id}/skills` → `goal_config` |
+| **Risk profile** (trading only) | Max position, trades/day, approval mode toggle | `GET /cp/hired-agents/{id}/performance-stats` + `goal_config` |
+| **Performance** | Win rate, return, posts-published etc. — agent-type-specific | `GET /cp/hired-agents/{id}/performance-stats` |
+| **Pause / Resume** | Single button flips Scheduler state | `POST /cp/hired-agents/{id}/pause` (proposed) |
+
+---
+
+#### HiredAgentsListScreen.tsx
+`src/mobile/src/screens/agents/HiredAgentsListScreen.tsx`
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | Lists deliverables | Add `agent_type` discriminator on deliverable card: trading shows P&L chip; content shows platform + reach metrics | Publisher | `deliverable.publish_receipt.agent_type` |
+| 2 | No filtering | Add filter sheet: by result (all / success / failed), by agent, by date range | — | query params |
+| 3 | No P&L summary | Trading agents: add sticky header card "Total return: +₹8,400 · Win rate: 68%" | Publisher | `performance-stats` |
+
+---
+
+#### NotificationsScreen.tsx
+`src/mobile/src/screens/profile/NotificationsScreen.tsx`
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | Unknown — likely generic list | Add agent-aware notification types with deep-link navigation: `APPROVAL_REQUIRED` → AgentOperationsScreen; `CREDENTIAL_EXPIRING` → HireWizardScreen step 1; `DELIVERABLE_FAILED` → AgentOperationsScreen deliverables tab | LifecycleHooks | push payload `notification_type` |
+| 2 | No per-agent notification preference | Add toggle per hired agent: "Notify me when this agent needs attention" | — | `GET /cp/hired-agents/{id}/notifications-config` (proposed) |
+
 ---
 
 ## 14. PP — Partner Portal: Platform-IT Diagnostic Toolkit
@@ -1807,6 +1925,170 @@ HOOK TRACE (last 5 events)
 3. Action: notify customer to reconnect LinkedIn via `/cp/hired-agents/9034/platform-connections`
 4. After customer reconnects: `POST /pp/ops/dlq/{entry_id}/requeue` × 3 to replay missed posts
 5. Recommend: fast-track G11 — add `CredentialExpiringSoon` check in `PRE_PUMP` hook at T-7 days
+
+### 14.7 PP — Screen-by-Screen UI Changes and New Screens
+
+> PP is a web-based operator dashboard (not the mobile app). Screens are listed by their logical panel name. Where a screen does not exist today it is marked **NEW — build required**.
+
+---
+
+#### OpsHiredAgentsListScreen — Ops Fleet View
+`GET /pp/ops/hired-agents` (existing route)
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | Raw list of hired agents | Add **health column** per row: 🟢 / 🟡 / 🔴 computed from DLQ depth + connector status. Click → construct-health panel | Scheduler + Connector | `GET /pp/ops/hired-agents/{id}/construct-health` |
+| 2 | No filtering | Add filters: by agent type, by health status (show only ❌ issues), by customer | — | query params |
+| 3 | No construct summary | Add expandable row: shows 6 construct icons, each coloured by health. Hover = tooltip with one-liner status | All constructs | `construct-health` response |
+| 4 | No bulk action | Add "Pause all trials" button (admin only) and "Requeue all DLQ" button | Scheduler + DLQ | `POST /pp/ops/hired-agents/{id}/scheduler/pause` batch |
+
+---
+
+#### NEW: ConstructHealthPanel
+`/pp/ops/hired-agents/{id}/construct-health` — **new screen/drawer**
+
+Opens as a right-side drawer when ops user clicks a hired agent row. Renders the full diagnostic view described in §14.5 / §14.6 as a structured UI.
+
+**Layout (single page, 6 card columns):**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  HA-9034 · Content Creator · Customer: Rahul · 🔴 Action required       │
+├────────────┬────────────┬──────────┬──────────┬───────────┬─────────────┤
+│ SCHEDULER  │  PUMP      │PROCESSOR │CONNECTOR │ PUBLISHER │  POLICY     │
+│ 🟢 Running  │ 🟢 Healthy │🟢 Healthy │🔴 EXPIRED│ 🔴 50% ok │ 🟢 MANUAL   │
+│ 3×/day     │ 12ms fetch │gpt-4o-mini│LinkedIn  │ 3 failed  │ 5 tasks/day │
+│ lag: 0s    │ 1 record   │₹0.45/day │⚠️ Expired│ 50% rate  │ 4/5 used    │
+│ DLQ: 3 ⚠️  │ no errors  │0.0% err  │[Re-verify]│[Requeue 3]│[Toggle AUTO]│
+└────────────┴────────────┴──────────┴──────────┴───────────┴─────────────┘
+```
+
+**Per-card actions:**
+
+| Card | Inline action | Route called |
+|---|---|---|
+| Scheduler | [Pause] / [Resume] | `POST /pp/ops/hired-agents/{id}/scheduler/pause|resume` |
+| Scheduler | [View DLQ entries] | `GET /pp/ops/dlq?hired_agent_id={id}` |
+| Connector | [Trigger re-verify] | Plant re-checks credential validity |
+| Publisher | [Requeue N failed] | `POST /pp/ops/dlq/{entry_id}/requeue` (per entry) |
+| Policy | [Toggle approval_mode] | `PATCH /pp/agent-setups/{agent_type_id}/constraint-policy` |
+| Policy | [Edit max_tasks] | same PATCH route |
+
+---
+
+#### NEW: SchedulerDiagnosticsPanel
+`/pp/ops/hired-agents/{id}/scheduler-diagnostics` — **new screen/drawer tab**
+
+Second tab within the ConstructHealthPanel drawer (tab: "Scheduler Detail").
+
+**Fields rendered:**
+
+| Field | Display label | Format |
+|---|---|---|
+| `cron_expression` | Schedule pattern | Raw cron + human translation: `"0 9 * * Mon-Fri"` → "Weekdays 9am" |
+| `next_run_at` | Next execution | Absolute datetime + countdown: "in 4h 12m" |
+| `last_run_at` | Last execution | Absolute datetime + elapsed: "3h ago" |
+| `lag_seconds` | Execution lag | Green ≤ 10s / Amber 10–30s / Red > 30s |
+| `pause_state` | State | `RUNNING` (green badge) or `PAUSED` (amber badge) + reason if paused |
+| `dlq_depth` | Failed executions | Number badge; click → expand DLQ entries inline |
+| `tasks_used_today` | Today's usage | "2 / 5 tasks" progress bar |
+| `trial_task_limit` | Trial cap | Only shown if `trial_mode = true` |
+
+**DLQ inline table** (expands on `dlq_depth > 0` click):
+
+| Column | Content |
+|---|---|
+| Execution ID | UUID |
+| Failed at | Timestamp |
+| Stage failed | HookStage enum value (e.g. `PRE_PUBLISH`) |
+| Error message | First 120 chars of traceback |
+| Action | [Requeue] [Dismiss] |
+
+---
+
+#### NEW: HookTracePanel
+`/pp/ops/hired-agents/{id}/hook-trace` — **new screen/drawer tab**
+
+Third tab within the ConstructHealthPanel drawer (tab: "Hook Trace").
+
+**Renders**: ordered table of the last 50 hook events, newest first.
+
+| Column | Content | Notes |
+|---|---|---|
+| Timestamp | ISO datetime | Colour-code: red = FAILED / amber = HALTED / green = OK |
+| Stage | HookStage value | `PRE_PUMP`, `PRE_PROCESSOR`, `POST_PROCESSOR`, `PRE_PUBLISH`, `POST_PUBLISH` |
+| Hook class | Python class name | e.g. `ApprovalRequiredHook`, `AuditHook`, `ConstraintPolicyHook` |
+| Result | `OK` / `HALTED` / `FAILED` | |
+| Detail | Expandable row | Full hook context dict (masked PII) |
+
+**Filter bar**: by stage, by result (failed only), by date range.
+
+---
+
+#### NEW: AgentTypeSetupScreen
+`PUT /pp/agent-setups` (existing route) — needs dedicated UI form
+
+Currently route exists but there is no defined UI form for PP users to configure agent types. Required form fields:
+
+| Section | Fields | Maps to |
+|---|---|---|
+| Identity | `agent_type_code`, `display_name`, `industry`, `description` | `AgentSpec` fields |
+| Construct bindings | `scheduler_class`, `pump_class`, `processor_class`, `connector_type`, `publisher_class` | `ConstructBindings` |
+| ConstraintPolicy defaults | `approval_mode` (radio), `max_tasks_per_day` (number), `max_position_size_inr` (number, trading only), `trial_task_limit` (number) | `ConstraintPolicy` |
+| Lifecycle hooks | Checklist: which hook classes to register — `AuditHook` (always-on), `ApprovalRequiredHook` (toggle), `ConstraintPolicyHook` (toggle), `CredentialExpiryHook` (toggle) | `LifecycleHooks.registered_hooks` |
+| Status | `published` / `draft` — unpublished types do not appear in marketplace | `PUT /pp/agent-types/{id}` |
+
+**Validation rules on form submit:**
+- At least one Connector binding required
+- `max_tasks_per_day` ≥ 1
+- Trading agent type: `max_position_size_inr` is mandatory
+- `AuditHook` cannot be deregistered (greyed out, always checked)
+
+---
+
+#### NEW: ConstraintPolicyLiveTuneDrawer
+`PATCH /pp/agent-setups/{agent_type_id}/constraint-policy` — **new screen/drawer**
+
+Accessible from: ConstructHealthPanel Policy card → [Edit max_tasks] or [Toggle approval_mode].
+
+**Fields:**
+
+| Field | Control | Validation |
+|---|---|---|
+| `approval_mode` | Toggle: MANUAL ↔ AUTO | Changing to AUTO shows confirmation: "Posts will publish without customer review" |
+| `max_tasks_per_day` | Stepper (1–100) | Decrease ≤ current `tasks_used_today` shows warning: "Will pause today's remaining tasks" |
+| `max_position_size_inr` | Number input (trading only) | Must be ≤ account balance if known |
+
+**Audit requirement**: Every save must display: "This change will be logged with your admin ID and timestamp." Confirm button only active after user ticks acknowledgement checkbox.
+
+---
+
+#### ApprovalsQueueScreen
+`GET /pp/approvals` (existing route) — needs UI overhaul
+
+| # | Current state | Required change | Construct | Data |
+|---|---|---|---|---|
+| 1 | Unknown — likely raw list | Add approval type badge: `FINANCIAL_ACTION` (red) / `CREDENTIAL_CHANGE` (amber) / `SUBSCRIPTION_COMMIT` (blue) | Governor (OPA) | `approval.action_type` |
+| 2 | No context preview | Show approval context inline: for financial action → trade instrument + amount preview; for subscription → plan + price | Governor | `approval.context` JSONB |
+| 3 | No expiry indicator | Approval tokens expire — show "Expires in Xh" countdown; expired tokens greyed with [Re-mint] action | Governor | `approval.expires_at` |
+| 4 | No bulk mint | Add [Mint batch approvals] for ops scenarios (e.g. post-maintenance resume of 20 hires) | — | `POST /pp/approvals` ×N |
+
+---
+
+#### NEW: CostBreakdownScreen
+`GET /pp/ops/hired-agents/{id}/cost-breakdown` — **new screen/panel tab**
+
+Fourth tab in ConstructHealthPanel (tab: "Cost"). Only visible to `admin` and `manager` roles.
+
+| Column | Content |
+|---|---|
+| Date | ISO date |
+| Processor calls | LLM call count |
+| Cost (INR) | ₹ amount for that day's processor usage |
+| Tasks executed | Successful Scheduler triggers |
+| Avg cost/task | Cost ÷ tasks |
+
+**Footer row**: 30-day total. Alert bar if projected monthly cost > `cost_alert_threshold_inr` (configured per agent setup).
 
 ---
 
