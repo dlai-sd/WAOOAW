@@ -780,6 +780,8 @@ async def upsert_draft(
         _assert_refs_only_config(body.config)
         await _validate_agent_job_role_skill_chain(agent_id=body.agent_id, db=db)
 
+        _defn = get_agent_type_definition(canonical_agent_type_id)
+        _def_version = _defn.version if _defn else None
         configured = _compute_agent_configured(body.nickname, theme, agent_id=body.agent_id, config=(body.config or {}))
         persisted = await repo.draft_upsert(
             subscription_id=body.subscription_id,
@@ -790,6 +792,7 @@ async def upsert_draft(
             theme=theme,
             config=dict(body.config or {}),
             configured=configured,
+            definition_version_id=_def_version,
         )
         await db.commit()
         record = _db_model_to_record(persisted)
