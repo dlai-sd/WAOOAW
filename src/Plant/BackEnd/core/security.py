@@ -2,6 +2,7 @@
 Security utilities - JWT, password hashing, RBAC helpers
 """
 
+import functools
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 from uuid import uuid4
@@ -231,6 +232,31 @@ def decode_refresh_token_unverified(token: str) -> dict:
         return jwt.get_unverified_claims(token)
     except Exception:
         return {}
+
+
+# ── Circuit-breaker decorator (EXEC-ENGINE-001) ───────────────────────────────
+
+
+def circuit_breaker(service: str):
+    """Decorator that marks an async function as an external service call.
+
+    In this MVP implementation the decorator acts as a pass-through while
+    providing a consistent annotation point for every external HTTP call site.
+    A production-grade implementation would track failure rates per *service*
+    and open/half-open/close the circuit automatically.
+
+    Usage::
+
+        @circuit_breaker(service="delta_exchange_api")
+        async def _fetch_candles(self, instrument: str, api_key: str) -> list[dict]:
+            ...
+    """
+    def decorator(fn):
+        @functools.wraps(fn)
+        async def wrapper(*args, **kwargs):
+            return await fn(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # ── Access token revocation helpers (E2-S2) ───────────────────────────────────
