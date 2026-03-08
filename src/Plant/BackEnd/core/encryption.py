@@ -139,6 +139,45 @@ def email_search_hash(email: str) -> str:
 # SQLAlchemy TypeDecorator
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Field-level helpers for component/service code
+# ---------------------------------------------------------------------------
+
+def encrypt_field(plaintext: str) -> str:
+    """Encrypt *plaintext* using the AES-256-GCM key from ENCRYPTION_KEY env var.
+
+    Returns the ciphertext as a base64-encoded string.
+    When ENCRYPTION_KEY is not set (local dev / tests), returns the plaintext
+    unchanged so that test suites don't need to supply an encryption key.
+    """
+    key = _load_key()
+    if key is None:
+        return plaintext
+    return encrypt(plaintext, key)
+
+
+def decrypt_field(ciphertext: str) -> str:
+    """Decrypt a value previously encrypted with :func:`encrypt_field`.
+
+    When ENCRYPTION_KEY is not set (local dev / tests), returns *ciphertext*
+    unchanged (pass-through mode).
+
+    Args:
+        ciphertext: Base64-encoded AES-256-GCM ciphertext, or plain text in dev.
+
+    Returns:
+        Decrypted plaintext string.
+    """
+    key = _load_key()
+    if key is None:
+        return ciphertext
+    try:
+        return decrypt(ciphertext, key)
+    except Exception:
+        # Graceful degradation for un-migrated plain-text rows.
+        return ciphertext
+
+
 class EncryptedString(TypeDecorator):
     """SQLAlchemy column type that transparently encrypts on write and
     decrypts on read using AES-256-GCM.

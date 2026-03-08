@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 from components import ComponentInput, get_component
 from core.logging import PiiMaskingFilter, get_logger
 from models.component_run import ComponentRunModel
+from models.deliverable import DeliverableModel
 from models.flow_run import FlowRunModel
 
 logger = get_logger(__name__)
@@ -95,6 +96,26 @@ async def execute_sequential_flow(
     flow_run.completed_at = datetime.now(timezone.utc)
     flow_run.updated_at = datetime.now(timezone.utc)
     db.commit()
+    # E6-S2: write deliverable record on successful flow completion.
+    # Only created when goal_instance_id is present in run_context so FK is satisfied.
+    goal_instance_id = flow_run.run_context.get("goal_instance_id")
+    if goal_instance_id:
+        _deliverable = DeliverableModel(
+            deliverable_id=str(uuid.uuid4()),
+            hired_instance_id=flow_run.run_context.get(
+                "hired_instance_id", flow_run.hired_instance_id
+            ),
+            goal_instance_id=goal_instance_id,
+            goal_template_id=flow_run.run_context.get("deliverable_type", "trade_execution"),
+            title=f"Flow result: {flow_run.flow_name}",
+            payload=prev_output or {},
+            review_status="pending_review",
+            execution_status="not_executed",
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(_deliverable)
+        db.commit()
 
 
 async def execute_parallel_flow(

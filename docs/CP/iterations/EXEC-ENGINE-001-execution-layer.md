@@ -165,11 +165,11 @@ async def call_external(): ...
 | E3-S3 | 2 | E3: BaseComponent | Component registry | 🟢 Done | — |
 | E4-S1 | 2 | E4: FlowRun executor | FlowRun executor: sequential step runner | 🟢 Done | — |
 | E4-S2 | 2 | E4: FlowRun executor | FlowRun executor: fan-out (parallel) + PARTIAL_FAILURE | 🟢 Done | — |
-| E5-S1 | 3 | E5: Share Trader components | `DeltaExchangePump` component | 🔴 Not Started | — |
-| E5-S2 | 3 | E5: Share Trader components | `RSIProcessor` component | 🔴 Not Started | — |
-| E5-S3 | 3 | E5: Share Trader components | `DeltaPublisher` component | 🔴 Not Started | — |
-| E6-S1 | 3 | E6: Share Trader flow | Share Trader FlowDef + end-to-end run | 🔴 Not Started | — |
-| E6-S2 | 3 | E6: Share Trader flow | Deliverable written at FlowRun completion | 🔴 Not Started | — |
+| E5-S1 | 3 | E5: Share Trader components | `DeltaExchangePump` component | 🟢 Done | — |
+| E5-S2 | 3 | E5: Share Trader components | `RSIProcessor` component | 🟢 Done | — |
+| E5-S3 | 3 | E5: Share Trader components | `DeltaPublisher` component | 🟢 Done | — |
+| E6-S1 | 3 | E6: Share Trader flow | Share Trader FlowDef + end-to-end run | 🟢 Done | — |
+| E6-S2 | 3 | E6: Share Trader flow | Deliverable written at FlowRun completion | 🟢 Done | — |
 | E7-S1 | 4 | E7: Marketing components | `GoalConfigPump` component | 🔴 Not Started | — |
 | E7-S2 | 4 | E7: Marketing components | `ContentProcessor` component | 🔴 Not Started | — |
 | E7-S3 | 4 | E7: Marketing components | `LinkedInPublisher` + `YouTubePublisher` components | 🔴 Not Started | — |
