@@ -835,8 +835,9 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant  # direct
 psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembic_version;"
 ```
 
-> **Known issue**: `plant-sql-demo` is private-IP-only by default. If the proxy log shows
-> `instance does not have IP of type "PUBLIC"`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth` (SA has `cloudsql.admin`). Then restart the auth script.
+> **Public IP**: `plant-sql-demo` has public IP enabled (patched 8 Mar 2026 — SA has `cloudsql.admin`).
+> If the proxy log ever shows `instance does not have IP of type "PUBLIC"` (e.g. after a Terraform refresh),
+> re-run: `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth`, wait ~30s, then restart the auth script.
 
 ### Secrets in GitHub
 
@@ -883,7 +884,8 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembi
 
 ### How to connect to demo DB from Codespace
 
-Cloud SQL `plant-sql-demo` is **private-IP-only** (`10.19.0.3`) within GCP VPC. Access requires Cloud SQL Auth Proxy.
+Cloud SQL `plant-sql-demo` has **public IP enabled** (patched 8 Mar 2026). Access still goes through the
+Cloud SQL Auth Proxy for IAM-based authentication — do not connect directly on port 5432.
 
 | Property | Value |
 |----------|-------|
@@ -891,34 +893,50 @@ Cloud SQL `plant-sql-demo` is **private-IP-only** (`10.19.0.3`) within GCP VPC. 
 | DB name | `plant` |
 | DB user | `plant_app` |
 | Local port | `15432` (via proxy) |
-| Password | Stored in Secret Manager: `demo-plant-database-url` |
-| pgpass | `/root/.pgpass` (auto-written) |
+| Password | Stored in Secret Manager: `demo-plant-database-url` (special chars — handled by `gcp-auth.sh`) |
+| pgpass | `/root/.pgpass` (auto-written by `gcp-auth.sh`) |
+| env file | `/root/.env.db` — `source /root/.env.db && psql` is all you need |
+
+> **demo@waooaw.com test customer** (inserted 8 Mar 2026): `id = ce8cf044-b378-4d3d-b11d-4817074b08f6`.
+> Required for dev-token auth — Plant `/api/v1/auth/validate` looks up this email on every request.
 
 #### Precise steps (follow in order, every step matters)
 
+> **gcloud is pre-installed** in every Codespace via `setup-slim.sh` (added 8 Mar 2026).
+> Step 1 below is only needed if you rebuilt the container without running `postCreateCommand`.
+
 ```bash
-# 1. Install gcloud if missing — verify with: which gcloud
+# 1. Install gcloud if missing (verify first: which gcloud)
+#    Skip if 'gcloud version' already prints SDK 559+
 curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
 echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
 apt-get update -qq && apt-get install -y -qq google-cloud-cli
-gcloud version   # should print SDK 558+
+gcloud version   # should print SDK 559+
 
-# 2. Run auth script — activates SA, installs proxy binary, writes /root/.env.db
+# 2. Run auth script — activates SA, starts proxy, writes /root/.env.db + /root/.pgpass
 bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 # Expected last line: "✅ DB ready — connect: source /root/.env.db && psql"
 
-# 3. If proxy log says "instance does not have IP of type PUBLIC"
-cat /tmp/cloud-sql-proxy.log   # check the error
-yes | gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth || true
-# Wait ~30s for the patch to complete, then re-run step 2
-bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
-
-# 4. Connect and verify
+# 3. Connect and verify
 source /root/.env.db && psql -c "SELECT version_num FROM alembic_version;"
 
-# 5. Proxy diagnostics
+# 4. Check number of customers (quick sanity check)
+psql -c "SELECT COUNT(*) AS customers FROM customer_entity;"
+# Expected: 4 (yogeshkhandge@gmail.com, rupalikhandge@gmail.com, yogeshk7377@gmail.com, demo@waooaw.com)
+
+# --- Recovery steps (only needed if step 2 fails) ---
+
+# If proxy log says "instance does not have IP of type PUBLIC" (public IP was disabled)
+cat /tmp/cloud-sql-proxy.log   # check exact error
+gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth
+# Wait ~30s for the patch, then re-run step 2
+
+# If proxy died between sessions, restart it:
+kill $(pgrep cloud-sql-proxy) 2>/dev/null; bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
+
+# Proxy diagnostics
 cat /tmp/cloud-sql-proxy.log        # full proxy log
-pgrep -fa cloud-sql-proxy           # check PID — empty means proxy died
+pgrep -fa cloud-sql-proxy           # check PID — empty means proxy not running
 ```
 
 ### How to test database locally
@@ -2004,7 +2022,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **PII masking is automatic** | `PIIMaskingFilter` is wired at the root logger. Don't try to mask fields manually in route code. Debug by correlation ID or user_id — not by email (masked in logs). |
 | **C8 (PII DB encryption) is PARKED** | Decision: never implement application-layer field encryption for `email`/`phone`/`full_name`. CMEK + masking + email_hash + GDPR erasure cover the compliance requirement. See Section 5.6. |
 | **GCP auth is permanent in Codespace** | `waooaw-codespace-reader` SA activates automatically via `gcp-auth.sh` on every Codespace start. Run `gcloud auth list` to verify. Cloud SQL Proxy starts on port 15432 automatically. No user action needed. |
-| **Cloud SQL is private-IP-only** | `plant-sql-demo` has no public IP by default. Always connect via Cloud SQL Auth Proxy on `127.0.0.1:15432`. The proxy uses `--gcloud-auth` flag. If you get `dial tcp 10.19.0.3:3307: i/o timeout`, the proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. |
+| **Cloud SQL Auth Proxy required** | `plant-sql-demo` has public IP enabled (8 Mar 2026) but always connect via Cloud SQL Auth Proxy on `127.0.0.1:15432` for IAM auth. Never connect directly on port 5432. If you get `connection refused` on 15432, proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. gcloud is pre-installed via `setup-slim.sh`; `source /root/.env.db && psql` is all you need after the proxy starts. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config MUST come from env vars (non-sensitive) or GCP Secret Manager (sensitive) — injected by terraform at deploy time. See §8.1 for the full checklist and §19 for code examples. **Terraform template anti-pattern that is BANNED**: `SOME_VAR = var.x != "" ? var.x : (var.environment == "demo" ? "value_a" : "value_b")` — this bakes environment-conditional logic into the template. Defaults belong in `variables.tf default =`, not in `main.tf` ternaries. Violations are reverted on review. This was found and fixed in PR #851 for CP Backend `PAYMENTS_MODE` and `OTP_DELIVERY_MODE`. |
 | **`SecretManagerAdapter` — never call GCP SDK directly in routes** | CP BackEnd `services/secret_manager.py` provides the ABC. Routes call `get_secret_manager_adapter()` which reads `SECRET_MANAGER_BACKEND`. For `local`/CI: in-memory `LocalSecretManagerAdapter`. For `gcp`: `GcpSecretManagerAdapter` using Application Default Credentials on Cloud Run — no key file needed. Never instantiate `secretmanager.SecretManagerServiceClient` directly in a route or service other than `GcpSecretManagerAdapter`. |
