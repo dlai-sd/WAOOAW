@@ -1,10 +1,40 @@
 # EXEC-ENGINE-001 — Execution Layer: Flow, Component & Agent Runtime
 
-**Plan ID:** EXEC-ENGINE-001  
-**Service/Area:** Plant BackEnd (execution engine) + CP FrontEnd + PP FrontEnd  
+## Plan Metadata
+
+| Field | Value |
+|---|---|
+| Plan ID | `EXEC-ENGINE-001` |
+| Feature area | Plant BackEnd (execution engine) + CP FrontEnd + PP FrontEnd |
+| Created | 2026-03-08 |
+| Author | GitHub Copilot (PM mode) |
+| Parent vision doc | `docs/CONTEXT_AND_INDEX.md` §3, §5 |
+| Platform index | `docs/CONTEXT_AND_INDEX.md` (file map §13) |
+| Total iterations | 6 |
+| Total epics | 14 |
+| Total stories | 29 |
+
 **Branch:** `feat/execution-engine-v1`  
 **Status:** IN PROGRESS — skeleton committed, story cards being written per iteration  
-**Created:** 2026-03-08  
+
+---
+
+## Zero-Cost Agent Constraints (READ FIRST)
+
+This plan is designed for **autonomous zero-cost model agents** (Gemini Flash, GPT-4o-mini, etc.)
+with limited context windows. Every structural decision in this plan exists to preserve context.
+
+| Constraint | How this plan handles it |
+|---|---|
+| Context window 8K–32K tokens | Every story card is fully self-contained — no cross-references, no "see above" |
+| No working memory across files | NFR code patterns are embedded **inline** in each story — agent never opens NFRReusable.md |
+| No planning ability | Stories are atomic — one deliverable, one set of files, one test command |
+| Token cost per file read | Max 3 files to read per story — pre-identified by PM in the card |
+| Binary inference only | Acceptance criteria are pass/fail — no judgment calls required from the agent |
+
+> **Agent:** Execute exactly ONE story at a time. Read your assigned story card fully, then act.
+> Do NOT read other stories. Do NOT open NFRReusable.md. All patterns you need are in your card.
+> Do NOT read files not listed in your story card's "Files to read first" section.
 
 ---
 
@@ -108,31 +138,213 @@ async def call_external(): ...
 
 ## Iteration Summary
 
-| Iteration | Scope | ⏱ Est | P-gaps closed |
-|---|---|---|---|
-| 1 | DB foundation: `flow_run`, `component_run`, `skill_config` tables + migrations | 4h | P0 (DB base), P1 (component_run, skill_config), P2 (definition_version_id) |
-| 2 | `BaseComponent`, `ComponentInput/Output`, `RunContext` + Celery component queues | 4.5h | P0 (BaseComponent, Celery queues) |
-| 3 | Share Trader components + FlowRun executor (sequential) | 5h | P0 (execution engine for ST) |
-| 4 | Marketing Agent components + fan-out executor + PARTIAL_FAILURE | 5h | P2 (fan-out, PARTIAL_FAILURE) |
-| 5 | CP UI: hire wizard, goal setting, approval queue, deliverables view | 5h | CP features 1-8 |
-| 6 | PP UI: fleet dashboard, agent health drill-in, DLQ | 3.5h | PP features 1-4 |
+| Iteration | Scope | Epics | Stories | ⏱ Est | Come back |
+|---|---|---|---|---|---|
+| 1 | Lane B — DB foundation: `flow_run`, `component_run`, `skill_config` tables + migrations | E1, E2 | 5 | 4h | 2026-03-08 12:00 IST |
+| 2 | Lane B — `BaseComponent`, `ComponentInput/Output`, Celery component queues, FlowRun executor | E3, E4 | 5 | 4.5h | 2026-03-08 17:00 IST |
+| 3 | Lane B — Share Trader components + end-to-end sequential flow | E5, E6 | 5 | 5h | 2026-03-09 10:00 IST |
+| 4 | Lane B — Marketing Agent components + fan-out executor + PARTIAL_FAILURE + approvals | E7, E8 | 5 | 5h | 2026-03-09 16:00 IST |
+| 5 | Lane A — CP Portal UI: marketplace, hire wizard, my agents, approval queue | E9, E10, E11 | 5 | 5h | 2026-03-10 11:00 IST |
+| 6 | Lane A — PP Portal UI: fleet dashboard, health drill-in, DLQ + CP proxies | E12, E13, E14 | 4 | 3.5h | 2026-03-10 15:30 IST |
+
+**Estimate basis:** FE wiring = 30 min | New BE endpoint = 45 min | Full-stack = 90 min | Docker test = 15 min | PR = 10 min. Add 20% buffer for zero-cost model context loading.
 
 ---
 
-## Agent Execution Rules (every story must follow)
+## Tracking Table
 
-> **CHECKPOINT RULE**: After completing each epic (all tests passing), run:
-> ```bash
-> git add -A && git commit -m "feat(EXEC-ENGINE-001): [epic-id] — [epic title]" && git push
-> ```
-> Do this BEFORE starting the next epic. If interrupted, completed epics are already saved.
+| ID | Iteration | Epic | Story | Status | PR |
+|---|---|---|---|---|---|
+| E1-S1 | 1 | E1: flow_run table | Add `flow_run` table with status machine | 🔴 Not Started | — |
+| E1-S2 | 1 | E1: flow_run table | Add `component_run` table | 🔴 Not Started | — |
+| E1-S3 | 1 | E1: flow_run table | Add `skill_config` table | 🔴 Not Started | — |
+| E2-S1 | 1 | E2: hired_agents column | Add `definition_version_id` to `hired_agents` | 🔴 Not Started | — |
+| E2-S2 | 1 | E2: hired_agents column | Register models + smoke test | 🔴 Not Started | — |
+| E3-S1 | 2 | E3: BaseComponent | Define `BaseComponent`, `ComponentInput`, `ComponentOutput` | 🔴 Not Started | — |
+| E3-S2 | 2 | E3: BaseComponent | Celery component task routing + worker queue config | 🔴 Not Started | — |
+| E3-S3 | 2 | E3: BaseComponent | Component registry | 🔴 Not Started | — |
+| E4-S1 | 2 | E4: FlowRun executor | FlowRun executor: sequential step runner | 🔴 Not Started | — |
+| E4-S2 | 2 | E4: FlowRun executor | FlowRun executor: fan-out (parallel) + PARTIAL_FAILURE | 🔴 Not Started | — |
+| E5-S1 | 3 | E5: Share Trader components | `DeltaExchangePump` component | 🔴 Not Started | — |
+| E5-S2 | 3 | E5: Share Trader components | `RSIProcessor` component | 🔴 Not Started | — |
+| E5-S3 | 3 | E5: Share Trader components | `DeltaPublisher` component | 🔴 Not Started | — |
+| E6-S1 | 3 | E6: Share Trader flow | Share Trader FlowDef + end-to-end run | 🔴 Not Started | — |
+| E6-S2 | 3 | E6: Share Trader flow | Deliverable written at FlowRun completion | 🔴 Not Started | — |
+| E7-S1 | 4 | E7: Marketing components | `GoalConfigPump` component | 🔴 Not Started | — |
+| E7-S2 | 4 | E7: Marketing components | `ContentProcessor` component | 🔴 Not Started | — |
+| E7-S3 | 4 | E7: Marketing components | `LinkedInPublisher` + `YouTubePublisher` components | 🔴 Not Started | — |
+| E8-S1 | 4 | E8: Marketing flow | Marketing Agent FlowDef + fan-out end-to-end | 🔴 Not Started | — |
+| E8-S2 | 4 | E8: Marketing flow | `POST /v1/approvals/{flow_run_id}/approve` endpoint | 🔴 Not Started | — |
+| E9-S1 | 5 | E9: CP UI components | Reusable `AgentCard` + `StatusDot` | 🔴 Not Started | — |
+| E10-S1 | 5 | E10: CP marketplace | Marketplace screen with hire CTA | 🔴 Not Started | — |
+| E10-S2 | 5 | E10: CP marketplace | Hire wizard: skill config + goal setting | 🔴 Not Started | — |
+| E11-S1 | 5 | E11: CP my agents | My Agents + `FlowRunTimeline` + `DeliverableCard` | 🔴 Not Started | — |
+| E11-S2 | 5 | E11: CP my agents | Approval queue + `ApprovalQueueItem` | 🔴 Not Started | — |
+| E12-S1 | 6 | E12: PP fleet | PP Fleet dashboard with agent health map | 🔴 Not Started | — |
+| E13-S1 | 6 | E13: PP health | Per-agent health drill-in with `ComponentRunRow` | 🔴 Not Started | — |
+| E14-S1 | 6 | E14: PP DLQ + proxies | DLQ panel: view, requeue, skip | 🔴 Not Started | — |
+| E14-S2 | 6 | E14: PP DLQ + proxies | CP proxy routes for flow-runs + component-runs | 🔴 Not Started | — |
 
-- Never use bare `APIRouter` — always `waooaw_router()`
-- GET routes: `get_read_db_session` — never `get_db_session`
-- `PIIMaskingFilter` on every logger
-- `@circuit_breaker` on every external HTTP call (Delta API, LinkedIn API, YouTube API)
-- Postgres owns flow state; Redis only transports jobs
-- Stories are self-contained — no "see above" references
+**Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
+
+---
+
+## Agent Execution Rules
+
+> Agent: read this section once before executing any story. These rules override all instructions.
+
+### Rule -1 — Activate Expert Personas (first thing, before Rule 0)
+
+Read the `EXPERT PERSONAS:` field from the task you were given. Activate each persona now.
+For every epic you execute, open with one line:
+
+> *"Acting as a [persona], I will [what you're building] by [approach]."*
+
+| Technology area | Expert persona to activate |
+|---|---|
+| `src/Plant/BackEnd/` | Senior Python 3.11 / FastAPI / SQLAlchemy / Celery engineer |
+| `src/CP/BackEnd/` | Senior Python 3.11 / FastAPI thin-proxy engineer |
+| `frontend/` `src/CP/FrontEnd/` | Senior HTML5 / CSS3 / vanilla JS or React engineer |
+| `src/PP/BackEnd/` | Senior Python 3.11 / FastAPI engineer |
+| `infrastructure/` | Senior Terraform / GCP Cloud Run engineer |
+
+### Rule 0 — Open tracking draft PR first (before writing any code)
+
+```bash
+# 1. Create the epic branch from main
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-itN-eN   # replace N with iteration and epic numbers
+
+# 2. Push an empty init commit
+git commit --allow-empty -m "chore(EXEC-ENGINE-001): start iteration N epic N"
+git push origin feat/EXEC-ENGINE-001-itN-eN
+
+# 3. Open draft PR — progress tracker
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-itN-eN \
+  --draft \
+  --title "tracking: EXEC-ENGINE-001 Iteration N — in progress" \
+  --body "## tracking: EXEC-ENGINE-001 Iteration N
+Subscribe to this PR to receive one notification per story completion.
+### Stories
+- [ ] [paste story IDs from Tracking Table for this iteration]
+_Live updates posted as comments below ↓_"
+```
+
+### Rule 1 — Branch discipline
+One epic = one branch: `feat/EXEC-ENGINE-001-itN-eN`.
+All stories in one epic commit to the same branch sequentially.
+Never push to `main` directly.
+
+### Rule 2 — Scope lock
+Implement exactly the acceptance criteria in the story card.
+Do not fix unrelated code. Do not refactor. Do not gold-plate.
+**File scope**: Only create or modify files listed in your story card's "Files to create / modify" table.
+
+**Missing iteration HALT rule**: Before writing any code:
+```bash
+grep -n "## Iteration N" docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+# Zero results → HALT. Post: "Iteration N not found in plan file. Cannot proceed."
+```
+
+### Rule 3 — Tests before the next story
+Write every test listed in the story's "Tests to write" table before advancing to the next story.
+Run the exact test command in the story card.
+
+### Rule 4 — Commit + push + notify after every story
+```bash
+git add -A
+git commit -m "feat(EXEC-ENGINE-001): [story title]"
+git push origin feat/EXEC-ENGINE-001-itN-eN
+
+# Update Tracking Table in this plan file: change story status to 🟢 Done
+git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+git commit -m "docs(EXEC-ENGINE-001): mark [story-id] done"
+git push origin feat/EXEC-ENGINE-001-itN-eN
+
+# Post progress comment to tracking draft PR
+gh pr comment \
+  $(gh pr list --head feat/EXEC-ENGINE-001-itN-eN --json number -q '.[0].number') \
+  --body "✅ **[story-id] done** — $(git rev-parse --short HEAD)
+Files changed: [list]
+Tests: [T1 ✅ T2 ✅ ...]
+Next: [next-story-id]"
+```
+
+### Rule 5 — Docker integration test after every epic
+```bash
+docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+exit_code=$?; docker compose -f docker-compose.test.yml down; exit $exit_code
+```
+Exit 0 → add `**Epic complete ✅**` under the epic heading, commit, push.
+Non-zero → fix on same branch, retry. Max 3 attempts. Then: **STUCK PROTOCOL** (Rule 6).
+
+### Rule 6 — STUCK PROTOCOL (3 failures = stop immediately)
+```bash
+git add -A && git commit -m "WIP: [story-id] blocked — [exact error]"
+git push origin feat/EXEC-ENGINE-001-itN-eN
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-itN-eN \
+  --title "WIP: [story-id] — blocked" \
+  --draft \
+  --body "Blocked on: [test name]
+Error: [exact error message — paste in full]
+Attempted fixes:
+1. [what I tried]
+2. [what I tried]"
+```
+Post the draft PR URL. **HALT. Do not start the next story.**
+
+### Rule 7 — Iteration PR (after ALL epics complete)
+```bash
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-itN
+git merge --no-ff feat/EXEC-ENGINE-001-itN-e1 feat/EXEC-ENGINE-001-itN-e2
+git push origin feat/EXEC-ENGINE-001-itN
+
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-itN \
+  --title "feat(EXEC-ENGINE-001): iteration N — [one-line summary]" \
+  --body "## EXEC-ENGINE-001 Iteration N
+
+### Stories completed
+[paste Tracking Table rows for this iteration]
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() — no bare APIRouter
+- [ ] GET routes use get_read_db_session()
+- [ ] PIIMaskingFilter on all new loggers
+- [ ] @circuit_breaker on all external HTTP calls
+- [ ] No env-specific values in Dockerfile or code
+- [ ] Tests >= 80% coverage on new BE code
+- [ ] Postgres owns flow state; Redis only transports jobs"
+```
+Post the PR URL in chat. **HALT — do not start the next iteration.**
+
+---
+
+## NFR Quick Reference (PM review only — agents do not read this)
+
+| # | Rule | Consequence of violation |
+|---|---|---|
+| 1 | `waooaw_router()` factory — never bare `APIRouter` | CI ruff ban — PR blocked |
+| 2 | `get_read_db_session()` on all GET routes | Primary DB overloaded |
+| 3 | `PIIMaskingFilter()` on every logger | PII incident |
+| 4 | `@circuit_breaker(service=...)` on every external HTTP call | Cascading failure |
+| 5 | `dependencies=[Depends(get_correlation_id), Depends(get_audit_log)]` on FastAPI() | Audit trail missing |
+| 6 | `X-Correlation-ID` header on every outgoing HTTP request | Trace broken |
+| 7 | Tests >= 80% coverage on all new BE code | PR blocked by CI |
+| 8 | Never embed env-specific values in Dockerfile or code | Image cannot be promoted |
+| 9 | PR always `--base main` — never target an intermediate branch | Work never ships |
+| 10 | CP BackEnd is a thin proxy only — no business logic | Architecture violation |
+| 11 | Pattern B: missing `/cp/*` route → new `api/cp_<resource>.py` with `waooaw_router` | Architecture violation |
+| 12 | Postgres owns workflow state; Redis/Celery owns job transport only | State loss on Redis restart |
 
 ---
 
@@ -157,58 +369,280 @@ async def call_external(): ...
 
 > **One iteration = one feature branch + one PR to `main`.** Never start iteration N+1 until the iteration N PR is merged and the user confirms.
 
-### Step 1 — Create a feature branch (once per iteration)
-```bash
-git checkout main && git pull origin main
-git checkout -b feat/exec-engine-iter-N   # replace N with iteration number
-```
-
-### Step 2 — Launch in Copilot Agent Mode
+### Steps to launch any iteration
 1. Open VS Code → Copilot Chat (`Ctrl+Alt+I` / `Cmd+Alt+I`)
 2. Click model dropdown → **Agent mode**
 3. Click `+` → type `@` → select **platform-engineer**
-4. Paste the exact task from the table below
+4. Copy the iteration's agent task block below and paste it verbatim → press **Enter**
 
-### Step 3 — Copy-Paste Agent Tasks (one per iteration)
+---
 
-| Iter | Paste this exactly into the agent |
-|------|-----------------------------------|
-| **1** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I1-S1 through I1-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I1-SX — [title]" && git push`, then rename the story heading in the plan file from `### I1-SX —` to `### ✅ I1-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 1 Completion Checkpoint** section in the plan. |
-| **2** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I2-S1 through I2-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I2-SX — [title]" && git push`, then rename the story heading in the plan file from `### I2-SX —` to `### ✅ I2-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 2 Completion Checkpoint** section in the plan. |
-| **3** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I3-S1 through I3-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I3-SX — [title]" && git push`, then rename the story heading in the plan file from `### I3-SX —` to `### ✅ I3-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 3 Completion Checkpoint** section in the plan. |
-| **4** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I4-S1 through I4-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I4-SX — [title]" && git push`, then rename the story heading in the plan file from `### I4-SX —` to `### ✅ I4-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 4 Completion Checkpoint** section in the plan. |
-| **5** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I5-S1 through I5-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I5-SX — [title]" && git push`, then rename the story heading in the plan file from `### I5-SX —` to `### ✅ I5-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 5 Completion Checkpoint** section in the plan. |
-| **6** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I6-S1 through I6-S4** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I6-SX — [title]" && git push`, then rename the story heading in the plan file from `### I6-SX —` to `### ✅ I6-SX —` and commit that change. After all 4 stories pass, follow the **Iteration 6 Completion Checkpoint** section in the plan. |
+### Iteration 1 agent task (paste verbatim)
 
-### Step 4 — Wait for PR merge before next iteration
+**Pre-flight check (run in terminal before launching):**
+```bash
+git status && git log --oneline -3
+# Must show: clean tree on main. If not, resolve before launching.
+```
 
-The agent will open a PR and report "Iteration N complete." Review the PR, merge to `main`, then come back and launch the next iteration.
+```
+You are executing a pre-planned iteration on the WAOOAW platform.
+
+EXPERT PERSONAS: Senior Python 3.11 / FastAPI / SQLAlchemy / Alembic engineer
+Activate this persona NOW. Begin each epic with:
+  "Acting as a Senior Python 3.11 / FastAPI / SQLAlchemy / Alembic engineer, I will [what] by [approach]."
+
+PLAN FILE: docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+YOUR SCOPE: Iteration 1 only — Epics E1, E2. Do not touch Iteration 2 or later content.
+TIME BUDGET: 4h. If you reach 5h without finishing, follow STUCK PROTOCOL (Rule 6) now.
+
+PREREQUISITE CHECK (do before anything else):
+  Run: git status && git log --oneline -3
+  Must show: clean tree on main.
+  If not: post why and HALT.
+
+EXECUTION ORDER:
+1. Read "Agent Execution Rules" section in this plan file (Rules -1 through 7).
+2. Read "Iteration 1" section in this plan file.
+3. Read nothing else before starting.
+4. Execute epics in order: E1 (stories E1-S1, E1-S2, E1-S3) → E2 (stories E2-S1, E2-S2).
+5. After each story: commit + push + notify (Rule 4).
+6. After each epic: Docker integration test (Rule 5).
+7. When all epics are docker-tested, open the iteration PR (Rule 7). Post PR URL. HALT.
+```
+
+**Come back at: 2026-03-08 12:00 IST**
+
+---
+
+### Iteration 2 agent task (paste verbatim)
+
+> ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
+
+**Verify merge first:**
+```bash
+git fetch origin && git log --oneline origin/main | head -3
+# Must show: feat(EXEC-ENGINE-001): iteration 1 commit
+```
+
+```
+You are executing a pre-planned iteration on the WAOOAW platform.
+
+EXPERT PERSONAS: Senior Python 3.11 / FastAPI / SQLAlchemy / Celery engineer
+Activate this persona NOW. Begin each epic with:
+  "Acting as a Senior Python 3.11 / FastAPI / SQLAlchemy / Celery engineer, I will [what] by [approach]."
+
+PLAN FILE: docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+YOUR SCOPE: Iteration 2 only — Epics E3, E4. Do not touch Iteration 3 or later content.
+TIME BUDGET: 4.5h. If you reach 5.5h without finishing, follow STUCK PROTOCOL (Rule 6) now.
+
+PREREQUISITE CHECK (do before anything else):
+  Run: git log --oneline origin/main | head -5
+  Must show: feat(EXEC-ENGINE-001): iteration 1 — DB foundation
+  If not: post "Blocked: Iteration 1 not merged to main." and HALT.
+
+EXECUTION ORDER:
+1. git checkout main && git pull
+2. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
+3. Execute epics in order: E3 (stories E3-S1, E3-S2, E3-S3) → E4 (stories E4-S1, E4-S2).
+4. After each story: commit + push + notify (Rule 4).
+5. After each epic: Docker integration test (Rule 5).
+6. When all epics are docker-tested, open the iteration PR (Rule 7). Post PR URL. HALT.
+```
+
+**Come back at: 2026-03-08 17:00 IST**
+
+---
+
+### Iteration 3 agent task (paste verbatim)
+
+> ⚠️ Do NOT launch until Iteration 2 PR is merged to `main`.
+
+**Verify merge:** `git log --oneline origin/main | head -3` → must show Iteration 2 merge commit.
+
+```
+You are executing a pre-planned iteration on the WAOOAW platform.
+
+EXPERT PERSONAS: Senior Python 3.11 / FastAPI / SQLAlchemy / Celery engineer + Senior httpx / circuit-breaker / API integration engineer
+Activate these personas NOW. Begin each epic with:
+  "Acting as a [persona], I will [what] by [approach]."
+
+PLAN FILE: docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+YOUR SCOPE: Iteration 3 only — Epics E5, E6. Do not touch other content.
+TIME BUDGET: 5h. If you reach 6h without finishing, follow STUCK PROTOCOL (Rule 6) now.
+
+PREREQUISITE CHECK:
+  Run: git log --oneline origin/main | head -5
+  Must show: feat(EXEC-ENGINE-001): iteration 2 — BaseComponent + Celery queues
+  If not: post "Blocked: Iteration 2 not merged to main." and HALT.
+
+EXECUTION ORDER:
+1. git checkout main && git pull
+2. Read "Agent Execution Rules" and "Iteration 3" sections. Read nothing else.
+3. Execute epics: E5 (E5-S1, E5-S2, E5-S3) → E6 (E6-S1, E6-S2).
+4. After each story: commit + push + notify (Rule 4).
+5. After each epic: Docker integration test (Rule 5).
+6. Open iteration PR when done. Post URL. HALT.
+```
+
+**Come back at: 2026-03-09 10:00 IST**
+
+---
+
+### Iteration 4 agent task (paste verbatim)
+
+> ⚠️ Do NOT launch until Iteration 3 PR is merged to `main`.
+
+**Verify merge:** `git log --oneline origin/main | head -3` → must show Iteration 3 merge commit.
+
+```
+You are executing a pre-planned iteration on the WAOOAW platform.
+
+EXPERT PERSONAS: Senior Python 3.11 / FastAPI / Celery engineer + Senior LLM API integration engineer
+Activate these personas NOW. Begin each epic with:
+  "Acting as a [persona], I will [what] by [approach]."
+
+PLAN FILE: docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+YOUR SCOPE: Iteration 4 only — Epics E7, E8. Do not touch other content.
+TIME BUDGET: 5h. If you reach 6h without finishing, follow STUCK PROTOCOL (Rule 6) now.
+
+PREREQUISITE CHECK:
+  Run: git log --oneline origin/main | head -5
+  Must show: feat(EXEC-ENGINE-001): iteration 3 — Share Trader end-to-end
+  If not: post "Blocked: Iteration 3 not merged to main." and HALT.
+
+EXECUTION ORDER:
+1. git checkout main && git pull
+2. Read "Agent Execution Rules" and "Iteration 4" sections. Read nothing else.
+3. Execute epics: E7 (E7-S1, E7-S2, E7-S3) → E8 (E8-S1, E8-S2).
+4. After each story: commit + push + notify (Rule 4).
+5. After each epic: Docker integration test (Rule 5).
+6. Open iteration PR when done. Post URL. HALT.
+```
+
+**Come back at: 2026-03-09 16:00 IST**
+
+---
+
+### Iteration 5 agent task (paste verbatim)
+
+> ⚠️ Do NOT launch until Iteration 4 PR is merged to `main`.
+
+**Verify merge:** `git log --oneline origin/main | head -3` → must show Iteration 4 merge commit.
+
+```
+You are executing a pre-planned iteration on the WAOOAW platform.
+
+EXPERT PERSONAS: Senior HTML5 / CSS3 / vanilla JS frontend engineer with WAOOAW dark-theme design system expertise
+Activate this persona NOW. Begin each epic with:
+  "Acting as a Senior HTML5 / CSS3 / vanilla JS frontend engineer, I will [what] by [approach]."
+
+PLAN FILE: docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+YOUR SCOPE: Iteration 5 only — Epics E9, E10, E11. Do not touch other content.
+TIME BUDGET: 5h. If you reach 6h without finishing, follow STUCK PROTOCOL (Rule 6) now.
+
+PREREQUISITE CHECK:
+  Run: git log --oneline origin/main | head -5
+  Must show: feat(EXEC-ENGINE-001): iteration 4 — Marketing Agent fan-out flow
+  If not: post "Blocked: Iteration 4 not merged to main." and HALT.
+
+EXECUTION ORDER:
+1. git checkout main && git pull
+2. Read "Agent Execution Rules" and "Iteration 5" sections. Read nothing else.
+3. Execute epics: E9 (E9-S1) → E10 (E10-S1, E10-S2) → E11 (E11-S1, E11-S2).
+4. After each story: commit + push + notify (Rule 4).
+5. After each epic: Docker integration test (Rule 5).
+6. Open iteration PR when done. Post URL. HALT.
+```
+
+**Come back at: 2026-03-10 11:00 IST**
+
+---
+
+### Iteration 6 agent task (paste verbatim)
+
+> ⚠️ Do NOT launch until Iteration 5 PR is merged to `main`.
+
+**Verify merge:** `git log --oneline origin/main | head -3` → must show Iteration 5 merge commit.
+
+```
+You are executing a pre-planned iteration on the WAOOAW platform.
+
+EXPERT PERSONAS: Senior HTML5 / CSS3 / vanilla JS frontend engineer + Senior Python 3.11 / FastAPI thin-proxy engineer
+Activate these personas NOW. Begin each epic with:
+  "Acting as a [persona], I will [what] by [approach]."
+
+PLAN FILE: docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+YOUR SCOPE: Iteration 6 only — Epics E12, E13, E14. Do not touch other content.
+TIME BUDGET: 3.5h. If you reach 4.5h without finishing, follow STUCK PROTOCOL (Rule 6) now.
+
+PREREQUISITE CHECK:
+  Run: git log --oneline origin/main | head -5
+  Must show: feat(EXEC-ENGINE-001): iteration 5 — CP portal UI
+  If not: post "Blocked: Iteration 5 not merged to main." and HALT.
+
+EXECUTION ORDER:
+1. git checkout main && git pull
+2. Read "Agent Execution Rules" and "Iteration 6" sections. Read nothing else.
+3. Execute epics: E12 (E12-S1) → E13 (E13-S1) → E14 (E14-S1, E14-S2).
+4. After each story: commit + push + notify (Rule 4).
+5. After each epic: Docker integration test (Rule 5).
+6. Open iteration PR when done. Post URL. HALT. 🎉
+```
+
+**Come back at: 2026-03-10 15:30 IST**
 
 ---
 
 ## Iteration 1 — DB Foundation
 
-> **⛔ PRE-LAUNCH CHECK (Iteration 1 only)**: Create a fresh feature branch from `main` before writing any code:
-> ```bash
-> git checkout main && git pull origin main
-> git checkout -b feat/exec-engine-iter-1
-> ```
-> If already on a non-`main` branch with uncommitted work, stop and check with the user first.
+**Scope:** Customer and PP operator data is persisted to three new Postgres tables (`flow_runs`, `component_runs`, `skill_configs`) + `definition_version_id` on `hired_agents` — the structural foundation every subsequent iteration builds on.
+**Lane:** B — new backend tables and Alembic migrations; no frontend changes.
+**⏱ Estimated:** 4h | **Come back:** 2026-03-08 12:00 IST
+**Epics:** E1, E2
 
-> **Stories written and committed:** 2026-03-08
+### Dependency Map (Iteration 1)
 
-### I1-S1 — Add `flow_run` table with status machine (45 min)
+```
+E1-S1 ──► E1-S2 ──► E1-S3    (same branch feat/EXEC-ENGINE-001-it1-e1, sequential)
+E2-S1 ──► E2-S2               (branch feat/EXEC-ENGINE-001-it1-e2, sequential; E2-S1 can start after E1-S1 merged)
+```
 
-**Context:** `GoalRunModel` (`src/Plant/BackEnd/models/goal_run.py`) currently tracks runs with only `pending | running | completed | failed`. We need a richer `flow_run` table that owns multi-step workflow state — including `awaiting_approval` and `partial_failure` — so Postgres (not Redis) is the ledger for execution state. `GoalRunModel` is superseded but kept for backward compatibility until migration is complete.
+---
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/goal_run.py` — existing run model to understand shape
-- `src/Plant/BackEnd/models/hired_agent.py` — FK target
-- `src/Plant/BackEnd/database/migrations/versions/` — pick next migration number
+### Epic E1: flow_run, component_run, skill_config tables
 
-**Deliverable:** New file `src/Plant/BackEnd/models/flow_run.py` + Alembic migration.
+**Branch:** `feat/EXEC-ENGINE-001-it1-e1`
+**User story:** As a PP operator, I can query `flow_runs`, `component_runs`, and `skill_configs` in Postgres so that I have a complete execution and config audit trail.
 
-**Code pattern:**
+---
+
+#### Story E1-S1: Add `flow_run` table with status machine
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it1-e1`
+**CP BackEnd pattern:** N/A — Plant BackEnd model only
+
+**What to do:**
+`src/Plant/BackEnd/models/goal_run.py` tracks runs with only `pending | running | completed | failed`. Create a new `flow_run.py` model with a 6-status machine (`pending | running | awaiting_approval | completed | failed | partial_failure`) and an `idempotency_key` unique constraint. Create the corresponding Alembic migration. `GoalRunModel` is kept as-is for backward compatibility.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/goal_run.py` | 1–60 | Existing column shape, Base import, SQLAlchemy patterns used |
+| `src/Plant/BackEnd/models/hired_agent.py` | 1–40 | PK type (String/UUID) to match FK target |
+| `src/Plant/BackEnd/database/migrations/versions/` | last file | Highest revision ID to generate the next one |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/models/flow_run.py` | create | Full model as per code pattern below |
+| `src/Plant/BackEnd/database/migrations/versions/<next_rev>_add_flow_runs.py` | create | Alembic migration: `op.create_table("flow_runs", ...)` with all columns and indexes |
+
+**Code patterns to copy exactly:**
 ```python
 # src/Plant/BackEnd/models/flow_run.py
 from sqlalchemy import Column, String, DateTime, Index, UniqueConstraint
@@ -222,20 +656,18 @@ FLOW_RUN_STATUSES = (
 
 class FlowRunModel(Base):
     __tablename__ = "flow_runs"
-
     id = Column(String, primary_key=True, nullable=False)
     hired_instance_id = Column(String, nullable=False, index=True)
     skill_id = Column(String, nullable=False)
-    flow_name = Column(String, nullable=False)          # e.g. "MarketAnalysisFlow"
+    flow_name = Column(String, nullable=False)
     status = Column(String, nullable=False, default="pending", index=True)
-    current_step = Column(String, nullable=True)        # name of step in progress
+    current_step = Column(String, nullable=True)
     run_context = Column(JSONB, nullable=False, default=dict)
     idempotency_key = Column(String, unique=True, nullable=False, index=True)
     started_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     error_details = Column(JSONB, nullable=True)
-
     __table_args__ = (
         Index("ix_flow_runs_hired_instance_id", "hired_instance_id"),
         Index("ix_flow_runs_status", "status"),
@@ -243,27 +675,54 @@ class FlowRunModel(Base):
     )
 ```
 
-**Acceptance criteria:**
-- [ ] `flow_runs` table created in DB via Alembic migration (`alembic upgrade head`)
-- [ ] All 6 statuses can be set on `FlowRunModel.status`
-- [ ] `idempotency_key` constraint enforced (duplicate insert raises `IntegrityError`)
-- [ ] Unit test covers: create, transition statuses, idempotency guard
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E1-S1-T1 | `src/Plant/BackEnd/tests/models/test_flow_run.py` | Create `FlowRunModel` row with status `"pending"` | Row exists in DB, `status == "pending"` |
+| E1-S1-T2 | same | Transition status to each of the 6 values | All 6 set without constraint error |
+| E1-S1-T3 | same | Insert two rows with same `idempotency_key` | Second insert raises `IntegrityError` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/models/test_flow_run.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E1-S1 — add flow_run table with status machine`
+
+**Done signal:**
+`"E1-S1 done. Changed: models/flow_run.py, migrations/<rev>_add_flow_runs.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---
 
-### I1-S2 — Add `component_run` table (45 min)
+#### Story E1-S2: Add `component_run` table
 
-**Context:** There is currently no per-component audit record. Every `ComponentRun` must write an immutable record to Postgres so PP can drill into exactly which step of which flow failed, with what input, and what output. File to create: `src/Plant/BackEnd/models/component_run.py`.
+**BLOCKED UNTIL:** E1-S1 committed to `feat/EXEC-ENGINE-001-it1-e1`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it1-e1`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/flow_run.py` — FK source (from I1-S1)
-- `src/Plant/BackEnd/database/migrations/versions/` — next migration number
+**What to do:**
+There is no per-component audit record. Create `src/Plant/BackEnd/models/component_run.py` with a `flow_run_id` FK to `flow_runs.id`, JSONB `input_context` and `output` columns, and `duration_ms`. Create the Alembic migration.
 
-**Code pattern:**
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/flow_run.py` | 1–40 | PK type to use as FK target |
+| `src/Plant/BackEnd/database/migrations/versions/` | last file | Highest revision ID |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/models/component_run.py` | create | Full model as per code pattern below |
+| `src/Plant/BackEnd/database/migrations/versions/<next_rev>_add_component_runs.py` | create | Alembic migration creating `component_runs` table with FK constraint |
+
+**Code patterns to copy exactly:**
 ```python
 # src/Plant/BackEnd/models/component_run.py
-from sqlalchemy import Column, String, DateTime, Integer, Index
+from sqlalchemy import Column, String, DateTime, Integer, Index, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from core.database import Base
 
@@ -271,11 +730,10 @@ COMPONENT_RUN_STATUSES = ("pending", "running", "completed", "failed")
 
 class ComponentRunModel(Base):
     __tablename__ = "component_runs"
-
     id = Column(String, primary_key=True, nullable=False)
-    flow_run_id = Column(String, nullable=False, index=True)  # FK to flow_runs.id
-    component_type = Column(String, nullable=False, index=True)  # e.g. "DeltaExchangePump"
-    step_name = Column(String, nullable=False)                   # e.g. "step_1"
+    flow_run_id = Column(String, ForeignKey("flow_runs.id"), nullable=False, index=True)
+    component_type = Column(String, nullable=False, index=True)
+    step_name = Column(String, nullable=False)
     status = Column(String, nullable=False, default="pending", index=True)
     input_context = Column(JSONB, nullable=False, default=dict)
     output = Column(JSONB, nullable=True)
@@ -283,7 +741,6 @@ class ComponentRunModel(Base):
     started_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(String, nullable=True)
-
     __table_args__ = (
         Index("ix_component_runs_flow_run_id", "flow_run_id"),
         Index("ix_component_runs_component_type", "component_type"),
@@ -291,24 +748,54 @@ class ComponentRunModel(Base):
     )
 ```
 
-**Acceptance criteria:**
-- [ ] `component_runs` table created via Alembic migration
-- [ ] Foreign key integrity: `flow_run_id` references `flow_runs.id`
-- [ ] `input_context` and `output` stored as JSONB — arbitrary shape per component type
-- [ ] Unit test: create, mark running, mark completed with output, mark failed with error
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E1-S2-T1 | `src/Plant/BackEnd/tests/models/test_component_run.py` | Create parent `FlowRunModel` then `ComponentRunModel` with `status="running"` | Row exists, `flow_run_id` is set |
+| E1-S2-T2 | same | Mark `status="completed"`, set `output={"candles": []}`, `duration_ms=120` | All fields persisted |
+| E1-S2-T3 | same | Mark `status="failed"`, set `error_message="timeout"` | `error_message` persisted |
+| E1-S2-T4 | same | Insert `ComponentRunModel` with non-existent `flow_run_id` | Raises `IntegrityError` (FK violated) |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/models/test_component_run.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E1-S2 — add component_run table`
+
+**Done signal:**
+`"E1-S2 done. Changed: models/component_run.py, migrations/<rev>_add_component_runs.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
 
 ---
 
-### I1-S3 — Add `skill_config` table (45 min)
+#### Story E1-S3: Add `skill_config` table + PATCH endpoint
 
-**Context:** `HiredAgentModel.config` is a single JSONB blob mixing PP-locked fields, customer-fillable fields, and runtime hints. This creates an audit gap and prevents per-skill version pinning. New `skill_config` table stores one row per (hired_instance, skill) with `pp_locked_fields` and `customer_fields` separated. Location: `src/Plant/BackEnd/models/skill_config.py`.
+**BLOCKED UNTIL:** E1-S2 committed to `feat/EXEC-ENGINE-001-it1-e1`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it1-e1`
+**CP BackEnd pattern:** N/A (Plant BackEnd route only)
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/hired_agent.py` — FK target, existing `config` blob shape
-- `src/Plant/BackEnd/database/migrations/versions/` — next migration number
+**What to do:**
+`HiredAgentModel.config` is a single JSONB blob. Create `src/Plant/BackEnd/models/skill_config.py` separating `pp_locked_fields` from `customer_fields` with a `(hired_instance_id, skill_id)` unique constraint. Add `PATCH /v1/skill-configs/{hired_instance_id}/{skill_id}` endpoint that only accepts `customer_fields` updates.
 
-**Code pattern:**
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/hired_agent.py` | 1–50 | PK type, existing `config` blob shape |
+| `src/Plant/BackEnd/api/v1/hired_agents_simple.py` | 1–60 | `waooaw_router()` usage pattern, `get_db_session` import |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/models/skill_config.py` | create | Full model as per code pattern below |
+| `src/Plant/BackEnd/api/v1/skill_configs.py` | create | PATCH endpoint — see code pattern |
+| `src/Plant/BackEnd/main.py` | modify | Add `app.include_router(skill_configs.router)` |
+| `src/Plant/BackEnd/database/migrations/versions/<next_rev>_add_skill_configs.py` | create | Alembic migration: `op.create_table("skill_configs", ...)` |
+
+**Code patterns to copy exactly:**
 ```python
 # src/Plant/BackEnd/models/skill_config.py
 from sqlalchemy import Column, String, DateTime, Index, UniqueConstraint
@@ -317,126 +804,290 @@ from core.database import Base
 
 class SkillConfigModel(Base):
     __tablename__ = "skill_configs"
-
     id = Column(String, primary_key=True, nullable=False)
     hired_instance_id = Column(String, nullable=False, index=True)
-    skill_id = Column(String, nullable=False)              # e.g. "market_analysis_skill"
-    definition_version_id = Column(String, nullable=False) # pinned at hire time
+    skill_id = Column(String, nullable=False)
+    definition_version_id = Column(String, nullable=False)
     pp_locked_fields = Column(JSONB, nullable=False, default=dict)
     customer_fields = Column(JSONB, nullable=False, default=dict)
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
-
     __table_args__ = (
         UniqueConstraint("hired_instance_id", "skill_id", name="uq_skill_config_per_hire"),
         Index("ix_skill_configs_hired_instance_id", "hired_instance_id"),
     )
+
+# src/Plant/BackEnd/api/v1/skill_configs.py
+from core.routing import waooaw_router
+from core.database import get_db_session
+from models.skill_config import SkillConfigModel
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+
+router = waooaw_router(prefix="/v1/skill-configs", tags=["skill-configs"])
+
+class CustomerFieldsUpdate(BaseModel):
+    customer_fields: dict
+
+@router.patch("/{hired_instance_id}/{skill_id}")
+async def update_skill_config(
+    hired_instance_id: str,
+    skill_id: str,
+    body: CustomerFieldsUpdate,
+    db: Session = Depends(get_db_session),
+):
+    row = db.query(SkillConfigModel).filter_by(
+        hired_instance_id=hired_instance_id, skill_id=skill_id
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="skill_config not found")
+    row.customer_fields = body.customer_fields
+    db.commit()
+    return {"id": row.id, "customer_fields": row.customer_fields}
 ```
 
-**Acceptance criteria:**
-- [ ] `skill_configs` table created via Alembic migration
-- [ ] `(hired_instance_id, skill_id)` unique constraint enforced
-- [ ] PATCH endpoint on Plant BackEnd: `PATCH /v1/skill-configs/{hired_instance_id}/{skill_id}` accepts `customer_fields` only (pp_locked_fields not updatable by customer)
-- [ ] Unit test: create, update customer_fields, reject pp_locked_fields update attempt
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E1-S3-T1 | `src/Plant/BackEnd/tests/models/test_skill_config.py` | Insert two `SkillConfigModel` rows with same `(hired_instance_id, skill_id)` | Second insert raises `IntegrityError` |
+| E1-S3-T2 | `src/Plant/BackEnd/tests/api/test_skill_configs.py` | PATCH `/v1/skill-configs/{id}/{skill}` with `{"customer_fields": {"rsi_period": 14}}` | HTTP 200, `customer_fields` persisted |
+| E1-S3-T3 | same | PATCH with unknown `hired_instance_id` | HTTP 404 |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/models/test_skill_config.py src/Plant/BackEnd/tests/api/test_skill_configs.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E1-S3 — add skill_config table + PATCH endpoint`
+
+**Done signal:**
+`"E1-S3 done. Changed: models/skill_config.py, api/v1/skill_configs.py, main.py, migration. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+**Epic E1 complete ✅** — run Docker integration test (Rule 5) before starting E2.
 
 ---
 
-### I1-S4 — Add `definition_version_id` to `hired_agents` (30 min)
+### Epic E2: hired_agents column + model registration
 
-**Context:** `HiredAgentModel` currently has `agent_type_id` as a live pointer. If PP updates the agent type, all hired agents silently change behaviour. Add `definition_version_id` column set at hire time and never changed automatically. Alembic migration adds the column; `hired_agents_simple.py` hire endpoint sets it.
-
-**Files to read first:**
-- `src/Plant/BackEnd/models/hired_agent.py` — add column here
-- `src/Plant/BackEnd/api/v1/hired_agents_simple.py` — hire endpoint to update
-- `src/Plant/BackEnd/database/migrations/versions/` — next migration number
-
-**Acceptance criteria:**
-- [ ] `definition_version_id` (nullable String) column added to `hired_agents` via Alembic migration
-- [ ] Hire endpoint sets `definition_version_id = agent_type_version` from the `agent_type_definitions` table at hire time
-- [ ] Existing rows with null `definition_version_id` do not break — nullable is fine for now
-- [ ] Unit test: hire creates row with non-null `definition_version_id`
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Branch:** `feat/EXEC-ENGINE-001-it1-e2`
+**User story:** As the platform, I pin every hired agent to the exact definition version active at hire time so that PP definition updates never silently affect live agents.
 
 ---
 
-### I1-S5 — CHECKPOINT: register all new models in `__init__.py` + smoke test (30 min)
+#### Story E2-S1: Add `definition_version_id` to `hired_agents`
 
-**Context:** `src/Plant/BackEnd/models/__init__.py` imports all models so Alembic autodiscovers them. After I1-S1 through I1-S4, three new model files exist and one existing model is changed. This story ensures they are all imported, `alembic upgrade head` runs cleanly in the test DB, and a basic integration smoke test confirms all four tables exist.
+**BLOCKED UNTIL:** none (E2 branch independent of E1 branch; can start after E1-S1 merged to main, but may start in parallel on a separate branch)
+**Estimated time:** 30 min
+**Branch:** `feat/EXEC-ENGINE-001-it1-e2`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/__init__.py` — add imports here
-- `src/Plant/BackEnd/database/migrations/env.py` — confirm `target_metadata` picks up new models
+**What to do:**
+`HiredAgentModel` has `agent_type_id` as a live pointer. Add nullable `definition_version_id` String column via Alembic migration. Update the hire endpoint in `hired_agents_simple.py` to populate it from `agent_type_definitions.version` at hire time.
 
-**Acceptance criteria:**
-- [ ] `flow_runs`, `component_runs`, `skill_configs` imported in `models/__init__.py`
-- [ ] `alembic upgrade head` completes without error in test DB (Docker compose test environment)
-- [ ] `alembic downgrade -1` then `alembic upgrade head` round-trips cleanly
-- [ ] Smoke test queries each new table: `SELECT COUNT(*) FROM flow_runs` returns 0
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Files to read first (max 3):**
 
-### ✅ Iteration 1 — Completion Checkpoint
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/hired_agent.py` | 1–60 | Existing column list, `__tablename__`, Base import |
+| `src/Plant/BackEnd/api/v1/hired_agents_simple.py` | 1–80 | Hire endpoint — where `HiredAgentModel` is instantiated |
 
-After ALL I1-S1 through I1-S5 acceptance criteria pass:
+**Files to create / modify:**
 
-1. Verify all commits pushed:
-   ```bash
-   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
-   ```
-2. Open PR to main:
-   ```bash
-   gh pr create --base main \
-     --title "feat(EXEC-ENGINE-001): iteration 1 — DB foundation" \
-     --body "Stories: I1-S1 ✅ I1-S2 ✅ I1-S3 ✅ I1-S4 ✅ I1-S5 ✅"
-   ```
-3. Mark stories complete in this plan file — rename each `### I1-SX —` heading to `### ✅ I1-SX —` (if not done per-story), commit + push:
-   ```bash
-   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
-   git commit -m "docs(EXEC-ENGINE-001): mark iteration 1 stories complete"
-   git push
-   ```
-4. **Report to user**: "Iteration 1 complete. PR: [URL]. Stories: I1-S1 ✅ I1-S2 ✅ I1-S3 ✅ I1-S4 ✅ I1-S5 ✅. Please review and merge — **do not launch Iteration 2 until this PR is merged**."
-5. **STOP. Do not run any Iteration 2 code until the user confirms this PR is merged to `main`.**
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/models/hired_agent.py` | modify | Add `definition_version_id = Column(String, nullable=True)` after `agent_type_id` |
+| `src/Plant/BackEnd/database/migrations/versions/<next_rev>_add_definition_version_id.py` | create | `op.add_column("hired_agents", sa.Column("definition_version_id", sa.String(), nullable=True))` |
+| `src/Plant/BackEnd/api/v1/hired_agents_simple.py` | modify | At hire: query `agent_type_definitions` for the current version and set `hired_agent.definition_version_id = version` |
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E2-S1-T1 | `src/Plant/BackEnd/tests/api/test_hired_agents.py` | POST hire endpoint with valid `agent_type_id` | Response body contains non-null `definition_version_id` |
+| E2-S1-T2 | same | Query existing hire row from DB | `definition_version_id` column exists and is set |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/api/test_hired_agents.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E2-S1 — add definition_version_id to hired_agents`
+
+**Done signal:**
+`"E2-S1 done. Changed: models/hired_agent.py, migrations/<rev>, api/v1/hired_agents_simple.py. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E2-S2: Register all new models in `__init__.py` + smoke test
+
+**BLOCKED UNTIL:** E2-S1 committed to `feat/EXEC-ENGINE-001-it1-e2`
+**Estimated time:** 30 min
+**Branch:** `feat/EXEC-ENGINE-001-it1-e2`
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+`src/Plant/BackEnd/models/__init__.py` imports all models for Alembic autodiscovery. Add imports for `FlowRunModel`, `ComponentRunModel`, `SkillConfigModel`. Verify `alembic upgrade head` runs cleanly and round-trips. Add a smoke test confirming all three tables exist and are queryable.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/__init__.py` | 1–30 | Existing import list pattern |
+| `src/Plant/BackEnd/database/migrations/env.py` | 1–40 | `target_metadata` assignment — must use `Base.metadata` |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/models/__init__.py` | modify | Add three lines: `from .flow_run import FlowRunModel`, `from .component_run import ComponentRunModel`, `from .skill_config import SkillConfigModel` |
+| `src/Plant/BackEnd/tests/models/test_smoke.py` | create | Smoke test — see code pattern |
+
+**Code patterns to copy exactly:**
+```python
+# src/Plant/BackEnd/tests/models/test_smoke.py
+from sqlalchemy import text
+
+def test_all_new_tables_exist(db_session):
+    """Verify all three new tables are present and queryable."""
+    for table in ("flow_runs", "component_runs", "skill_configs"):
+        result = db_session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
+        assert result == 0, f"Table {table} not found or not empty after migration"
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E2-S2-T1 | `src/Plant/BackEnd/tests/models/test_smoke.py` | Fresh test DB after `alembic upgrade head` | `flow_runs`, `component_runs`, `skill_configs` all return `COUNT(*) = 0` |
+| E2-S2-T2 | same | `alembic downgrade -1` then `alembic upgrade head` | No error; all three tables still exist |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/models/test_smoke.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E2-S2 — register new models + smoke test`
+
+**Done signal:**
+`"E2-S2 done. Changed: models/__init__.py, tests/models/test_smoke.py. Tests: T1 ✅ T2 ✅"`
+
+**Epic E2 complete ✅** — run Docker integration test (Rule 5) before opening iteration PR.
+
+---
+
+### Iteration 1 — Completion Checkpoint
+
+After ALL E1 and E2 epics complete and Docker integration test passes:
+
+```bash
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-it1
+git merge --no-ff feat/EXEC-ENGINE-001-it1-e1 feat/EXEC-ENGINE-001-it1-e2
+git push origin feat/EXEC-ENGINE-001-it1
+
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-it1 \
+  --title "feat(EXEC-ENGINE-001): iteration 1 — DB foundation" \
+  --body "## EXEC-ENGINE-001 Iteration 1
+
+### Stories completed
+| E1-S1 | flow_run table + status machine | 🟢 Done |
+| E1-S2 | component_run table | 🟢 Done |
+| E1-S3 | skill_config table + PATCH endpoint | 🟢 Done |
+| E2-S1 | definition_version_id on hired_agents | 🟢 Done |
+| E2-S2 | model registration + smoke test | 🟢 Done |
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() — no bare APIRouter
+- [ ] GET routes use get_read_db_session()
+- [ ] PIIMaskingFilter on all new loggers
+- [ ] No env-specific values in Dockerfile or code
+- [ ] Tests >= 80% coverage on new BE code
+- [ ] Postgres owns flow state; Redis only transports jobs"
+```
+
+Post PR URL. **STOP — do not start Iteration 2 until this PR is merged to `main`.**
 
 ---
 
 ## Iteration 2 — BaseComponent Interface + Celery Component Queues
 
-> **⛔ ITERATION 2 GATE — verify before writing any code:** Iteration 1 PR must be merged to `main`:
+**Scope:** Define the `BaseComponent` / `ComponentInput` / `ComponentOutput` ABC, the component registry, Celery component queues, and the FlowRun executor (sequential + parallel fan-out).
+**Lane:** B — new Python packages; no frontend changes.
+**⏱ Estimated:** 4.5h | **Come back:** 2026-03-08 17:00 IST
+**Epics:** E3, E4
+
+> **⛔ ITERATION 2 GATE:** Verify before writing any code:
 > ```bash
 > git fetch origin
-> git show origin/main:docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md | grep "Iteration 1"
+> git log --oneline origin/main | head -3
+> # Must show: feat(EXEC-ENGINE-001): iteration 1 — DB foundation
 > ```
-> If Iteration 1 content is absent from `main`, **STOP** and tell the user: "Iteration 2 is blocked — the Iteration 1 PR must be merged to main first."
+> If absent: **STOP** — "Iteration 2 is blocked — the Iteration 1 PR must be merged to main first."
 
-> **Stories written and committed:** 2026-03-08
+### Dependency Map (Iteration 2)
 
-### I2-S1 — Define `BaseComponent`, `ComponentInput`, `ComponentOutput` (45 min)
+```
+E3-S1 ──► E3-S2 ──► E3-S3    (branch feat/EXEC-ENGINE-001-it2-e3, sequential)
+                       │
+                       ▼
+E4-S1 ──► E4-S2               (branch feat/EXEC-ENGINE-001-it2-e4; E4-S1 needs E3-S3)
+```
 
-**Context:** There is currently no abstract base class for components. Every future component (`DeltaExchangePump`, `RSIProcessor`, `ContentProcessor`, etc.) must implement the same interface so the FlowRun executor can call any component polymorphically. Create `src/Plant/BackEnd/components/base.py`.
+---
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/component_run.py` — the DB record that execute() must write
-- `src/Plant/BackEnd/core/observability.py` — OTel tracer to inject into execute()
+### Epic E3: BaseComponent ABC + registry + Celery queues
 
-**Code to implement:**
+**Branch:** `feat/EXEC-ENGINE-001-it2-e3`
+**User story:** As the execution engine, I can call any component via a single `component.safe_execute(input)` call so that the executor is decoupled from component implementations.
+
+---
+
+#### Story E3-S1: Define `BaseComponent`, `ComponentInput`, `ComponentOutput`
+
+**BLOCKED UNTIL:** none (Iteration 2 must be on `main` first)
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it2-e3`
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+There is no abstract base class for components. Create `src/Plant/BackEnd/components/__init__.py` (empty) and `src/Plant/BackEnd/components/base.py` with `ComponentInput` dataclass, `ComponentOutput` dataclass, and `BaseComponent` ABC with `component_type` property, `execute()` abstract method, and `safe_execute()` wrapper that catches exceptions and populates `duration_ms`.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/component_run.py` | 1–40 | Field names that `execute()` output must match |
+| `src/Plant/BackEnd/core/observability.py` | 1–30 | OTel tracer import pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/__init__.py` | create | Empty file — marks package |
+| `src/Plant/BackEnd/components/base.py` | create | Full ABC as per code pattern below |
+
+**Code patterns to copy exactly:**
 ```python
-# src/Plant/BackEnd/components/__init__.py  — empty, marks package
 # src/Plant/BackEnd/components/base.py
-
 from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
-from uuid import UUID
 
 @dataclass
 class ComponentInput:
     flow_run_id: str
     customer_id: str
-    skill_config: dict[str, Any]        # PP-locked + customer-filled values
-    run_context: dict[str, Any]         # dynamic params for this run cycle
+    skill_config: dict[str, Any]
+    run_context: dict[str, Any]
     previous_step_output: dict[str, Any] | None = None
 
 @dataclass
@@ -447,10 +1098,7 @@ class ComponentOutput:
     duration_ms: int = 0
 
 class BaseComponent(ABC):
-    """
-    Stateless execution unit. Implement execute() in every component subclass.
-    The executor writes ComponentRunModel records; do not write DB inside execute().
-    """
+    """Stateless execution unit. Implement execute() in every subclass."""
 
     @property
     @abstractmethod
@@ -471,181 +1119,243 @@ class BaseComponent(ABC):
             result.duration_ms = int((time.monotonic() - start) * 1000)
             return result
         except Exception as exc:
-            duration_ms = int((time.monotonic() - start) * 1000)
             return ComponentOutput(
                 success=False,
                 data={},
                 error_message=str(exc),
-                duration_ms=duration_ms,
+                duration_ms=int((time.monotonic() - start) * 1000),
             )
 ```
 
-**Acceptance criteria:**
-- [ ] `ComponentInput`, `ComponentOutput`, `BaseComponent` importable from `components.base`
-- [ ] Concrete subclass that does not implement `execute()` raises `TypeError` at instantiation
-- [ ] `safe_execute()` returns `ComponentOutput(success=False, error_message=...)` when `execute()` raises
-- [ ] `duration_ms` is always populated (≥ 0)
-- [ ] Unit tests for `safe_execute()` — success path and exception path
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S1-T1 | `src/Plant/BackEnd/tests/components/test_base.py` | Concrete subclass with `execute()` returning success | `safe_execute()` returns `success=True`, `duration_ms >= 0` |
+| E3-S1-T2 | same | Concrete subclass with `execute()` raising `RuntimeError("boom")` | `safe_execute()` returns `success=False`, `error_message="boom"`, `duration_ms >= 0` |
+| E3-S1-T3 | same | Attempt `BaseComponent()` (no concrete subclass) | `TypeError` raised at instantiation |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_base.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E3-S1 — define BaseComponent ComponentInput ComponentOutput`
+
+**Done signal:**
+`"E3-S1 done. Changed: components/__init__.py, components/base.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---
 
-### I2-S2 — Celery component task routing + worker queue config (45 min)
+#### Story E3-S2: Celery component task routing + worker queue config
 
-**Context:** `src/Plant/BackEnd/worker/celery_app.py` currently routes only `email`, `events`, and `archival` queues. Agent execution has no async worker backbone. Add three component queues (`pump`, `processor`, `publisher`) and a generic `execute_component` Celery task that accepts a component type name + serialized `ComponentInput` and dispatches to the correct registered component.
+**BLOCKED UNTIL:** E3-S1 committed to `feat/EXEC-ENGINE-001-it2-e3`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it2-e3`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/worker/celery_app.py` — add routes here
-- `src/Plant/BackEnd/worker/tasks/` — create `component_tasks.py` here
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
+**What to do:**
+`src/Plant/BackEnd/worker/celery_app.py` has no component queues. Add `pump`, `processor`, `publisher` to `task_routes`. Create `src/Plant/BackEnd/worker/tasks/component_tasks.py` with three Celery tasks (`execute_pump`, `execute_processor`, `execute_publisher`) each delegating to `_run_component()` with retry configs: pump 3×/5s, processor 3×/10s, publisher 3×/15s.
 
-**Code to add to `celery_app.py`:**
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/worker/celery_app.py` | 1–60 | Existing `task_routes` dict, `autodiscover_tasks()` call |
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `ComponentInput` fields (from E3-S1) |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/worker/celery_app.py` | modify | Add 3 routes to `task_routes`; add `"worker.tasks.component_tasks"` to `autodiscover_tasks` |
+| `src/Plant/BackEnd/worker/tasks/component_tasks.py` | create | Three Celery tasks + `_run_component` helper — see code pattern |
+
+**Code patterns to copy exactly:**
 ```python
-# Add to existing task_routes dict:
+# Add to celery_app.py task_routes dict:
 "execute_pump":      {"queue": "pump"},
 "execute_processor": {"queue": "processor"},
 "execute_publisher": {"queue": "publisher"},
 
-# Add to autodiscover_tasks:
-celery_app.autodiscover_tasks(["worker.tasks", "worker.tasks.component_tasks"])
-```
-
-**New file `worker/tasks/component_tasks.py`:**
-```python
+# src/Plant/BackEnd/worker/tasks/component_tasks.py
+import asyncio
 from worker.celery_app import celery_app
 from components.registry import get_component
 from components.base import ComponentInput
 
-@celery_app.task(name="execute_pump", bind=True, max_retries=3,
-                 default_retry_delay=5, acks_late=True)
+@celery_app.task(name="execute_pump", bind=True, max_retries=3, default_retry_delay=5, acks_late=True)
 def execute_pump(self, component_type: str, input_dict: dict, flow_run_id: str):
-    """Execute a Pump component. Retries up to 3x with 5s backoff."""
     _run_component(self, component_type, input_dict, flow_run_id)
 
-@celery_app.task(name="execute_processor", bind=True, max_retries=3,
-                 default_retry_delay=10, acks_late=True)
+@celery_app.task(name="execute_processor", bind=True, max_retries=3, default_retry_delay=10, acks_late=True)
 def execute_processor(self, component_type: str, input_dict: dict, flow_run_id: str):
-    """Execute a Processor component."""
     _run_component(self, component_type, input_dict, flow_run_id)
 
-@celery_app.task(name="execute_publisher", bind=True, max_retries=3,
-                 default_retry_delay=15, acks_late=True)
+@celery_app.task(name="execute_publisher", bind=True, max_retries=3, default_retry_delay=15, acks_late=True)
 def execute_publisher(self, component_type: str, input_dict: dict, flow_run_id: str):
-    """Execute a Publisher component."""
     _run_component(self, component_type, input_dict, flow_run_id)
 
 def _run_component(task, component_type: str, input_dict: dict, flow_run_id: str):
-    import asyncio
     component = get_component(component_type)
     comp_input = ComponentInput(**input_dict)
-    result = asyncio.get_event_loop().run_until_complete(
-        component.safe_execute(comp_input)
-    )
+    result = asyncio.get_event_loop().run_until_complete(component.safe_execute(comp_input))
     if not result.success:
         raise task.retry(exc=RuntimeError(result.error_message))
     return result.data
 ```
 
-**Acceptance criteria:**
-- [ ] `pump`, `processor`, `publisher` queues declared in `celery_app.conf.task_routes`
-- [ ] `execute_pump`, `execute_processor`, `execute_publisher` tasks importable without error
-- [ ] Task retry config: pump max 3×/5s, processor max 3×/10s, publisher max 3×/15s
-- [ ] `celery -A worker.celery_app inspect registered` shows all three tasks
-- [ ] Unit test: mocked component executes and returns data; failed component triggers retry
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S2-T1 | `src/Plant/BackEnd/tests/worker/test_component_tasks.py` | Mock `get_component` returns component whose `safe_execute` returns `success=True, data={"ok": 1}` | `execute_pump` returns `{"ok": 1}` |
+| E3-S2-T2 | same | Mock component returns `success=False, error_message="fail"` | `execute_pump` calls `task.retry` |
+| E3-S2-T3 | same | Inspect `celery_app.conf.task_routes` | Contains `pump`, `processor`, `publisher` keys |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/worker/test_component_tasks.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E3-S2 — Celery component task routing pump processor publisher`
+
+**Done signal:**
+`"E3-S2 done. Changed: worker/celery_app.py, worker/tasks/component_tasks.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---
 
-### I2-S3 — Component registry (30 min)
+#### Story E3-S3: Component registry
 
-**Context:** `_run_component` in I2-S2 calls `get_component(component_type)`. The registry maps string names to component class instances. This is the substitutability primitive — swapping `RSIProcessor_v1` for `RSIProcessor_v2` is a single registry change. Create `src/Plant/BackEnd/components/registry.py`.
+**BLOCKED UNTIL:** E3-S2 committed to `feat/EXEC-ENGINE-001-it2-e3`
+**Estimated time:** 30 min
+**Branch:** `feat/EXEC-ENGINE-001-it2-e3`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
+**What to do:**
+`_run_component` calls `get_component(component_type)` but the registry doesn't exist yet. Create `src/Plant/BackEnd/components/registry.py` with `register_component()`, `get_component()` (raises `KeyError` with available list if not found), and `list_registered()`.
 
-**Code pattern:**
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `BaseComponent` type to use in type hints |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/registry.py` | create | Full registry as per code pattern below |
+
+**Code patterns to copy exactly:**
 ```python
 # src/Plant/BackEnd/components/registry.py
-from typing import Type
 from components.base import BaseComponent
 
 _REGISTRY: dict[str, BaseComponent] = {}
 
 def register_component(component: BaseComponent) -> None:
-    """Register a component instance under its component_type."""
+    """Register component instance under its component_type. Second registration overwrites."""
     _REGISTRY[component.component_type] = component
 
 def get_component(component_type: str) -> BaseComponent:
-    """Retrieve registered component. Raises KeyError if not found."""
     if component_type not in _REGISTRY:
-        raise KeyError(f"Component '{component_type}' not registered. "
-                       f"Available: {list(_REGISTRY.keys())}")
+        raise KeyError(
+            f"Component '{component_type}' not registered. "
+            f"Available: {list(_REGISTRY.keys())}"
+        )
     return _REGISTRY[component_type]
 
 def list_registered() -> list[str]:
     return list(_REGISTRY.keys())
 ```
 
-**Acceptance criteria:**
-- [ ] `register_component()`, `get_component()`, `list_registered()` work correctly
-- [ ] `get_component("unknown")` raises `KeyError` with helpful message listing available
-- [ ] Two components with same `component_type` — second registration overwrites first (versioning path)
-- [ ] Unit tests for all three scenarios
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S3-T1 | `src/Plant/BackEnd/tests/components/test_registry.py` | Register a mock component with `component_type="TestComp"` | `get_component("TestComp")` returns the instance |
+| E3-S3-T2 | same | `get_component("unknown")` | Raises `KeyError` with message containing `"Available:"` |
+| E3-S3-T3 | same | Register two components with same type | Second overwrites; `list_registered()` has only one entry for that type |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_registry.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E3-S3 — component registry`
+
+**Done signal:**
+`"E3-S3 done. Changed: components/registry.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+**Epic E3 complete ✅** — run Docker integration test (Rule 5) before starting E4.
 
 ---
 
-### I2-S4 — FlowRun executor: sequential step runner (90 min)
+### Epic E4: FlowRun executor (sequential + fan-out)
 
-**Context:** There is currently no engine that reads a FlowRun's step sequence and dispatches ComponentRuns in order. This is the most critical story in Iteration 2. The executor reads `flow_run.run_context`, iterates `sequential_steps`, dispatches each to the appropriate Celery queue, writes `component_run` records for each step, and updates `flow_run.status` at each transition. Approval gate: when `flow_def.has_approval_gate=true` and `run_context.auto_execute=false`, set `flow_run.status="awaiting_approval"` and stop. Customer approval resumes from the gate step.
+**Branch:** `feat/EXEC-ENGINE-001-it2-e4`
+**User story:** As the execution engine, I can run a sequence of components and a fan-out of parallel components so that Share Trader and Marketing Agent flows execute end-to-end with full DB audit records.
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/flow_run.py` — from I1-S1
-- `src/Plant/BackEnd/models/component_run.py` — from I1-S2
-- `src/Plant/BackEnd/worker/tasks/component_tasks.py` — from I2-S2
-- `src/Plant/BackEnd/components/registry.py` — from I2-S3
+---
 
-**Code to create: `src/Plant/BackEnd/engine/flow_executor.py`**
+#### Story E4-S1: FlowRun executor — sequential step runner + approval gate
+
+**BLOCKED UNTIL:** E3-S3 committed to `feat/EXEC-ENGINE-001-it2-e3` (registry must exist)
+**Estimated time:** 90 min
+**Branch:** `feat/EXEC-ENGINE-001-it2-e4`
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+No engine exists to dispatch steps in order. Create `src/Plant/BackEnd/engine/__init__.py` (empty) and `src/Plant/BackEnd/engine/flow_executor.py` with `execute_sequential_flow()`. The function iterates `sequential_steps`, checks for an `approval_gate_index` (sets `awaiting_approval` and returns if `auto_execute=false`), calls `component.safe_execute()`, writes a `ComponentRunModel` record for each step, and sets `flow_run.status` accordingly. Uses `PIIMaskingFilter` on logger.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/flow_run.py` | 1–45 | Status values, JSONB `run_context`, `current_step` field |
+| `src/Plant/BackEnd/models/component_run.py` | 1–40 | Fields to populate: `id`, `flow_run_id`, `component_type`, `step_name`, `status`, `input_context`, `output`, `duration_ms` |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/engine/__init__.py` | create | Empty file |
+| `src/Plant/BackEnd/engine/flow_executor.py` | create | `execute_sequential_flow()` — see code pattern below |
+
+**Code patterns to copy exactly:**
 ```python
-"""
-FlowRun executor — sequential step dispatch.
-Postgres owns state; Redis/Celery owns transport.
-"""
+# src/Plant/BackEnd/engine/flow_executor.py
 from __future__ import annotations
-import asyncio, time, uuid
+import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from models.flow_run import FlowRunModel
 from models.component_run import ComponentRunModel
 from components.registry import get_component
 from components.base import ComponentInput
-from core.logging import get_logger
-from core.logging import PIIMaskingFilter
+from core.logging import get_logger, PIIMaskingFilter
 
 logger = get_logger(__name__)
 logger.addFilter(PIIMaskingFilter())
 
 async def execute_sequential_flow(
     flow_run: FlowRunModel,
-    sequential_steps: list[dict],  # [{"step_name": "step_1", "component_type": "DeltaExchangePump"}]
+    sequential_steps: list[dict],
     db: Session,
-    approval_gate_index: int | None = None,  # None = no gate; int = step index before which gate fires
+    approval_gate_index: int | None = None,
 ) -> None:
     prev_output = flow_run.run_context.get("previous_step_output")
     for idx, step in enumerate(sequential_steps):
-        # Approval gate check
         if approval_gate_index is not None and idx == approval_gate_index:
-            auto_execute = flow_run.run_context.get("auto_execute", False)
-            if not auto_execute:
+            if not flow_run.run_context.get("auto_execute", False):
                 flow_run.status = "awaiting_approval"
                 flow_run.current_step = step["step_name"]
                 flow_run.updated_at = datetime.now(timezone.utc)
                 db.commit()
-                return  # Stop — customer must approve to continue
-
+                return
         flow_run.current_step = step["step_name"]
         db.commit()
-
         comp = get_component(step["component_type"])
         comp_input = ComponentInput(
             flow_run_id=flow_run.id,
@@ -665,58 +1375,81 @@ async def execute_sequential_flow(
         )
         db.add(comp_run)
         db.commit()
-
         result = await comp.safe_execute(comp_input)
-
         comp_run.status = "completed" if result.success else "failed"
         comp_run.output = result.data
         comp_run.error_message = result.error_message
         comp_run.duration_ms = result.duration_ms
         comp_run.completed_at = datetime.now(timezone.utc)
         db.commit()
-
         if not result.success:
             flow_run.status = "failed"
             flow_run.error_details = {"step": step["step_name"], "error": result.error_message}
             flow_run.updated_at = datetime.now(timezone.utc)
             db.commit()
             return
-
         prev_output = result.data
-
     flow_run.status = "completed"
     flow_run.completed_at = datetime.now(timezone.utc)
     flow_run.updated_at = datetime.now(timezone.utc)
     db.commit()
 ```
 
-**Acceptance criteria:**
-- [ ] Sequential flow of 3 steps: all succeed → `flow_run.status = completed`, 3 `component_run` rows written
-- [ ] Step 2 fails → `flow_run.status = failed`, `component_run[step_2].status = failed`, step 3 not executed
-- [ ] Approval gate at index 1, `auto_execute=false` → `flow_run.status = awaiting_approval`, execution stops after step 0
-- [ ] Approval gate at index 1, `auto_execute=true` → gate skipped, execution continues
-- [ ] `previous_step_output` from step N is passed as `ComponentInput.previous_step_output` to step N+1
-- [ ] Unit tests (mocked components) for all four scenarios above
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S1-T1 | `src/Plant/BackEnd/tests/engine/test_flow_executor.py` | 3 mock components all succeed | `flow_run.status="completed"`, 3 `component_run` rows with `status="completed"` |
+| E4-S1-T2 | same | Step 2 fails | `flow_run.status="failed"`, step 3 **not** executed (no row) |
+| E4-S1-T3 | same | Gate at index 1, `auto_execute=false` | `flow_run.status="awaiting_approval"` after step 0; step 1 not executed |
+| E4-S1-T4 | same | Gate at index 1, `auto_execute=true` | Gate skipped; all 3 steps run; `flow_run.status="completed"` |
+| E4-S1-T5 | same | Verify `previous_step_output` chaining | Step N+1 receives `previous_step_output` equal to step N's `result.data` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/engine/test_flow_executor.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E4-S1 — sequential FlowRun executor with approval gate`
+
+**Done signal:**
+`"E4-S1 done. Changed: engine/__init__.py, engine/flow_executor.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅"`
 
 ---
 
-### I2-S5 — FlowRun executor: fan-out (parallel) step runner + PARTIAL_FAILURE (90 min)
+#### Story E4-S2: FlowRun executor — fan-out parallel runner + PARTIAL_FAILURE
 
-**Context:** Marketing Agent's `PublishingFlow` dispatches `LinkedInPublisher` and `YouTubePublisher` in parallel. The executor must launch both ComponentRuns concurrently, await both, and set `flow_run.status = partial_failure` if one succeeds and one fails. Create `engine/flow_executor.py` parallel path (in same file as I2-S4).
+**BLOCKED UNTIL:** E4-S1 committed to `feat/EXEC-ENGINE-001-it2-e4`
+**Estimated time:** 90 min
+**Branch:** `feat/EXEC-ENGINE-001-it2-e4`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/engine/flow_executor.py` — from I2-S4 (add to existing file)
-- `src/Plant/BackEnd/models/component_run.py` — from I1-S2
-- `src/Plant/BackEnd/models/flow_run.py` — from I1-S1
+**What to do:**
+Marketing Agent's `PublishingFlow` dispatches `LinkedInPublisher` and `YouTubePublisher` concurrently. Add `execute_parallel_flow()` to the existing `engine/flow_executor.py`. It launches all steps via `asyncio.gather()`, writes a `ComponentRunModel` per step, and sets `flow_run.status` to `completed` (all ok), `partial_failure` (some ok), or `failed` (all failed).
 
-**Code to add to existing `flow_executor.py`:**
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/engine/flow_executor.py` | 1–70 | Existing imports and `execute_sequential_flow` pattern to follow |
+| `src/Plant/BackEnd/models/flow_run.py` | 1–20 | `FLOW_RUN_STATUSES` — confirm `partial_failure` is valid |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/engine/flow_executor.py` | modify | Append `execute_parallel_flow()` function after the existing `execute_sequential_flow` function |
+
+**Code patterns to copy exactly:**
 ```python
+# Append to engine/flow_executor.py
+import asyncio
+
 async def execute_parallel_flow(
     flow_run: FlowRunModel,
-    parallel_steps: list[dict],  # [{"step_name": "linkedin", "component_type": "LinkedInPublisher"}, ...]
+    parallel_steps: list[dict],
     db: Session,
-    shared_input: dict,           # output from preceding sequential steps
+    shared_input: dict,
 ) -> None:
     flow_run.status = "running"
     db.commit()
@@ -741,7 +1474,6 @@ async def execute_parallel_flow(
         )
         db.add(comp_run)
         db.commit()
-
         result = await comp.safe_execute(comp_input)
         comp_run.status = "completed" if result.success else "failed"
         comp_run.output = result.data
@@ -752,60 +1484,89 @@ async def execute_parallel_flow(
         return step["step_name"], result.success, result.data
 
     outcomes = await asyncio.gather(*[run_one(s) for s in parallel_steps])
-
     all_ok = all(ok for _, ok, _ in outcomes)
     any_ok = any(ok for _, ok, _ in outcomes)
-
     if all_ok:
         flow_run.status = "completed"
     elif any_ok:
         flow_run.status = "partial_failure"
-        flow_run.error_details = {
-            "failed_steps": [name for name, ok, _ in outcomes if not ok]
-        }
+        flow_run.error_details = {"failed_steps": [n for n, ok, _ in outcomes if not ok]}
     else:
         flow_run.status = "failed"
-
     flow_run.completed_at = datetime.now(timezone.utc)
     flow_run.updated_at = datetime.now(timezone.utc)
     db.commit()
 ```
 
-**Acceptance criteria:**
-- [ ] Both parallel steps succeed → `flow_run.status = completed`
-- [ ] LinkedIn succeeds, YouTube fails → `flow_run.status = partial_failure`, `error_details.failed_steps = ["youtube"]`
-- [ ] Both fail → `flow_run.status = failed`
-- [ ] Both `component_run` rows written regardless of outcome
-- [ ] Steps run concurrently (use `asyncio.gather` — confirmed by timing test)
-- [ ] Unit tests for all three outcomes
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
 
-### ✅ Iteration 2 — Completion Checkpoint
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S2-T1 | `src/Plant/BackEnd/tests/engine/test_flow_executor_parallel.py` | Both steps succeed | `flow_run.status="completed"` |
+| E4-S2-T2 | same | LinkedIn ✓ + YouTube ✗ | `flow_run.status="partial_failure"`, `error_details.failed_steps=["youtube"]` |
+| E4-S2-T3 | same | Both fail | `flow_run.status="failed"` |
+| E4-S2-T4 | same | Both steps succeed | Two `component_run` rows exist, both `status="completed"` |
+| E4-S2-T5 | same | Verify concurrency: both mock steps record their start time before either completes | Start times overlap (delta < 50ms) — confirms `asyncio.gather` not serial |
 
-After ALL I2-S1 through I2-S5 acceptance criteria pass:
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/engine/test_flow_executor_parallel.py -v --cov=app --cov-fail-under=80
+```
 
-1. Verify all commits pushed:
-   ```bash
-   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
-   ```
-2. Open PR to main:
-   ```bash
-   gh pr create --base main \
-     --title "feat(EXEC-ENGINE-001): iteration 2 — BaseComponent + Celery queues" \
-     --body "Stories: I2-S1 ✅ I2-S2 ✅ I2-S3 ✅ I2-S4 ✅ I2-S5 ✅"
-   ```
-3. Mark stories complete in this plan file — rename each `### I2-SX —` heading to `### ✅ I2-SX —`, commit + push:
-   ```bash
-   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
-   git commit -m "docs(EXEC-ENGINE-001): mark iteration 2 stories complete"
-   git push
-   ```
-4. **Report to user**: "Iteration 2 complete. PR: [URL]. Stories: I2-S1 ✅ I2-S2 ✅ I2-S3 ✅ I2-S4 ✅ I2-S5 ✅. Please review and merge — **do not launch Iteration 3 until this PR is merged**."
-5. **STOP. Do not run any Iteration 3 code until the user confirms this PR is merged to `main`.**
+**Commit message:** `feat(EXEC-ENGINE-001): E4-S2 — parallel FlowRun executor + PARTIAL_FAILURE`
+
+**Done signal:**
+`"E4-S2 done. Changed: engine/flow_executor.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅"`
+
+**Epic E4 complete ✅** — run Docker integration test (Rule 5) before opening iteration PR.
 
 ---
 
+### Iteration 2 — Completion Checkpoint
+
+After ALL E3 and E4 epics complete and Docker integration test passes:
+
+```bash
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-it2
+git merge --no-ff feat/EXEC-ENGINE-001-it2-e3 feat/EXEC-ENGINE-001-it2-e4
+git push origin feat/EXEC-ENGINE-001-it2
+
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-it2 \
+  --title "feat(EXEC-ENGINE-001): iteration 2 — BaseComponent + Celery queues + FlowRun executor" \
+  --body "## EXEC-ENGINE-001 Iteration 2
+
+### Stories completed
+| E3-S1 | BaseComponent ComponentInput ComponentOutput | 🟢 Done |
+| E3-S2 | Celery component task routing | 🟢 Done |
+| E3-S3 | Component registry | 🟢 Done |
+| E4-S1 | Sequential FlowRun executor + approval gate | 🟢 Done |
+| E4-S2 | Parallel FlowRun executor + PARTIAL_FAILURE | 🟢 Done |
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() — no bare APIRouter
+- [ ] GET routes use get_read_db_session()
+- [ ] PIIMaskingFilter on all new loggers
+- [ ] @circuit_breaker on all external HTTP calls
+- [ ] No env-specific values in Dockerfile or code
+- [ ] Tests >= 80% coverage on new BE code
+- [ ] Postgres owns flow state; Redis only transports jobs"
+```
+
+Post PR URL. **STOP — do not start Iteration 3 until this PR is merged to `main`.**
+
+---
 ## Iteration 3 — Share Trader: Components + End-to-End Flow
+
+**Scope:** Customer with Share Trader hired can trigger market data fetch → RSI analysis → trade execution with full audit records persisted to DB and a deliverable delivered.
+**Lane:** B — new component implementations and Plant API endpoints; no frontend changes.
+**⏱ Estimated:** 5h | **Come back:** 2026-03-09 10:00 IST
+**Epics:** E5, E6
 
 > **⛔ ITERATION 3 GATE — verify before writing any code:** Iteration 2 PR must be merged to `main`:
 > ```bash
@@ -814,94 +1575,323 @@ After ALL I2-S1 through I2-S5 acceptance criteria pass:
 > ```
 > If Iteration 2 content is absent from `main`, **STOP** and tell the user: "Iteration 3 is blocked — the Iteration 2 PR must be merged to main first."
 
-> **Stories written and committed:** 2026-03-08
+### Dependency Map (Iteration 3)
 
-### I3-S1 — `DeltaExchangePump` component (45 min)
+```
+E5-S1 ──► E5-S2 ──► E5-S3    (branch feat/EXEC-ENGINE-001-it3-e5, sequential)
+                       │
+                       ▼
+E6-S1 ──► E6-S2               (branch feat/EXEC-ENGINE-001-it3-e6; E6-S1 needs E5-S3)
+```
 
-**Context:** First concrete `BaseComponent` implementation. Pulls OHLCV candle data from Delta Exchange API for a given instrument. Reads `skill_config.customer_fields.instrument` and `skill_config.pp_locked_fields.data_provider`. Uses `@circuit_breaker` on the HTTP call. Returns normalised candle list. Create `src/Plant/BackEnd/components/share_trader/delta_exchange_pump.py`.
+---
 
-**Files to read first:**
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
-- `src/Plant/BackEnd/components/registry.py` — from I2-S3
-- `src/Plant/BackEnd/core/security.py` — for any secrets access pattern
+### Epic E5: Customer delegates market analysis and trade execution to Share Trader agent
 
-**NFR pattern (mandatory):**
+**Branch:** `feat/EXEC-ENGINE-001-it3-e5`
+**User story:** As a Buy/Sell trader with Share Trader hired, I can see WAOOAW fetch market data, analyze RSI signals, and place orders on my behalf so that I delegate day-trading execution to the agent.
+
+---
+
+#### Story E5-S1: `DeltaExchangePump` component
+
+**BLOCKED UNTIL:** none (Iteration 3 must be on `main` first)
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it3-e5`
+**CP BackEnd pattern:** N/A — Plant BackEnd component only
+
+**What to do:**
+There is no concrete component that fetches market data. Create the `components/share_trader/` package and `delta_exchange_pump.py`, the first `BaseComponent` implementation. It pulls OHLCV candle data from the Delta Exchange API for the customer's configured instrument, wraps the HTTP call with `@circuit_breaker(service="delta_exchange_api")`, and registers itself at module import. API key must never appear in logs.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `BaseComponent`, `ComponentInput`, `ComponentOutput` interface |
+| `src/Plant/BackEnd/components/registry.py` | 1–30 | `register_component()` call pattern |
+| `src/Plant/BackEnd/core/encryption.py` | 1–40 | API key decryption pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/share_trader/__init__.py` | create | Empty file — marks package |
+| `src/Plant/BackEnd/components/share_trader/delta_exchange_pump.py` | create | Full component as per code pattern below |
+
+**Code patterns to copy exactly:**
 ```python
+# src/Plant/BackEnd/components/share_trader/delta_exchange_pump.py
+import httpx
 from core.logging import get_logger, PIIMaskingFilter
-from core.observability import tracer  # circuit_breaker from core.security or equivalent
+from core.security import circuit_breaker
+from components.base import BaseComponent, ComponentInput, ComponentOutput
+from components.registry import register_component
 
 logger = get_logger(__name__)
 logger.addFilter(PIIMaskingFilter())
 
-@circuit_breaker(service="delta_exchange_api")
-async def _fetch_candles(instrument: str, api_key: str) -> list[dict]:
-    # httpx async call to Delta Exchange API
-    ...
+class DeltaExchangePump(BaseComponent):
+    @property
+    def component_type(self) -> str:
+        return "DeltaExchangePump"
+
+    async def execute(self, input: ComponentInput) -> ComponentOutput:
+        instrument = input.skill_config.get("customer_fields", {}).get("instrument", "NIFTY")
+        api_key = input.skill_config.get("customer_fields", {}).get("delta_api_key", "")
+        candles = await self._fetch_candles(instrument, api_key)
+        return ComponentOutput(success=True, data={"candles": candles, "instrument": instrument})
+
+    @circuit_breaker(service="delta_exchange_api")
+    async def _fetch_candles(self, instrument: str, api_key: str) -> list[dict]:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.delta.exchange/v2/history/candles",
+                params={"symbol": instrument, "resolution": "1m", "limit": 50},
+                headers={"api-key": api_key},
+                timeout=10.0,
+            )
+            resp.raise_for_status()
+            return resp.json().get("result", [])
+
+register_component(DeltaExchangePump())
 ```
 
-**Acceptance criteria:**
-- [ ] `DeltaExchangePump.component_type == "DeltaExchangePump"`
-- [ ] `execute()` returns `ComponentOutput.data = {"candles": [...], "instrument": "NIFTY"}`
-- [ ] `skill_config.customer_fields.instrument` controls which instrument is fetched
-- [ ] `@circuit_breaker(service="delta_exchange_api")` wraps the HTTP call
-- [ ] `PIIMaskingFilter` on logger — API key never logged
-- [ ] Registered in registry at module import: `register_component(DeltaExchangePump())`
-- [ ] Unit test with mocked HTTP: success path returns candles; HTTP 500 returns `ComponentOutput(success=False)`
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E5-S1-T1 | `src/Plant/BackEnd/tests/components/test_delta_exchange_pump.py` | Mock `httpx.AsyncClient.get` returns 200 with candle list | `execute()` returns `success=True`, `data["candles"]` populated |
+| E5-S1-T2 | same | Mock returns HTTP 500 | `safe_execute()` returns `success=False`, `error_message` non-empty |
+| E5-S1-T3 | same | Call `get_component("DeltaExchangePump")` after module import | Returns instance without `KeyError` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_delta_exchange_pump.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E5-S1 — DeltaExchangePump component`
+
+**Done signal:**
+`"E5-S1 done. Changed: components/share_trader/__init__.py, components/share_trader/delta_exchange_pump.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---
 
-### I3-S2 — `RSIProcessor` component (45 min)
+#### Story E5-S2: `RSIProcessor` component
 
-**Context:** Takes candle data from `previous_step_output`, calculates RSI for a configurable period, and classifies the signal as `BUY | SELL | HOLD`. No external HTTP calls — pure calculation. Create `src/Plant/BackEnd/components/share_trader/rsi_processor.py`.
+**BLOCKED UNTIL:** E5-S1 committed to `feat/EXEC-ENGINE-001-it3-e5`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it3-e5`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
-- `src/Plant/BackEnd/components/registry.py` — from I2-S3
+**What to do:**
+There is no signal processor component. Create `components/share_trader/rsi_processor.py`. It reads `previous_step_output["candles"]` (from `DeltaExchangePump`), calculates RSI for a customer-configurable period, and classifies the signal as `BUY | SELL | HOLD`. No external HTTP — pure calculation. Empty candles → `ComponentOutput(success=False)`.
 
-**Acceptance criteria:**
-- [ ] `RSIProcessor.component_type == "RSIProcessor"`
-- [ ] `execute()` reads `previous_step_output.candles` and `skill_config.customer_fields.rsi_period`
-- [ ] Returns `{"rsi_value": float, "signal": "BUY"|"SELL"|"HOLD", "confidence": float}`
-- [ ] RSI < 30 → BUY; RSI > 70 → SELL; else HOLD
-- [ ] Empty candles list → `ComponentOutput(success=False, error_message="Insufficient data")`
-- [ ] No external HTTP — circuit_breaker not required
-- [ ] Unit tests: BUY threshold, SELL threshold, HOLD range, empty input
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `ComponentInput.previous_step_output` field type |
+| `src/Plant/BackEnd/components/registry.py` | 1–30 | `register_component()` call |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/share_trader/rsi_processor.py` | create | Full component as per code pattern below |
+
+**Code patterns to copy exactly:**
+```python
+# src/Plant/BackEnd/components/share_trader/rsi_processor.py
+from core.logging import get_logger, PIIMaskingFilter
+from components.base import BaseComponent, ComponentInput, ComponentOutput
+from components.registry import register_component
+
+logger = get_logger(__name__)
+logger.addFilter(PIIMaskingFilter())
+
+class RSIProcessor(BaseComponent):
+    @property
+    def component_type(self) -> str:
+        return "RSIProcessor"
+
+    async def execute(self, input: ComponentInput) -> ComponentOutput:
+        candles = (input.previous_step_output or {}).get("candles", [])
+        if not candles:
+            return ComponentOutput(success=False, error_message="Insufficient data")
+        period = int(input.skill_config.get("customer_fields", {}).get("rsi_period", 14))
+        rsi_value = self._calculate_rsi(candles, period)
+        if rsi_value < 30:
+            signal = "BUY"
+        elif rsi_value > 70:
+            signal = "SELL"
+        else:
+            signal = "HOLD"
+        return ComponentOutput(success=True, data={"rsi_value": rsi_value, "signal": signal, "confidence": 0.9})
+
+    def _calculate_rsi(self, candles: list[dict], period: int) -> float:
+        closes = [float(c.get("close", 0)) for c in candles]
+        if len(closes) < period + 1:
+            return 50.0
+        deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+        gains = [d for d in deltas[-period:] if d > 0]
+        losses = [-d for d in deltas[-period:] if d < 0]
+        avg_gain = sum(gains) / period if gains else 0
+        avg_loss = sum(losses) / period if losses else 0
+        if avg_loss == 0:
+            return 100.0
+        return 100 - (100 / (1 + avg_gain / avg_loss))
+
+register_component(RSIProcessor())
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E5-S2-T1 | `src/Plant/BackEnd/tests/components/test_rsi_processor.py` | `previous_step_output` with candles producing RSI < 30 | `data["signal"] == "BUY"` |
+| E5-S2-T2 | same | Candles producing RSI > 70 | `data["signal"] == "SELL"` |
+| E5-S2-T3 | same | Candles producing 30 ≤ RSI ≤ 70 | `data["signal"] == "HOLD"` |
+| E5-S2-T4 | same | `previous_step_output` with empty `candles` list | `success=False`, `error_message="Insufficient data"` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_rsi_processor.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E5-S2 — RSIProcessor component`
+
+**Done signal:**
+`"E5-S2 done. Changed: components/share_trader/rsi_processor.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
 
 ---
 
-### I3-S3 — `DeltaPublisher` component (45 min)
+#### Story E5-S3: `DeltaPublisher` component
 
-**Context:** Places a market order on Delta Exchange using the order params from `previous_step_output`. Reads API key from `skill_config.customer_fields.delta_api_key`. Uses `@circuit_breaker`. Returns order confirmation. Create `src/Plant/BackEnd/components/share_trader/delta_publisher.py`.
+**BLOCKED UNTIL:** E5-S2 committed to `feat/EXEC-ENGINE-001-it3-e5`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it3-e5`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
-- `src/Plant/BackEnd/core/encryption.py` — API key decryption pattern
+**What to do:**
+There is no order placement component. Create `components/share_trader/delta_publisher.py`. It reads the trade signal from `previous_step_output`, decrypts the Delta Exchange API key from `skill_config.customer_fields.delta_api_key` using `core.encryption`, and places a market order with `@circuit_breaker(service="delta_exchange_api")`. API key must never appear in logs. HOLD signal → skip without placing order.
 
-**Acceptance criteria:**
-- [ ] `DeltaPublisher.component_type == "DeltaPublisher"`
-- [ ] `@circuit_breaker(service="delta_exchange_api")` on HTTP call
-- [ ] API key decrypted from `skill_config.customer_fields.delta_api_key` using `core.encryption`
-- [ ] API key NEVER appears in logs (`PIIMaskingFilter` active)
-- [ ] Returns `{"order_id": str, "fill_price": float, "status": "filled"|"rejected"}`
-- [ ] HTTP failure → `ComponentOutput(success=False)` — triggers Celery retry via `execute_publisher` task
-- [ ] Unit tests: success path, HTTP 4xx (order rejected), HTTP 5xx (retry path)
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `ComponentInput` + `ComponentOutput` interface |
+| `src/Plant/BackEnd/core/encryption.py` | 1–40 | `decrypt_field()` call pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/share_trader/delta_publisher.py` | create | Full component as per code pattern below |
+
+**Code patterns to copy exactly:**
+```python
+# src/Plant/BackEnd/components/share_trader/delta_publisher.py
+import httpx
+from core.logging import get_logger, PIIMaskingFilter
+from core.security import circuit_breaker
+from core.encryption import decrypt_field
+from components.base import BaseComponent, ComponentInput, ComponentOutput
+from components.registry import register_component
+
+logger = get_logger(__name__)
+logger.addFilter(PIIMaskingFilter())
+
+class DeltaPublisher(BaseComponent):
+    @property
+    def component_type(self) -> str:
+        return "DeltaPublisher"
+
+    async def execute(self, input: ComponentInput) -> ComponentOutput:
+        signal = (input.previous_step_output or {}).get("signal", "HOLD")
+        if signal == "HOLD":
+            return ComponentOutput(success=True, data={"status": "skipped", "reason": "HOLD signal"})
+        encrypted_key = input.skill_config.get("customer_fields", {}).get("delta_api_key", "")
+        api_key = decrypt_field(encrypted_key)
+        instrument = input.skill_config.get("customer_fields", {}).get("instrument", "NIFTY")
+        result = await self._place_order(instrument, signal, api_key)
+        return ComponentOutput(success=True, data=result)
+
+    @circuit_breaker(service="delta_exchange_api")
+    async def _place_order(self, instrument: str, side: str, api_key: str) -> dict:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.delta.exchange/v2/orders",
+                json={"product_symbol": instrument, "side": side.lower(),
+                      "order_type": "market_order", "size": 1},
+                headers={"api-key": api_key},
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+            data = resp.json().get("result", {})
+            return {"order_id": data.get("id", ""), "fill_price": data.get("avg_fill_price", 0.0),
+                    "status": "filled"}
+
+register_component(DeltaPublisher())
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E5-S3-T1 | `src/Plant/BackEnd/tests/components/test_delta_publisher.py` | `previous_step_output.signal="BUY"`, mock HTTP 200 with order response | `success=True`, `data["order_id"]` set |
+| E5-S3-T2 | same | `previous_step_output.signal="HOLD"` | `success=True`, `data["status"]="skipped"` |
+| E5-S3-T3 | same | Mock HTTP 4xx (order rejected) | `safe_execute()` returns `success=False` |
+| E5-S3-T4 | same | Inspect log records captured during execute | API key value does NOT appear in any log record |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_delta_publisher.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E5-S3 — DeltaPublisher component`
+
+**Done signal:**
+`"E5-S3 done. Changed: components/share_trader/delta_publisher.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+**Epic E5 complete ✅** — run Docker integration test (Rule 5) before starting E6.
 
 ---
 
-### I3-S4 — Share Trader FlowDef + end-to-end run (90 min)
+### Epic E6: Customer sees Share Trader deliver end-to-end trade results
 
-**Context:** Wire `DeltaExchangePump → RSIProcessor → DeltaPublisher` into a FlowDef and run it end-to-end using the `execute_sequential_flow` engine from I2-S4. The FlowDef is stored as a Python constant (no DB table yet — P3 gap, deferred). Create `src/Plant/BackEnd/flows/share_trader.py`. Add Plant API endpoint: `POST /v1/flow-runs` to trigger a named flow for a hired agent.
+**Branch:** `feat/EXEC-ENGINE-001-it3-e6`
+**User story:** As a customer with Share Trader hired, I can trigger a full market analysis → approval gate → trade execution cycle via the Plant API and see a deliverable with my order confirmation appear in the CP dashboard.
 
-**Files to read first:**
-- `src/Plant/BackEnd/engine/flow_executor.py` — from I2-S4
-- `src/Plant/BackEnd/models/flow_run.py` — from I1-S1
-- `src/Plant/BackEnd/models/skill_config.py` — from I1-S3
-- `src/Plant/BackEnd/api/v1/` — add new route here
+---
 
-**Flow constant:**
+#### Story E6-S1: Share Trader FlowDef + `POST /v1/flow-runs` + `GET /v1/flow-runs/{id}` endpoints
+
+**BLOCKED UNTIL:** E5-S3 committed to `feat/EXEC-ENGINE-001-it3-e5` (all three Share Trader components must exist)
+**Estimated time:** 90 min
+**Branch:** `feat/EXEC-ENGINE-001-it3-e6`
+**CP BackEnd pattern:** Pattern B — new `/cp/flow-runs` proxy is added in Iteration 6 (E14-S2); this story adds only the Plant `/v1/flow-runs` source endpoints
+
+**What to do:**
+Wire `DeltaExchangePump → RSIProcessor → DeltaPublisher` into FlowDef Python constants stored in `flows/share_trader.py`. Add `POST /v1/flow-runs` (creates `FlowRunModel`, triggers `execute_sequential_flow` as a background task) and `GET /v1/flow-runs/{flow_run_id}` (read-replica, returns status + current_step). Register the router in `main.py`. Use `waooaw_router()` — no bare `APIRouter`.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/engine/flow_executor.py` | 1–80 | `execute_sequential_flow()` signature — `flow_run`, `sequential_steps`, `db`, `approval_gate_index` |
+| `src/Plant/BackEnd/models/flow_run.py` | 1–45 | Column list, JSONB `run_context`, `idempotency_key` unique constraint |
+| `src/Plant/BackEnd/api/v1/skill_configs.py` | 1–40 | `waooaw_router()` + `get_db_session` / `get_read_db_session` import pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/flows/__init__.py` | create | Empty file — marks package |
+| `src/Plant/BackEnd/flows/share_trader.py` | create | Flow constants + `FLOW_REGISTRY` dict as per code pattern below |
+| `src/Plant/BackEnd/api/v1/flow_runs.py` | create | `POST /` and `GET /{id}` endpoints as per code pattern below |
+| `src/Plant/BackEnd/main.py` | modify | Add `from api.v1 import flow_runs` and `app.include_router(flow_runs.router)` |
+
+**Code patterns to copy exactly:**
 ```python
 # src/Plant/BackEnd/flows/share_trader.py
 MARKET_ANALYSIS_FLOW = {
@@ -910,9 +1900,8 @@ MARKET_ANALYSIS_FLOW = {
         {"step_name": "step_1", "component_type": "DeltaExchangePump"},
         {"step_name": "step_2", "component_type": "RSIProcessor"},
     ],
-    "approval_gate_index": None,  # No gate on analysis
+    "approval_gate_index": None,
 }
-
 EXECUTE_TRADE_FLOW = {
     "flow_name": "ExecuteTradeFlow",
     "sequential_steps": [
@@ -920,57 +1909,197 @@ EXECUTE_TRADE_FLOW = {
     ],
     "approval_gate_index": 0,  # Gate fires before DeltaPublisher
 }
+FLOW_REGISTRY = {
+    "MarketAnalysisFlow": MARKET_ANALYSIS_FLOW,
+    "ExecuteTradeFlow": EXECUTE_TRADE_FLOW,
+}
+
+# src/Plant/BackEnd/api/v1/flow_runs.py
+import uuid
+from datetime import datetime, timezone
+from fastapi import Depends, HTTPException, BackgroundTasks
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from core.routing import waooaw_router
+from core.database import get_db_session, get_read_db_session
+from core.logging import get_logger, PIIMaskingFilter
+from models.flow_run import FlowRunModel
+from flows.share_trader import FLOW_REGISTRY
+from engine.flow_executor import execute_sequential_flow
+
+logger = get_logger(__name__)
+logger.addFilter(PIIMaskingFilter())
+
+router = waooaw_router(prefix="/v1/flow-runs", tags=["flow-runs"])
+
+class FlowRunRequest(BaseModel):
+    hired_instance_id: str
+    flow_name: str
+    run_context: dict
+
+@router.post("/", status_code=201)
+async def create_flow_run(
+    body: FlowRunRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db_session),
+):
+    flow_def = FLOW_REGISTRY.get(body.flow_name)
+    if not flow_def:
+        raise HTTPException(status_code=400, detail=f"Unknown flow: {body.flow_name}")
+    flow_run = FlowRunModel(
+        id=str(uuid.uuid4()),
+        hired_instance_id=body.hired_instance_id,
+        skill_id=body.run_context.get("skill_id", ""),
+        flow_name=body.flow_name,
+        status="pending",
+        run_context=body.run_context,
+        idempotency_key=body.run_context.get("idempotency_key", str(uuid.uuid4())),
+        started_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(flow_run)
+    db.commit()
+    background_tasks.add_task(
+        execute_sequential_flow,
+        flow_run, flow_def["sequential_steps"], db, flow_def.get("approval_gate_index"),
+    )
+    return {"id": flow_run.id, "status": flow_run.status}
+
+@router.get("/{flow_run_id}")
+async def get_flow_run(
+    flow_run_id: str,
+    db: Session = Depends(get_read_db_session),
+):
+    row = db.query(FlowRunModel).filter_by(id=flow_run_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="flow_run not found")
+    return {"id": row.id, "status": row.status, "current_step": row.current_step,
+            "flow_name": row.flow_name}
 ```
 
-**Acceptance criteria:**
-- [ ] `POST /v1/flow-runs` accepts `{hired_instance_id, flow_name, run_context}`, creates `FlowRunModel`, enqueues to correct Celery queue
-- [ ] `GET /v1/flow-runs/{flow_run_id}` returns current status + current_step
-- [ ] Full end-to-end integration test: trigger `MarketAnalysisFlow` → RSI=28 → signal=BUY → `ExecuteTradeFlow` triggered → order placed → `flow_run.status=completed`
-- [ ] With `auto_execute=false`: `ExecuteTradeFlow` stops at gate → `awaiting_approval`
-- [ ] `waooaw_router()` used — bare `APIRouter` forbidden
-- [ ] `get_read_db_session` on GET route, `get_db_session` on POST route
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E6-S1-T1 | `src/Plant/BackEnd/tests/api/test_flow_runs.py` | `POST /v1/flow-runs` with `flow_name="MarketAnalysisFlow"` | HTTP 201, body contains `id` and `status="pending"` |
+| E6-S1-T2 | same | `POST /v1/flow-runs` with unknown `flow_name` | HTTP 400 |
+| E6-S1-T3 | same | `GET /v1/flow-runs/{id}` after creating a run | HTTP 200, `status` and `current_step` present |
+| E6-S1-T4 | same | `GET /v1/flow-runs/{unknown_id}` | HTTP 404 |
+| E6-S1-T5 | same | Two POSTs with same `idempotency_key` in `run_context` | Second raises `IntegrityError` → HTTP 409 or 500 with unique key violation |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/api/test_flow_runs.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E6-S1 — Share Trader FlowDef + flow-runs endpoints`
+
+**Done signal:**
+`"E6-S1 done. Changed: flows/__init__.py, flows/share_trader.py, api/v1/flow_runs.py, main.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅"`
 
 ---
 
-### I3-S5 — Deliverable written at FlowRun completion (30 min)
+#### Story E6-S2: Deliverable written at FlowRun completion
 
-**Context:** When `ExecuteTradeFlow` completes, a `DeliverableModel` row must be written with the order confirmation so the customer can see it in their CP dashboard. Add deliverable-creation logic to `execute_sequential_flow` post-completion hook. The deliverable `content` field stores the last step's `component_run.output` as JSONB.
+**BLOCKED UNTIL:** E6-S1 committed to `feat/EXEC-ENGINE-001-it3-e6`
+**Estimated time:** 30 min
+**Branch:** `feat/EXEC-ENGINE-001-it3-e6`
+**CP BackEnd pattern:** N/A — Plant BackEnd engine hook only
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/deliverable.py` — existing model
-- `src/Plant/BackEnd/engine/flow_executor.py` — add post-completion hook here
+**What to do:**
+When `execute_sequential_flow` sets `flow_run.status = "completed"`, no `DeliverableModel` row is written yet. Add a post-completion hook at the end of `execute_sequential_flow` in `engine/flow_executor.py` that creates a `DeliverableModel` row using the last step's output as `content`, reading `hired_instance_id`, `goal_instance_id`, and `deliverable_type` from `flow_run.run_context`. Failed flows must NOT create a deliverable.
 
-**Acceptance criteria:**
-- [ ] On `flow_run.status = completed`, a `DeliverableModel` row is created with `content = last_component_run.output`
-- [ ] `deliverable.hired_instance_id` and `deliverable.goal_instance_id` populated from `flow_run.run_context`
-- [ ] `deliverable.type` set to `"trade_execution"` for Share Trader flows
-- [ ] `GET /v1/deliverables?hired_instance_id=X` returns the new deliverable
-- [ ] Unit test: completed flow → deliverable row exists with correct content
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Files to read first (max 3):**
 
-### ✅ Iteration 3 — Completion Checkpoint
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/deliverable.py` | 1–50 | Column list — `hired_instance_id`, `goal_instance_id`, `type`, `content`, `created_at` fields |
+| `src/Plant/BackEnd/engine/flow_executor.py` | 55–90 | Post-loop `flow_run.status = "completed"` + `db.commit()` block to extend |
 
-After ALL I3-S1 through I3-S5 acceptance criteria pass:
+**Files to create / modify:**
 
-1. Verify all commits pushed:
-   ```bash
-   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
-   ```
-2. Open PR to main:
-   ```bash
-   gh pr create --base main \
-     --title "feat(EXEC-ENGINE-001): iteration 3 — Share Trader end-to-end" \
-     --body "Stories: I3-S1 ✅ I3-S2 ✅ I3-S3 ✅ I3-S4 ✅ I3-S5 ✅"
-   ```
-3. Mark stories complete in this plan file — rename each `### I3-SX —` heading to `### ✅ I3-SX —`, commit + push:
-   ```bash
-   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
-   git commit -m "docs(EXEC-ENGINE-001): mark iteration 3 stories complete"
-   git push
-   ```
-4. **Report to user**: "Iteration 3 complete. PR: [URL]. Stories: I3-S1 ✅ I3-S2 ✅ I3-S3 ✅ I3-S4 ✅ I3-S5 ✅. Please review and merge — **do not launch Iteration 4 until this PR is merged**."
-5. **STOP. Do not run any Iteration 4 code until the user confirms this PR is merged to `main`.**
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/engine/flow_executor.py` | modify | Add `from models.deliverable import DeliverableModel` to imports; insert deliverable-creation block immediately after the `db.commit()` on completed status at end of function |
+
+**Code patterns to copy exactly:**
+```python
+# Add to top-of-file imports in flow_executor.py:
+from models.deliverable import DeliverableModel
+
+# Deliverable hook — insert after db.commit() at the end of execute_sequential_flow,
+# AFTER flow_run.status has been set to "completed":
+_deliverable = DeliverableModel(
+    id=str(uuid.uuid4()),
+    hired_instance_id=flow_run.run_context.get("hired_instance_id", flow_run.hired_instance_id),
+    goal_instance_id=flow_run.run_context.get("goal_instance_id"),
+    type=flow_run.run_context.get("deliverable_type", "trade_execution"),
+    content=prev_output or {},
+    created_at=datetime.now(timezone.utc),
+)
+db.add(_deliverable)
+db.commit()
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E6-S2-T1 | `src/Plant/BackEnd/tests/engine/test_deliverable_hook.py` | `execute_sequential_flow` with all mock steps succeeding, `deliverable_type="trade_execution"` in `run_context` | `DeliverableModel` row exists with `type="trade_execution"` and `content == last_step_output` |
+| E6-S2-T2 | same | Successful run with `goal_instance_id="goal-123"` in `run_context` | `deliverable.goal_instance_id == "goal-123"` |
+| E6-S2-T3 | same | Step 2 fails — `flow_run.status = "failed"` | No `DeliverableModel` row written |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/engine/test_deliverable_hook.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E6-S2 — deliverable written at FlowRun completion`
+
+**Done signal:**
+`"E6-S2 done. Changed: engine/flow_executor.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+**Epic E6 complete ✅** — run Docker integration test (Rule 5) before opening iteration PR.
+
+---
+
+### Iteration 3 — Completion Checkpoint
+
+After ALL E5 and E6 epics complete and Docker integration test passes:
+
+```bash
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-it3
+git merge --no-ff feat/EXEC-ENGINE-001-it3-e5 feat/EXEC-ENGINE-001-it3-e6
+git push origin feat/EXEC-ENGINE-001-it3
+
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-it3 \
+  --title "feat(EXEC-ENGINE-001): iteration 3 — Share Trader end-to-end" \
+  --body "## EXEC-ENGINE-001 Iteration 3
+
+### Stories completed
+| E5-S1 | DeltaExchangePump component | 🟢 Done |
+| E5-S2 | RSIProcessor component | 🟢 Done |
+| E5-S3 | DeltaPublisher component | 🟢 Done |
+| E6-S1 | Share Trader FlowDef + flow-runs endpoints | 🟢 Done |
+| E6-S2 | Deliverable written at FlowRun completion | 🟢 Done |
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() — no bare APIRouter
+- [ ] GET routes use get_read_db_session()
+- [ ] PIIMaskingFilter on all new loggers
+- [ ] @circuit_breaker on all external HTTP calls
+- [ ] No env-specific values in Dockerfile or code
+- [ ] Tests >= 80% coverage on new BE code
+- [ ] Postgres owns flow state; Redis only transports jobs"
+```
+
+Post PR URL. **STOP — do not start Iteration 4 until this PR is merged to `main`.**
 
 ---
 
