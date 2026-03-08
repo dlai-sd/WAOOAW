@@ -5,5 +5,5 @@ min_instances         = 0
 max_instances         = 5
 enable_db_updates     = "true"
 allowed_email_domains = "dlaisd.com,waooaw.com,gmail.com,googlemail.com"
-enable_dev_token      = "false"
+enable_dev_token      = "true"
 enable_metering_debug = "false"
