@@ -121,6 +121,10 @@ app.include_router(cp_scheduler_router, prefix="/api")
 from api.cp_approvals_proxy import router as cp_approvals_proxy_router  # noqa: E402
 app.include_router(cp_approvals_proxy_router, prefix="/api")
 
+# EXEC-ENGINE-001 It-6 E14-S2: Flow-run + component-run proxy routes
+from api.cp_flow_runs import router as cp_flow_runs_router  # noqa: E402
+app.include_router(cp_flow_runs_router, prefix="/api")
+
 # Frontend static files path
 FRONTEND_DIST = Path("/app/frontend/dist")
 

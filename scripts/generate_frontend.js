@@ -1207,6 +1207,647 @@ describe('approvals page', () => {
 });
 `);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EXEC-ENGINE-001 Iteration 6 — PP Portal UI: Fleet + Health + DLQ
+// Epics E12-S1, E13-S1, E14-S1
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── pp-portal/components/ComponentRunRow.js (E13-S1) ─────────────────────────
+write('pp-portal/components/ComponentRunRow.js', `// frontend/pp-portal/components/ComponentRunRow.js
+const STATUS_ICONS = { completed: '✓', running: '⏳', failed: '✗', pending: '⏸' };
+const STATUS_CLASSES = { completed: 'success', running: 'running', failed: 'error', pending: 'pending' };
+
+export function renderComponentRunRow(cr) {
+  const icon = STATUS_ICONS[cr.status] || '•';
+  const cls = STATUS_CLASSES[cr.status] || 'pending';
+  const errMsg = cr.error_message
+    ? \`<span class="cr-row__error" title="\${cr.error_message}">\${cr.error_message.slice(0, 80)}…</span>\`
+    : '';
+  return \`
+<div class="cr-row cr-row--\${cls}">
+  <span class="cr-row__icon">\${icon}</span>
+  <span class="cr-row__step">\${cr.step_name}</span>
+  \${cr.duration_ms ? \`<span class="cr-row__dur">\${cr.duration_ms}ms</span>\` : ''}
+  \${errMsg}
+</div>\`;
+}
+`);
+
+// ── pp-portal/pages/fleet.html (E12-S1) ─────────────────────────────────────
+write('pp-portal/pages/fleet.html', `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW PP — Fleet Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-green:#10b981;--status-yellow:#f59e0b;--status-red:#ef4444;
+          --text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .page{max-width:1100px;margin:0 auto;padding:2rem}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:1.75rem;margin-bottom:.5rem}
+    .page-subtitle{color:var(--text-secondary);margin-bottom:2rem;font-size:.9rem}
+    #fleet-grid{display:flex;flex-direction:column;gap:.75rem}
+    .fleet-row{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1rem;padding:1rem 1.5rem;display:grid;grid-template-columns:2fr 1fr 3fr 1fr auto;align-items:center;gap:1rem;transition:border-color .2s}
+    .fleet-row:hover{border-color:rgba(0,242,254,.3)}
+    .fleet-row__name{font-family:'Space Grotesk',sans-serif;font-weight:600}
+    .fleet-row__instances{font-size:.85rem;color:var(--text-secondary)}
+    .fleet-row__bars{display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.05)}
+    .fleet-bar{height:100%;transition:width .4s ease}
+    .fleet-bar--green{background:var(--status-green)}
+    .fleet-bar--yellow{background:var(--status-yellow)}
+    .fleet-bar--red{background:var(--status-red)}
+    .fleet-row__error-rate{font-size:.85rem;font-weight:600;color:var(--text-secondary);text-align:right}
+    .fleet-row__error-rate--high{color:var(--status-red)}
+    .btn{display:inline-block;padding:.4rem .9rem;border-radius:.4rem;text-decoration:none;font-weight:600;font-size:.85rem;cursor:pointer;border:none;transition:all .2s}
+    .btn--outline{background:transparent;border:1px solid var(--border-dark);color:var(--text-primary)}
+    .btn--outline:hover{border-color:var(--color-neon-cyan);color:var(--color-neon-cyan)}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+    .error{color:var(--status-red);padding:1rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW PP</h1>
+    <nav>
+      <a href="/pp/fleet">Fleet</a>
+      <a href="/pp/dlq">DLQ</a>
+    </nav>
+  </header>
+  <main class="page">
+    <h2>Fleet Dashboard</h2>
+    <p class="page-subtitle">Live status of all deployed agents. Auto-refreshes every 10 seconds.</p>
+    <div id="fleet-grid">
+      <div class="empty-state">Loading fleet…</div>
+    </div>
+  </main>
+  <script type="module" src="fleet.js"></script>
+</body>
+</html>
+`);
+
+// ── pp-portal/pages/fleet.js (E12-S1) ────────────────────────────────────────
+write('pp-portal/pages/fleet.js', `// frontend/pp-portal/pages/fleet.js
+const API_BASE = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : '';
+let refreshTimer = null;
+
+export function renderFleetAgentRow(agent, summary) {
+  const errorRate = summary.total > 0
+    ? ((summary.failed / summary.total) * 100).toFixed(1)
+    : '0.0';
+  const barWidth = (count, total) => total > 0 ? Math.round((count / total) * 100) : 0;
+  return \`
+<div class="fleet-row" data-agent-id="\${agent.id}">
+  <div class="fleet-row__name">\${agent.name}</div>
+  <div class="fleet-row__instances">\${agent.instance_count != null ? agent.instance_count : 0} instances</div>
+  <div class="fleet-row__bars">
+    <div class="fleet-bar fleet-bar--green" style="width:\${barWidth(summary.completed, summary.total)}%"
+         title="\${summary.completed} completed"></div>
+    <div class="fleet-bar fleet-bar--yellow" style="width:\${barWidth(summary.running, summary.total)}%"
+         title="\${summary.running} running"></div>
+    <div class="fleet-bar fleet-bar--red" style="width:\${barWidth(summary.failed, summary.total)}%"
+         title="\${summary.failed} failed"></div>
+  </div>
+  <div class="fleet-row__error-rate \${parseFloat(errorRate) > 10 ? 'fleet-row__error-rate--high' : ''}">
+    \${errorRate}% err
+  </div>
+  <a href="/pp/agent?id=\${agent.id}" class="btn btn--outline fleet-row__drill">Details →</a>
+</div>\`;
+}
+
+export async function loadFleet() {
+  const base = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : API_BASE;
+  const agentsRes = await fetch(\`\${base}/v1/agents\`);
+  if (!agentsRes.ok) throw new Error('Failed to load agents');
+  const agents = await agentsRes.json();
+  const summaries = await Promise.all(
+    agents.map(a => fetch(\`\${base}/v1/component-runs/summary?agent_id=\${a.id}\`)
+      .then(r => r.ok ? r.json() : { total: 0, running: 0, completed: 0, failed: 0 })
+    )
+  );
+  const grid = document.getElementById('fleet-grid');
+  if (!agents.length) { grid.innerHTML = '<p class="empty-state">No agents deployed yet.</p>'; return; }
+  grid.innerHTML = agents.map((a, i) => renderFleetAgentRow(a, summaries[i])).join('');
+}
+
+export function startPolling() {
+  loadFleet().catch(err => { document.getElementById('fleet-grid').innerHTML = \`<p class="error">\${err.message}</p>\`; });
+  refreshTimer = typeof setInterval !== 'undefined'
+    ? setInterval(() => loadFleet().catch(console.error), 10000)
+    : null;
+}
+
+document.addEventListener('DOMContentLoaded', startPolling);
+`);
+
+// ── pp-portal/pages/agent-detail.html (E13-S1) ──────────────────────────────
+write('pp-portal/pages/agent-detail.html', `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW PP — Agent Detail</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-green:#10b981;--status-yellow:#f59e0b;--status-red:#ef4444;
+          --text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .page{max-width:900px;margin:0 auto;padding:2rem}
+    .back-link{font-size:.85rem;color:var(--color-neon-cyan);text-decoration:none;margin-bottom:1.5rem;display:inline-block}
+    .back-link:hover{opacity:.8}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;margin-bottom:1.5rem}
+    #flow-run-list{display:flex;flex-direction:column;gap:.75rem}
+    details.flow-run-item{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1rem;overflow:hidden}
+    details.flow-run-item[open]{border-color:rgba(0,242,254,.3)}
+    summary.flow-run-item__summary{padding:1rem 1.5rem;cursor:pointer;display:flex;align-items:center;gap:1rem;list-style:none;user-select:none}
+    summary.flow-run-item__summary::-webkit-details-marker{display:none}
+    .flow-run-item__status{font-size:.75rem;font-weight:700;padding:.2rem .6rem;border-radius:9999px;text-transform:uppercase}
+    .flow-run-item__status--completed{background:rgba(16,185,129,.15);color:var(--status-green)}
+    .flow-run-item__status--running{background:rgba(245,158,11,.15);color:var(--status-yellow)}
+    .flow-run-item__status--failed{background:rgba(239,68,68,.15);color:var(--status-red)}
+    .flow-run-item__steps{padding:.75rem 1.5rem 1.25rem}
+    .cr-row{display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;border-radius:.5rem;margin-bottom:.35rem;font-size:.875rem}
+    .cr-row--success{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2)}
+    .cr-row--running{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)}
+    .cr-row--error{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2)}
+    .cr-row--pending{background:rgba(255,255,255,.03);border:1px solid var(--border-dark)}
+    .cr-row__icon{flex-shrink:0;width:1.25rem;text-align:center}
+    .cr-row__step{flex:1;font-weight:500}
+    .cr-row__dur{font-size:.75rem;color:var(--text-secondary)}
+    .cr-row__error{font-size:.75rem;color:var(--status-red);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+    .error{color:var(--status-red);padding:1rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW PP</h1>
+    <nav>
+      <a href="/pp/fleet">Fleet</a>
+      <a href="/pp/dlq">DLQ</a>
+    </nav>
+  </header>
+  <main class="page">
+    <a href="/pp/fleet" class="back-link">← Back to Fleet</a>
+    <h2 id="agent-name">Agent Detail</h2>
+    <div id="flow-run-list">
+      <div class="empty-state">Loading flow runs…</div>
+    </div>
+  </main>
+  <script type="module" src="agent-detail.js"></script>
+</body>
+</html>
+`);
+
+// ── pp-portal/pages/agent-detail.js (E13-S1) ─────────────────────────────────
+write('pp-portal/pages/agent-detail.js', `// frontend/pp-portal/pages/agent-detail.js
+import { renderComponentRunRow } from '../components/ComponentRunRow.js';
+const API_BASE = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : '';
+
+export async function loadAgentDetail(agentId) {
+  const base = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : API_BASE;
+  const runsRes = await fetch(\`\${base}/v1/flow-runs?agent_id=\${agentId}&limit=10\`);
+  if (!runsRes.ok) throw new Error('Failed to load flow runs');
+  const flowRuns = await runsRes.json();
+  const list = document.getElementById('flow-run-list');
+  if (!flowRuns.length) { list.innerHTML = '<p class="empty-state">No runs yet for this agent.</p>'; return; }
+  list.innerHTML = flowRuns.map(fr => \`
+<details class="flow-run-item">
+  <summary class="flow-run-item__summary">
+    <span class="flow-run-item__status flow-run-item__status--\${fr.status}">\${fr.status}</span>
+    <time>\${fr.created_at ? new Date(fr.created_at).toLocaleString() : ''}</time>
+  </summary>
+  <div class="flow-run-item__steps" data-flow-run-id="\${fr.id}">Loading steps…</div>
+</details>\`).join('');
+
+  list.addEventListener('toggle', async (e) => {
+    const details = e.target.closest('details');
+    if (!details || !e.target.open) return;
+    const stepsDiv = details.querySelector('[data-flow-run-id]');
+    const flowRunId = stepsDiv && stepsDiv.dataset.flowRunId;
+    if (!flowRunId) return;
+    const base2 = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : API_BASE;
+    const crRes = await fetch(\`\${base2}/v1/component-runs?flow_run_id=\${flowRunId}\`);
+    const componentRuns = crRes.ok ? await crRes.json() : [];
+    stepsDiv.innerHTML = componentRuns.map(renderComponentRunRow).join('') || '<em>No steps recorded.</em>';
+  }, true);
+}
+
+const agentId = typeof window !== 'undefined'
+  ? new URLSearchParams(window.location.search).get('id')
+  : null;
+document.addEventListener('DOMContentLoaded', () => agentId && loadAgentDetail(agentId)
+  .catch(err => { document.getElementById('flow-run-list').innerHTML = \`<p class="error">\${err.message}</p>\`; }));
+`);
+
+// ── pp-portal/pages/dlq.html (E14-S1) ───────────────────────────────────────
+write('pp-portal/pages/dlq.html', `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW PP — Dead Letter Queue</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-green:#10b981;--status-yellow:#f59e0b;--status-red:#ef4444;
+          --text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .dlq-badge{background:var(--status-red);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:9999px;margin-left:.25rem;vertical-align:middle}
+    .page{max-width:900px;margin:0 auto;padding:2rem}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:1.75rem;margin-bottom:.5rem}
+    .page-subtitle{color:var(--text-secondary);margin-bottom:2rem;font-size:.9rem}
+    #dlq-list{display:flex;flex-direction:column;gap:.75rem}
+    .dlq-item{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1.25rem;padding:1.25rem 1.5rem;display:flex;align-items:flex-start;gap:1rem}
+    .dlq-item__info{flex:1}
+    .dlq-item__id{font-family:monospace;font-size:.8rem;color:var(--text-secondary);margin-right:.5rem}
+    .dlq-item__agent{font-weight:600;font-family:'Space Grotesk',sans-serif;margin-right:.5rem}
+    .dlq-item__step{font-size:.85rem;color:var(--color-neon-cyan);margin-right:.5rem}
+    .dlq-item__failures{font-size:.8rem;color:var(--status-red);font-weight:600}
+    .dlq-item__error{font-size:.8rem;color:var(--text-secondary);margin-top:.4rem;word-break:break-word}
+    .dlq-item__actions{display:flex;gap:.5rem;flex-shrink:0;align-items:center}
+    .btn{padding:.45rem 1rem;border-radius:.4rem;font-weight:600;font-size:.85rem;cursor:pointer;border:none;transition:all .2s}
+    .btn--cyan{background:var(--color-neon-cyan);color:#0a0a0a}
+    .btn--red{background:var(--status-red);color:#fff}
+    .btn:hover{opacity:.9;transform:translateY(-1px)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+    .empty-state--celebrate{font-size:1.1rem}
+    .error{color:var(--status-red);padding:1rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW PP</h1>
+    <nav>
+      <a href="/pp/fleet">Fleet</a>
+      <a href="/pp/dlq">DLQ
+        <span class="dlq-badge" id="dlq-badge" hidden>0</span>
+      </a>
+    </nav>
+  </header>
+  <main class="page">
+    <h2>Dead Letter Queue</h2>
+    <p class="page-subtitle">Failed tasks waiting for manual intervention. Requeue to retry or skip to discard.</p>
+    <div id="dlq-list">
+      <div class="empty-state">Loading…</div>
+    </div>
+  </main>
+  <script type="module" src="dlq.js"></script>
+</body>
+</html>
+`);
+
+// ── pp-portal/pages/dlq.js (E14-S1) ─────────────────────────────────────────
+write('pp-portal/pages/dlq.js', `// frontend/pp-portal/pages/dlq.js
+const API_BASE = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : '';
+
+export function renderDlqItem(task) {
+  const errMsg = task.last_error ? task.last_error.slice(0, 100) : 'No error detail';
+  return \`
+<div class="dlq-item" data-task-id="\${task.id}">
+  <div class="dlq-item__info">
+    <span class="dlq-item__id">#\${task.id.slice(0, 8)}</span>
+    <span class="dlq-item__agent">\${task.agent_name}</span>
+    <span class="dlq-item__step">\${task.step_name}</span>
+    <span class="dlq-item__failures">\${task.failure_count}× failed</span>
+    <p class="dlq-item__error" title="\${task.last_error || ''}">\${errMsg}…</p>
+  </div>
+  <div class="dlq-item__actions">
+    <button class="btn btn--cyan" onclick="requeueTask('\${task.id}', this)">Requeue</button>
+    <button class="btn btn--red" onclick="skipTask('\${task.id}')">Skip</button>
+  </div>
+</div>\`;
+}
+
+export async function loadDlq() {
+  const base = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : API_BASE;
+  const res = await fetch(\`\${base}/v1/dlq?limit=50\`);
+  if (!res.ok) throw new Error('Failed to load DLQ');
+  const tasks = await res.json();
+  const container = document.getElementById('dlq-list');
+  if (!tasks.length) {
+    container.innerHTML = '<div class="empty-state empty-state--celebrate">🎉 Queue is clear — all agents running smoothly!</div>';
+    return;
+  }
+  container.innerHTML = tasks.map(renderDlqItem).join('');
+  updateNavBadge(tasks.length);
+  if (typeof window !== 'undefined') {
+    window.requeueTask = requeueTask;
+    window.skipTask = skipTask;
+  }
+}
+
+export async function requeueTask(taskId, btn) {
+  btn.disabled = true;
+  btn.nextElementSibling && (btn.nextElementSibling.disabled = true);
+  const base = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : API_BASE;
+  const res = await fetch(\`\${base}/v1/dlq/\${taskId}/requeue\`, { method: 'POST' });
+  if (!res.ok) {
+    btn.disabled = false;
+    btn.nextElementSibling && (btn.nextElementSibling.disabled = false);
+    typeof alert !== 'undefined' && alert('Requeue failed');
+    return;
+  }
+  document.querySelector(\`[data-task-id="\${taskId}"]\`)?.remove();
+}
+
+export async function skipTask(taskId) {
+  if (typeof confirm !== 'undefined' && !confirm('Skip this task permanently? It will not be retried.')) return;
+  const base = typeof window !== 'undefined' ? (window.PP_API_BASE || '') : API_BASE;
+  await fetch(\`\${base}/v1/dlq/\${taskId}/skip\`, { method: 'POST' });
+  document.querySelector(\`[data-task-id="\${taskId}"]\`)?.remove();
+}
+
+export function updateNavBadge(count) {
+  const badge = document.getElementById('dlq-badge');
+  if (badge) { badge.textContent = count; badge.hidden = count === 0; }
+}
+
+document.addEventListener('DOMContentLoaded', () =>
+  loadDlq().catch(err => { document.getElementById('dlq-list').innerHTML = \`<p class="error">\${err.message}</p>\`; })
+);
+`);
+
+// ── tests/pp-portal/test_fleet.spec.js (E12-S1) ──────────────────────────────
+write('tests/pp-portal/test_fleet.spec.js', `import { renderFleetAgentRow, loadFleet } from '../../pp-portal/pages/fleet.js';
+
+const MOCK_AGENT_1 = { id: 'agt-1', name: 'Share Trader', instance_count: 3 };
+const MOCK_AGENT_2 = { id: 'agt-2', name: 'Marketing Agent', instance_count: 1 };
+const MOCK_SUMMARY = { total: 10, running: 2, completed: 7, failed: 1 };
+
+beforeEach(() => {
+  document.body.innerHTML = '<div id="fleet-grid"></div>';
+});
+
+describe('renderFleetAgentRow', () => {
+  test('T1: renders fleet-row with agent name, instance count, and error rate 10.0%', () => {
+    const html = renderFleetAgentRow(MOCK_AGENT_1, MOCK_SUMMARY);
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    expect(div.querySelector('.fleet-row__name').textContent).toContain('Share Trader');
+    expect(div.querySelector('.fleet-row__instances').textContent).toContain('3');
+    expect(div.querySelector('.fleet-row__error-rate').textContent).toContain('10.0%');
+  });
+
+  test('T2: error rate > 10% adds --high class', () => {
+    const highErrSummary = { total: 10, running: 0, completed: 7, failed: 2 };
+    const html = renderFleetAgentRow(MOCK_AGENT_1, highErrSummary);
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    expect(div.querySelector('.fleet-row__error-rate--high')).not.toBeNull();
+  });
+
+  test('T2-safe: error rate <= 10% does NOT add --high class', () => {
+    const lowErrSummary = { total: 10, running: 0, completed: 9, failed: 1 };
+    const html = renderFleetAgentRow(MOCK_AGENT_1, lowErrSummary);
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    expect(div.querySelector('.fleet-row__error-rate--high')).toBeNull();
+  });
+});
+
+describe('loadFleet', () => {
+  test('T1: two agents render two fleet-row elements', async () => {
+    global.fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => [MOCK_AGENT_1, MOCK_AGENT_2] })
+      .mockResolvedValueOnce({ ok: true, json: async () => MOCK_SUMMARY })
+      .mockResolvedValueOnce({ ok: true, json: async () => MOCK_SUMMARY });
+
+    await loadFleet();
+    expect(document.querySelectorAll('.fleet-row').length).toBe(2);
+  });
+
+  test('T3: empty agents array shows empty-state message', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
+    await loadFleet();
+    expect(document.querySelector('.empty-state')).not.toBeNull();
+  });
+
+  test('T4: HTTP 500 from GET /v1/agents throws error (caller handles display)', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: false, status: 500 });
+    await expect(loadFleet()).rejects.toThrow('Failed to load agents');
+  });
+});
+`);
+
+// ── tests/pp-portal/test_component_run_row.spec.js (E13-S1) ──────────────────
+write('tests/pp-portal/test_component_run_row.spec.js', `import { renderComponentRunRow } from '../../pp-portal/components/ComponentRunRow.js';
+
+describe('renderComponentRunRow', () => {
+  test('T3: status=failed renders cr-row--error class and shows error message', () => {
+    const cr = { step_name: 'DeltaExchangePump', status: 'failed', duration_ms: 300, error_message: 'Timeout after 30s' };
+    const div = document.createElement('div');
+    div.innerHTML = renderComponentRunRow(cr);
+    expect(div.querySelector('.cr-row--error')).not.toBeNull();
+    expect(div.querySelector('.cr-row__error')).not.toBeNull();
+    expect(div.querySelector('.cr-row__error').textContent).toContain('Timeout after 30s');
+  });
+
+  test('T4: error_message longer than 80 chars is truncated with ellipsis', () => {
+    const longError = 'A'.repeat(100);
+    const cr = { step_name: 'Pump', status: 'failed', duration_ms: 100, error_message: longError };
+    const div = document.createElement('div');
+    div.innerHTML = renderComponentRunRow(cr);
+    const errSpan = div.querySelector('.cr-row__error');
+    expect(errSpan).not.toBeNull();
+    expect(errSpan.textContent.endsWith('…')).toBe(true);
+    expect(errSpan.textContent.length).toBeLessThan(longError.length);
+  });
+
+  test('renders success icon for completed status', () => {
+    const cr = { step_name: 'Processor', status: 'completed', duration_ms: 120 };
+    const div = document.createElement('div');
+    div.innerHTML = renderComponentRunRow(cr);
+    expect(div.querySelector('.cr-row--success')).not.toBeNull();
+    expect(div.querySelector('.cr-row__icon').textContent).toBe('✓');
+  });
+
+  test('renders duration when provided', () => {
+    const cr = { step_name: 'Publisher', status: 'completed', duration_ms: 456 };
+    const div = document.createElement('div');
+    div.innerHTML = renderComponentRunRow(cr);
+    expect(div.querySelector('.cr-row__dur').textContent).toContain('456ms');
+  });
+
+  test('does not render duration element when duration_ms is absent', () => {
+    const cr = { step_name: 'Pending', status: 'pending' };
+    const div = document.createElement('div');
+    div.innerHTML = renderComponentRunRow(cr);
+    expect(div.querySelector('.cr-row__dur')).toBeNull();
+  });
+});
+`);
+
+// ── tests/pp-portal/test_agent_detail.spec.js (E13-S1) ───────────────────────
+write('tests/pp-portal/test_agent_detail.spec.js', `import { loadAgentDetail } from '../../pp-portal/pages/agent-detail.js';
+
+const MOCK_FLOW_RUNS = [
+  { id: 'fr-1', status: 'completed', created_at: '2026-03-08T10:00:00Z' },
+  { id: 'fr-2', status: 'failed',    created_at: '2026-03-08T09:00:00Z' },
+];
+const MOCK_COMPONENT_RUNS = [
+  { step_name: 'Pump',      status: 'completed', duration_ms: 200 },
+  { step_name: 'Processor', status: 'failed',    duration_ms: 300, error_message: 'Bad signal' },
+];
+
+beforeEach(() => {
+  document.body.innerHTML = '<div id="flow-run-list"></div>';
+});
+
+describe('loadAgentDetail', () => {
+  test('T1: two flow runs render two flow-run-item details elements', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => MOCK_FLOW_RUNS });
+    await loadAgentDetail('agt-1');
+    expect(document.querySelectorAll('details.flow-run-item').length).toBe(2);
+  });
+
+  test('empty flow runs shows empty-state message', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
+    await loadAgentDetail('agt-1');
+    expect(document.querySelector('.empty-state')).not.toBeNull();
+    expect(document.getElementById('flow-run-list').textContent).toContain('No runs yet');
+  });
+
+  test('HTTP 500 throws (caller handles error display)', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: false, status: 500 });
+    await expect(loadAgentDetail('agt-1')).rejects.toThrow('Failed to load flow runs');
+  });
+});
+`);
+
+// ── tests/pp-portal/test_dlq.spec.js (E14-S1) ────────────────────────────────
+write('tests/pp-portal/test_dlq.spec.js', `import { renderDlqItem, loadDlq, requeueTask, skipTask, updateNavBadge } from '../../pp-portal/pages/dlq.js';
+
+const MOCK_TASKS = [
+  { id: 'task-aabbccdd', agent_name: 'Share Trader', step_name: 'DeltaExchangePump', failure_count: 3, last_error: 'Connection refused' },
+  { id: 'task-eeff0011', agent_name: 'Marketing Agent', step_name: 'ContentProcessor', failure_count: 1, last_error: null },
+];
+
+beforeEach(() => {
+  document.body.innerHTML = \`
+    <div id="dlq-list"></div>
+    <span id="dlq-badge" hidden>0</span>
+  \`;
+});
+
+describe('renderDlqItem', () => {
+  test('renders dlq-item with agent name, step name, failure count', () => {
+    const html = renderDlqItem(MOCK_TASKS[0]);
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    expect(div.querySelector('.dlq-item__agent').textContent).toBe('Share Trader');
+    expect(div.querySelector('.dlq-item__step').textContent).toBe('DeltaExchangePump');
+    expect(div.querySelector('.dlq-item__failures').textContent).toContain('3×');
+  });
+
+  test('shows "No error detail" when last_error is null', () => {
+    const html = renderDlqItem(MOCK_TASKS[1]);
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    expect(div.querySelector('.dlq-item__error').textContent).toContain('No error detail');
+  });
+});
+
+describe('loadDlq', () => {
+  test('T1: 2 tasks render two dlq-item elements', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => MOCK_TASKS });
+    await loadDlq();
+    expect(document.querySelectorAll('.dlq-item').length).toBe(2);
+  });
+
+  test('T4: empty tasks array shows "Queue is clear" celebration message', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => [] });
+    await loadDlq();
+    expect(document.querySelector('.empty-state--celebrate')).not.toBeNull();
+    expect(document.getElementById('dlq-list').textContent).toContain('Queue is clear');
+  });
+
+  test('T5: HTTP 500 throws (caller renders error message)', async () => {
+    global.fetch.mockResolvedValueOnce({ ok: false, status: 500 });
+    await expect(loadDlq()).rejects.toThrow('Failed to load DLQ');
+  });
+});
+
+describe('requeueTask', () => {
+  test('T2: successful requeue disables buttons and removes item from DOM', async () => {
+    document.body.innerHTML = \`
+      <div id="dlq-list">
+        <div class="dlq-item" data-task-id="task-aabbccdd">
+          <button id="requeue-btn" class="btn btn--cyan">Requeue</button>
+          <button id="skip-btn" class="btn btn--red">Skip</button>
+        </div>
+      </div>
+    \`;
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    const btn = document.getElementById('requeue-btn');
+    await requeueTask('task-aabbccdd', btn);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/dlq/task-aabbccdd/requeue'),
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(document.querySelector('[data-task-id="task-aabbccdd"]')).toBeNull();
+  });
+});
+
+describe('skipTask', () => {
+  test('T3: confirm=false does NOT call API or remove item', async () => {
+    document.body.innerHTML = '<div class="dlq-item" data-task-id="task-eeff0011"></div>';
+    global.confirm.mockReturnValueOnce(false);
+    await skipTask('task-eeff0011');
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-task-id="task-eeff0011"]')).not.toBeNull();
+  });
+
+  test('skip with confirm=true calls API and removes item', async () => {
+    document.body.innerHTML = '<div class="dlq-item" data-task-id="task-eeff0011"></div>';
+    global.confirm.mockReturnValueOnce(true);
+    global.fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+    await skipTask('task-eeff0011');
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/dlq/task-eeff0011/skip'),
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(document.querySelector('[data-task-id="task-eeff0011"]')).toBeNull();
+  });
+});
+
+describe('updateNavBadge', () => {
+  test('shows badge with count > 0', () => {
+    updateNavBadge(5);
+    const badge = document.getElementById('dlq-badge');
+    expect(badge.hidden).toBe(false);
+    expect(badge.textContent).toBe('5');
+  });
+
+  test('hides badge when count = 0', () => {
+    updateNavBadge(0);
+    expect(document.getElementById('dlq-badge').hidden).toBe(true);
+  });
+});
+`);
+
 console.log('\n✅ All frontend/ files generated successfully.');
-console.log(\`📁 Location: \${FRONTEND}\`);
+console.log(`📁 Location: ${FRONTEND}`);
 console.log('📦 Next: cd frontend && npm install && npm test');
