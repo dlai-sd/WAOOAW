@@ -160,11 +160,11 @@ async def call_external(): ...
 | E1-S3 | 1 | E1: flow_run table | Add `skill_config` table | 🔴 Not Started | — |
 | E2-S1 | 1 | E2: hired_agents column | Add `definition_version_id` to `hired_agents` | 🔴 Not Started | — |
 | E2-S2 | 1 | E2: hired_agents column | Register models + smoke test | 🔴 Not Started | — |
-| E3-S1 | 2 | E3: BaseComponent | Define `BaseComponent`, `ComponentInput`, `ComponentOutput` | 🔴 Not Started | — |
-| E3-S2 | 2 | E3: BaseComponent | Celery component task routing + worker queue config | 🔴 Not Started | — |
-| E3-S3 | 2 | E3: BaseComponent | Component registry | 🔴 Not Started | — |
-| E4-S1 | 2 | E4: FlowRun executor | FlowRun executor: sequential step runner | 🔴 Not Started | — |
-| E4-S2 | 2 | E4: FlowRun executor | FlowRun executor: fan-out (parallel) + PARTIAL_FAILURE | 🔴 Not Started | — |
+| E3-S1 | 2 | E3: BaseComponent | Define `BaseComponent`, `ComponentInput`, `ComponentOutput` | 🟢 Done | — |
+| E3-S2 | 2 | E3: BaseComponent | Celery component task routing + worker queue config | 🟢 Done | — |
+| E3-S3 | 2 | E3: BaseComponent | Component registry | 🟢 Done | — |
+| E4-S1 | 2 | E4: FlowRun executor | FlowRun executor: sequential step runner | 🟢 Done | — |
+| E4-S2 | 2 | E4: FlowRun executor | FlowRun executor: fan-out (parallel) + PARTIAL_FAILURE | 🟢 Done | — |
 | E5-S1 | 3 | E5: Share Trader components | `DeltaExchangePump` component | 🔴 Not Started | — |
 | E5-S2 | 3 | E5: Share Trader components | `RSIProcessor` component | 🔴 Not Started | — |
 | E5-S3 | 3 | E5: Share Trader components | `DeltaPublisher` component | 🔴 Not Started | — |

@@ -51,6 +51,10 @@ celery_app.conf.task_routes = {
     # E4-S1 / E4-S2 (Iteration 7): archival + cleanup
     "archive_audit_logs": {"queue": "archival"},
     "cleanup_otp_sessions": {"queue": "archival"},
+    # EXEC-ENGINE-001 Iteration 2 — component queues
+    "execute_pump":      {"queue": "pump"},
+    "execute_processor": {"queue": "processor"},
+    "execute_publisher": {"queue": "publisher"},
 }
 
 # E4-S1 / E4-S2 (Iteration 7): Celery Beat scheduled tasks
