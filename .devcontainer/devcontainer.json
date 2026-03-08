@@ -14,11 +14,15 @@
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-azuretools.vscode-docker"
+        "ms-azuretools.vscode-docker",
+        "github.copilot",
+        "github.copilot-chat"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python3",
-        "python.testing.pytestEnabled": true
+        "python.terminal.activateEnvironment": false,
+        "python.testing.pytestEnabled": false,
+        "chat.promptFiles": true
       }
     }
   },
