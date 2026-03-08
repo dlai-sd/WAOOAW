@@ -24,6 +24,18 @@ if ! command -v gh &>/dev/null; then
     apt-get update -qq
 fi
 
+# Install Google Cloud CLI (needed for Cloud SQL Proxy + SA auth)
+if ! command -v gcloud &>/dev/null; then
+    echo "📦 Installing Google Cloud CLI..."
+    curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+        | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+        > /etc/apt/sources.list.d/google-cloud-sdk.list
+    apt-get update -qq
+    apt-get install -y -qq google-cloud-cli
+    echo "✅ gcloud $(gcloud version --format='value(Google Cloud SDK)' 2>/dev/null) installed"
+fi
+
 # Install essential development tools
 echo "📦 Installing development tools..."
 apt-get install -y -qq \

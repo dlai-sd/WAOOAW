@@ -27,6 +27,6 @@
     }
   },
   "postCreateCommand": "bash .devcontainer/setup-slim.sh && bash .devcontainer/gcp-auth.sh",
-  "forwardPorts": [3000, 5432, 8000, 8001, 8080],
+  "forwardPorts": [3000, 5432, 8000, 8001, 8080, 15432],
   "remoteUser": "root"
 }
