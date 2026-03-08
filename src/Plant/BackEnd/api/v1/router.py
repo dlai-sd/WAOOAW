@@ -4,7 +4,7 @@ API v1 router - mount all endpoints
 
 from core.routing import waooaw_router  # P-3
 
-from api.v1 import genesis, agents, audit, agent_mold, reference_agents, db_updates, usage_events, marketing_drafts, customers, customers_fcm, auth, payments_simple, hired_agents_simple, invoices_simple, receipts_simple, trial_status_simple, notifications, agent_types_simple, agent_types_db, deliverables_simple, otp, feature_flags, agent_skills, platform_connections, performance_stats, campaigns, skill_configs, flow_runs
+from api.v1 import genesis, agents, audit, agent_mold, reference_agents, db_updates, usage_events, marketing_drafts, customers, customers_fcm, auth, payments_simple, hired_agents_simple, invoices_simple, receipts_simple, trial_status_simple, notifications, agent_types_simple, agent_types_db, deliverables_simple, otp, feature_flags, agent_skills, platform_connections, performance_stats, campaigns, skill_configs, flow_runs, approvals
 from api.v1.construct_diagnostics import router as construct_diagnostics_router, ops_router as construct_ops_router
 from api import trials
 
@@ -45,4 +45,5 @@ api_v1_router.include_router(construct_diagnostics_router)      # PLANT-MOULD-1 
 api_v1_router.include_router(construct_ops_router)              # PLANT-MOULD-1 E4: ops DLQ console
 api_v1_router.include_router(skill_configs.router)              # EXEC-ENGINE-001 E1-S3: skill config PATCH
 api_v1_router.include_router(flow_runs.router)                  # EXEC-ENGINE-001 E6-S1: flow-runs endpoints
+api_v1_router.include_router(approvals.router)                  # EXEC-ENGINE-001 E8-S2: approve/reject gate
 

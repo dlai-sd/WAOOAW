@@ -20,9 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db_session, get_read_db_session
 from core.logging import PiiMaskingFilter, get_logger
 from core.routing import waooaw_router
-from flow_executor import execute_sequential_flow
+from flow_executor import execute_parallel_flow, execute_sequential_flow
+from marketing_agent_flows import MARKETING_FLOW_REGISTRY
 from models.flow_run import FlowRunModel
 from share_trader_flows import FLOW_REGISTRY
+
+# Merge Marketing Agent flows into the combined registry (E8-S1).
+FLOW_REGISTRY = {**FLOW_REGISTRY, **MARKETING_FLOW_REGISTRY}
 
 logger = get_logger(__name__)
 logger.addFilter(PiiMaskingFilter())
@@ -62,13 +66,25 @@ async def create_flow_run(
     await db.commit()
     await db.refresh(flow_run)
 
-    background_tasks.add_task(
-        execute_sequential_flow,
-        flow_run,
-        flow_def["sequential_steps"],
-        db,
-        flow_def.get("approval_gate_index"),
-    )
+    if "parallel_steps" in flow_def:
+        # Fan-out parallel flow (e.g. PublishingFlow)
+        shared_input = body.run_context.get("shared_input", {})
+        background_tasks.add_task(
+            execute_parallel_flow,
+            flow_run,
+            flow_def["parallel_steps"],
+            db,
+            shared_input,
+        )
+    else:
+        # Sequential flow with optional approval gate
+        background_tasks.add_task(
+            execute_sequential_flow,
+            flow_run,
+            flow_def["sequential_steps"],
+            db,
+            flow_def.get("approval_gate_index"),
+        )
     return {"id": flow_run.id, "status": flow_run.status}
 
 
