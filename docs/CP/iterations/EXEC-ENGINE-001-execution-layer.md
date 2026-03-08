@@ -153,7 +153,47 @@ async def call_external(): ...
 
 ---
 
+## How to Launch Each Iteration
+
+> **One iteration = one feature branch + one PR to `main`.** Never start iteration N+1 until the iteration N PR is merged and the user confirms.
+
+### Step 1 — Create a feature branch (once per iteration)
+```bash
+git checkout main && git pull origin main
+git checkout -b feat/exec-engine-iter-N   # replace N with iteration number
+```
+
+### Step 2 — Launch in Copilot Agent Mode
+1. Open VS Code → Copilot Chat (`Ctrl+Alt+I` / `Cmd+Alt+I`)
+2. Click model dropdown → **Agent mode**
+3. Click `+` → type `@` → select **platform-engineer**
+4. Paste the exact task from the table below
+
+### Step 3 — Copy-Paste Agent Tasks (one per iteration)
+
+| Iter | Paste this exactly into the agent |
+|------|-----------------------------------|
+| **1** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I1-S1 through I1-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I1-SX — [title]" && git push`, then rename the story heading in the plan file from `### I1-SX —` to `### ✅ I1-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 1 Completion Checkpoint** section in the plan. |
+| **2** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I2-S1 through I2-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I2-SX — [title]" && git push`, then rename the story heading in the plan file from `### I2-SX —` to `### ✅ I2-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 2 Completion Checkpoint** section in the plan. |
+| **3** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I3-S1 through I3-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I3-SX — [title]" && git push`, then rename the story heading in the plan file from `### I3-SX —` to `### ✅ I3-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 3 Completion Checkpoint** section in the plan. |
+| **4** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I4-S1 through I4-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I4-SX — [title]" && git push`, then rename the story heading in the plan file from `### I4-SX —` to `### ✅ I4-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 4 Completion Checkpoint** section in the plan. |
+| **5** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I5-S1 through I5-S5** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I5-SX — [title]" && git push`, then rename the story heading in the plan file from `### I5-SX —` to `### ✅ I5-SX —` and commit that change. After all 5 stories pass, follow the **Iteration 5 Completion Checkpoint** section in the plan. |
+| **6** | Read `docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md`. Execute stories **I6-S1 through I6-S4** in order. For each story: read its full card, implement the changes, run `pytest --cov=app --cov-fail-under=80`, fix any failures, commit `git add -A && git commit -m "feat(EXEC-ENGINE-001): I6-SX — [title]" && git push`, then rename the story heading in the plan file from `### I6-SX —` to `### ✅ I6-SX —` and commit that change. After all 4 stories pass, follow the **Iteration 6 Completion Checkpoint** section in the plan. |
+
+### Step 4 — Wait for PR merge before next iteration
+
+The agent will open a PR and report "Iteration N complete." Review the PR, merge to `main`, then come back and launch the next iteration.
+
+---
+
 ## Iteration 1 — DB Foundation
+
+> **⛔ PRE-LAUNCH CHECK (Iteration 1 only)**: Create a fresh feature branch from `main` before writing any code:
+> ```bash
+> git checkout main && git pull origin main
+> git checkout -b feat/exec-engine-iter-1
+> ```
+> If already on a non-`main` branch with uncommitted work, stop and check with the user first.
 
 > **Stories written and committed:** 2026-03-08
 
@@ -335,9 +375,39 @@ class SkillConfigModel(Base):
 - [ ] Smoke test queries each new table: `SELECT COUNT(*) FROM flow_runs` returns 0
 - [ ] `pytest --cov=app --cov-fail-under=80` passes
 
+### ✅ Iteration 1 — Completion Checkpoint
+
+After ALL I1-S1 through I1-S5 acceptance criteria pass:
+
+1. Verify all commits pushed:
+   ```bash
+   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
+   ```
+2. Open PR to main:
+   ```bash
+   gh pr create --base main \
+     --title "feat(EXEC-ENGINE-001): iteration 1 — DB foundation" \
+     --body "Stories: I1-S1 ✅ I1-S2 ✅ I1-S3 ✅ I1-S4 ✅ I1-S5 ✅"
+   ```
+3. Mark stories complete in this plan file — rename each `### I1-SX —` heading to `### ✅ I1-SX —` (if not done per-story), commit + push:
+   ```bash
+   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+   git commit -m "docs(EXEC-ENGINE-001): mark iteration 1 stories complete"
+   git push
+   ```
+4. **Report to user**: "Iteration 1 complete. PR: [URL]. Stories: I1-S1 ✅ I1-S2 ✅ I1-S3 ✅ I1-S4 ✅ I1-S5 ✅. Please review and merge — **do not launch Iteration 2 until this PR is merged**."
+5. **STOP. Do not run any Iteration 2 code until the user confirms this PR is merged to `main`.**
+
 ---
 
 ## Iteration 2 — BaseComponent Interface + Celery Component Queues
+
+> **⛔ ITERATION 2 GATE — verify before writing any code:** Iteration 1 PR must be merged to `main`:
+> ```bash
+> git fetch origin
+> git show origin/main:docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md | grep "Iteration 1"
+> ```
+> If Iteration 1 content is absent from `main`, **STOP** and tell the user: "Iteration 2 is blocked — the Iteration 1 PR must be merged to main first."
 
 > **Stories written and committed:** 2026-03-08
 
@@ -710,9 +780,39 @@ async def execute_parallel_flow(
 - [ ] Unit tests for all three outcomes
 - [ ] `pytest --cov=app --cov-fail-under=80` passes
 
+### ✅ Iteration 2 — Completion Checkpoint
+
+After ALL I2-S1 through I2-S5 acceptance criteria pass:
+
+1. Verify all commits pushed:
+   ```bash
+   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
+   ```
+2. Open PR to main:
+   ```bash
+   gh pr create --base main \
+     --title "feat(EXEC-ENGINE-001): iteration 2 — BaseComponent + Celery queues" \
+     --body "Stories: I2-S1 ✅ I2-S2 ✅ I2-S3 ✅ I2-S4 ✅ I2-S5 ✅"
+   ```
+3. Mark stories complete in this plan file — rename each `### I2-SX —` heading to `### ✅ I2-SX —`, commit + push:
+   ```bash
+   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+   git commit -m "docs(EXEC-ENGINE-001): mark iteration 2 stories complete"
+   git push
+   ```
+4. **Report to user**: "Iteration 2 complete. PR: [URL]. Stories: I2-S1 ✅ I2-S2 ✅ I2-S3 ✅ I2-S4 ✅ I2-S5 ✅. Please review and merge — **do not launch Iteration 3 until this PR is merged**."
+5. **STOP. Do not run any Iteration 3 code until the user confirms this PR is merged to `main`.**
+
 ---
 
 ## Iteration 3 — Share Trader: Components + End-to-End Flow
+
+> **⛔ ITERATION 3 GATE — verify before writing any code:** Iteration 2 PR must be merged to `main`:
+> ```bash
+> git fetch origin
+> git show origin/main:docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md | grep "Iteration 2"
+> ```
+> If Iteration 2 content is absent from `main`, **STOP** and tell the user: "Iteration 3 is blocked — the Iteration 2 PR must be merged to main first."
 
 > **Stories written and committed:** 2026-03-08
 
@@ -849,9 +949,39 @@ EXECUTE_TRADE_FLOW = {
 - [ ] Unit test: completed flow → deliverable row exists with correct content
 - [ ] `pytest --cov=app --cov-fail-under=80` passes
 
+### ✅ Iteration 3 — Completion Checkpoint
+
+After ALL I3-S1 through I3-S5 acceptance criteria pass:
+
+1. Verify all commits pushed:
+   ```bash
+   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
+   ```
+2. Open PR to main:
+   ```bash
+   gh pr create --base main \
+     --title "feat(EXEC-ENGINE-001): iteration 3 — Share Trader end-to-end" \
+     --body "Stories: I3-S1 ✅ I3-S2 ✅ I3-S3 ✅ I3-S4 ✅ I3-S5 ✅"
+   ```
+3. Mark stories complete in this plan file — rename each `### I3-SX —` heading to `### ✅ I3-SX —`, commit + push:
+   ```bash
+   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+   git commit -m "docs(EXEC-ENGINE-001): mark iteration 3 stories complete"
+   git push
+   ```
+4. **Report to user**: "Iteration 3 complete. PR: [URL]. Stories: I3-S1 ✅ I3-S2 ✅ I3-S3 ✅ I3-S4 ✅ I3-S5 ✅. Please review and merge — **do not launch Iteration 4 until this PR is merged**."
+5. **STOP. Do not run any Iteration 4 code until the user confirms this PR is merged to `main`.**
+
 ---
 
 ## Iteration 4 — Marketing Agent: Components + Fan-out Flow
+
+> **⛔ ITERATION 4 GATE — verify before writing any code:** Iteration 3 PR must be merged to `main`:
+> ```bash
+> git fetch origin
+> git show origin/main:docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md | grep "Iteration 3"
+> ```
+> If Iteration 3 content is absent from `main`, **STOP** and tell the user: "Iteration 4 is blocked — the Iteration 3 PR must be merged to main first."
 
 > **Stories written and committed:** 2026-03-08
 
@@ -996,9 +1126,39 @@ async def approve_flow_run(
 - [ ] Unit tests: approve → resumes execution; reject → failed; wrong status → 409
 - [ ] `pytest --cov=app --cov-fail-under=80` passes
 
+### ✅ Iteration 4 — Completion Checkpoint
+
+After ALL I4-S1 through I4-S5 acceptance criteria pass:
+
+1. Verify all commits pushed:
+   ```bash
+   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
+   ```
+2. Open PR to main:
+   ```bash
+   gh pr create --base main \
+     --title "feat(EXEC-ENGINE-001): iteration 4 — Marketing Agent fan-out flow" \
+     --body "Stories: I4-S1 ✅ I4-S2 ✅ I4-S3 ✅ I4-S4 ✅ I4-S5 ✅"
+   ```
+3. Mark stories complete in this plan file — rename each `### I4-SX —` heading to `### ✅ I4-SX —`, commit + push:
+   ```bash
+   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+   git commit -m "docs(EXEC-ENGINE-001): mark iteration 4 stories complete"
+   git push
+   ```
+4. **Report to user**: "Iteration 4 complete. PR: [URL]. Stories: I4-S1 ✅ I4-S2 ✅ I4-S3 ✅ I4-S4 ✅ I4-S5 ✅. Please review and merge — **do not launch Iteration 5 until this PR is merged**."
+5. **STOP. Do not run any Iteration 5 code until the user confirms this PR is merged to `main`.**
+
 ---
 
 ## Iteration 5 — CP Portal UI
+
+> **⛔ ITERATION 5 GATE — verify before writing any code:** Iteration 4 PR must be merged to `main`:
+> ```bash
+> git fetch origin
+> git show origin/main:docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md | grep "Iteration 4"
+> ```
+> If Iteration 4 content is absent from `main`, **STOP** and tell the user: "Iteration 5 is blocked — the Iteration 4 PR must be merged to main first."
 
 > **Stories written and committed:** 2026-03-08
 
@@ -1096,9 +1256,39 @@ async def approve_flow_run(
 - [ ] On approve: item removed from queue, `FlowRunTimeline` on My Agents updates to `running`
 - [ ] Empty queue: "Nothing waiting for your approval — nice!" with confetti emoji
 
+### ✅ Iteration 5 — Completion Checkpoint
+
+After ALL I5-S1 through I5-S5 acceptance criteria pass:
+
+1. Verify all commits pushed:
+   ```bash
+   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
+   ```
+2. Open PR to main:
+   ```bash
+   gh pr create --base main \
+     --title "feat(EXEC-ENGINE-001): iteration 5 — CP portal UI" \
+     --body "Stories: I5-S1 ✅ I5-S2 ✅ I5-S3 ✅ I5-S4 ✅ I5-S5 ✅"
+   ```
+3. Mark stories complete in this plan file — rename each `### I5-SX —` heading to `### ✅ I5-SX —`, commit + push:
+   ```bash
+   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+   git commit -m "docs(EXEC-ENGINE-001): mark iteration 5 stories complete"
+   git push
+   ```
+4. **Report to user**: "Iteration 5 complete. PR: [URL]. Stories: I5-S1 ✅ I5-S2 ✅ I5-S3 ✅ I5-S4 ✅ I5-S5 ✅. Please review and merge — **do not launch Iteration 6 until this PR is merged**."
+5. **STOP. Do not run any Iteration 6 code until the user confirms this PR is merged to `main`.**
+
 ---
 
 ## Iteration 6 — PP Portal UI: Fleet + Health + DLQ
+
+> **⛔ ITERATION 6 GATE — verify before writing any code:** Iteration 5 PR must be merged to `main`:
+> ```bash
+> git fetch origin
+> git show origin/main:docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md | grep "Iteration 5"
+> ```
+> If Iteration 5 content is absent from `main`, **STOP** and tell the user: "Iteration 6 is blocked — the Iteration 5 PR must be merged to main first."
 
 > **Stories written and committed:** 2026-03-08
 
@@ -1176,6 +1366,29 @@ GET  /cp/component-runs           → GET /v1/component-runs (Plant)
 - [ ] `get_read_db_session` on all GET routes
 - [ ] Unit tests: each proxy route returns Plant response body unchanged (mocked Plant)
 - [ ] `pytest --cov=app --cov-fail-under=80` passes
+
+### ✅ Iteration 6 — Completion Checkpoint
+
+After ALL I6-S1 through I6-S4 acceptance criteria pass:
+
+1. Verify all commits pushed:
+   ```bash
+   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
+   ```
+2. Open PR to main:
+   ```bash
+   gh pr create --base main \
+     --title "feat(EXEC-ENGINE-001): iteration 6 — PP portal UI + CP proxies" \
+     --body "Stories: I6-S1 ✅ I6-S2 ✅ I6-S3 ✅ I6-S4 ✅"
+   ```
+3. Mark stories complete in this plan file — rename each `### I6-SX —` heading to `### ✅ I6-SX —`, commit + push:
+   ```bash
+   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
+   git commit -m "docs(EXEC-ENGINE-001): mark iteration 6 stories complete"
+   git push
+   ```
+4. **Report to user**: "🎉 ALL 6 ITERATIONS COMPLETE. PR: [URL]. Stories: I6-S1 ✅ I6-S2 ✅ I6-S3 ✅ I6-S4 ✅. The full EXEC-ENGINE-001 execution layer is implemented. Please review and merge this final PR."
+5. **STOP. The plan is complete. No further code changes should be made until the user reviews.**
 
 ---
 
