@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "/usr/local/bin/python3",
+  "python.interpreter.infoVisibility": "always",
+  "python.terminal.activateEnvironment": false,
+  "python.testing.pytestEnabled": false,
+  "chat.promptFiles": true
+}
