@@ -15,7 +15,7 @@
 | Total stories | 29 |
 
 **Branch:** `feat/execution-engine-v1`  
-**Status:** IN PROGRESS — skeleton committed, story cards being written per iteration  
+**Status:** ✅ COMPLETE — all 6 iterations merged to `main` (PRs #894–#899, 2026-03-08)  
 
 ---
 
@@ -138,14 +138,14 @@ async def call_external(): ...
 
 ## Iteration Summary
 
-| Iteration | Scope | Epics | Stories | ⏱ Est | Come back |
-|---|---|---|---|---|---|
-| 1 | Lane B — DB foundation: `flow_run`, `component_run`, `skill_config` tables + migrations | E1, E2 | 5 | 4h | 2026-03-08 12:00 IST |
-| 2 | Lane B — `BaseComponent`, `ComponentInput/Output`, Celery component queues, FlowRun executor | E3, E4 | 5 | 4.5h | 2026-03-08 17:00 IST |
-| 3 | Lane B — Share Trader components + end-to-end sequential flow | E5, E6 | 5 | 5h | 2026-03-09 10:00 IST |
-| 4 | Lane B — Marketing Agent components + fan-out executor + PARTIAL_FAILURE + approvals | E7, E8 | 5 | 5h | 2026-03-09 16:00 IST |
-| 5 | Lane A — CP Portal UI: marketplace, hire wizard, my agents, approval queue | E9, E10, E11 | 5 | 5h | 2026-03-10 11:00 IST |
-| 6 | Lane A — PP Portal UI: fleet dashboard, health drill-in, DLQ + CP proxies | E12, E13, E14 | 4 | 3.5h | 2026-03-10 15:30 IST |
+| Iteration | Scope | Epics | Stories | ⏱ Est | Status | PR |
+|---|---|---|---|---|---|---|
+| 1 | Lane B — DB foundation: `flow_run`, `component_run`, `skill_config` tables + migrations | E1, E2 | 5 | 4h | ✅ Merged 2026-03-08 | #894 |
+| 2 | Lane B — `BaseComponent`, `ComponentInput/Output`, Celery component queues, FlowRun executor | E3, E4 | 5 | 4.5h | ✅ Merged 2026-03-08 | #895 |
+| 3 | Lane B — Share Trader components + end-to-end sequential flow | E5, E6 | 5 | 5h | ✅ Merged 2026-03-08 | #896 |
+| 4 | Lane B — Marketing Agent components + fan-out executor + PARTIAL_FAILURE + approvals | E7, E8 | 5 | 5h | ✅ Merged 2026-03-08 | #897 |
+| 5 | Lane A — CP Portal UI: marketplace, hire wizard, my agents, approval queue | E9, E10, E11 | 5 | 5h | ✅ Merged 2026-03-08 | #898 |
+| 6 | Lane A — PP Portal UI: fleet dashboard, health drill-in, DLQ + CP proxies | E12, E13, E14 | 4 | 3.5h | ✅ Merged 2026-03-08 | #899 |
 
 **Estimate basis:** FE wiring = 30 min | New BE endpoint = 45 min | Full-stack = 90 min | Docker test = 15 min | PR = 10 min. Add 20% buffer for zero-cost model context loading.
 
@@ -155,35 +155,35 @@ async def call_external(): ...
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | E1: flow_run table | Add `flow_run` table with status machine | 🔴 Not Started | — |
-| E1-S2 | 1 | E1: flow_run table | Add `component_run` table | 🔴 Not Started | — |
-| E1-S3 | 1 | E1: flow_run table | Add `skill_config` table | 🔴 Not Started | — |
-| E2-S1 | 1 | E2: hired_agents column | Add `definition_version_id` to `hired_agents` | 🔴 Not Started | — |
-| E2-S2 | 1 | E2: hired_agents column | Register models + smoke test | 🔴 Not Started | — |
-| E3-S1 | 2 | E3: BaseComponent | Define `BaseComponent`, `ComponentInput`, `ComponentOutput` | 🟢 Done | — |
-| E3-S2 | 2 | E3: BaseComponent | Celery component task routing + worker queue config | 🟢 Done | — |
-| E3-S3 | 2 | E3: BaseComponent | Component registry | 🟢 Done | — |
-| E4-S1 | 2 | E4: FlowRun executor | FlowRun executor: sequential step runner | 🟢 Done | — |
-| E4-S2 | 2 | E4: FlowRun executor | FlowRun executor: fan-out (parallel) + PARTIAL_FAILURE | 🟢 Done | — |
-| E5-S1 | 3 | E5: Share Trader components | `DeltaExchangePump` component | 🟢 Done | — |
-| E5-S2 | 3 | E5: Share Trader components | `RSIProcessor` component | 🟢 Done | — |
-| E5-S3 | 3 | E5: Share Trader components | `DeltaPublisher` component | 🟢 Done | — |
-| E6-S1 | 3 | E6: Share Trader flow | Share Trader FlowDef + end-to-end run | 🟢 Done | — |
-| E6-S2 | 3 | E6: Share Trader flow | Deliverable written at FlowRun completion | 🟢 Done | — |
-| E7-S1 | 4 | E7: Marketing components | `GoalConfigPump` component | 🟢 Done | — |
-| E7-S2 | 4 | E7: Marketing components | `ContentProcessor` component | 🟢 Done | — |
-| E7-S3 | 4 | E7: Marketing components | `LinkedInPublisher` + `YouTubePublisher` components | 🟢 Done | — |
-| E8-S1 | 4 | E8: Marketing flow | Marketing Agent FlowDef + fan-out end-to-end | 🟢 Done | — |
-| E8-S2 | 4 | E8: Marketing flow | `POST /v1/approvals/{flow_run_id}/approve` endpoint | 🟢 Done | — |
-| E9-S1 | 5 | E9: CP UI components | Reusable `AgentCard` + `StatusDot` | 🟢 Done | — |
-| E10-S1 | 5 | E10: CP marketplace | Marketplace screen with hire CTA | 🟢 Done | — |
-| E10-S2 | 5 | E10: CP marketplace | Hire wizard: skill config + goal setting | 🟢 Done | — |
-| E11-S1 | 5 | E11: CP my agents | My Agents + `FlowRunTimeline` + `DeliverableCard` | 🟢 Done | — |
-| E11-S2 | 5 | E11: CP my agents | Approval queue + `ApprovalQueueItem` | 🟢 Done | — |
-| E12-S1 | 6 | E12: PP fleet | PP Fleet dashboard with agent health map | 🔴 Not Started | — |
-| E13-S1 | 6 | E13: PP health | Per-agent health drill-in with `ComponentRunRow` | 🔴 Not Started | — |
-| E14-S1 | 6 | E14: PP DLQ + proxies | DLQ panel: view, requeue, skip | 🔴 Not Started | — |
-| E14-S2 | 6 | E14: PP DLQ + proxies | CP proxy routes for flow-runs + component-runs | 🔴 Not Started | — |
+| E1-S1 | 1 | E1: flow_run table | Add `flow_run` table with status machine | � Done | #894 |
+| E1-S2 | 1 | E1: flow_run table | Add `component_run` table | 🟢 Done | #894 |
+| E1-S3 | 1 | E1: flow_run table | Add `skill_config` table | 🟢 Done | #894 |
+| E2-S1 | 1 | E2: hired_agents column | Add `definition_version_id` to `hired_agents` | 🟢 Done | #894 |
+| E2-S2 | 1 | E2: hired_agents column | Register models + smoke test | 🟢 Done | #894 |
+| E3-S1 | 2 | E3: BaseComponent | Define `BaseComponent`, `ComponentInput`, `ComponentOutput` | 🟢 Done | #895 |
+| E3-S2 | 2 | E3: BaseComponent | Celery component task routing + worker queue config | 🟢 Done | #895 |
+| E3-S3 | 2 | E3: BaseComponent | Component registry | 🟢 Done | #895 |
+| E4-S1 | 2 | E4: FlowRun executor | FlowRun executor: sequential step runner | 🟢 Done | #895 |
+| E4-S2 | 2 | E4: FlowRun executor | FlowRun executor: fan-out (parallel) + PARTIAL_FAILURE | 🟢 Done | #895 |
+| E5-S1 | 3 | E5: Share Trader components | `DeltaExchangePump` component | 🟢 Done | #896 |
+| E5-S2 | 3 | E5: Share Trader components | `RSIProcessor` component | 🟢 Done | #896 |
+| E5-S3 | 3 | E5: Share Trader components | `DeltaPublisher` component | 🟢 Done | #896 |
+| E6-S1 | 3 | E6: Share Trader flow | Share Trader FlowDef + end-to-end run | 🟢 Done | #896 |
+| E6-S2 | 3 | E6: Share Trader flow | Deliverable written at FlowRun completion | 🟢 Done | #896 |
+| E7-S1 | 4 | E7: Marketing components | `GoalConfigPump` component | 🟢 Done | #897 |
+| E7-S2 | 4 | E7: Marketing components | `ContentProcessor` component | 🟢 Done | #897 |
+| E7-S3 | 4 | E7: Marketing components | `LinkedInPublisher` + `YouTubePublisher` components | 🟢 Done | #897 |
+| E8-S1 | 4 | E8: Marketing flow | Marketing Agent FlowDef + fan-out end-to-end | 🟢 Done | #897 |
+| E8-S2 | 4 | E8: Marketing flow | `POST /v1/approvals/{flow_run_id}/approve` endpoint | 🟢 Done | #897 |
+| E9-S1 | 5 | E9: CP UI components | Reusable `AgentCard` + `StatusDot` | 🟢 Done | #898 |
+| E10-S1 | 5 | E10: CP marketplace | Marketplace screen with hire CTA | 🟢 Done | #898 |
+| E10-S2 | 5 | E10: CP marketplace | Hire wizard: skill config + goal setting | 🟢 Done | #898 |
+| E11-S1 | 5 | E11: CP my agents | My Agents + `FlowRunTimeline` + `DeliverableCard` | 🟢 Done | #898 |
+| E11-S2 | 5 | E11: CP my agents | Approval queue + `ApprovalQueueItem` | 🟢 Done | #898 |
+| E12-S1 | 6 | E12: PP fleet | PP Fleet dashboard with agent health map | 🟢 Done | #899 |
+| E13-S1 | 6 | E13: PP health | Per-agent health drill-in with `ComponentRunRow` | 🟢 Done | #899 |
+| E14-S1 | 6 | E14: PP DLQ + proxies | DLQ panel: view, requeue, skip | 🟢 Done | #899 |
+| E14-S2 | 6 | E14: PP DLQ + proxies | CP proxy routes for flow-runs + component-runs | 🟢 Done | #899 |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
