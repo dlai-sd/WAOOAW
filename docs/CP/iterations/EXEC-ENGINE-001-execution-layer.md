@@ -170,11 +170,11 @@ async def call_external(): ...
 | E5-S3 | 3 | E5: Share Trader components | `DeltaPublisher` component | 🟢 Done | — |
 | E6-S1 | 3 | E6: Share Trader flow | Share Trader FlowDef + end-to-end run | 🟢 Done | — |
 | E6-S2 | 3 | E6: Share Trader flow | Deliverable written at FlowRun completion | 🟢 Done | — |
-| E7-S1 | 4 | E7: Marketing components | `GoalConfigPump` component | 🔴 Not Started | — |
-| E7-S2 | 4 | E7: Marketing components | `ContentProcessor` component | 🔴 Not Started | — |
-| E7-S3 | 4 | E7: Marketing components | `LinkedInPublisher` + `YouTubePublisher` components | 🔴 Not Started | — |
-| E8-S1 | 4 | E8: Marketing flow | Marketing Agent FlowDef + fan-out end-to-end | 🔴 Not Started | — |
-| E8-S2 | 4 | E8: Marketing flow | `POST /v1/approvals/{flow_run_id}/approve` endpoint | 🔴 Not Started | — |
+| E7-S1 | 4 | E7: Marketing components | `GoalConfigPump` component | 🟢 Done | — |
+| E7-S2 | 4 | E7: Marketing components | `ContentProcessor` component | 🟢 Done | — |
+| E7-S3 | 4 | E7: Marketing components | `LinkedInPublisher` + `YouTubePublisher` components | 🟢 Done | — |
+| E8-S1 | 4 | E8: Marketing flow | Marketing Agent FlowDef + fan-out end-to-end | 🟢 Done | — |
+| E8-S2 | 4 | E8: Marketing flow | `POST /v1/approvals/{flow_run_id}/approve` endpoint | 🟢 Done | — |
 | E9-S1 | 5 | E9: CP UI components | Reusable `AgentCard` + `StatusDot` | 🔴 Not Started | — |
 | E10-S1 | 5 | E10: CP marketplace | Marketplace screen with hire CTA | 🔴 Not Started | — |
 | E10-S2 | 5 | E10: CP marketplace | Hire wizard: skill config + goal setting | 🔴 Not Started | — |
