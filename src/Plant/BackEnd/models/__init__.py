@@ -11,6 +11,9 @@ from models.hired_agent import HiredAgentModel, GoalInstanceModel
 from models.deliverable import DeliverableModel, ApprovalModel
 from models.subscription import SubscriptionModel
 from models.campaign import CampaignModel, DailyThemeItemModel, ContentPostModel
+from models.flow_run import FlowRunModel
+from models.component_run import ComponentRunModel
+from models.skill_config import SkillConfigModel
 from models.schemas import (
     BaseEntitySchema,
     SkillCreate,
@@ -35,6 +38,9 @@ __all__ = [
     "CampaignModel",
     "DailyThemeItemModel",
     "ContentPostModel",
+    "FlowRunModel",
+    "ComponentRunModel",
+    "SkillConfigModel",
     "BaseEntitySchema",
     "SkillCreate",
     "SkillResponse",

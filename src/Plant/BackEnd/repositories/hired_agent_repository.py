@@ -66,6 +66,7 @@ class HiredAgentRepository:
         theme: str | None = None,
         config: dict[str, Any] | None = None,
         configured: bool | None = None,
+        definition_version_id: str | None = None,
     ) -> HiredAgentModel:
         """Create or update a hired agent instance draft.
         
@@ -80,6 +81,7 @@ class HiredAgentRepository:
             nickname: Optional agent nickname
             theme: Optional theme preference
             config: Optional configuration dictionary (JSONB)
+            definition_version_id: Version of agent type definition active at hire time
             
         Returns:
             Created or updated HiredAgentModel instance
@@ -121,6 +123,7 @@ class HiredAgentRepository:
             subscription_id=subscription_id,
             agent_id=agent_id,
             agent_type_id=agent_type_id,
+            definition_version_id=definition_version_id,
             customer_id=customer_id,
             nickname=nickname,
             theme=theme,

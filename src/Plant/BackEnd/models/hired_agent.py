@@ -34,6 +34,7 @@ class HiredAgentModel(Base):
     subscription_id = Column(String, nullable=False, unique=True, index=True)
     agent_id = Column(String, nullable=False, index=True)
     agent_type_id = Column(String, nullable=True, index=True)
+    definition_version_id = Column(String, nullable=True)
     customer_id = Column(String, nullable=True, index=True)  # Nullable during draft phase
     
     # Configuration
@@ -74,6 +75,7 @@ class HiredAgentModel(Base):
         subscription_id: str,
         agent_id: str,
         agent_type_id: str | None = None,
+        definition_version_id: str | None = None,
         customer_id: str | None = None,
         nickname: str | None = None,
         theme: str | None = None,
@@ -92,6 +94,7 @@ class HiredAgentModel(Base):
         self.subscription_id = subscription_id
         self.agent_id = agent_id
         self.agent_type_id = agent_type_id
+        self.definition_version_id = definition_version_id
         self.customer_id = customer_id
         self.nickname = nickname
         self.theme = theme
