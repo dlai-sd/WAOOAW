@@ -2105,6 +2105,11 @@ Post PR URL. **STOP — do not start Iteration 4 until this PR is merged to `mai
 
 ## Iteration 4 — Marketing Agent: Components + Fan-out Flow
 
+**Scope:** Customer with Marketing Agent hired can configure a campaign brief, generate platform-specific content via LLM, approve it at the gate, and publish to LinkedIn and YouTube in parallel — with `partial_failure` handled gracefully.
+**Lane:** B — new component implementations, Marketing FlowDef, and approvals endpoint.
+**⏱ Estimated:** 5h | **Come back:** 2026-03-09 16:00 IST
+**Epics:** E7, E8
+
 > **⛔ ITERATION 4 GATE — verify before writing any code:** Iteration 3 PR must be merged to `main`:
 > ```bash
 > git fetch origin
@@ -2112,83 +2117,339 @@ Post PR URL. **STOP — do not start Iteration 4 until this PR is merged to `mai
 > ```
 > If Iteration 3 content is absent from `main`, **STOP** and tell the user: "Iteration 4 is blocked — the Iteration 3 PR must be merged to main first."
 
-> **Stories written and committed:** 2026-03-08
+### Dependency Map (Iteration 4)
 
-### I4-S1 — `GoalConfigPump` component (30 min)
-
-**Context:** Marketing Agent's first step. Reads the customer's campaign brief and platform targets from `flow_run.run_context.goal_context` (set by the goal setting form). No external HTTP — pure context extraction and normalisation. Returns a structured `brief_payload` for the ContentProcessor. Create `src/Plant/BackEnd/components/marketing/goal_config_pump.py`.
-
-**Files to read first:**
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
-
-**Acceptance criteria:**
-- [ ] `GoalConfigPump.component_type == "GoalConfigPump"`
-- [ ] Reads `run_context.goal_context.campaign_brief`, `run_context.goal_context.content_type`, `skill_config.customer_fields.target_platforms`
-- [ ] Returns `{"brief_payload": {...}, "platform_specs": [{"platform": "linkedin", "format": "post"}, ...]}`
-- [ ] Missing `campaign_brief` → `ComponentOutput(success=False, error_message="campaign_brief required")`
-- [ ] Registered in component registry at module import
-- [ ] Unit tests: full brief, missing brief
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
-
----
-
-### I4-S2 — `ContentProcessor` component (90 min)
-
-**Context:** Takes `GoalConfigPump` output and calls an LLM (OpenAI or equivalent) to generate platform-specific post variants. Reads `skill_config.pp_locked_fields.brand_voice_model` (e.g. `gpt-4o`) and `skill_config.customer_fields.brand_name`, `tone`, `audience`. Uses `@circuit_breaker(service="openai_api")`. Returns `per_platform_variants` dict keyed by platform name. Create `src/Plant/BackEnd/components/marketing/content_processor.py`.
-
-**Files to read first:**
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
-- `src/Plant/BackEnd/core/encryption.py` — for OpenAI API key decryption
-
-**NFR pattern:**
-```python
-@circuit_breaker(service="openai_api")
-async def _call_llm(prompt: str, model: str, api_key: str) -> str:
-    # httpx async POST to OpenAI /v1/chat/completions
-    ...
+```
+E7-S1 ──► E7-S2 ──► E7-S3    (branch feat/EXEC-ENGINE-001-it4-e7, sequential)
+                       │
+                       ▼
+E8-S1 ──► E8-S2               (branch feat/EXEC-ENGINE-001-it4-e8; E8-S1 needs E7-S3)
 ```
 
-**Acceptance criteria:**
-- [ ] `ContentProcessor.component_type == "ContentProcessor"`
-- [ ] `@circuit_breaker(service="openai_api")` wraps LLM call
-- [ ] OpenAI API key never logged (`PIIMaskingFilter` active)
-- [ ] Returns `{"post_text": str, "hashtags": list, "per_platform_variants": {"linkedin": {...}, "youtube": {...}}}`
-- [ ] LLM HTTP failure → `ComponentOutput(success=False)` — triggers retry
-- [ ] Unit test with mocked LLM: success path; HTTP 429 (rate limit) returns failure
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+---
+
+### Epic E7: Customer's Marketing Agent produces platform-specific content via LLM
+
+**Branch:** `feat/EXEC-ENGINE-001-it4-e7`
+**User story:** As a Marketing Manager with Marketing Agent hired, I can provide a campaign brief and see the agent extract my goal context, call an LLM to generate platform-specific variants, and prepare content for LinkedIn and YouTube so that my publishing workflow is automated.
 
 ---
 
-### I4-S3 — `LinkedInPublisher` + `YouTubePublisher` components (45 min)
+#### Story E7-S1: `GoalConfigPump` component
 
-**Context:** Two publisher components for Marketing Agent. Both implement `BaseComponent`. Each reads its platform API key from `skill_config.customer_fields`. Both use `@circuit_breaker` on the post call. Return published content URL. Create `src/Plant/BackEnd/components/marketing/linkedin_publisher.py` and `youtube_publisher.py`.
+**BLOCKED UNTIL:** none (Iteration 4 must be on `main` first)
+**Estimated time:** 30 min
+**Branch:** `feat/EXEC-ENGINE-001-it4-e7`
+**CP BackEnd pattern:** N/A — Plant BackEnd component only
 
-**Files to read first:**
-- `src/Plant/BackEnd/components/base.py` — from I2-S1
-- `src/Plant/BackEnd/core/encryption.py` — API key decryption
+**What to do:**
+Create the `components/marketing/` package and `goal_config_pump.py`. This is the first step of the Marketing Agent flow — it reads the customer's campaign brief and platform targets from `flow_run.run_context.goal_context`, normalises them, and returns a structured `brief_payload` for `ContentProcessor`. No external HTTP calls — pure context extraction. Missing `campaign_brief` → failure.
 
-**Acceptance criteria (both publishers):**
-- [ ] `LinkedInPublisher.component_type == "LinkedInPublisher"`, `YouTubePublisher.component_type == "YouTubePublisher"`
-- [ ] `@circuit_breaker(service="linkedin_api")` / `@circuit_breaker(service="youtube_api")`
-- [ ] API keys never logged
-- [ ] Return `{"platform_post_id": str, "published_url": str, "platform": str}`
-- [ ] HTTP 4xx from platform → `ComponentOutput(success=False, error_message=...)` with platform name in message
-- [ ] Both registered in component registry
-- [ ] Unit tests: success, platform rejection, network error
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `ComponentInput.run_context` field, `ComponentOutput` interface |
+| `src/Plant/BackEnd/components/registry.py` | 1–30 | `register_component()` call pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/marketing/__init__.py` | create | Empty file — marks package |
+| `src/Plant/BackEnd/components/marketing/goal_config_pump.py` | create | Full component as per code pattern below |
+
+**Code patterns to copy exactly:**
+```python
+# src/Plant/BackEnd/components/marketing/goal_config_pump.py
+from core.logging import get_logger, PIIMaskingFilter
+from components.base import BaseComponent, ComponentInput, ComponentOutput
+from components.registry import register_component
+
+logger = get_logger(__name__)
+logger.addFilter(PIIMaskingFilter())
+
+class GoalConfigPump(BaseComponent):
+    @property
+    def component_type(self) -> str:
+        return "GoalConfigPump"
+
+    async def execute(self, input: ComponentInput) -> ComponentOutput:
+        goal_context = input.run_context.get("goal_context", {})
+        campaign_brief = goal_context.get("campaign_brief")
+        if not campaign_brief:
+            return ComponentOutput(success=False, error_message="campaign_brief required")
+        content_type = goal_context.get("content_type", "post")
+        target_platforms = input.skill_config.get("customer_fields", {}).get(
+            "target_platforms", ["linkedin"]
+        )
+        platform_specs = [{"platform": p, "format": content_type} for p in target_platforms]
+        return ComponentOutput(
+            success=True,
+            data={
+                "brief_payload": {
+                    "campaign_brief": campaign_brief,
+                    "content_type": content_type,
+                    "brand_name": input.skill_config.get("customer_fields", {}).get("brand_name", ""),
+                    "tone": input.skill_config.get("customer_fields", {}).get("tone", "professional"),
+                    "audience": input.skill_config.get("customer_fields", {}).get("audience", ""),
+                },
+                "platform_specs": platform_specs,
+            },
+        )
+
+register_component(GoalConfigPump())
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E7-S1-T1 | `src/Plant/BackEnd/tests/components/test_goal_config_pump.py` | `run_context.goal_context` with `campaign_brief` set and `target_platforms=["linkedin","youtube"]` | `success=True`, `data["platform_specs"]` has 2 entries |
+| E7-S1-T2 | same | `run_context.goal_context` missing `campaign_brief` | `success=False`, `error_message="campaign_brief required"` |
+| E7-S1-T3 | same | Call `get_component("GoalConfigPump")` after module import | Returns instance without `KeyError` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_goal_config_pump.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E7-S1 — GoalConfigPump component`
+
+**Done signal:**
+`"E7-S1 done. Changed: components/marketing/__init__.py, components/marketing/goal_config_pump.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---
 
-### I4-S4 — Marketing Agent FlowDef + fan-out end-to-end (90 min)
+#### Story E7-S2: `ContentProcessor` component
 
-**Context:** Wire `GoalConfigPump → ContentProcessor → [approval gate] → [LinkedInPublisher || YouTubePublisher]` using `execute_sequential_flow` + `execute_parallel_flow` from I2-S4/S5. Add `CONTENT_CREATION_FLOW` and `PUBLISHING_FLOW` constants. Full end-to-end test: brief → LLM content → approval → publish to both platforms.
+**BLOCKED UNTIL:** E7-S1 committed to `feat/EXEC-ENGINE-001-it4-e7`
+**Estimated time:** 90 min
+**Branch:** `feat/EXEC-ENGINE-001-it4-e7`
+**CP BackEnd pattern:** N/A
 
-**Files to read first:**
-- `src/Plant/BackEnd/engine/flow_executor.py` — from I2-S4 and I2-S5
-- `src/Plant/BackEnd/flows/` — create `marketing_agent.py` here
-- `src/Plant/BackEnd/models/deliverable.py`
+**What to do:**
+Create `components/marketing/content_processor.py`. It takes `GoalConfigPump` output from `previous_step_output`, reads `skill_config.pp_locked_fields.brand_voice_model` (e.g. `gpt-4o`), decrypts the OpenAI API key from `skill_config.customer_fields`, and calls the LLM to generate platform-specific post variants. Uses `@circuit_breaker(service="openai_api")`. API key must never appear in logs.
 
-**Flow constants:**
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `ComponentInput.previous_step_output` — this contains `brief_payload` from E7-S1 |
+| `src/Plant/BackEnd/core/encryption.py` | 1–40 | `decrypt_field()` call pattern for OpenAI API key |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/marketing/content_processor.py` | create | Full component as per code pattern below |
+
+**Code patterns to copy exactly:**
+```python
+# src/Plant/BackEnd/components/marketing/content_processor.py
+import httpx
+from core.logging import get_logger, PIIMaskingFilter
+from core.security import circuit_breaker
+from core.encryption import decrypt_field
+from components.base import BaseComponent, ComponentInput, ComponentOutput
+from components.registry import register_component
+
+logger = get_logger(__name__)
+logger.addFilter(PIIMaskingFilter())
+
+class ContentProcessor(BaseComponent):
+    @property
+    def component_type(self) -> str:
+        return "ContentProcessor"
+
+    async def execute(self, input: ComponentInput) -> ComponentOutput:
+        brief_payload = (input.previous_step_output or {}).get("brief_payload", {})
+        platform_specs = (input.previous_step_output or {}).get("platform_specs", [])
+        model = input.skill_config.get("pp_locked_fields", {}).get("brand_voice_model", "gpt-4o-mini")
+        encrypted_key = input.skill_config.get("customer_fields", {}).get("openai_api_key", "")
+        api_key = decrypt_field(encrypted_key)
+        variants = {}
+        for spec in platform_specs:
+            platform = spec["platform"]
+            prompt = self._build_prompt(brief_payload, spec)
+            text = await self._call_llm(prompt, model, api_key)
+            variants[platform] = {"post_text": text, "hashtags": [], "format": spec["format"]}
+        return ComponentOutput(
+            success=True,
+            data={"post_text": list(variants.values())[0]["post_text"] if variants else "",
+                  "hashtags": [], "per_platform_variants": variants},
+        )
+
+    def _build_prompt(self, brief: dict, spec: dict) -> str:
+        return (f"Write a {spec['format']} for {spec['platform']} about: {brief.get('campaign_brief', '')}. "
+                f"Brand: {brief.get('brand_name', '')}. Tone: {brief.get('tone', 'professional')}. "
+                f"Audience: {brief.get('audience', 'general')}.")
+
+    @circuit_breaker(service="openai_api")
+    async def _call_llm(self, prompt: str, model: str, api_key: str) -> str:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                json={"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 500},
+                headers={"Authorization": f"Bearer {api_key}"},
+                timeout=30.0,
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+
+register_component(ContentProcessor())
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E7-S2-T1 | `src/Plant/BackEnd/tests/components/test_content_processor.py` | Mock LLM returns `"Great post!"`, `platform_specs=[{platform:linkedin}]` | `success=True`, `data["per_platform_variants"]["linkedin"]["post_text"]="Great post!"` |
+| E7-S2-T2 | same | Mock LLM returns HTTP 429 (rate limit) | `safe_execute()` returns `success=False` |
+| E7-S2-T3 | same | Inspect log records captured during execute | OpenAI API key value does NOT appear in any log record |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_content_processor.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E7-S2 — ContentProcessor component`
+
+**Done signal:**
+`"E7-S2 done. Changed: components/marketing/content_processor.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E7-S3: `LinkedInPublisher` + `YouTubePublisher` components
+
+**BLOCKED UNTIL:** E7-S2 committed to `feat/EXEC-ENGINE-001-it4-e7`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it4-e7`
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+Create two publisher components: `components/marketing/linkedin_publisher.py` and `youtube_publisher.py`. Both implement `BaseComponent`, read their platform variant from `previous_step_output["per_platform_variants"]`, decrypt the platform API key from `skill_config.customer_fields`, and post via the platform API with `@circuit_breaker`. API keys must never appear in logs. Both registered at module import.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/components/base.py` | 1–50 | `ComponentInput.previous_step_output` — contains `per_platform_variants` from E7-S2 |
+| `src/Plant/BackEnd/core/encryption.py` | 1–40 | `decrypt_field()` call pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/components/marketing/linkedin_publisher.py` | create | Full LinkedIn component as per code pattern below |
+| `src/Plant/BackEnd/components/marketing/youtube_publisher.py` | create | Full YouTube component following identical structure with `service="youtube_api"` |
+
+**Code patterns to copy exactly:**
+```python
+# src/Plant/BackEnd/components/marketing/linkedin_publisher.py
+import httpx
+from core.logging import get_logger, PIIMaskingFilter
+from core.security import circuit_breaker
+from core.encryption import decrypt_field
+from components.base import BaseComponent, ComponentInput, ComponentOutput
+from components.registry import register_component
+
+logger = get_logger(__name__)
+logger.addFilter(PIIMaskingFilter())
+
+class LinkedInPublisher(BaseComponent):
+    @property
+    def component_type(self) -> str:
+        return "LinkedInPublisher"
+
+    async def execute(self, input: ComponentInput) -> ComponentOutput:
+        variants = (input.previous_step_output or {}).get("per_platform_variants", {})
+        variant = variants.get("linkedin", {})
+        if not variant:
+            return ComponentOutput(success=False, error_message="No LinkedIn variant in previous output")
+        encrypted_key = input.skill_config.get("customer_fields", {}).get("linkedin_access_token", "")
+        token = decrypt_field(encrypted_key)
+        result = await self._post_to_linkedin(variant["post_text"], token)
+        return ComponentOutput(success=True, data=result)
+
+    @circuit_breaker(service="linkedin_api")
+    async def _post_to_linkedin(self, text: str, token: str) -> dict:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.linkedin.com/v2/ugcPosts",
+                json={"author": "urn:li:person:me", "lifecycleState": "PUBLISHED",
+                      "specificContent": {"com.linkedin.ugc.ShareContent":
+                          {"shareCommentary": {"text": text}, "shareMediaCategory": "NONE"}}},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+            return {"platform_post_id": resp.headers.get("x-linkedin-id", ""),
+                    "published_url": "", "platform": "linkedin"}
+
+register_component(LinkedInPublisher())
+
+# src/Plant/BackEnd/components/marketing/youtube_publisher.py follows identical
+# structure: component_type="YouTubePublisher", service="youtube_api",
+# reads variants["youtube"], uses skill_config.customer_fields.youtube_api_key
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E7-S3-T1 | `src/Plant/BackEnd/tests/components/test_linkedin_publisher.py` | `previous_step_output.per_platform_variants.linkedin` set, mock HTTP 200 | `success=True`, `data["platform"]="linkedin"` |
+| E7-S3-T2 | same | LinkedIn API returns HTTP 4xx (post rejected) | `safe_execute()` returns `success=False`, error message contains "linkedin" |
+| E7-S3-T3 | `src/Plant/BackEnd/tests/components/test_youtube_publisher.py` | `previous_step_output.per_platform_variants.youtube` set, mock HTTP 200 | `success=True`, `data["platform"]="youtube"` |
+| E7-S3-T4 | same | YouTube API returns HTTP 5xx (server error) | `safe_execute()` returns `success=False` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/components/test_linkedin_publisher.py src/Plant/BackEnd/tests/components/test_youtube_publisher.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E7-S3 — LinkedInPublisher + YouTubePublisher components`
+
+**Done signal:**
+`"E7-S3 done. Changed: components/marketing/linkedin_publisher.py, components/marketing/youtube_publisher.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+**Epic E7 complete ✅** — run Docker integration test (Rule 5) before starting E8.
+
+---
+
+### Epic E8: Customer approves and publishes Marketing Agent content end-to-end
+
+**Branch:** `feat/EXEC-ENGINE-001-it4-e8`
+**User story:** As a customer with Marketing Agent hired, I can configure a campaign, see generated content stop at the approval gate, approve it, and watch parallel publishing to LinkedIn and YouTube succeed — with partial failure handled gracefully — and then see a deliverable row in my CP dashboard.
+
+---
+
+#### Story E8-S1: Marketing Agent FlowDef + fan-out end-to-end
+
+**BLOCKED UNTIL:** E7-S3 committed to `feat/EXEC-ENGINE-001-it4-e7` (all three Marketing components must exist)
+**Estimated time:** 90 min
+**Branch:** `feat/EXEC-ENGINE-001-it4-e8`
+**CP BackEnd pattern:** N/A — Plant BackEnd flows only
+
+**What to do:**
+Create `flows/marketing_agent.py` with `CONTENT_CREATION_FLOW` (sequential, approval gate after content generation) and `PUBLISHING_FLOW` (parallel fan-out to LinkedIn + YouTube). Register both in `FLOW_REGISTRY` in `api/v1/flow_runs.py`. Write an end-to-end integration test proving: brief → LLM (mocked) → stop at gate → approve → fan-out publish → `partial_failure` when one platform fails. Add Marketing deliverable type `"content_post"` to the deliverable hook.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/engine/flow_executor.py` | 1–120 | `execute_sequential_flow` + `execute_parallel_flow` signatures |
+| `src/Plant/BackEnd/flows/share_trader.py` | 1–30 | `FLOW_REGISTRY` pattern to follow |
+| `src/Plant/BackEnd/api/v1/flow_runs.py` | 1–50 | `FLOW_REGISTRY` import — extend to include marketing flows |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/flows/marketing_agent.py` | create | Flow constants + registry entries as per code pattern below |
+| `src/Plant/BackEnd/api/v1/flow_runs.py` | modify | Import `from flows.marketing_agent import MARKETING_FLOW_REGISTRY`; merge into existing `FLOW_REGISTRY` dict |
+
+**Code patterns to copy exactly:**
 ```python
 # src/Plant/BackEnd/flows/marketing_agent.py
 CONTENT_CREATION_FLOW = {
@@ -2198,85 +2459,177 @@ CONTENT_CREATION_FLOW = {
         {"step_name": "step_2", "component_type": "ContentProcessor"},
     ],
     "approval_gate_index": 2,  # Gate fires AFTER ContentProcessor, BEFORE publishing
+    "deliverable_type": "content_post",
 }
-
 PUBLISHING_FLOW = {
     "flow_name": "PublishingFlow",
     "parallel_steps": [
         {"step_name": "linkedin", "component_type": "LinkedInPublisher"},
         {"step_name": "youtube", "component_type": "YouTubePublisher"},
     ],
+    "deliverable_type": "content_post",
 }
+MARKETING_FLOW_REGISTRY = {
+    "ContentCreationFlow": CONTENT_CREATION_FLOW,
+    "PublishingFlow": PUBLISHING_FLOW,
+}
+
+# In api/v1/flow_runs.py — add after existing FLOW_REGISTRY import:
+from flows.marketing_agent import MARKETING_FLOW_REGISTRY
+FLOW_REGISTRY = {**FLOW_REGISTRY, **MARKETING_FLOW_REGISTRY}
 ```
 
-**Acceptance criteria:**
-- [ ] `customer_reviews=true`: `ContentCreationFlow` stops at gate → `awaiting_approval`
-- [ ] Customer approves → `PublishingFlow` triggered → both publishers run in parallel
-- [ ] LinkedIn ✓ + YouTube ✗ → `flow_run.status = partial_failure`, both `component_run` rows written
-- [ ] Deliverable created with `type="content_post"` and `content = {linkedin: {...}, youtube: {...}}`
-- [ ] `customer_reviews=false`: gate skipped, publishing happens immediately
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E8-S1-T1 | `src/Plant/BackEnd/tests/flows/test_marketing_flow.py` | `POST /v1/flow-runs` with `flow_name="ContentCreationFlow"`, `customer_reviews=true` | `flow_run.status = "awaiting_approval"` after ContentProcessor step |
+| E8-S1-T2 | same | `customer_reviews=false` | Gate skipped; `flow_run.status = "completed"` (all mocked steps succeed) |
+| E8-S1-T3 | same | `POST /v1/flow-runs` with `flow_name="PublishingFlow"`, LinkedIn mock succeeds + YouTube mock fails | `flow_run.status = "partial_failure"`, `error_details.failed_steps = ["youtube"]` |
+| E8-S1-T4 | same | Both LinkedIn + YouTube mocks succeed | `flow_run.status = "completed"`, two `component_run` rows with `status="completed"` |
+| E8-S1-T5 | same | Both fail | `flow_run.status = "failed"` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/flows/test_marketing_flow.py -v --cov=app --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E8-S1 — Marketing Agent FlowDef + fan-out end-to-end`
+
+**Done signal:**
+`"E8-S1 done. Changed: flows/marketing_agent.py, api/v1/flow_runs.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅"`
 
 ---
 
-### I4-S5 — `POST /v1/approvals/{flow_run_id}/approve` endpoint (45 min)
+#### Story E8-S2: `POST /v1/approvals/{flow_run_id}/approve` + `/reject` endpoints
 
-**Context:** When `flow_run.status = awaiting_approval`, the customer clicks Approve in CP. CP calls this Plant endpoint. The endpoint transitions `flow_run.status = running` and re-enqueues the next step to the appropriate Celery queue. This is the resume-from-gate mechanism.
+**BLOCKED UNTIL:** E8-S1 committed to `feat/EXEC-ENGINE-001-it4-e8`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it4-e8`
+**CP BackEnd pattern:** Pattern B — new `/cp/approvals/*` proxy is added in Iteration 6 (E14-S2); this story adds only the Plant `/v1/approvals/*` source endpoints
 
-**Files to read first:**
-- `src/Plant/BackEnd/models/flow_run.py` — from I1-S1
-- `src/Plant/BackEnd/engine/flow_executor.py` — from I2-S4
-- `src/CP/BackEnd/api/cp_approvals_proxy.py` — CP proxy that calls this endpoint
+**What to do:**
+When `flow_run.status = "awaiting_approval"`, the customer must be able to approve or reject it. Create `api/v1/approvals.py` with `POST /v1/approvals/{flow_run_id}/approve` (transitions to `running`, sets `auto_execute=True` in `run_context`, re-enqueues remaining steps) and `POST /v1/approvals/{flow_run_id}/reject` (transitions to `failed`, sets `error_details.reason="customer_rejected"`). Non-`awaiting_approval` status → HTTP 409. Register router in `main.py`.
 
-**NFR pattern:**
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/flow_run.py` | 1–45 | `status` column, `run_context` JSONB, `error_details` JSONB |
+| `src/Plant/BackEnd/api/v1/skill_configs.py` | 1–40 | `waooaw_router()` + `get_db_session` usage pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/approvals.py` | create | Approve + reject endpoints as per code pattern below |
+| `src/Plant/BackEnd/main.py` | modify | Add `from api.v1 import approvals` and `app.include_router(approvals.router)` |
+
+**Code patterns to copy exactly:**
 ```python
+# src/Plant/BackEnd/api/v1/approvals.py
+from datetime import datetime, timezone
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
+from core.routing import waooaw_router
+from core.database import get_db_session
+from core.logging import get_logger, PIIMaskingFilter
+from models.flow_run import FlowRunModel
+
+logger = get_logger(__name__)
+logger.addFilter(PIIMaskingFilter())
+
 router = waooaw_router(prefix="/v1/approvals", tags=["approvals"])
 
 @router.post("/{flow_run_id}/approve")
 async def approve_flow_run(
     flow_run_id: str,
-    db: Session = Depends(get_db_session),  # write — not read replica
+    db: Session = Depends(get_db_session),
 ):
     flow_run = db.query(FlowRunModel).filter_by(id=flow_run_id).first()
     if not flow_run or flow_run.status != "awaiting_approval":
         raise HTTPException(status_code=409, detail="Not awaiting approval")
     flow_run.status = "running"
     flow_run.run_context = {**flow_run.run_context, "auto_execute": True}
+    flow_run.updated_at = datetime.now(timezone.utc)
     db.commit()
-    # Re-enqueue remaining steps via Celery
-    ...
+    return {"id": flow_run_id, "status": flow_run.status}
+
+@router.post("/{flow_run_id}/reject")
+async def reject_flow_run(
+    flow_run_id: str,
+    db: Session = Depends(get_db_session),
+):
+    flow_run = db.query(FlowRunModel).filter_by(id=flow_run_id).first()
+    if not flow_run or flow_run.status != "awaiting_approval":
+        raise HTTPException(status_code=409, detail="Not awaiting approval")
+    flow_run.status = "failed"
+    flow_run.error_details = {"reason": "customer_rejected"}
+    flow_run.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"id": flow_run_id, "status": flow_run.status}
 ```
 
-**Acceptance criteria:**
-- [ ] `POST /v1/approvals/{flow_run_id}/approve` transitions status from `awaiting_approval` → `running`
-- [ ] `POST /v1/approvals/{flow_run_id}/reject` transitions to `failed` with `error_details.reason = "customer_rejected"`
-- [ ] Calling approve on a non-`awaiting_approval` flow_run returns HTTP 409
-- [ ] CP proxy `cp_approvals_proxy.py` updated to call new endpoint (not old deliverable-level endpoint)
-- [ ] Unit tests: approve → resumes execution; reject → failed; wrong status → 409
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+**Tests to write:**
 
-### ✅ Iteration 4 — Completion Checkpoint
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E8-S2-T1 | `src/Plant/BackEnd/tests/api/test_approvals.py` | Create `FlowRunModel` with `status="awaiting_approval"`, call `POST /v1/approvals/{id}/approve` | HTTP 200, DB row `status="running"`, `run_context["auto_execute"] == True` |
+| E8-S2-T2 | same | Create row with `status="awaiting_approval"`, call `/reject` | HTTP 200, DB row `status="failed"`, `error_details["reason"]="customer_rejected"` |
+| E8-S2-T3 | same | Call approve on `flow_run.status="running"` (not awaiting) | HTTP 409 |
+| E8-S2-T4 | same | Call reject on `flow_run.status="completed"` | HTTP 409 |
 
-After ALL I4-S1 through I4-S5 acceptance criteria pass:
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/api/test_approvals.py -v --cov=app --cov-fail-under=80
+```
 
-1. Verify all commits pushed:
-   ```bash
-   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
-   ```
-2. Open PR to main:
-   ```bash
-   gh pr create --base main \
-     --title "feat(EXEC-ENGINE-001): iteration 4 — Marketing Agent fan-out flow" \
-     --body "Stories: I4-S1 ✅ I4-S2 ✅ I4-S3 ✅ I4-S4 ✅ I4-S5 ✅"
-   ```
-3. Mark stories complete in this plan file — rename each `### I4-SX —` heading to `### ✅ I4-SX —`, commit + push:
-   ```bash
-   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
-   git commit -m "docs(EXEC-ENGINE-001): mark iteration 4 stories complete"
-   git push
-   ```
-4. **Report to user**: "Iteration 4 complete. PR: [URL]. Stories: I4-S1 ✅ I4-S2 ✅ I4-S3 ✅ I4-S4 ✅ I4-S5 ✅. Please review and merge — **do not launch Iteration 5 until this PR is merged**."
-5. **STOP. Do not run any Iteration 5 code until the user confirms this PR is merged to `main`.**
+**Commit message:** `feat(EXEC-ENGINE-001): E8-S2 — approvals approve + reject endpoints`
+
+**Done signal:**
+`"E8-S2 done. Changed: api/v1/approvals.py, main.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+**Epic E8 complete ✅** — run Docker integration test (Rule 5) before opening iteration PR.
+
+---
+
+### Iteration 4 — Completion Checkpoint
+
+After ALL E7 and E8 epics complete and Docker integration test passes:
+
+```bash
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-it4
+git merge --no-ff feat/EXEC-ENGINE-001-it4-e7 feat/EXEC-ENGINE-001-it4-e8
+git push origin feat/EXEC-ENGINE-001-it4
+
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-it4 \
+  --title "feat(EXEC-ENGINE-001): iteration 4 — Marketing Agent fan-out flow" \
+  --body "## EXEC-ENGINE-001 Iteration 4
+
+### Stories completed
+| E7-S1 | GoalConfigPump component | 🟢 Done |
+| E7-S2 | ContentProcessor component | 🟢 Done |
+| E7-S3 | LinkedInPublisher + YouTubePublisher components | 🟢 Done |
+| E8-S1 | Marketing Agent FlowDef + fan-out end-to-end | 🟢 Done |
+| E8-S2 | Approvals approve + reject endpoints | 🟢 Done |
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() — no bare APIRouter
+- [ ] GET routes use get_read_db_session()
+- [ ] PIIMaskingFilter on all new loggers
+- [ ] @circuit_breaker on all external HTTP calls
+- [ ] No env-specific values in Dockerfile or code
+- [ ] Tests >= 80% coverage on new BE code
+- [ ] Postgres owns flow state; Redis only transports jobs"
+```
+
+Post PR URL. **STOP — do not start Iteration 5 until this PR is merged to `main`.**
 
 ---
 
