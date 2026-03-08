@@ -2635,6 +2635,11 @@ Post PR URL. **STOP — do not start Iteration 5 until this PR is merged to `mai
 
 ## Iteration 5 — CP Portal UI
 
+**Scope:** Customer can browse the marketplace, hire an agent with skill configuration and goal setting, monitor live agent runs with timeline view, see deliverables, and approve or reject content from an approval queue — all in the CP dark-theme UI.
+**Lane:** A — wires existing Plant API endpoints; no new backend required beyond what Iteration 4 delivered.
+**⏱ Estimated:** 5h | **Come back:** 2026-03-10 11:00 IST
+**Epics:** E9, E10, E11
+
 > **⛔ ITERATION 5 GATE — verify before writing any code:** Iteration 4 PR must be merged to `main`:
 > ```bash
 > git fetch origin
@@ -2642,124 +2647,538 @@ Post PR URL. **STOP — do not start Iteration 5 until this PR is merged to `mai
 > ```
 > If Iteration 4 content is absent from `main`, **STOP** and tell the user: "Iteration 5 is blocked — the Iteration 4 PR must be merged to main first."
 
-> **Stories written and committed:** 2026-03-08
+### Dependency Map (Iteration 5)
 
-### I5-S1 — Reusable `AgentCard` + `StatusDot` UI components (30 min)
-
-**Context:** These two components are used on Marketplace, My Agents, and everywhere an agent is displayed. Defining them once as reusable HTML/CSS/JS components prevents duplication in all subsequent UI stories. All styling uses WAOOAW design system tokens. Create `frontend/components/AgentCard.js` and `frontend/components/StatusDot.js`.
-
-**Design system tokens to use:**
-```css
---bg-card: #18181b;
---color-primary: #667eea;
---color-neon-cyan: #00f2fe;
---border-dark: rgba(255,255,255,0.08);
---status-green: #10b981;   /* running */
---status-yellow: #f59e0b;  /* awaiting_approval */
---status-red: #ef4444;     /* failed */
---status-gray: #6b7280;    /* paused / no goal */
+```
+E9-S1                             (branch feat/EXEC-ENGINE-001-it5-e9; foundational UI components)
+  │
+  ▼
+E10-S1 ──► E10-S2                 (branch feat/EXEC-ENGINE-001-it5-e10; depends on E9-S1)
+E11-S1 ──► E11-S2                 (branch feat/EXEC-ENGINE-001-it5-e11; depends on E9-S1)
 ```
 
-**AgentCard renders:** avatar (initials + gradient bg), agent name, industry tag, status dot, specialty text, rating (⭐ n.n), monthly price, "Hire / View" CTA button.
+---
 
-**StatusDot renders:** 8px circle, colour from status string, tooltip on hover (`running | awaiting approval | failed | paused`).
+### Epic E9: Customer discovers and browses the WAOOAW agent marketplace
 
-**Acceptance criteria:**
-- [ ] `AgentCard` accepts props: `{id, name, industry, status, specialty, rating, price, ctaLabel, ctaHref}`
-- [ ] `StatusDot` accepts props: `{status}` — maps to correct CSS color token
-- [ ] Both dark theme compliant — `#0a0a0a` background, no white backgrounds
-- [ ] Hover on AgentCard: `translateY(-8px)` + neon cyan box-shadow
-- [ ] StatusDot tooltip shows human-readable status label
-- [ ] Renders correctly with missing optional props (no JS errors)
-- [ ] Visual review: screenshot matches WAOOAW design system
+**Branch:** `feat/EXEC-ENGINE-001-it5-e9`
+**User story:** As a prospective customer, I can browse the agent marketplace and see agent cards with live status, specialty, and ratings so that I can compare agents before hiring.
 
 ---
 
-### I5-S2 — Marketplace screen with hire CTA (45 min)
+#### Story E9-S1: Reusable `AgentCard` + `StatusDot` UI components
 
-**Context:** The marketplace is the first screen a customer sees — it must feel like browsing talent (Upwork/Fiverr), not a SaaS feature list. Uses `AgentCard` from I5-S1. Calls `GET /cp/agents` (existing CP proxy). Displays Share Trader and Marketing Agent cards. Each card has a "Start 7-day trial" CTA linking to the hire wizard. File: `frontend/pages/marketplace.html` + `frontend/pages/marketplace.js`.
+**BLOCKED UNTIL:** none (Iteration 5 must be on `main` first)
+**Estimated time:** 30 min
+**Branch:** `feat/EXEC-ENGINE-001-it5-e9`
+**CP BackEnd pattern:** N/A — frontend components only; no API call in this story
 
-**Acceptance criteria:**
-- [ ] Prominent search bar at top (placeholder: "Find your agent...")
-- [ ] Filter row: Industry (All / Marketing / Trading), Status (All / Available), Rating (★ 4+)
-- [ ] Agent cards rendered using `AgentCard` component — no inline card markup
-- [ ] "Start 7-day trial" CTA on each card links to `/hire/{agent_id}`
-- [ ] Empty state: "No agents found — adjust your filters" with reset button
-- [ ] Dark theme — `#0a0a0a` background, neon cyan search bar focus ring
-- [ ] Works with keyboard navigation (tab through cards + enter to hire)
+**What to do:**
+Create `frontend/components/AgentCard.js` and `frontend/components/StatusDot.js` as reusable vanilla-JS components used across Marketplace, My Agents, and PP Fleet. Both must use WAOOAW dark-theme design tokens exclusively. `AgentCard` renders avatar (initials + gradient background), agent name, industry tag, status dot, specialty, rating (⭐ n.n), monthly price, and a CTA button. `StatusDot` renders an 8px circle mapped from status string to CSS color token with a hover tooltip.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `frontend/` (directory listing) | — | Existing component conventions and import patterns |
+| `frontend/pages/` (any existing page) | 1–40 | How existing JS components are imported/exported |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/components/AgentCard.js` | create | Full component as per code pattern below |
+| `frontend/components/StatusDot.js` | create | Full component as per code pattern below |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/components/StatusDot.js
+const STATUS_COLORS = {
+  running:            'var(--status-green)',    // #10b981
+  awaiting_approval:  'var(--status-yellow)',   // #f59e0b
+  failed:             'var(--status-red)',       // #ef4444
+  paused:             'var(--status-gray)',      // #6b7280
+  completed:          'var(--status-green)',
+};
+const STATUS_LABELS = {
+  running: 'Running', awaiting_approval: 'Needs Approval',
+  failed: 'Failed', paused: 'Paused', completed: 'Done',
+};
+export function renderStatusDot(status) {
+  const color = STATUS_COLORS[status] || 'var(--status-gray)';
+  const label = STATUS_LABELS[status] || status;
+  return `<span class="status-dot" style="background:${color}" title="${label}"
+    aria-label="${label}"></span>`;
+}
+
+// frontend/components/AgentCard.js
+// CSS vars: --bg-card:#18181b, --color-neon-cyan:#00f2fe, --border-dark:rgba(255,255,255,0.08)
+import { renderStatusDot } from './StatusDot.js';
+export function renderAgentCard({ id, name, industry, status, specialty, rating, price,
+                                   ctaLabel = 'View', ctaHref = '#' }) {
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  return `
+<article class="agent-card" data-agent-id="${id}">
+  <div class="agent-card__avatar">${initials}</div>
+  <div class="agent-card__info">
+    <div class="agent-card__header">
+      <h3 class="agent-card__name">${name}</h3>
+      ${renderStatusDot(status)}
+    </div>
+    <span class="agent-card__industry">${industry}</span>
+    <p class="agent-card__specialty">${specialty}</p>
+    <div class="agent-card__meta">
+      <span class="agent-card__rating">⭐ ${rating?.toFixed(1) ?? '—'}</span>
+      <span class="agent-card__price">₹${price?.toLocaleString('en-IN') ?? '—'}/mo</span>
+    </div>
+  </div>
+  <a href="${ctaHref}" class="btn btn--cyan agent-card__cta">${ctaLabel}</a>
+</article>`;
+}
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E9-S1-T1 | `frontend/tests/components/test_agent_card.spec.js` | Render `AgentCard` with all props | HTML contains agent name, status dot span, CTA link |
+| E9-S1-T2 | same | Render with `status="failed"` | StatusDot color maps to `--status-red` |
+| E9-S1-T3 | same | Render with missing optional props (`rating=undefined`) | No JS exception thrown; renders `⭐ —` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/components/test_agent_card.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E9-S1 — AgentCard + StatusDot reusable UI components`
+
+**Done signal:**
+`"E9-S1 done. Changed: frontend/components/AgentCard.js, frontend/components/StatusDot.js. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+**Epic E9 complete ✅** — run Docker integration test (Rule 5) before starting E10.
 
 ---
 
-### I5-S3 — Hire wizard: skill config + goal setting (90 min)
+### Epic E10: Customer hires an agent with skill configuration and goal setting
 
-**Context:** Three-step wizard: (1) Confirm agent + nickname, (2) Fill skill config fields (customer-fillable fields from `SkillConfig`), (3) Goal setting (schedule, approval preference). Calls `POST /cp/hired-agents` then `PATCH /cp/skill-configs/{id}` then `POST /cp/goal-instances`. On completion, redirects to My Agents. File: `frontend/pages/hire.html` + `frontend/pages/hire.js`.
-
-**Acceptance criteria:**
-- [ ] Step 1: Agent name (read-only), nickname input (required), trial badge "7 days free · keep everything"
-- [ ] Step 2: Dynamic form — fields rendered from `skill_config.customer_fields` schema; API key fields are `type=password` masked
-- [ ] Step 3: Schedule picker (daily / hourly / custom cron), approval toggle ("Review before execution" on/off)
-- [ ] Back/Next navigation with validation — cannot advance with invalid fields
-- [ ] Step 2 calls `PATCH /cp/skill-configs` on Next (not on final submit)
-- [ ] Final submit: goal created → redirect to `/my-agents`
-- [ ] API errors shown inline under relevant field, not alert()
+**Branch:** `feat/EXEC-ENGINE-001-it5-e10`
+**User story:** As a customer, I can browse the marketplace, click "Start 7-day trial" on an agent card, complete a three-step hire wizard with skill config and goal setting, and land on My Agents — all without page reload errors.
 
 ---
 
-### I5-S4 — My Agents + `FlowRunTimeline` + `DeliverableCard` (90 min)
+#### Story E10-S1: Marketplace screen with hire CTA
 
-**Context:** The My Agents screen is the customer's daily hub. Shows each hired agent with `StatusDot`, last run time, next scheduled run, and a "View" button. Clicking View opens the per-agent detail page showing `FlowRunTimeline` (current run in progress or last completed) and `DeliverableCard` list. New reusable components: `FlowRunTimeline` and `DeliverableCard`.
+**BLOCKED UNTIL:** E9-S1 merged to `main` (needs `AgentCard` + `StatusDot` components)
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it5-e10`
+**CP BackEnd pattern:** Pattern A — calls existing `GET /cp/agents` proxy (already in `src/CP/BackEnd/api/`)
 
-**FlowRunTimeline renders:** horizontal step sequence — each step as a node: `step_name`, status icon (✓ / ⏳ / ✗ / ⏸), duration_ms. Highlights `current_step` with pulse animation when status = `running`.
+**What to do:**
+Create `frontend/pages/marketplace.html` and `frontend/pages/marketplace.js`. Fetch agents from `GET /cp/agents`, render using `AgentCard` with `ctaLabel="Start 7-day trial"` and `ctaHref="/hire/{agent_id}"`. Include a search bar and filter row (Industry, Status, Rating). The page must feel like browsing talent (Upwork/Fiverr) — not a SaaS feature list. Dark theme with `#0a0a0a` background.
 
-**DeliverableCard renders:** type badge (`trade_execution` | `content_post`), creation time, content preview (truncated 120 chars), "View full" expand, download link.
+**Files to read first (max 3):**
 
-**Acceptance criteria:**
-- [ ] My Agents lists all hired agents with `AgentCard` (compact variant) + `StatusDot`
-- [ ] "Needs approval" badge on cards where `flow_run.status = awaiting_approval`
-- [ ] Per-agent detail: `FlowRunTimeline` at top, `DeliverableCard` list below
-- [ ] `FlowRunTimeline` auto-refreshes every 5s when `flow_run.status = running`
-- [ ] `DeliverableCard` "View full" expands inline without page reload
-- [ ] Empty state: "No runs yet — your first run will appear here"
-- [ ] Calls `GET /cp/flow-runs?hired_instance_id=X` and `GET /cp/deliverables?hired_instance_id=X`
+| File | Lines | What to look for |
+|---|---|---|
+| `frontend/components/AgentCard.js` | 1–40 | `renderAgentCard()` props interface |
+| `src/CP/BackEnd/api/` (list files) | — | Confirm `GET /cp/agents` exists; note response shape |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/pages/marketplace.html` | create | HTML shell with search bar, filter row, `#agent-grid` container, dark theme, font imports |
+| `frontend/pages/marketplace.js` | create | Fetch + filter + render logic as per code pattern below |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/pages/marketplace.js
+import { renderAgentCard } from '../components/AgentCard.js';
+
+const API_BASE = window.API_BASE || '';
+let allAgents = [];
+
+async function loadAgents() {
+  const res = await fetch(`${API_BASE}/cp/agents`);
+  if (!res.ok) throw new Error('Failed to fetch agents');
+  allAgents = await res.json();
+  renderGrid(allAgents);
+}
+
+function renderGrid(agents) {
+  const grid = document.getElementById('agent-grid');
+  if (!agents.length) {
+    grid.innerHTML = `<div class="empty-state">No agents found — <button onclick="resetFilters()">reset filters</button></div>`;
+    return;
+  }
+  grid.innerHTML = agents.map(a => renderAgentCard({
+    id: a.id, name: a.name, industry: a.industry, status: a.status,
+    specialty: a.specialty, rating: a.rating, price: a.price,
+    ctaLabel: 'Start 7-day trial', ctaHref: `/hire/${a.id}`,
+  })).join('');
+}
+
+function applyFilters() {
+  const query = document.getElementById('search-input').value.toLowerCase();
+  const industry = document.getElementById('filter-industry').value;
+  const minRating = parseFloat(document.getElementById('filter-rating').value || 0);
+  const filtered = allAgents.filter(a =>
+    (a.name.toLowerCase().includes(query) || a.specialty.toLowerCase().includes(query)) &&
+    (!industry || a.industry === industry) &&
+    (a.rating >= minRating)
+  );
+  renderGrid(filtered);
+}
+
+function resetFilters() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('filter-industry').value = '';
+  document.getElementById('filter-rating').value = '';
+  renderGrid(allAgents);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadAgents().catch(err => { document.getElementById('agent-grid').innerHTML = `<p class="error">${err.message}</p>`; });
+  document.getElementById('search-input').addEventListener('input', applyFilters);
+  document.getElementById('filter-industry').addEventListener('change', applyFilters);
+  document.getElementById('filter-rating').addEventListener('change', applyFilters);
+});
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E10-S1-T1 | `frontend/tests/pages/test_marketplace.spec.js` | Mock `GET /cp/agents` returns 2 agents | Grid renders 2 `agent-card` articles |
+| E10-S1-T2 | same | Filter by `industry="marketing"` | Only marketing-industry agents visible |
+| E10-S1-T3 | same | Mock returns empty array | Empty state message with reset button shown |
+| E10-S1-T4 | same | Mock `GET /cp/agents` returns HTTP 500 | Error message displayed in grid container |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/pages/test_marketplace.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E10-S1 — Marketplace screen with hire CTA`
+
+**Done signal:**
+`"E10-S1 done. Changed: frontend/pages/marketplace.html, frontend/pages/marketplace.js. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
 
 ---
 
-### I5-S5 — Approval queue + `ApprovalQueueItem` (45 min)
+#### Story E10-S2: Hire wizard — skill config + goal setting
 
-**Context:** When `flow_run.status = awaiting_approval`, the customer must be able to see a preview of what the agent produced and approve or reject it with one tap. This is the zero-risk promise in action. New reusable component `ApprovalQueueItem`. Notification badge on nav shows count. File: `frontend/pages/approvals.html` + `frontend/pages/approvals.js`.
+**BLOCKED UNTIL:** E10-S1 committed to `feat/EXEC-ENGINE-001-it5-e10`
+**Estimated time:** 90 min
+**Branch:** `feat/EXEC-ENGINE-001-it5-e10`
+**CP BackEnd pattern:** Pattern A — calls existing `POST /cp/hired-agents`, `PATCH /cp/skill-configs/{id}/{skill_id}`, `POST /cp/goal-instances` proxies
 
-**ApprovalQueueItem renders:** agent name + avatar, preview of what will happen (e.g. "Publish to LinkedIn: [post preview]" or "Place trade: NIFTY BUY ₹22,340"), time waiting, Approve (neon cyan) / Reject (red) buttons.
+**What to do:**
+Create `frontend/pages/hire.html` and `frontend/pages/hire.js` — a three-step wizard. Step 1: Confirm agent + nickname. Step 2: Fill skill config `customer_fields` (form is dynamic; API key fields use `type=password`). Step 3: Schedule + approval preference. API errors display inline under the relevant field, not `alert()`. On completion redirect to `/my-agents`.
 
-**Acceptance criteria:**
-- [ ] Approval queue accessible from main nav ("Approvals" with badge count)
-- [ ] Each `ApprovalQueueItem` shows content preview from `deliverable.content.per_platform_variants` or `deliverable.content.order_params`
-- [ ] Approve button calls `POST /cp/approvals/{flow_run_id}/approve` — optimistic UI (button disabled immediately)
-- [ ] Reject button calls `POST /cp/approvals/{flow_run_id}/reject` with confirmation dialog
-- [ ] On approve: item removed from queue, `FlowRunTimeline` on My Agents updates to `running`
-- [ ] Empty queue: "Nothing waiting for your approval — nice!" with confetti emoji
+**Files to read first (max 3):**
 
-### ✅ Iteration 5 — Completion Checkpoint
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/BackEnd/api/hired_agents_proxy.py` | 1–50 | `POST /cp/hired-agents` response shape — need `id` field |
+| `frontend/pages/marketplace.js` | 1–40 | Fetch pattern and `API_BASE` convention to match |
 
-After ALL I5-S1 through I5-S5 acceptance criteria pass:
+**Files to create / modify:**
 
-1. Verify all commits pushed:
-   ```bash
-   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
-   ```
-2. Open PR to main:
-   ```bash
-   gh pr create --base main \
-     --title "feat(EXEC-ENGINE-001): iteration 5 — CP portal UI" \
-     --body "Stories: I5-S1 ✅ I5-S2 ✅ I5-S3 ✅ I5-S4 ✅ I5-S5 ✅"
-   ```
-3. Mark stories complete in this plan file — rename each `### I5-SX —` heading to `### ✅ I5-SX —`, commit + push:
-   ```bash
-   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
-   git commit -m "docs(EXEC-ENGINE-001): mark iteration 5 stories complete"
-   git push
-   ```
-4. **Report to user**: "Iteration 5 complete. PR: [URL]. Stories: I5-S1 ✅ I5-S2 ✅ I5-S3 ✅ I5-S4 ✅ I5-S5 ✅. Please review and merge — **do not launch Iteration 6 until this PR is merged**."
-5. **STOP. Do not run any Iteration 6 code until the user confirms this PR is merged to `main`.**
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/pages/hire.html` | create | Three-step wizard HTML with step indicators, form containers, Back/Next/Submit buttons, inline error spans, trial badge |
+| `frontend/pages/hire.js` | create | Wizard state machine + API calls as per code pattern below |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/pages/hire.js
+const API_BASE = window.API_BASE || '';
+let wizardState = { step: 1, agentId: null, hiredInstanceId: null, skillConfigId: null };
+
+async function goToStep(n) {
+  document.querySelectorAll('.wizard-step').forEach((el, i) => {
+    el.hidden = i + 1 !== n;
+  });
+  wizardState.step = n;
+}
+
+async function submitStep1() {
+  const nickname = document.getElementById('nickname').value.trim();
+  if (!nickname) { showError('nickname-error', 'Nickname is required'); return; }
+  const res = await fetch(`${API_BASE}/cp/hired-agents`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent_id: wizardState.agentId, nickname }),
+  });
+  if (!res.ok) { showError('step1-error', (await res.json()).detail); return; }
+  const data = await res.json();
+  wizardState.hiredInstanceId = data.id;
+  goToStep(2);
+}
+
+async function submitStep2() {
+  const customerFields = readFormFields('skill-config-form');
+  const res = await fetch(`${API_BASE}/cp/skill-configs/${wizardState.hiredInstanceId}/default`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customer_fields: customerFields }),
+  });
+  if (!res.ok) { showError('step2-error', (await res.json()).detail); return; }
+  goToStep(3);
+}
+
+async function submitStep3() {
+  const schedule = document.getElementById('schedule').value;
+  const customerReviews = document.getElementById('approval-toggle').checked;
+  const res = await fetch(`${API_BASE}/cp/goal-instances`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hired_instance_id: wizardState.hiredInstanceId,
+                           schedule, customer_reviews: customerReviews }),
+  });
+  if (!res.ok) { showError('step3-error', (await res.json()).detail); return; }
+  window.location.href = '/my-agents';
+}
+
+function showError(elementId, message) {
+  const el = document.getElementById(elementId);
+  if (el) { el.textContent = message; el.hidden = false; }
+}
+
+function readFormFields(formId) {
+  const form = document.getElementById(formId);
+  const result = {};
+  new FormData(form).forEach((v, k) => { result[k] = v; });
+  return result;
+}
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E10-S2-T1 | `frontend/tests/pages/test_hire_wizard.spec.js` | Submit Step 1 with empty nickname | `showError` called with "Nickname is required"; page stays on step 1 |
+| E10-S2-T2 | same | Mock `POST /cp/hired-agents` returns 201 with `id` | Wizard advances to step 2 |
+| E10-S2-T3 | same | Mock `PATCH /cp/skill-configs` returns 500 | Inline error shown; step does not advance |
+| E10-S2-T4 | same | Full happy path (all APIs mock 200) | Final step triggers redirect to `/my-agents` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/pages/test_hire_wizard.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E10-S2 — hire wizard skill config + goal setting`
+
+**Done signal:**
+`"E10-S2 done. Changed: frontend/pages/hire.html, frontend/pages/hire.js. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+**Epic E10 complete ✅** — run Docker integration test (Rule 5) before starting E11.
+
+---
+
+### Epic E11: Customer monitors live agent runs, views deliverables, and approves output
+
+**Branch:** `feat/EXEC-ENGINE-001-it5-e11`
+**User story:** As a customer with agents hired, I can see all my agents with live status, open any agent to watch the flow run step-by-step in a timeline, view delivered results, and approve or reject pending content — all from the CP portal.
+
+---
+
+#### Story E11-S1: My Agents screen + `FlowRunTimeline` + `DeliverableCard` components
+
+**BLOCKED UNTIL:** E9-S1 merged to `main` (needs `AgentCard` + `StatusDot`)
+**Estimated time:** 90 min
+**Branch:** `feat/EXEC-ENGINE-001-it5-e11`
+**CP BackEnd pattern:** Pattern A — calls `GET /cp/hired-agents` (existing), `GET /cp/flow-runs?hired_instance_id=X` (E14-S2 proxy, BLOCKED UNTIL E14-S2 merged; frontenc calls it anyway — guard with empty-state fallback)
+
+**What to do:**
+Create `frontend/pages/my-agents.html`, `frontend/pages/my-agents.js`, `frontend/components/FlowRunTimeline.js`, and `frontend/components/DeliverableCard.js`. My Agents lists hired agents (compact `AgentCard`) with a "Needs Approval" badge when `flow_run.status = "awaiting_approval"`. Per-agent detail shows `FlowRunTimeline` (auto-refreshes every 5s when running) and a `DeliverableCard` list. Error and empty states required.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `frontend/components/AgentCard.js` | 1–40 | Import path and props interface |
+| `frontend/components/StatusDot.js` | 1–20 | `renderStatusDot()` import path |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/components/FlowRunTimeline.js` | create | Renders horizontal stepper — each step node with `step_name`, status icon, `duration_ms`; highlights `current_step` with pulse CSS class when `status="running"` |
+| `frontend/components/DeliverableCard.js` | create | Renders type badge, creation time, 120-char truncated preview, "View full" inline expand toggle, download link |
+| `frontend/pages/my-agents.html` | create | Agent list container + per-agent detail panel (hidden by default), dark theme |
+| `frontend/pages/my-agents.js` | create | Load agents, load flow runs, render components, 5s polling when `status="running"` |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/components/FlowRunTimeline.js
+export function renderFlowRunTimeline(flowRun, componentRuns) {
+  if (!flowRun) return '<p class="empty-state">No runs yet — your first run will appear here.</p>';
+  const steps = componentRuns.map(cr => {
+    const icon = { completed: '✓', running: '⏳', failed: '✗', pending: '⏸' }[cr.status] || '•';
+    const pulse = cr.status === 'running' ? ' timeline-step--pulse' : '';
+    return `<div class="timeline-step timeline-step--${cr.status}${pulse}">
+      <span class="timeline-step__icon">${icon}</span>
+      <span class="timeline-step__name">${cr.step_name}</span>
+      ${cr.duration_ms ? `<span class="timeline-step__dur">${cr.duration_ms}ms</span>` : ''}
+    </div>`;
+  }).join('<span class="timeline-arrow">→</span>');
+  return `<div class="flow-timeline" data-flow-run-id="${flowRun.id}" data-status="${flowRun.status}">${steps}</div>`;
+}
+
+// frontend/components/DeliverableCard.js
+export function renderDeliverableCard(d) {
+  const preview = JSON.stringify(d.content).slice(0, 120);
+  return `<div class="deliverable-card">
+    <span class="deliverable-card__type-badge">${d.type}</span>
+    <time class="deliverable-card__time">${new Date(d.created_at).toLocaleString()}</time>
+    <p class="deliverable-card__preview">${preview}…</p>
+    <button class="deliverable-card__expand" onclick="this.nextElementSibling.hidden=!this.nextElementSibling.hidden">View full</button>
+    <pre class="deliverable-card__full" hidden>${JSON.stringify(d.content, null, 2)}</pre>
+  </div>`;
+}
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E11-S1-T1 | `frontend/tests/components/test_flow_run_timeline.spec.js` | Pass `flowRun.status="running"` and 3 component runs | Renders 3 step nodes; running step has `--pulse` class |
+| E11-S1-T2 | same | `flowRun = null` | Renders empty-state paragraph |
+| E11-S1-T3 | `frontend/tests/components/test_deliverable_card.spec.js` | Pass deliverable with `content={order_id:"X"}` | Preview contains `order_id`; "View full" button present |
+| E11-S1-T4 | `frontend/tests/pages/test_my_agents.spec.js` | Mock `GET /cp/hired-agents` returns 1 agent with `awaiting_approval` flow_run | "Needs Approval" badge rendered on that agent's card |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/components/test_flow_run_timeline.spec.js frontend/tests/components/test_deliverable_card.spec.js frontend/tests/pages/test_my_agents.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E11-S1 — My Agents + FlowRunTimeline + DeliverableCard`
+
+**Done signal:**
+`"E11-S1 done. Changed: frontend/components/FlowRunTimeline.js, components/DeliverableCard.js, pages/my-agents.html, pages/my-agents.js. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+---
+
+#### Story E11-S2: Approval queue + `ApprovalQueueItem` component
+
+**BLOCKED UNTIL:** E11-S1 committed to `feat/EXEC-ENGINE-001-it5-e11`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it5-e11`
+**CP BackEnd pattern:** Pattern A — calls `POST /cp/approvals/{id}/approve` + `/reject` (E14-S2 proxy, BLOCKED UNTIL E14-S2 merged; fallback gracefully if unavailable)
+
+**What to do:**
+Create `frontend/pages/approvals.html`, `frontend/pages/approvals.js`, and `frontend/components/ApprovalQueueItem.js`. The approval queue is accessible from the main nav with a badge count. Each `ApprovalQueueItem` renders the agent name + avatar, a content preview from `deliverable.content`, and Approve (neon cyan) / Reject (red) buttons. Approve is optimistic (disabled immediately). Reject requires a confirmation dialog. Empty queue shows a congratulations message.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `frontend/components/AgentCard.js` | 1–40 | Avatar initials rendering pattern to reuse |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/components/ApprovalQueueItem.js` | create | Full component as per code pattern below |
+| `frontend/pages/approvals.html` | create | Nav badge, approval list container, empty state, dark theme |
+| `frontend/pages/approvals.js` | create | Fetch pending approvals from `GET /cp/flow-runs?status=awaiting_approval`, render items, handle approve/reject actions |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/components/ApprovalQueueItem.js
+const API_BASE = window.API_BASE || '';
+
+export function renderApprovalQueueItem(flowRun, deliverable, agentName) {
+  const preview = deliverable
+    ? (deliverable.content?.per_platform_variants
+        ? `Publish to platforms: ${Object.keys(deliverable.content.per_platform_variants).join(', ')}`
+        : `Place trade: ${JSON.stringify(deliverable.content).slice(0, 80)}`)
+    : 'Pending output preview';
+  return `
+<div class="approval-item" data-flow-run-id="${flowRun.id}">
+  <div class="approval-item__agent">${agentName}</div>
+  <p class="approval-item__preview">${preview}</p>
+  <div class="approval-item__actions">
+    <button class="btn btn--cyan" onclick="approveFlowRun('${flowRun.id}', this)">Approve</button>
+    <button class="btn btn--red" onclick="rejectFlowRun('${flowRun.id}')">Reject</button>
+  </div>
+</div>`;
+}
+
+async function approveFlowRun(flowRunId, btn) {
+  btn.disabled = true;
+  const res = await fetch(`${API_BASE}/cp/approvals/${flowRunId}/approve`, { method: 'POST' });
+  if (!res.ok) { btn.disabled = false; alert('Approval failed — try again'); return; }
+  document.querySelector(`[data-flow-run-id="${flowRunId}"]`)?.remove();
+}
+
+async function rejectFlowRun(flowRunId) {
+  if (!confirm('Reject this agent output? The run will be marked as failed.')) return;
+  await fetch(`${API_BASE}/cp/approvals/${flowRunId}/reject`, { method: 'POST' });
+  document.querySelector(`[data-flow-run-id="${flowRunId}"]`)?.remove();
+}
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E11-S2-T1 | `frontend/tests/components/test_approval_queue_item.spec.js` | Render item with `deliverable.content.per_platform_variants={linkedin:{}}` | Preview text contains "linkedin" |
+| E11-S2-T2 | same | Mock `POST /cp/approvals/{id}/approve` returns 200, click Approve | Button disabled immediately; item removed from DOM after response |
+| E11-S2-T3 | `frontend/tests/pages/test_approvals.spec.js` | Mock `GET /cp/flow-runs?status=awaiting_approval` returns empty array | Empty queue message displayed |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/components/test_approval_queue_item.spec.js frontend/tests/pages/test_approvals.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E11-S2 — approval queue + ApprovalQueueItem component`
+
+**Done signal:**
+`"E11-S2 done. Changed: frontend/components/ApprovalQueueItem.js, pages/approvals.html, pages/approvals.js. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+**Epic E11 complete ✅** — run Docker integration test (Rule 5) before opening iteration PR.
+
+---
+
+### Iteration 5 — Completion Checkpoint
+
+After ALL E9, E10, and E11 epics complete and Docker integration test passes:
+
+```bash
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-it5
+git merge --no-ff feat/EXEC-ENGINE-001-it5-e9 feat/EXEC-ENGINE-001-it5-e10 feat/EXEC-ENGINE-001-it5-e11
+git push origin feat/EXEC-ENGINE-001-it5
+
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-it5 \
+  --title "feat(EXEC-ENGINE-001): iteration 5 — CP portal UI" \
+  --body "## EXEC-ENGINE-001 Iteration 5
+
+### Stories completed
+| E9-S1 | AgentCard + StatusDot reusable UI components | 🟢 Done |
+| E10-S1 | Marketplace screen with hire CTA | 🟢 Done |
+| E10-S2 | Hire wizard skill config + goal setting | 🟢 Done |
+| E11-S1 | My Agents + FlowRunTimeline + DeliverableCard | 🟢 Done |
+| E11-S2 | Approval queue + ApprovalQueueItem component | 🟢 Done |
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() — no bare APIRouter (N/A — FE only iteration)
+- [ ] Dark theme: #0a0a0a background, neon cyan #00f2fe accents
+- [ ] No raw API keys/secrets in frontend code or localStorage
+- [ ] Loading + error + empty states on every data-fetching screen
+- [ ] Keyboard navigation on Marketplace and Hire wizard
+- [ ] StatusDot tooltip shows human-readable label"
+```
+
+Post PR URL. **STOP — do not start Iteration 6 until this PR is merged to `main`.**
 
 ---
 
