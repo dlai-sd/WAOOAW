@@ -21,7 +21,7 @@ from core.dependencies import _correlation_id
 logger = logging.getLogger(__name__)
 
 router = waooaw_router(
-    prefix="/v1/hired-agents",
+    prefix="/hired-agents",
     tags=["construct-diagnostics"],
 )
 
@@ -281,7 +281,7 @@ async def get_scheduler_diagnostics(
 # ---------------------------------------------------------------------------
 
 ops_router = waooaw_router(
-    prefix="/v1/ops",
+    prefix="/ops",
     tags=["construct-diagnostics"],
 )
 

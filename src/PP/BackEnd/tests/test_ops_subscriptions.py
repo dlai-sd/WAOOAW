@@ -24,7 +24,7 @@ async def test_list_subscriptions_returns_200(app, client):
     plant = _make_plant(200, [{"subscription_id": "sub-1", "status": "active"}])
     app.dependency_overrides[get_plant_client] = lambda: plant
     try:
-        resp = await client.get("/api/pp/ops/subscriptions")
+        resp = await client.get("/api/pp/ops/subscriptions?customer_id=C1")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -42,7 +42,21 @@ async def test_list_subscriptions_forwards_query_params(app, client):
     try:
         await client.get("/api/pp/ops/subscriptions?customer_id=C1&status=active")
         call_kwargs = plant._request.call_args
-        assert call_kwargs.kwargs.get("params") == {"customer_id": "C1", "status": "active"}
+        assert call_kwargs.kwargs.get("path").endswith("/by-customer/C1")
+        assert call_kwargs.kwargs.get("params") == {"status": "active"}
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+async def test_list_subscriptions_returns_400_without_customer_id(app, client):
+    from clients.plant_client import get_plant_client
+
+    plant = _make_plant(200, [])
+    app.dependency_overrides[get_plant_client] = lambda: plant
+    try:
+        resp = await client.get("/api/pp/ops/subscriptions")
+        assert resp.status_code == 400
     finally:
         app.dependency_overrides.clear()
 
@@ -83,5 +97,19 @@ async def test_get_subscription_passthrough_404(app, client):
     try:
         resp = await client.get("/api/pp/ops/subscriptions/does-not-exist")
         assert resp.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+async def test_get_subscription_uses_payments_path(app, client):
+    from clients.plant_client import get_plant_client
+
+    plant = _make_plant(200, {"subscription_id": "sub-1", "status": "active"})
+    app.dependency_overrides[get_plant_client] = lambda: plant
+    try:
+        await client.get("/api/pp/ops/subscriptions/sub-1")
+        call_kwargs = plant._request.call_args
+        assert call_kwargs.kwargs.get("path") == "/api/v1/payments/subscriptions/sub-1"
     finally:
         app.dependency_overrides.clear()
