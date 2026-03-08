@@ -70,21 +70,30 @@ WAOOAW is an AI agent marketplace platform where specialized AI agents earn busi
 ## Technical Architecture
 
 ### Stack
-- **Backend**: Python 3.11+, FastAPI, PostgreSQL, Redis, Celery
-- **Frontend**: HTML5, CSS3, Modern JavaScript
-- **Infrastructure**: Docker, Docker Compose, Kubernetes
+- **Backend**: Python 3.11+, FastAPI, PostgreSQL 15, Redis 7, SQLAlchemy (async), Alembic
+- **Frontend**: React 18, TypeScript, Vite (CP & PP portals); React Native / Expo (mobile)
+- **Infrastructure**: Docker, Docker Compose, GCP Cloud Run, Terraform
 - **CI/CD**: GitHub Actions
 - **Development**: Docker-first, Codespaces-optimized
 
 ### Project Structure
 ```
 WAOOAW/
-├── backend/       # FastAPI application
-├── frontend/      # Marketplace UI
-├── docs/          # Documentation (Brand, Product, Marketing, Data)
-├── infrastructure/# Docker, Terraform, K8s
-├── .github/       # Workflows, Copilot instructions
-└── scripts/       # Automation
+├── src/
+│   ├── CP/
+│   │   ├── BackEnd/    # Customer Portal — FastAPI thin proxy
+│   │   └── FrontEnd/   # Customer Portal — React 18 / TypeScript / Vite
+│   ├── Plant/
+│   │   ├── BackEnd/    # Plant (agent-side) — FastAPI core business logic
+│   │   └── Gateway/    # Plant API gateway — auth, RBAC, OPA policy, budget
+│   ├── PP/
+│   │   ├── BackEnd/    # Partner Portal — FastAPI thin proxy
+│   │   └── FrontEnd/   # Partner Portal — React 18 / TypeScript / Vite
+│   └── mobile/         # React Native / Expo / TypeScript — mobile app
+├── docs/               # All platform docs (start with CONTEXT_AND_INDEX.md)
+├── infrastructure/     # Docker, Terraform, GCP Cloud Run
+├── .github/            # Workflows, Copilot instructions, agent personas
+└── scripts/            # Automation
 ```
 
 ---
@@ -100,26 +109,29 @@ WAOOAW/
 - **Testing**: Pytest, minimum 80% coverage
 
 ```python
-# Example
+# Example — always use waooaw_router(), never bare APIRouter
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException
-from app.models.agent import Agent
-from app.services.agent_service import AgentService
+from fastapi import Depends
+from core.routing import waooaw_router
+from models.agent import Agent
+from services.agent_service import AgentService
+from core.database import get_read_db_session
 
-router = APIRouter(prefix="/agents", tags=["agents"])
+router = waooaw_router(prefix="/agents", tags=["agents"])
 
 @router.get("/", response_model=List[Agent])
 async def list_agents(
     industry: Optional[str] = None,
-    min_rating: float = 0.0
+    min_rating: float = 0.0,
+    db=Depends(get_read_db_session),
 ) -> List[Agent]:
     """
     List all available agents with optional filters.
-    
+
     Args:
         industry: Filter by industry (marketing, education, sales)
         min_rating: Minimum rating (0.0 to 5.0)
-        
+
     Returns:
         List of agent objects matching filters
     """
@@ -228,10 +240,10 @@ async function fetchAgents({ industry, minRating } = {}) {
 ## Critical Documents (Reference)
 
 When working on features, reference these docs in `/docs`:
-- **BRAND_STRATEGY.md**: Name, tagline, messaging, logo concepts
-- **PRODUCT_SPEC.md**: Features, user stories, acceptance criteria
-- **DIGITAL_MARKETING.md**: 40+ marketing dimensions, GTM strategy
-- **DATA_DICTIONARY.md**: Agent schemas, personas, specializations
+- **`docs/CONTEXT_AND_INDEX.md`**: Master platform reference — architecture, file index, test commands, gotchas (read §1, §3, §5, §11, §17 first)
+- **`docs/CP/iterations/NFRReusable.md`**: Mandatory NFR patterns every route must follow (§3 interface definitions, §5 preventive gate stories)
+- **`docs/CP/README.md`**: Customer Portal feature overview and iteration history
+- **`docs/plant/README.md`**: Plant (agent-side) backend overview
 
 ---
 
@@ -271,7 +283,7 @@ Use Conventional Commits format:
 ```
 
 **Types**: feat, fix, docs, style, refactor, test, chore
-**Scope**: agent, marketplace, api, frontend, docker, ci
+**Scope**: cp, plant, gateway, pp, mobile, infra, ci
 
 Examples:
 ```
@@ -303,30 +315,20 @@ Fixes #87
 ```python
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
+from main import app
 
 client = TestClient(app)
 
 def test_list_agents():
-    response = client.get("/api/agents")
+    response = client.get("/v1/agents")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
-
-@pytest.mark.parametrize("industry,expected_count", [
-    ("marketing", 7),
-    ("education", 7),
-    ("sales", 5),
-])
-def test_filter_agents_by_industry(industry, expected_count):
-    response = client.get(f"/api/agents?industry={industry}")
-    assert response.status_code == 200
-    assert len(response.json()) == expected_count
 ```
 
 ### Coverage
 - Minimum: 80% overall
 - Critical paths: 90%+
-- Run: `pytest --cov=app --cov-report=html`
+- Run: `pytest --cov=app --cov-report=xml --cov-fail-under=80`
 
 ---
 
@@ -334,13 +336,13 @@ def test_filter_agents_by_industry(industry, expected_count):
 
 ### When to Trigger CI/CD
 - **Pull Request**: Lint, test, build (auto)
-- **Merge to develop**: Deploy to staging (auto)
+- **Merge to main**: Deploy to demo/staging (auto)
 - **Tag v*.*.* **: Deploy to production (manual approval)
 - **Daily**: Security scans, dependency updates
 
 ### Branch Protection
 - **main**: Requires PR review, status checks, up-to-date branch
-- **develop**: Requires status checks, allows direct push for maintainers
+- Branch naming: `feat/<scope>-<desc>` | `fix/<scope>-<desc>` | `docs/<topic>`
 
 ---
 
@@ -397,20 +399,28 @@ Agents must feel ALIVE:
 ### Starting Development
 ```bash
 # With Docker (recommended)
-docker-compose up -d
+docker-compose -f docker-compose.local.yml up -d
 ```
 
 ### Running Tests
 ```bash
-docker-compose run backend pytest
-docker-compose run backend pytest --cov=app
+# Python backend — minimum 80% coverage required
+docker-compose -f docker-compose.test.yml run cp-test pytest --cov=app --cov-report=xml --cov-fail-under=80
+docker-compose -f docker-compose.test.yml run plant-test pytest --cov=app --cov-report=xml --cov-fail-under=80
+
+# Mobile
+cd src/mobile && node_modules/.bin/jest --forceExit
 ```
 
 ### Accessing Services
-- Frontend: http://localhost:3000 or :8080
-- API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-- Database UI: http://localhost:8081
+- CP Frontend: http://localhost:3002
+- PP Frontend: http://localhost:3001
+- Plant Gateway: http://localhost:8000
+- Plant Backend: http://localhost:8001
+- CP Backend: http://localhost:8020
+- PP Backend: http://localhost:8015
+- API Docs (Plant Gateway): http://localhost:8000/docs
+- Database UI (Adminer): http://localhost:8081
 
 ---
 
@@ -442,7 +452,7 @@ Common mistakes to avoid:
 
 You are building WAOOAW, an AI agent marketplace with:
 - **Vibe**: Dark, tech-forward, talent marketplace (not SaaS)
-- **Stack**: Python/FastAPI, Docker-first, GitHub Actions
+- **Stack**: Python/FastAPI + React/TypeScript, Docker-first, GitHub Actions
 - **Rules**: Ask before docs, always serve on Codespace browser
 - **Brand**: Palindrome name, "Agents Earn Your Business", try-before-hire
 
