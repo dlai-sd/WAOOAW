@@ -20,7 +20,8 @@
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python3",
-        "python.testing.pytestEnabled": true
+        "python.testing.pytestEnabled": true,
+        "chat.promptFiles": true
       }
     }
   },
