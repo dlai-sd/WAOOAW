@@ -63,7 +63,7 @@ module.exports = {
   },
   testMatch: ['<rootDir>/tests/**/*.spec.js'],
   testPathIgnorePatterns: ['/node_modules/'],
-  setupFilesAfterFramework: ['<rootDir>/tests/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
 };
 `);
 
