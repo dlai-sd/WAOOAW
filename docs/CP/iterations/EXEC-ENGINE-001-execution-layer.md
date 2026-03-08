@@ -3184,6 +3184,11 @@ Post PR URL. **STOP — do not start Iteration 6 until this PR is merged to `mai
 
 ## Iteration 6 — PP Portal UI: Fleet + Health + DLQ
 
+**Scope:** Partner can see the full WAOOAW agent fleet health dashboard, drill into per-agent component run history, manage the Dead Letter Queue (requeue or skip failed tasks), and the Customer Portal gains proxy routes for flow-runs and component-runs so the frontend stories in Iteration 5 work end-to-end.
+**Lane:** A (E12–E14 frontend wires existing Plant Gateway endpoints) + Lane B (E14-S2 adds thin CP proxy routes).
+**⏱ Estimated:** 3h 45 min | **Come back:** 2026-03-11 11:00 IST
+**Epics:** E12, E13, E14
+
 > **⛔ ITERATION 6 GATE — verify before writing any code:** Iteration 5 PR must be merged to `main`:
 > ```bash
 > git fetch origin
@@ -3191,105 +3196,521 @@ Post PR URL. **STOP — do not start Iteration 6 until this PR is merged to `mai
 > ```
 > If Iteration 5 content is absent from `main`, **STOP** and tell the user: "Iteration 6 is blocked — the Iteration 5 PR must be merged to main first."
 
-> **Stories written and committed:** 2026-03-08
+### Dependency Map (Iteration 6)
 
-### I6-S1 — PP Fleet dashboard with agent health map (45 min)
-
-**Context:** PP operators need a real-time view of all hired agents across all customers. This is the ops nerve centre. Calls `GET /pp/hired-agents` (existing ops proxy, extend to include `flow_run` latest status). Uses `AgentCard` (compact variant) + `StatusDot`. File: `frontend/pp/pages/fleet.html` + `fleet.js`.
-
-**Acceptance criteria:**
-- [ ] Table/grid view: customer name (PII-masked in PP logs), agent name, agent type, status dot, last run time, last run duration, error count last 24h
-- [ ] Filter: by status (all / running / awaiting_approval / failed / paused)
-- [ ] Sort: by last run time (desc default), by error count
-- [ ] Row click → opens Agent Health panel (I6-S2)
-- [ ] Auto-refresh every 30s (not polling every second — battery/cost consideration)
-- [ ] Error rows highlighted with red left border
-- [ ] Dark theme, neon cyan active filters
-
----
-
-### I6-S2 — Per-agent health drill-in with `ComponentRunRow` (45 min)
-
-**Context:** PP operator clicks a fleet row → opens a rightside panel (or dedicated page) showing all `FlowRun` records for that hired agent, and for each FlowRun the individual `ComponentRunRow` entries. New reusable `ComponentRunRow` component. Calls `GET /pp/flow-runs?hired_instance_id=X` and `GET /pp/component-runs?flow_run_id=Y`.
-
-**ComponentRunRow renders:** component type badge, step name, status icon, `duration_ms` bar (relative to slowest step), expand arrow → inline JSON display of `input_context` and `output` (syntax highlighted).
-
-**Acceptance criteria:**
-- [ ] FlowRun list shows last 20 runs, paginated
-- [ ] Each FlowRun row expandable → shows `ComponentRunRow` list for that run
-- [ ] `ComponentRunRow` input/output JSON expand uses syntax-highlighted `<pre>` block
-- [ ] `PIIMaskingFilter` respected: PP UI must not display raw customer API keys even if they leaked into `input_context` — mask `*_key`, `*_secret`, `*_token` fields client-side
-- [ ] "Re-run" button on failed FlowRun → calls `POST /pp/flow-runs/{id}/retry`
-- [ ] `ComponentRunRow` duration bar: longest step = 100% width, others proportional
-
----
-
-### I6-S3 — DLQ panel: view, requeue, skip (45 min)
-
-**Context:** `scheduler_dlq` table already exists. This story wires the existing DLQ model to a PP UI panel showing failed component runs that exhausted all retries, with Requeue and Skip actions. Calls existing `GET /pp/dlq` and new `POST /pp/dlq/{id}/requeue` + `POST /pp/dlq/{id}/skip`.
-
-**Files to read first:**
-- `src/PP/BackEnd/api/ops_dlq.py` — existing DLQ endpoint
-- `src/Plant/BackEnd/models/scheduler_dlq.py` — existing DLQ model
-
-**Acceptance criteria:**
-- [ ] DLQ panel accessible from PP nav ("DLQ" with error count badge)
-- [ ] Each DLQ item shows: component type, flow_run_id, hired_instance_id, error message (last retry), retry count, first failed at
-- [ ] "Requeue" button: calls `POST /pp/dlq/{id}/requeue` — component re-enters `execute_pump`/`execute_processor`/`execute_publisher` queue
-- [ ] "Skip" button: marks DLQ item `skipped` — removes from queue with reason input required
-- [ ] Filter: by component type, by date range
-- [ ] Empty DLQ: "All clear — no failed jobs" in green
-
----
-
-### I6-S4 — CP proxy routes for flow-runs + component-runs (30 min)
-
-**Context:** All new Plant endpoints (`/v1/flow-runs`, `/v1/component-runs`, `/v1/approvals`) need CP proxy routes so the CP frontend can call them. CP BackEnd is a thin proxy — Pattern A: existing `/cp/*` route calls Plant via `gatewayRequestJson`. No business logic in CP BackEnd.
-
-**Files to read first:**
-- `src/CP/BackEnd/api/cp_approvals_proxy.py` — existing approval proxy pattern
-- `src/CP/BackEnd/api/hired_agents_proxy.py` — existing hire proxy pattern
-
-**New routes to add (Pattern A):**
 ```
-GET  /cp/flow-runs                → GET /v1/flow-runs (Plant)
-GET  /cp/flow-runs/{id}           → GET /v1/flow-runs/{id} (Plant)
-POST /cp/approvals/{id}/approve   → POST /v1/approvals/{id}/approve (Plant)
-POST /cp/approvals/{id}/reject    → POST /v1/approvals/{id}/reject (Plant)
-GET  /cp/component-runs           → GET /v1/component-runs (Plant)
+E12-S1                     (branch feat/EXEC-ENGINE-001-it6-e12; standalone PP fleet dashboard)
+E13-S1                     (branch feat/EXEC-ENGINE-001-it6-e13; standalone PP per-agent drill-in)
+E14-S1                     (branch feat/EXEC-ENGINE-001-it6-e14; PP DLQ panel)
+E14-S2  ◄── MUST MERGE     (same branch feat/EXEC-ENGINE-001-it6-e14; CP proxy routes that unlock
+ │              first       Iteration 5 E11-S1/E11-S2 live flow data; merge to main before E14-S1)
+ └──► E14-S1
 ```
 
-**Acceptance criteria:**
-- [ ] All 5 routes implemented as thin proxies via `gatewayRequestJson`
-- [ ] `waooaw_router()` used — not bare `APIRouter`
-- [ ] Auth header forwarded on all proxied calls
-- [ ] `X-Correlation-ID` forwarded on all proxied calls
-- [ ] `get_read_db_session` on all GET routes
-- [ ] Unit tests: each proxy route returns Plant response body unchanged (mocked Plant)
-- [ ] `pytest --cov=app --cov-fail-under=80` passes
+---
 
-### ✅ Iteration 6 — Completion Checkpoint
+### Epic E12: Partner sees the full agent fleet health at a glance
 
-After ALL I6-S1 through I6-S4 acceptance criteria pass:
+**Branch:** `feat/EXEC-ENGINE-001-it6-e12`
+**User story:** As a WAOOAW partner, I can open the PP portal Fleet dashboard and see all deployed agents, their live status, active run counts, and error rates in a single dark-theme grid so that I can identify struggling agents immediately.
 
-1. Verify all commits pushed:
-   ```bash
-   git status   # should be clean; if not: git add -A && git commit -m "..." && git push
-   ```
-2. Open PR to main:
-   ```bash
-   gh pr create --base main \
-     --title "feat(EXEC-ENGINE-001): iteration 6 — PP portal UI + CP proxies" \
-     --body "Stories: I6-S1 ✅ I6-S2 ✅ I6-S3 ✅ I6-S4 ✅"
-   ```
-3. Mark stories complete in this plan file — rename each `### I6-SX —` heading to `### ✅ I6-SX —`, commit + push:
-   ```bash
-   git add docs/CP/iterations/EXEC-ENGINE-001-execution-layer.md
-   git commit -m "docs(EXEC-ENGINE-001): mark iteration 6 stories complete"
-   git push
-   ```
-4. **Report to user**: "🎉 ALL 6 ITERATIONS COMPLETE. PR: [URL]. Stories: I6-S1 ✅ I6-S2 ✅ I6-S3 ✅ I6-S4 ✅. The full EXEC-ENGINE-001 execution layer is implemented. Please review and merge this final PR."
-5. **STOP. The plan is complete. No further code changes should be made until the user reviews.**
+---
+
+#### Story E12-S1: PP Fleet dashboard with agent health map
+
+**BLOCKED UNTIL:** none — Iteration 6 gate verified
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it6-e12`
+**CP BackEnd pattern:** N/A — PP portal wires Plant Gateway directly; calls `GET /v1/agents` and `GET /v1/component-runs/summary` on Plant Gateway
+
+**What to do:**
+Create `frontend/pp-portal/pages/fleet.html` and `frontend/pp-portal/pages/fleet.js`. Fetch all agents from `GET /v1/agents`, then for each fetch component run summary from `GET /v1/component-runs/summary?agent_id={id}`. Render a `FleetAgentRow` per agent: name, instance count, status distribution (running / failed / completed bars), error rate %. Auto-refresh every 10s. Empty state and error state required.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `frontend/components/StatusDot.js` | 1–20 | `renderStatusDot()` import pattern |
+| `src/Plant/Gateway/main.py` or `src/Plant/Gateway/api/` | 1–40 | Confirm `GET /v1/agents` and `GET /v1/component-runs/summary` route paths |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/pp-portal/pages/fleet.html` | create | Dark-theme shell with PP nav, fleet grid container, auto-refresh counter |
+| `frontend/pp-portal/pages/fleet.js` | create | Fetch agents + summaries, render rows, 10s polling loop, error/empty states |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/pp-portal/pages/fleet.js
+const API_BASE = window.PP_API_BASE || '';
+let refreshTimer = null;
+
+function renderFleetAgentRow(agent, summary) {
+  const errorRate = summary.total > 0
+    ? ((summary.failed / summary.total) * 100).toFixed(1)
+    : '0.0';
+  const barWidth = (count, total) => total > 0 ? Math.round((count / total) * 100) : 0;
+  return `
+<div class="fleet-row" data-agent-id="${agent.id}">
+  <div class="fleet-row__name">${agent.name}</div>
+  <div class="fleet-row__instances">${agent.instance_count ?? 0} instances</div>
+  <div class="fleet-row__bars">
+    <div class="fleet-bar fleet-bar--green" style="width:${barWidth(summary.completed, summary.total)}%"
+         title="${summary.completed} completed"></div>
+    <div class="fleet-bar fleet-bar--yellow" style="width:${barWidth(summary.running, summary.total)}%"
+         title="${summary.running} running"></div>
+    <div class="fleet-bar fleet-bar--red" style="width:${barWidth(summary.failed, summary.total)}%"
+         title="${summary.failed} failed"></div>
+  </div>
+  <div class="fleet-row__error-rate ${parseFloat(errorRate) > 10 ? 'fleet-row__error-rate--high' : ''}">
+    ${errorRate}% err
+  </div>
+  <a href="/pp/agent/${agent.id}" class="btn btn--outline fleet-row__drill">Details →</a>
+</div>`;
+}
+
+async function loadFleet() {
+  const agentsRes = await fetch(`${API_BASE}/v1/agents`);
+  if (!agentsRes.ok) throw new Error('Failed to load agents');
+  const agents = await agentsRes.json();
+  const summaries = await Promise.all(
+    agents.map(a => fetch(`${API_BASE}/v1/component-runs/summary?agent_id=${a.id}`)
+      .then(r => r.ok ? r.json() : { total: 0, running: 0, completed: 0, failed: 0 })
+    )
+  );
+  const grid = document.getElementById('fleet-grid');
+  if (!agents.length) { grid.innerHTML = '<p class="empty-state">No agents deployed yet.</p>'; return; }
+  grid.innerHTML = agents.map((a, i) => renderFleetAgentRow(a, summaries[i])).join('');
+}
+
+function startPolling() {
+  loadFleet().catch(err => { document.getElementById('fleet-grid').innerHTML = `<p class="error">${err.message}</p>`; });
+  refreshTimer = setInterval(() => loadFleet().catch(console.error), 10000);
+}
+
+document.addEventListener('DOMContentLoaded', startPolling);
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E12-S1-T1 | `frontend/tests/pp-portal/test_fleet.spec.js` | Mock agents returns 2; summaries return `{total:10,running:2,completed:7,failed:1}` | Two `fleet-row` elements rendered; error rate shows `10.0%` |
+| E12-S1-T2 | same | Error rate > 10 % | `fleet-row__error-rate--high` class present |
+| E12-S1-T3 | same | Mock `GET /v1/agents` returns empty array | Empty-state message rendered |
+| E12-S1-T4 | same | Mock `GET /v1/agents` returns HTTP 500 | Error message displayed in fleet grid |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/pp-portal/test_fleet.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E12-S1 — PP fleet dashboard with agent health map`
+
+**Done signal:**
+`"E12-S1 done. Changed: frontend/pp-portal/pages/fleet.html, fleet.js. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+**Epic E12 complete ✅** — run Docker integration test (Rule 5) before starting E13.
+
+---
+
+### Epic E13: Partner drills into a single agent to diagnose component failures
+
+**Branch:** `feat/EXEC-ENGINE-001-it6-e13`
+**User story:** As a partner, I can click on any agent in the Fleet dashboard and see a detailed per-agent page with recent flow runs, each step's duration and error message, so that I can diagnose why a specific component is failing.
+
+---
+
+#### Story E13-S1: Per-agent health drill-in with `ComponentRunRow` component
+
+**BLOCKED UNTIL:** E12-S1 merged to `main`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it6-e13`
+**CP BackEnd pattern:** N/A — PP portal wires Plant Gateway directly; calls `GET /v1/flow-runs?agent_id={id}` and `GET /v1/component-runs?flow_run_id={id}`
+
+**What to do:**
+Create `frontend/pp-portal/pages/agent-detail.html`, `frontend/pp-portal/pages/agent-detail.js`, and `frontend/pp-portal/components/ComponentRunRow.js`. Agent detail page loads `GET /v1/flow-runs?agent_id={id}` (most recent 10), renders each as a collapsible row with `ComponentRunRow` sub-rows for each step — showing step name, status badge, `duration_ms`, and truncated `error_message`. Expand/collapse on click without full page reload.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `frontend/components/FlowRunTimeline.js` | 1–25 | Step status icon map to reuse consistently |
+| `frontend/pp-portal/pages/fleet.js` | 1–20 | `API_BASE` convention and fetch pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/pp-portal/components/ComponentRunRow.js` | create | Full component as per code pattern below |
+| `frontend/pp-portal/pages/agent-detail.html` | create | Agent name header, back link to fleet, flow run list container |
+| `frontend/pp-portal/pages/agent-detail.js` | create | Load flow runs, render expandable rows with `ComponentRunRow` sub-rows |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/pp-portal/components/ComponentRunRow.js
+const STATUS_ICONS = { completed: '✓', running: '⏳', failed: '✗', pending: '⏸' };
+const STATUS_CLASSES = { completed: 'success', running: 'running', failed: 'error', pending: 'pending' };
+
+export function renderComponentRunRow(cr) {
+  const icon = STATUS_ICONS[cr.status] || '•';
+  const cls = STATUS_CLASSES[cr.status] || 'pending';
+  const errMsg = cr.error_message
+    ? `<span class="cr-row__error" title="${cr.error_message}">${cr.error_message.slice(0, 80)}…</span>`
+    : '';
+  return `
+<div class="cr-row cr-row--${cls}">
+  <span class="cr-row__icon">${icon}</span>
+  <span class="cr-row__step">${cr.step_name}</span>
+  ${cr.duration_ms ? `<span class="cr-row__dur">${cr.duration_ms}ms</span>` : ''}
+  ${errMsg}
+</div>`;
+}
+
+// frontend/pp-portal/pages/agent-detail.js
+import { renderComponentRunRow } from '../components/ComponentRunRow.js';
+const API_BASE = window.PP_API_BASE || '';
+
+async function loadAgentDetail(agentId) {
+  const runsRes = await fetch(`${API_BASE}/v1/flow-runs?agent_id=${agentId}&limit=10`);
+  if (!runsRes.ok) throw new Error('Failed to load flow runs');
+  const flowRuns = await runsRes.json();
+  const list = document.getElementById('flow-run-list');
+  if (!flowRuns.length) { list.innerHTML = '<p class="empty-state">No runs yet for this agent.</p>'; return; }
+  list.innerHTML = flowRuns.map(fr => `
+<details class="flow-run-item">
+  <summary class="flow-run-item__summary">
+    <span class="flow-run-item__status flow-run-item__status--${fr.status}">${fr.status}</span>
+    <time>${new Date(fr.created_at).toLocaleString()}</time>
+  </summary>
+  <div class="flow-run-item__steps" data-flow-run-id="${fr.id}">Loading steps…</div>
+</details>`).join('');
+
+  list.addEventListener('toggle', async (e) => {
+    const details = e.target.closest('details');
+    if (!details || !e.target.open) return;
+    const flowRunId = details.querySelector('[data-flow-run-id]')?.dataset?.flowRunId;
+    if (!flowRunId) return;
+    const crRes = await fetch(`${API_BASE}/v1/component-runs?flow_run_id=${flowRunId}`);
+    const componentRuns = crRes.ok ? await crRes.json() : [];
+    details.querySelector('.flow-run-item__steps').innerHTML =
+      componentRuns.map(renderComponentRunRow).join('') || '<em>No steps recorded.</em>';
+  }, true);
+}
+
+const agentId = new URLSearchParams(window.location.search).get('id');
+document.addEventListener('DOMContentLoaded', () => agentId && loadAgentDetail(agentId)
+  .catch(err => { document.getElementById('flow-run-list').innerHTML = `<p class="error">${err.message}</p>`; }));
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E13-S1-T1 | `frontend/tests/pp-portal/test_agent_detail.spec.js` | Mock `GET /v1/flow-runs?agent_id=X` returns 2 runs | Two `flow-run-item` details elements rendered |
+| E13-S1-T2 | same | Expand first item; mock `GET /v1/component-runs?flow_run_id=X` returns 2 steps | Two `cr-row` elements rendered inside the expanded `details` |
+| E13-S1-T3 | `frontend/tests/pp-portal/test_component_run_row.spec.js` | Render with `status="failed"` and `error_message="Timeout after 30s"` | `cr-row--error` class; error message text present |
+| E13-S1-T4 | same | `error_message` longer than 80 chars | Displayed text truncated with `…` |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/pp-portal/test_agent_detail.spec.js frontend/tests/pp-portal/test_component_run_row.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E13-S1 — PP per-agent health drill-in with ComponentRunRow`
+
+**Done signal:**
+`"E13-S1 done. Changed: frontend/pp-portal/components/ComponentRunRow.js, pp-portal/pages/agent-detail.html, agent-detail.js. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+**Epic E13 complete ✅** — run Docker integration test (Rule 5) before starting E14.
+
+---
+
+### Epic E14: Partner manages the Dead Letter Queue; Customer Portal wires live execution data
+
+**Branch:** `feat/EXEC-ENGINE-001-it6-e14`
+**User story (partner):** As a partner, I can view all failed tasks in the DLQ, requeue a task for retry, or skip it permanently — so that I can recover from transient failures without code deployments.
+**User story (customer — enabled by E14-S2):** As a CP customer with an agent hired, I can see live flow run timelines and approve/reject output because CP now proxies the necessary Plant Gateway routes.
+
+---
+
+#### Story E14-S2: CP proxy routes for flow-runs + component-runs
+
+> **⚠️ Start with E14-S2 — merge it to `main` before E14-S1** so Iteration 5 E11-S1/E11-S2 customer stories unblock.
+
+**BLOCKED UNTIL:** Iteration 5 PR merged to `main`
+**Estimated time:** 30 min
+**Branch:** `feat/EXEC-ENGINE-001-it6-e14`
+**CP BackEnd pattern:** Pattern A — thin proxy via `gatewayRequestJson()`; routes go in a new file `src/CP/BackEnd/api/cp_flow_runs.py`; all 5 routes use `waooaw_router()`; GET routes use `get_read_db_session()`; `X-Correlation-ID` forwarded automatically by `get_correlation_id` global dep
+
+**What to do:**
+Create `src/CP/BackEnd/api/cp_flow_runs.py` with 5 routes that proxy Plant Gateway: `GET /cp/flow-runs`, `GET /cp/flow-runs/{flow_run_id}`, `POST /cp/approvals/{flow_run_id}/approve`, `POST /cp/approvals/{flow_run_id}/reject`, `GET /cp/component-runs`. Register the router in `src/CP/BackEnd/main.py`. All routes validate the authenticated customer owns the requested resource before proxying (call `GET /v1/flow-runs/{id}` and check `customer_id` field).
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/BackEnd/api/cp_deliverables.py` | 1–60 | Canonical Pattern A thin proxy — copy `waooaw_router()`, `gatewayRequestJson`, auth, `get_read_db_session` usage exactly |
+| `src/CP/BackEnd/main.py` | 1–40 | How routers are registered — find the `app.include_router(...)` block |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/BackEnd/api/cp_flow_runs.py` | create | 5 proxy routes as per code pattern below |
+| `src/CP/BackEnd/main.py` | modify | Add `from api.cp_flow_runs import router as flow_runs_router` and `app.include_router(flow_runs_router)` |
+
+**Code patterns to copy exactly:**
+```python
+# src/CP/BackEnd/api/cp_flow_runs.py
+from typing import Annotated
+from fastapi import Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.routing import waooaw_router
+from core.database import get_read_db_session
+from core.gateway import gatewayRequestJson
+from dependencies.auth import get_current_customer
+
+router = waooaw_router(prefix="/cp", tags=["flow-runs"])
+
+
+@router.get("/flow-runs")
+async def list_flow_runs(
+    hired_instance_id: str | None = None,
+    flow_status: str | None = None,
+    customer=Depends(get_current_customer),
+    db: AsyncSession = Depends(get_read_db_session),
+):
+    params = {"customer_id": customer.id}
+    if hired_instance_id:
+        params["hired_instance_id"] = hired_instance_id
+    if flow_status:
+        params["status"] = flow_status
+    return await gatewayRequestJson("GET", "/v1/flow-runs", params=params)
+
+
+@router.get("/flow-runs/{flow_run_id}")
+async def get_flow_run(
+    flow_run_id: str,
+    customer=Depends(get_current_customer),
+    db: AsyncSession = Depends(get_read_db_session),
+):
+    data = await gatewayRequestJson("GET", f"/v1/flow-runs/{flow_run_id}")
+    if data.get("customer_id") != customer.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    return data
+
+
+@router.post("/approvals/{flow_run_id}/approve")
+async def approve_flow_run(
+    flow_run_id: str,
+    customer=Depends(get_current_customer),
+):
+    data = await gatewayRequestJson("GET", f"/v1/flow-runs/{flow_run_id}")
+    if data.get("customer_id") != customer.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    return await gatewayRequestJson("POST", f"/v1/approvals/{flow_run_id}/approve")
+
+
+@router.post("/approvals/{flow_run_id}/reject")
+async def reject_flow_run(
+    flow_run_id: str,
+    customer=Depends(get_current_customer),
+):
+    data = await gatewayRequestJson("GET", f"/v1/flow-runs/{flow_run_id}")
+    if data.get("customer_id") != customer.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    return await gatewayRequestJson("POST", f"/v1/approvals/{flow_run_id}/reject")
+
+
+@router.get("/component-runs")
+async def list_component_runs(
+    flow_run_id: str,
+    customer=Depends(get_current_customer),
+    db: AsyncSession = Depends(get_read_db_session),
+):
+    # Ownership verified via parent flow_run
+    fr = await gatewayRequestJson("GET", f"/v1/flow-runs/{flow_run_id}")
+    if fr.get("customer_id") != customer.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    return await gatewayRequestJson("GET", "/v1/component-runs", params={"flow_run_id": flow_run_id})
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E14-S2-T1 | `src/CP/BackEnd/tests/api/test_cp_flow_runs.py` | Authenticated; mock Gateway `GET /v1/flow-runs` 200 | CP returns 200 with flow runs list |
+| E14-S2-T2 | same | `GET /cp/flow-runs/{id}` where `customer_id` ≠ token | 403 Forbidden |
+| E14-S2-T3 | same | `POST /cp/approvals/{id}/approve` where `customer_id` ≠ token | 403 Forbidden |
+| E14-S2-T4 | same | Unauthenticated request to any route | 401 Unauthorized |
+| E14-S2-T5 | same | `GET /cp/component-runs?flow_run_id=X` — customer owns the flow run | Proxied list returned |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-test pytest src/CP/BackEnd/tests/api/test_cp_flow_runs.py -v --cov=src/CP/BackEnd/api/cp_flow_runs --cov-fail-under=80
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E14-S2 — CP proxy routes for flow-runs and approvals`
+
+**Done signal:**
+`"E14-S2 done. Changed: src/CP/BackEnd/api/cp_flow_runs.py, main.py. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅ Coverage ≥ 80% ✅"`
+
+> **⚠️ Merge E14-S2 to `main` NOW** (open PR `feat/EXEC-ENGINE-001-it6-e14 → main`, get it merged). Only then start E14-S1 DLQ panel.
+
+---
+
+#### Story E14-S1: PP DLQ panel — view, requeue, skip
+
+**BLOCKED UNTIL:** E14-S2 merged to `main`
+**Estimated time:** 45 min
+**Branch:** `feat/EXEC-ENGINE-001-it6-e14`
+**CP BackEnd pattern:** N/A — PP portal wires Plant Gateway directly; calls `GET /v1/dlq`, `POST /v1/dlq/{task_id}/requeue`, `POST /v1/dlq/{task_id}/skip`
+
+**What to do:**
+Create `frontend/pp-portal/pages/dlq.html` and `frontend/pp-portal/pages/dlq.js`. Render DLQ tasks as a list: task ID, agent name, step name, failure count, last error message, and action buttons (Requeue / Skip). Requeue is optimistic (disables buttons immediately). Skip requires a `confirm()` dialog. Auto-refresh badge count in PP nav. Empty DLQ shows a "Queue is clear" celebration message. Paginate at 50 items.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `frontend/pp-portal/components/ComponentRunRow.js` | 1–20 | Status class naming convention to be consistent |
+| `frontend/pp-portal/pages/fleet.js` | 1–10 | `PP_API_BASE` convention |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `frontend/pp-portal/pages/dlq.html` | create | PP nav with DLQ badge, task list container, empty state, dark theme |
+| `frontend/pp-portal/pages/dlq.js` | create | Fetch + render + requeue/skip actions as per code pattern below |
+
+**Code patterns to copy exactly:**
+```javascript
+// frontend/pp-portal/pages/dlq.js
+const API_BASE = window.PP_API_BASE || '';
+
+function renderDlqItem(task) {
+  const errMsg = task.last_error ? task.last_error.slice(0, 100) : 'No error detail';
+  return `
+<div class="dlq-item" data-task-id="${task.id}">
+  <div class="dlq-item__info">
+    <span class="dlq-item__id">#${task.id.slice(0, 8)}</span>
+    <span class="dlq-item__agent">${task.agent_name}</span>
+    <span class="dlq-item__step">${task.step_name}</span>
+    <span class="dlq-item__failures">${task.failure_count}× failed</span>
+    <p class="dlq-item__error" title="${task.last_error || ''}">${errMsg}…</p>
+  </div>
+  <div class="dlq-item__actions">
+    <button class="btn btn--cyan" onclick="requeueTask('${task.id}', this)">Requeue</button>
+    <button class="btn btn--red" onclick="skipTask('${task.id}')">Skip</button>
+  </div>
+</div>`;
+}
+
+async function loadDlq() {
+  const res = await fetch(`${API_BASE}/v1/dlq?limit=50`);
+  if (!res.ok) throw new Error('Failed to load DLQ');
+  const tasks = await res.json();
+  const container = document.getElementById('dlq-list');
+  if (!tasks.length) {
+    container.innerHTML = '<div class="empty-state empty-state--celebrate">🎉 Queue is clear — all agents running smoothly!</div>';
+    return;
+  }
+  container.innerHTML = tasks.map(renderDlqItem).join('');
+  updateNavBadge(tasks.length);
+}
+
+async function requeueTask(taskId, btn) {
+  btn.disabled = true;
+  btn.nextElementSibling.disabled = true;
+  const res = await fetch(`${API_BASE}/v1/dlq/${taskId}/requeue`, { method: 'POST' });
+  if (!res.ok) { btn.disabled = false; btn.nextElementSibling.disabled = false; alert('Requeue failed'); return; }
+  document.querySelector(`[data-task-id="${taskId}"]`)?.remove();
+}
+
+async function skipTask(taskId) {
+  if (!confirm('Skip this task permanently? It will not be retried.')) return;
+  await fetch(`${API_BASE}/v1/dlq/${taskId}/skip`, { method: 'POST' });
+  document.querySelector(`[data-task-id="${taskId}"]`)?.remove();
+}
+
+function updateNavBadge(count) {
+  const badge = document.getElementById('dlq-badge');
+  if (badge) { badge.textContent = count; badge.hidden = count === 0; }
+}
+
+document.addEventListener('DOMContentLoaded', () =>
+  loadDlq().catch(err => { document.getElementById('dlq-list').innerHTML = `<p class="error">${err.message}</p>`; })
+);
+```
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E14-S1-T1 | `frontend/tests/pp-portal/test_dlq.spec.js` | Mock `GET /v1/dlq` returns 2 tasks | Two `dlq-item` elements rendered |
+| E14-S1-T2 | same | Mock `POST /v1/dlq/{id}/requeue` returns 200, click Requeue | Buttons disabled immediately; item removed from DOM |
+| E14-S1-T3 | same | `confirm()` returns false, click Skip | Item NOT removed; no API call made |
+| E14-S1-T4 | same | Mock `GET /v1/dlq` returns empty array | "Queue is clear" celebration message displayed |
+| E14-S1-T5 | same | Mock `GET /v1/dlq` returns HTTP 500 | Error message displayed in DLQ container |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run cp-frontend-test npx jest frontend/tests/pp-portal/test_dlq.spec.js --forceExit
+```
+
+**Commit message:** `feat(EXEC-ENGINE-001): E14-S1 — PP DLQ panel view requeue skip`
+
+**Done signal:**
+`"E14-S1 done. Changed: frontend/pp-portal/pages/dlq.html, dlq.js. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅"`
+
+**Epic E14 complete ✅** — run Docker integration test (Rule 5) before opening iteration PR.
+
+---
+
+### Iteration 6 — Completion Checkpoint
+
+After ALL E12, E13, and E14 epics complete and Docker integration test passes:
+
+```bash
+git checkout main && git pull
+git checkout -b feat/EXEC-ENGINE-001-it6
+git merge --no-ff feat/EXEC-ENGINE-001-it6-e12 feat/EXEC-ENGINE-001-it6-e13 feat/EXEC-ENGINE-001-it6-e14
+git push origin feat/EXEC-ENGINE-001-it6
+
+gh pr create \
+  --base main \
+  --head feat/EXEC-ENGINE-001-it6 \
+  --title "feat(EXEC-ENGINE-001): iteration 6 — PP portal UI + CP proxy routes" \
+  --body "## EXEC-ENGINE-001 Iteration 6
+
+### Stories completed
+| E12-S1 | PP fleet dashboard with agent health map | 🟢 Done |
+| E13-S1 | Per-agent health drill-in with ComponentRunRow | 🟢 Done |
+| E14-S2 | CP proxy routes for flow-runs + approvals | 🟢 Done |
+| E14-S1 | PP DLQ panel: view, requeue, skip | 🟢 Done |
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() on all new CP routes — no bare APIRouter
+- [ ] GET routes use get_read_db_session()
+- [ ] PIIMaskingFilter on all new loggers
+- [ ] 403 ownership check on all CP proxy routes before proxying
+- [ ] Dark theme on PP portal pages
+- [ ] Loading + error + empty states on all data-fetching screens
+- [ ] Optimistic UI on Requeue (disables immediately)
+- [ ] Skip requires confirm() guard"
+```
+
+Post PR URL. **EXEC-ENGINE-001 all 6 iterations complete — plan is fully implemented.**
+
+---
+
+
 
 ---
 
