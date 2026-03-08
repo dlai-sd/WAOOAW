@@ -114,6 +114,25 @@ services:
     networks: [waooaw-test-network]
     entrypoint: ["python", "-m", "pytest"]
 
+  # ── CP FrontEnd Test Runner (Jest) ──────────────────
+  # Generates frontend/ directory via scripts/generate_frontend.js,
+  # installs npm deps, then runs Jest tests.
+  cp-frontend-test:
+    image: node:20-alpine
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - frontend-node-modules:/workspace/frontend/node_modules
+    networks: [waooaw-test-network]
+    entrypoint:
+      - sh
+      - -c
+      - |
+        node /workspace/scripts/generate_frontend.js &&
+        cd /workspace/frontend &&
+        npm install --prefer-offline --silent &&
+        npx jest --forceExit --passWithNoTests
+
   # ── Mobile Test Runner (Jest) ─────────────────────
   mobile-test:
     image: node:20-alpine
@@ -171,3 +190,4 @@ networks:
 
 volumes:
   mobile-node-modules:
+  frontend-node-modules:

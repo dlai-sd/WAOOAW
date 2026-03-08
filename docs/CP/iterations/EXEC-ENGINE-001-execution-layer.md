@@ -175,11 +175,11 @@ async def call_external(): ...
 | E7-S3 | 4 | E7: Marketing components | `LinkedInPublisher` + `YouTubePublisher` components | 🟢 Done | — |
 | E8-S1 | 4 | E8: Marketing flow | Marketing Agent FlowDef + fan-out end-to-end | 🟢 Done | — |
 | E8-S2 | 4 | E8: Marketing flow | `POST /v1/approvals/{flow_run_id}/approve` endpoint | 🟢 Done | — |
-| E9-S1 | 5 | E9: CP UI components | Reusable `AgentCard` + `StatusDot` | 🔴 Not Started | — |
-| E10-S1 | 5 | E10: CP marketplace | Marketplace screen with hire CTA | 🔴 Not Started | — |
-| E10-S2 | 5 | E10: CP marketplace | Hire wizard: skill config + goal setting | 🔴 Not Started | — |
-| E11-S1 | 5 | E11: CP my agents | My Agents + `FlowRunTimeline` + `DeliverableCard` | 🔴 Not Started | — |
-| E11-S2 | 5 | E11: CP my agents | Approval queue + `ApprovalQueueItem` | 🔴 Not Started | — |
+| E9-S1 | 5 | E9: CP UI components | Reusable `AgentCard` + `StatusDot` | 🟢 Done | — |
+| E10-S1 | 5 | E10: CP marketplace | Marketplace screen with hire CTA | 🟢 Done | — |
+| E10-S2 | 5 | E10: CP marketplace | Hire wizard: skill config + goal setting | 🟢 Done | — |
+| E11-S1 | 5 | E11: CP my agents | My Agents + `FlowRunTimeline` + `DeliverableCard` | 🟢 Done | — |
+| E11-S2 | 5 | E11: CP my agents | Approval queue + `ApprovalQueueItem` | 🟢 Done | — |
 | E12-S1 | 6 | E12: PP fleet | PP Fleet dashboard with agent health map | 🔴 Not Started | — |
 | E13-S1 | 6 | E13: PP health | Per-agent health drill-in with `ComponentRunRow` | 🔴 Not Started | — |
 | E14-S1 | 6 | E14: PP DLQ + proxies | DLQ panel: view, requeue, skip | 🔴 Not Started | — |
