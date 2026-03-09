@@ -3,8 +3,10 @@
 Handles saving scheduler state and recovering after restart.
 """
 
+from __future__ import annotations
+
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import logging
 
 from sqlalchemy.orm import Session
@@ -12,6 +14,9 @@ from sqlalchemy.orm import Session
 from models.scheduled_goal_run import ScheduledGoalRunModel, ScheduledGoalRunRepository
 from models.goal_run import GoalRunModel, GoalRunRepository
 from services.goal_scheduler_service import GoalSchedulerService
+
+if TYPE_CHECKING:
+    from services.skill_runtime_resolver import SkillRuntimeResolver
 
 
 logger = logging.getLogger(__name__)
@@ -51,6 +56,7 @@ class SchedulerPersistenceService:
         db: Session,
         scheduler_service: Optional[GoalSchedulerService] = None,
         replay_threshold_hours: int = 24,
+        resolver: Optional["SkillRuntimeResolver"] = None,
     ):
         """Initialize persistence service.
         
@@ -58,10 +64,15 @@ class SchedulerPersistenceService:
             db: Database session
             scheduler_service: Goal scheduler service for replaying runs
             replay_threshold_hours: Hours threshold for replaying missed runs
+            resolver: Optional SkillRuntimeResolver for typed pipeline dispatch
+                (PLANT-RUNTIME-1 E4).  When provided, each replayed run is
+                resolved before being handed to the scheduler so the typed
+                pump→processor path is used instead of the legacy stub.
         """
         self.db = db
         self.scheduler_service = scheduler_service
         self.replay_threshold_hours = replay_threshold_hours
+        self.resolver = resolver
         self.scheduled_run_repo = ScheduledGoalRunRepository(db)
         self.goal_run_repo = GoalRunRepository(db)
     
@@ -190,10 +201,25 @@ class SchedulerPersistenceService:
         # Use scheduler service to replay with retry logic
         if self.scheduler_service:
             try:
+                # Resolve agent_spec + goal_config when a resolver is wired in
+                # (PLANT-RUNTIME-1 E4).  Soft-fail: if resolution misses, fall
+                # back to the legacy path.
+                agent_spec = None
+                goal_config = None
+                if self.resolver is not None:
+                    bundle = await self.resolver.resolve_for_goal(
+                        scheduled_run.goal_instance_id
+                    )
+                    if bundle is not None:
+                        agent_spec = bundle.agent_spec
+                        goal_config = bundle.goal_config
+
                 await self.scheduler_service.run_goal_with_retry(
                     goal_instance_id=scheduled_run.goal_instance_id,
                     hired_instance_id=scheduled_run.hired_instance_id,
                     scheduled_time=scheduled_run.scheduled_time,
+                    agent_spec=agent_spec,
+                    goal_config=goal_config,
                 )
                 result.replayed_runs_count += 1
             except Exception as e:

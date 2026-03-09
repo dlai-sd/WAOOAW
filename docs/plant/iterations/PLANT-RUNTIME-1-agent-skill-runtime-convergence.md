@@ -13,9 +13,9 @@
 | Created | 2026-03-09 |
 | Author | GitHub Copilot (PM mode) |
 | Parent vision doc | `docs/CONTEXT_AND_INDEX.md` §4.6 (Construct Execution Flow) |
-| Total iterations | 1 |
-| Total epics | 2 |
-| Total stories | 2 |
+| Total iterations | 2 |
+| Total epics | 4 |
+| Total stories | 4 |
 
 ---
 
@@ -43,6 +43,7 @@ and `run_goal_with_retry` is updated to accept and forward them.
 | Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
 |---|---|---|---|---|---|
 | 1 | Lane B — SkillRuntimeResolver + GoalSchedulerService wiring | E1, E2 | 2 | 2h | +2.5h from launch |
+| 2 | Lane A — Wire resolver into all run_goal_with_retry call-sites | E3, E4 | 2 | 2h | +2.5h from launch |
 
 ---
 
@@ -126,3 +127,60 @@ stub. This epic wires the two together.
 - [x] When `agent_spec` is provided with bindings, typed path fires (pump + processor called)
 - [x] When `agent_spec` is None, legacy path fires (`NotImplementedError`)
 - [x] `pytest tests/unit/test_runtime_convergence_wiring.py` exits 0
+
+---
+
+## Iteration 2
+
+### Epic E3: Wire SkillRuntimeResolver into the scheduler trigger API
+
+**Outcome:** `POST /scheduler/trigger/{goal_instance_id}` resolves `agent_spec` and
+`goal_config` via `SkillRuntimeResolver` before calling `run_goal_with_retry`, so
+manual triggers use the typed pump→processor path when a spec is available.
+
+**Context:** After E1 and E2, `SkillRuntimeResolver` can bridge DB → runtime bundle
+and `run_goal_with_retry` can accept the bundle, but the trigger API endpoint
+(`trigger_goal_run` in `scheduler_admin.py`) still calls `run_goal_with_retry`
+without `agent_spec` or `goal_config` — so manual triggers always fall through to
+the legacy stub path.  This epic closes the gap at the API layer.
+
+**Files to create / modify:**
+
+| Action | File |
+|---|---|
+| MODIFY | `src/Plant/BackEnd/api/v1/scheduler_admin.py` — inject `AsyncSession` into `trigger_goal_run` and call `SkillRuntimeResolver.resolve_for_goal` |
+| CREATE | `src/Plant/BackEnd/tests/unit/test_scheduler_admin_uses_resolver.py` |
+
+**Acceptance criteria:**
+- [x] `trigger_goal_run` accepts `db: AsyncSession = Depends(get_read_db_session)`
+- [x] A `SkillRuntimeResolver(db)` is constructed inside the handler
+- [x] When resolver returns a bundle, `run_goal_with_retry` is called with `agent_spec` and `goal_config`
+- [x] When resolver returns `None` (soft-fail), `run_goal_with_retry` is called without them (legacy path)
+- [x] `pytest tests/unit/test_scheduler_admin_uses_resolver.py` exits 0
+
+---
+
+### Epic E4: Wire SkillRuntimeResolver into SchedulerPersistenceService recovery
+
+**Outcome:** `SchedulerPersistenceService._replay_missed_run` uses
+`SkillRuntimeResolver` when one is injected, enabling the typed pipeline for
+recovered/replayed goal runs — not just manually triggered ones.
+
+**Context:** `_replay_missed_run` in `scheduler_persistence_service.py` is the
+recovery path that fires when the scheduler restarts and replays missed runs.
+Like the trigger API, it calls `run_goal_with_retry` without `agent_spec` /
+`goal_config`, leaving replayed runs on the legacy stub path even after E3 fixes
+the manual-trigger path.
+
+**Files to create / modify:**
+
+| Action | File |
+|---|---|
+| MODIFY | `src/Plant/BackEnd/services/scheduler_persistence_service.py` — add optional `resolver` param to `__init__`; use it in `_replay_missed_run` |
+| CREATE | `src/Plant/BackEnd/tests/unit/test_persistence_service_uses_resolver.py` |
+
+**Acceptance criteria:**
+- [x] `SchedulerPersistenceService.__init__` accepts `resolver: Optional[SkillRuntimeResolver] = None`
+- [x] When resolver is provided, `_replay_missed_run` awaits `resolver.resolve_for_goal` and passes the bundle to `run_goal_with_retry`
+- [x] When resolver is `None`, behaviour is unchanged (no regression)
+- [x] `pytest tests/unit/test_persistence_service_uses_resolver.py` exits 0
