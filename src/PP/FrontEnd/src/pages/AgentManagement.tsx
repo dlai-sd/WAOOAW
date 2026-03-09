@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, CardHeader, Text, Body1, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell, Field, Textarea } from '@fluentui/react-components'
+import { Card, CardHeader, Text, Body1, Button, Table, TableHeader, TableRow, TableHeaderCell, TableBody, TableCell, Field, Textarea, Divider } from '@fluentui/react-components'
 import ApiErrorPanel from '../components/ApiErrorPanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
 
@@ -191,7 +191,8 @@ export default function AgentManagement() {
         </Table>
       </Card>
 
-      <div style={{ height: 16 }} />
+      {/* PP-FIX-1: DEF-015 audit — no hardcoded AGT-* IDs found; agents sourced from listAgents() */}
+      <Divider style={{ margin: '24px 0' }} />
 
       <Card>
         <CardHeader header={<Text weight="semibold">Agent Type Definitions</Text>} />
