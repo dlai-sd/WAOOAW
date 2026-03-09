@@ -194,3 +194,130 @@ def test_construct_diagnostics_routes_use_read_db_session():
                 pytest.fail(
                     f"{endpoint_fn.__name__} uses get_db_session instead of get_read_db_session"
                 )
+
+
+# ---------------------------------------------------------------------------
+# CP-DEFECTS-1 E4: hook-trace tests
+# ---------------------------------------------------------------------------
+
+
+def test_hook_trace_returns_404_for_unknown_hire():
+    """GET /api/v1/hired-agents/{id}/hook-trace → 404 when hired_agent_id not found."""
+    for client in _make_test_client():
+        resp = client.get(
+            "/api/v1/hired-agents/no-such-ha/hook-trace",
+            headers={"X-Correlation-ID": "test-ht-1"},
+        )
+        assert resp.status_code == 404
+
+
+def test_hook_trace_returns_empty_list_for_known_hire():
+    """GET hook-trace returns 200 + empty list for a known hire (stub implementation)."""
+    from main import app
+    from core.database import get_read_db_session
+
+    async def _fake_db_hire():
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = "ha-001"  # truthy → hire exists
+        mock_result.scalar_one_or_none.return_value = None
+        mock_result.scalars.return_value.all.return_value = []
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        yield mock_session
+
+    app.dependency_overrides[get_read_db_session] = _fake_db_hire
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get(
+            "/api/v1/hired-agents/ha-001/hook-trace",
+            headers={"X-Correlation-ID": "test-ht-2"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    app.dependency_overrides.clear()
+
+
+def test_hook_trace_accepts_stage_and_result_filters():
+    """GET hook-trace accepts stage/result/limit query params without error."""
+    from main import app
+    from core.database import get_read_db_session
+
+    async def _fake_db_hire():
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar.return_value = "ha-001"
+        mock_result.scalar_one_or_none.return_value = None
+        mock_result.scalars.return_value.all.return_value = []
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        yield mock_session
+
+    app.dependency_overrides[get_read_db_session] = _fake_db_hire
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get(
+            "/api/v1/hired-agents/ha-001/hook-trace?stage=pre_pump&result=proceed&limit=10",
+            headers={"X-Correlation-ID": "test-ht-3"},
+        )
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    app.dependency_overrides.clear()
+
+
+# ---------------------------------------------------------------------------
+# CP-DEFECTS-1 E4: DLQ requeue tests
+# ---------------------------------------------------------------------------
+
+
+def test_dlq_requeue_returns_404_for_unknown_entry():
+    """POST /api/v1/ops/dlq/{id}/requeue → 404 when dlq_id not found."""
+    from main import app
+    from core.database import get_db_session, get_read_db_session
+
+    async def _fake_write_db():
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.rowcount = 0  # no rows deleted → entry not found
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.commit = AsyncMock()
+        yield mock_session
+
+    app.dependency_overrides[get_db_session] = _fake_write_db
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.post(
+            "/api/v1/ops/dlq/nonexistent-id/requeue",
+            headers={"X-Correlation-ID": "test-requeue-1"},
+        )
+        assert resp.status_code == 404
+
+    app.dependency_overrides.clear()
+
+
+def test_dlq_requeue_returns_queued_status_on_success():
+    """POST /api/v1/ops/dlq/{id}/requeue → {status: queued, dlq_id} when entry deleted."""
+    from main import app
+    from core.database import get_db_session
+
+    async def _fake_write_db():
+        mock_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.rowcount = 1  # row deleted successfully
+        mock_session.execute = AsyncMock(return_value=mock_result)
+        mock_session.commit = AsyncMock()
+        yield mock_session
+
+    app.dependency_overrides[get_db_session] = _fake_write_db
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.post(
+            "/api/v1/ops/dlq/dlq-xyz/requeue",
+            headers={"X-Correlation-ID": "test-requeue-2"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "queued"
+        assert body["dlq_id"] == "dlq-xyz"
+
+    app.dependency_overrides.clear()

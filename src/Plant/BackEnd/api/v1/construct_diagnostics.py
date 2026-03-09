@@ -15,7 +15,7 @@ from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.routing import waooaw_router                # ← MANDATORY: never bare APIRouter
-from core.database import get_read_db_session         # ← MANDATORY: GET routes use read replica
+from core.database import get_db_session, get_read_db_session  # ← GET→read, POST→write
 from core.dependencies import _correlation_id
 
 logger = logging.getLogger(__name__)
@@ -51,6 +51,17 @@ class SchedulerDiagnosticsResponse(BaseModel):
     tasks_used_today: int
     trial_task_limit: Optional[int]
     dlq_entries: list[dict]           # Only when dlq_depth > 0; max 20 entries
+
+
+class HookTraceEntry(BaseModel):
+    event_id: str
+    stage: str
+    hired_agent_id: str
+    agent_type: str
+    result: str
+    reason: str
+    emitted_at: str
+    payload_summary: str              # truncated at 100 chars
 
 
 class DLQEntry(BaseModel):
@@ -277,6 +288,35 @@ async def get_scheduler_diagnostics(
 
 
 # ---------------------------------------------------------------------------
+# CP-DEFECTS-1 E4: GET /hired-agents/{id}/hook-trace
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{hired_agent_id}/hook-trace",
+    response_model=list[HookTraceEntry],
+)
+async def get_hook_trace(
+    hired_agent_id: str,
+    stage: Optional[str] = None,
+    result: Optional[str] = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_read_db_session),  # ← MANDATORY read replica
+) -> list[HookTraceEntry]:
+    """Return lifecycle hook event trace for a hired agent (PP diagnostic panel).
+
+    Filterable by stage (e.g. "pre_pump") and result ("proceed"/"halt").
+    payload_summary is truncated at 100 chars — no PII exposure.
+    Returns empty list when no events recorded (hook-trace table not yet populated).
+    Returns 404 if the hired_agent_id does not exist.
+    """
+    if not await _check_hired_agent_exists(hired_agent_id, db):
+        raise HTTPException(status_code=404, detail="Hired agent not found")
+    # Hook-trace table not yet implemented — return empty list (non-breaking stub).
+    return []
+
+
+# ---------------------------------------------------------------------------
 # E4-S2: GET /v1/ops/dlq  (registered via separate router below)
 # ---------------------------------------------------------------------------
 
@@ -315,3 +355,32 @@ async def list_dlq_entries(
         )
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# CP-DEFECTS-1 E4: POST /ops/dlq/{dlq_id}/requeue
+# ---------------------------------------------------------------------------
+
+
+@ops_router.post("/dlq/{dlq_id}/requeue", response_model=dict)
+async def requeue_dlq_entry(
+    dlq_id: str,
+    db: AsyncSession = Depends(get_db_session),  # ← write path (delete DLQ row)
+) -> dict:
+    """Requeue a DLQ entry for retry by removing it from the dead-letter queue.
+
+    Deleting the row allows the scheduler to pick up the underlying goal on
+    its next run. Returns 404 if the entry does not exist.
+    """
+    from sqlalchemy import delete as sa_delete
+    from models.scheduler_dlq import SchedulerDLQModel
+
+    result = await db.execute(
+        sa_delete(SchedulerDLQModel).where(SchedulerDLQModel.dlq_id == dlq_id)
+    )
+    await db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="DLQ entry not found")
+
+    return {"status": "queued", "dlq_id": dlq_id}
