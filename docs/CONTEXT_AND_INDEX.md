@@ -1,8 +1,8 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.4  
+**Version**: 2.5  
 **Date**: 2026-03-09  
-**Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
+**Purpose**: Single-source operating manual for handing WAOOAW work to AI agents, especially zero-cost and small-context agents, so they can navigate, understand, plan, and execute complex platform tasks with minimal drift.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
 
@@ -51,6 +51,20 @@
 ## 0. How To Use This Document
 
 Treat this file as the platform operating manual, not as a changelog dump. It should answer three questions fast: what WAOOAW is, where each responsibility lives, and which files are the canonical edit points for a task.
+
+### Zero-cost agent handover contract
+
+If you are handing work to a lower-cost or small-context agent, this document is the primary source of truth. The handoff should assume the agent can execute complex work only if task boundaries, file ownership, test expectations, and deployment rules are made explicit.
+
+| Handover need | Where this document answers it | What the agent should do |
+|---|---|---|
+| Understand platform shape fast | §§1, 4, 5.1, 6 | Build a mental map before editing any code |
+| Know exact edit surfaces | §5.2, §5.3, §13 | Restrict file reads and edits to the owning service paths |
+| Avoid infra/config drift | §§8, 9, 14, 17, 19 | Externalize config, preserve image promotion, respect secrets flow |
+| Execute complex tasks safely | §§11, 18, 19, 22 | Follow the planning, model-selection, testing, and troubleshooting rules in order |
+| Recover when context is thin | §§17, 21, 22, 25 | Use the known gotchas, CLI playbooks, FAQ, and session recovery protocol before guessing |
+
+**Operating rule:** when this document conflicts with stale comments, old plan files, or scattered notes, prefer this document unless a newer code change clearly proves otherwise.
 
 ### Reading order by task
 
@@ -2265,6 +2279,8 @@ http://localhost:8020/docs   # CP Backend Swagger
 
 > **INSTRUCTION TO AI AGENT**: When a user describes a task, you MUST consult this section and recommend the best free model BEFORE starting work. State the model name, why it's the best fit, and which sections of this document to include in context.
 
+This section exists to make handoff to zero-cost agents practical. Model choice is part of execution quality: pick the cheapest model that can still finish the task without inventing architecture, skipping tests, or drifting across service boundaries.
+
 ### Available free models
 
 | Model | Access | Context window | Strengths | Monthly free limit |
@@ -2323,6 +2339,32 @@ When a user describes a task:
 ## 19. Agent Working Instructions — Epic & Story Execution
 
 > **MANDATORY**: Every AI agent working on this codebase MUST follow these instructions when the user describes a feature, fix, or improvement.
+
+### Zero-cost agent execution checklist
+
+Use this checklist before starting any non-trivial task. If any row cannot be answered, pause and gather that context from the referenced section before editing code.
+
+| Question | Read here | Required outcome |
+|---|---|---|
+| What service owns the change? | §5.3 + §13 | Exact backend/frontend/gateway/infra ownership is clear |
+| Which routes and hops are involved? | §5.2 + §6 + §13 | The caller, proxy, gateway, and Plant target are named explicitly |
+| Which files are the canonical edit points? | §13 | The task is reduced to a small, concrete file set |
+| Which tests must pass? | §11 | Required unit/integration/UI checks are named before coding |
+| Which config/secrets/deploy rules apply? | §§8, 9, 14, 19 | No environment logic is baked into code, Dockerfiles, or Terraform templates |
+| How will the agent recover if blocked? | §§17, 21, 22, 25 | The fallback commands, gotchas, and context-recovery path are known |
+
+### Complex-task handoff bundle
+
+When delegating a complex task to a zero-cost agent, include all of the following in the prompt or linked plan:
+
+| Required handoff element | Why it matters |
+|---|---|
+| User outcome in one sentence | Prevents the agent from optimizing for implementation detail instead of behavior |
+| Explicit out-of-scope list | Stops gold-plating and opportunistic refactors |
+| Exact file paths or file-index sections | Keeps the read set within a small context window |
+| Route/data-flow statement | Prevents confusion across CP, PP, Gateway, Plant, Mobile, and Terraform |
+| Test command list | Forces completion to include verification, not just code edits |
+| Deployment or runtime constraints | Prevents image-promotion, secret, CORS, and port regressions |
 
 ### Step 1: Create Epic & Story Document
 
