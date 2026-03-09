@@ -222,3 +222,25 @@ def test_get_user_store_singleton():
     store2 = get_user_store()
     
     assert store1 is store2
+
+
+def test_normalize_user_id_rekeys_existing_user():
+    """Test normalize_user_id makes the canonical id the user's real id."""
+    store = UserStore()
+    user = store.create_user(
+        UserCreate(
+            email="test@example.com",
+            name="Test User",
+            provider="google",
+            provider_id="google123",
+        )
+    )
+
+    old_id = user.id
+    normalized = store.normalize_user_id(user, "canonical-user-id")
+
+    assert normalized.id == "canonical-user-id"
+    assert store.get_user_by_id("canonical-user-id").id == "canonical-user-id"
+    assert store.get_user_by_id(old_id).id == "canonical-user-id"
+    assert store.get_user_by_email("test@example.com").id == "canonical-user-id"
+    assert store.get_user_by_provider("google", "google123").id == "canonical-user-id"

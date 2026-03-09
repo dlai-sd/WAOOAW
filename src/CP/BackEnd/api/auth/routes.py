@@ -155,7 +155,7 @@ async def google_callback(code: Optional[str], state: Optional[str], error: Opti
         # resolve the user by jwt_subject even though the store was created with
         # an in-memory UUID.
         if plant_customer_id:
-            user_store.alias_user_id(user, plant_customer_id)
+            user = user_store.normalize_user_id(user, plant_customer_id)
 
         tokens = create_tokens(jwt_subject, user.email)
 
@@ -233,7 +233,7 @@ async def verify_google_id_token(
         # get_current_user (which calls user_store.get_user_by_id(jwt_sub)) can
         # resolve the user even though the store was created with an in-memory UUID.
         if plant_customer_id:
-            user_store.alias_user_id(user, plant_customer_id)
+            user = user_store.normalize_user_id(user, plant_customer_id)
 
         # Create JWT tokens using Plant's stable UUID as sub
         tokens = create_tokens(jwt_subject, user.email)
@@ -287,15 +287,8 @@ async def refresh_access_token(
                 provider_id=token_data.user_id,
             )
         )
-        # Alias the token's subject (Plant UUID or previously issued in-memory
-        # UUID) to this restored user entry so get_user_by_id(jwt_sub) succeeds.
-        user_store.alias_user_id(user, token_data.user_id)
-        return Token(**create_tokens(token_data.user_id, token_data.email))
-
-    # Create new token pair
-    tokens = create_tokens(user.id, user.email)
-
-    return Token(**tokens)
+    user = user_store.normalize_user_id(user, token_data.user_id)
+    return Token(**create_tokens(user.id, user.email))
 
 @router.post("/logout")
 async def logout(

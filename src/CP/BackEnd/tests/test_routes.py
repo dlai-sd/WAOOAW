@@ -7,6 +7,9 @@ from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 
+from api.auth.user_store import get_user_store
+from core.jwt_handler import create_tokens
+
 
 pytestmark = pytest.mark.unit
 
@@ -19,6 +22,59 @@ def test_refresh_token_with_invalid_token(client: TestClient):
     )
     
     assert response.status_code == 401
+
+
+def test_refresh_restore_normalizes_user_id(client: TestClient):
+    """Refresh restore should recreate the user with the JWT subject as id."""
+    store = get_user_store()
+    assert store.get_user_by_id("canonical-user-id") is None
+
+    tokens = create_tokens("canonical-user-id", "restore@example.com")
+    refresh_response = client.post(
+        "/api/auth/refresh",
+        headers={"Authorization": f"Bearer {tokens['refresh_token']}"},
+    )
+
+    assert refresh_response.status_code == 200
+    refreshed = refresh_response.json()
+
+    me_response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {refreshed['access_token']}"},
+    )
+
+    assert me_response.status_code == 200
+    assert me_response.json()["id"] == "canonical-user-id"
+
+
+@patch("api.auth.routes._lookup_plant_customer_id")
+@patch("api.auth.routes.verify_google_token")
+def test_google_verify_normalizes_user_id_to_plant_uuid(mock_verify, mock_lookup_plant_customer_id, client: TestClient):
+    """Google verify should return auth/me with the canonical Plant UUID."""
+    mock_verify.return_value = {
+        "sub": "google-user-123",
+        "email": "canonical@example.com",
+        "name": "Canonical User",
+        "picture": "https://example.com/photo.jpg",
+        "email_verified": True,
+    }
+    mock_lookup_plant_customer_id.return_value = "plant-customer-123"
+
+    response = client.post(
+        "/api/auth/google/verify",
+        json={"id_token": "valid_google_id_token", "source": "cp"},
+    )
+
+    assert response.status_code == 200
+    tokens = response.json()
+
+    me_response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+
+    assert me_response.status_code == 200
+    assert me_response.json()["id"] == "plant-customer-123"
 
 
 def test_google_login_redirects_with_state(client: TestClient):
