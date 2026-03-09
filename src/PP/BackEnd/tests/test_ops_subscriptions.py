@@ -68,7 +68,7 @@ async def test_list_subscriptions_503_on_plant_error(app, client):
     plant = SimpleNamespace(_request=AsyncMock(side_effect=PlantAPIError("circuit open")))
     app.dependency_overrides[get_plant_client] = lambda: plant
     try:
-        resp = await client.get("/api/pp/ops/subscriptions")
+        resp = await client.get("/api/pp/ops/subscriptions?customer_id=C1")
         assert resp.status_code == 503
     finally:
         app.dependency_overrides.clear()
