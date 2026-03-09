@@ -64,7 +64,7 @@
 | 1 | Critical backend path fixes unblocking the OPS portal | E1, E2, E3 | 4 | 2.5h | ✅ Done |
 | 2 | Missing Plant endpoint + Demo Login button + hardcoded ID fix | E4, E5, E6 | 3 | 1.5h | ✅ Done |
 | 3 | Nav/label accuracy + email customer lookup | E7, E8, E9 | 3 | 2h | ✅ Done |
-| 4 | Dashboard live data + agent ID audit | E10, E11 | 2 | 1.5h | 2026-03-09 11:30 IST |
+| 4 | Dashboard live data + agent ID audit | E10, E11 | 2 | 1.5h | ✅ Done |
 
 **Estimate basis:** FE wiring = 30 min | New BE endpoint = 45 min | Path fix = 15–30 min | PR = 10 min. Add 20% buffer for zero-cost model context loading.
 
@@ -352,8 +352,8 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E7-S1 | 3 | E7: Nav labels match actual page content | Fix nav labels and page titles | 🟢 Done | — |
 | E8-S1 | 3 | E8: Nav icons are distinct and pages are grouped | Assign unique icons + section headers | 🟢 Done | — |
 | E9-S1 | 3 | E9: Operators look up customers by email | Add email lookup to HiredAgentsOps | 🟢 Done | — |
-| E10-S1 | 4 | E10: Dashboard shows real agent count | Wire listAgents, null fake MRR/Churn/Customers | 🔴 Not Started | — |
-| E11-S1 | 4 | E11: No hardcoded agent type IDs + section divider | Audit AgentManagement.tsx for hardcoded IDs | 🔴 Not Started | — |
+| E10-S1 | 4 | E10: Dashboard shows real agent count | Wire listAgents, null fake MRR/Churn/Customers | 🟢 Done | — |
+| E11-S1 | 4 | E11: No hardcoded agent type IDs + section divider | Audit AgentManagement.tsx for hardcoded IDs | 🟢 Done | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 

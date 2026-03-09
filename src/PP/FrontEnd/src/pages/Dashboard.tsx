@@ -1,38 +1,54 @@
-import { Card, CardHeader, Text, Body1 } from '@fluentui/react-components'
+import React, { useEffect, useState } from 'react'
+import { Card, CardHeader, Text, Spinner } from '@fluentui/react-components'
+import { gatewayApiClient } from '../services/gatewayApiClient'
 
-export default function Dashboard() {
+export const Dashboard: React.FC = () => {
+  const [agentCount, setAgentCount] = useState<number | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    gatewayApiClient.listAgents()
+      .then((agents: unknown[]) => setAgentCount(agents.length))
+      .catch(() => setError('Failed to load'))
+      .finally(() => setLoading(false))
+  }, [])
+
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <Text as="h1" size={900} weight="semibold">Dashboard</Text>
-        <Body1>Platform overview and key metrics</Body1>
-      </div>
-
-      <div className="dashboard-grid">
-        <Card className="metric-card">
+    <div style={{ padding: 24 }}>
+      <Text as="h1" size={900} weight="semibold" style={{ marginBottom: 24 }}>
+        Dashboard
+      </Text>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <Card>
           <CardHeader header={<Text weight="semibold">MRR</Text>} />
-          <Text size={700}>₹2.4M</Text>
-          <Text size={200} style={{ color: '#10b981' }}>+12% vs last month</Text>
+          <Text size={700}>N/A</Text>
+          <Text size={200} style={{ color: '#888' }}>Coming soon</Text>
         </Card>
-
-        <Card className="metric-card">
+        <Card>
           <CardHeader header={<Text weight="semibold">Active Agents</Text>} />
-          <Text size={700}>47</Text>
-          <Text size={200}>Across 3 industries</Text>
+          {loading ? (
+            <Spinner size="tiny" />
+          ) : error ? (
+            <Text style={{ color: 'red' }}>—</Text>
+          ) : (
+            <Text size={700}>{agentCount ?? '—'}</Text>
+          )}
         </Card>
-
-        <Card className="metric-card">
+        <Card>
           <CardHeader header={<Text weight="semibold">Customers</Text>} />
-          <Text size={700}>1,234</Text>
-          <Text size={200} style={{ color: '#10b981' }}>+89 this month</Text>
+          <Text size={700}>N/A</Text>
+          <Text size={200} style={{ color: '#888' }}>Coming soon</Text>
         </Card>
-
-        <Card className="metric-card">
+        <Card>
           <CardHeader header={<Text weight="semibold">Churn Rate</Text>} />
-          <Text size={700}>2.3%</Text>
-          <Text size={200}>Industry avg: 5.1%</Text>
+          <Text size={700}>N/A</Text>
+          <Text size={200} style={{ color: '#888' }}>Coming soon</Text>
         </Card>
       </div>
     </div>
   )
 }
+
+export default Dashboard
