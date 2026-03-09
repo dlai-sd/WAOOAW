@@ -75,10 +75,11 @@ def mock_write_session() -> AsyncMock:
 async def client(mock_read_session, mock_write_session) -> AsyncGenerator:
     """Async test client with DB dependencies overridden."""
     from fastapi import FastAPI
-    from api.v1.agent_skills import router
+    from api.v1.agent_skills import hired_agent_skills_router, router
 
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
+    app.include_router(hired_agent_skills_router, prefix="/api/v1")
 
     async def _override_read():
         yield mock_read_session
@@ -134,6 +135,50 @@ async def test_list_agent_skills_goal_config_none_when_not_set(client, mock_read
 
     assert resp.status_code == 200
     assert resp.json()[0]["goal_config"] is None
+
+
+@pytest.mark.asyncio
+async def test_list_hired_agent_skills_returns_runtime_shape(client, mock_read_session):
+    """GET hired-agent skills returns runtime Skill objects, not raw join rows."""
+    skill = _make_skill(_SKILL_ID)
+    skill.external_id = "SK-001"
+    skill.description = "Writes content"
+    link = _make_link(_AGENT_ID, _SKILL_ID, goal_config=None)
+    row = _row(link, skill)
+
+    hired_record = MagicMock()
+    hired_record.agent_id = _AGENT_ID
+
+    list_result = MagicMock()
+    list_result.all.return_value = [row]
+
+    config_row = MagicMock()
+    config_row.skill_id = "SK-001"
+    config_row.pp_locked_fields = {"channel": "linkedin"}
+    config_row.customer_fields = {"topic": "AI trends"}
+    config_result = MagicMock()
+    config_result.scalars.return_value.all.return_value = [config_row]
+
+    mock_read_session.execute = AsyncMock(side_effect=[list_result, config_result])
+
+    with patch("api.v1.agent_skills.hired_agents_simple._get_record_by_id", AsyncMock(return_value=hired_record)):
+        resp = await client.get("/api/v1/hired-agents/HIRED-001/skills")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data[0]["skill_id"] == "SK-001"
+    assert data[0]["display_name"] == "Content Writer"
+    assert data[0]["platform_fields"] == {"channel": "linkedin"}
+    assert data[0]["customer_fields"] == {"topic": "AI trends"}
+    assert data[0]["goal_config"] == {"topic": "AI trends"}
+
+
+@pytest.mark.asyncio
+async def test_list_hired_agent_skills_not_found(client):
+    with patch("api.v1.agent_skills.hired_agents_simple._get_record_by_id", AsyncMock(return_value=None)):
+        resp = await client.get("/api/v1/hired-agents/HIRED-MISSING/skills")
+
+    assert resp.status_code == 404
 
 
 # ── PATCH /agents/{agent_id}/skills/{skill_id}/goal-config ────────────────────

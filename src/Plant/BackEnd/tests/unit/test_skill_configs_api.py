@@ -56,7 +56,7 @@ def _make_mock_db(row: SkillConfigModel | None) -> AsyncMock:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_patch_skill_config_success():
-    """E1-S3-T2: PATCH with valid ids returns 200 and updated customer_fields."""
+    """E1-S3-T2: PATCH with valid ids returns normalized runtime payload."""
     from api.v1.skill_configs import update_skill_config, CustomerFieldsUpdate
 
     row = _make_skill_config_row()
@@ -70,8 +70,9 @@ async def test_patch_skill_config_success():
         db=db,
     )
 
-    assert response["id"] == "sc-001"
+    assert response["skill_id"] == "skill-001"
     assert response["customer_fields"] == {"rsi_period": 14}
+    assert response["goal_config"] == {"rsi_period": 14}
     db.commit.assert_awaited_once()
 
 

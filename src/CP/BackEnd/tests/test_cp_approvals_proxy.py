@@ -26,10 +26,16 @@ def _mock_plant_http(status_code: int, json_body: dict | list) -> AsyncMock:
 
     mock_client = AsyncMock()
     mock_client.get = AsyncMock(return_value=mock_response)
-    mock_client.patch = AsyncMock(return_value=mock_response)
+    mock_client.post = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
     return mock_client
+
+
+def _called_url(call_args) -> str:
+    if "url" in call_args.kwargs:
+        return call_args.kwargs["url"]
+    return call_args.args[0]
 
 
 PENDING_DELIVERABLES = [
@@ -52,7 +58,7 @@ def test_approval_queue_requires_auth(client, monkeypatch):
 
 
 @pytest.mark.unit
-def test_approval_queue_proxies_to_plant(client, monkeypatch):
+def test_approval_queue_proxies_to_plant(client, auth_headers, monkeypatch):
     """GET /approval-queue with auth returns pending deliverables."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
     mock_client = _mock_plant_http(200, PENDING_DELIVERABLES)
@@ -60,28 +66,30 @@ def test_approval_queue_proxies_to_plant(client, monkeypatch):
     with patch("api.cp_approvals_proxy.httpx.AsyncClient", return_value=mock_client):
         resp = client.get(
             "/api/cp/hired-agents/ha-1/approval-queue",
-            headers={"Authorization": "Bearer test-token"},
+            headers=auth_headers,
         )
 
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
     assert data[0]["deliverable_id"] == "dlv-001"
+    called_url = _called_url(mock_client.get.call_args)
+    assert "/api/v1/hired-agents/ha-1/deliverables?status=pending_review&customer_id=" in called_url
 
 
 @pytest.mark.unit
-def test_approval_queue_missing_plant_url_returns_503(client, monkeypatch):
+def test_approval_queue_missing_plant_url_returns_503(client, auth_headers, monkeypatch):
     """GET /approval-queue when PLANT_GATEWAY_URL is missing returns 503."""
     monkeypatch.delenv("PLANT_GATEWAY_URL", raising=False)
     resp = client.get(
         "/api/cp/hired-agents/ha-1/approval-queue",
-        headers={"Authorization": "Bearer test-token"},
+        headers=auth_headers,
     )
     assert resp.status_code == 503
 
 
 @pytest.mark.unit
-def test_approval_queue_plant_unreachable_returns_502(client, monkeypatch):
+def test_approval_queue_plant_unreachable_returns_502(client, auth_headers, monkeypatch):
     """GET /approval-queue when Plant is unreachable returns 502."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
 
@@ -93,7 +101,7 @@ def test_approval_queue_plant_unreachable_returns_502(client, monkeypatch):
     with patch("api.cp_approvals_proxy.httpx.AsyncClient", return_value=mock_client):
         resp = client.get(
             "/api/cp/hired-agents/ha-1/approval-queue",
-            headers={"Authorization": "Bearer test-token"},
+            headers=auth_headers,
         )
 
     assert resp.status_code == 502
@@ -110,27 +118,27 @@ def test_approve_deliverable_requires_auth(client, monkeypatch):
 
 
 @pytest.mark.unit
-def test_approve_deliverable_proxies_to_plant(client, monkeypatch):
-    """POST .../approve with auth returns 200 and patches Plant deliverable status to approved."""
+def test_approve_deliverable_proxies_to_plant(client, auth_headers, monkeypatch):
+    """POST .../approve with auth calls Plant review route with approved decision."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
-    approve_response = {"deliverable_id": "dlv-001", "status": "approved"}
+    approve_response = {"deliverable_id": "dlv-001", "review_status": "approved"}
     mock_client = _mock_plant_http(200, approve_response)
 
     with patch("api.cp_approvals_proxy.httpx.AsyncClient", return_value=mock_client):
         resp = client.post(
             "/api/cp/hired-agents/ha-1/approval-queue/dlv-001/approve",
-            headers={"Authorization": "Bearer test-token"},
+            headers=auth_headers,
         )
 
     assert resp.status_code == 200
-    assert resp.json()["status"] == "approved"
+    assert resp.json()["review_status"] == "approved"
 
-    # Verify Plant was called with correct body
-    call_kwargs = mock_client.patch.call_args
+    call_kwargs = mock_client.post.call_args
     assert call_kwargs is not None
+    assert _called_url(call_kwargs).endswith("/api/v1/deliverables/dlv-001/review")
     body_sent = call_kwargs.kwargs.get("json", {})
-    assert body_sent.get("status") == "approved"
-    assert body_sent.get("hired_agent_id") == "ha-1"
+    assert body_sent.get("decision") == "approved"
+    assert "customer_id" in body_sent
 
 
 # ─── E2-S2: POST reject ───────────────────────────────────────────────────────
@@ -144,27 +152,27 @@ def test_reject_deliverable_requires_auth(client, monkeypatch):
 
 
 @pytest.mark.unit
-def test_reject_deliverable_proxies_to_plant(client, monkeypatch):
-    """POST .../reject with auth returns 200 and patches Plant deliverable status to rejected."""
+def test_reject_deliverable_proxies_to_plant(client, auth_headers, monkeypatch):
+    """POST .../reject with auth calls Plant review route with rejected decision."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
-    reject_response = {"deliverable_id": "dlv-001", "status": "rejected"}
+    reject_response = {"deliverable_id": "dlv-001", "review_status": "rejected"}
     mock_client = _mock_plant_http(200, reject_response)
 
     with patch("api.cp_approvals_proxy.httpx.AsyncClient", return_value=mock_client):
         resp = client.post(
             "/api/cp/hired-agents/ha-1/approval-queue/dlv-001/reject",
-            headers={"Authorization": "Bearer test-token"},
+            headers=auth_headers,
         )
 
     assert resp.status_code == 200
-    assert resp.json()["status"] == "rejected"
+    assert resp.json()["review_status"] == "rejected"
 
-    # Verify Plant was called with correct body
-    call_kwargs = mock_client.patch.call_args
+    call_kwargs = mock_client.post.call_args
     assert call_kwargs is not None
+    assert _called_url(call_kwargs).endswith("/api/v1/deliverables/dlv-001/review")
     body_sent = call_kwargs.kwargs.get("json", {})
-    assert body_sent.get("status") == "rejected"
-    assert body_sent.get("hired_agent_id") == "ha-1"
+    assert body_sent.get("decision") == "rejected"
+    assert "customer_id" in body_sent
 
 
 # ─── Router registration ──────────────────────────────────────────────────────

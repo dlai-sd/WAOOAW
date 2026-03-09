@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.2  
-**Date**: 2026-03-07  
+**Version**: 2.3  
+**Date**: 2026-03-09  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
@@ -14,9 +14,12 @@
 2. [Solution Hypothesis](#2-solution-hypothesis)
 3. [Constitutional Design Pattern](#3-constitutional-design-pattern)
 4. [Four Major Components](#4-four-major-components)
-   - [4.6 Agent Construct Architecture](#46-agent-construct-architecture)
+  - [4.6 Agent Construct Architecture](#46-agent-construct-architecture)
+  - [4.7 Canonical Runtime Vocabulary](#47-canonical-runtime-vocabulary)
 5. [Architecture & Technical Stack](#5-architecture--technical-stack)
-   - [5.6 Platform NFR Standards — Mandatory Patterns for Every New Route](#56-platform-nfr-standards--mandatory-patterns-for-every-new-route)
+  - [5.1 Platform Runtime Layout](#51-platform-runtime-layout)
+  - [5.2 Route Ownership And Debug Order](#52-route-ownership-and-debug-order)
+  - [5.6 Platform NFR Standards — Mandatory Patterns for Every New Route](#56-platform-nfr-standards--mandatory-patterns-for-every-new-route)
 6. [Service Communication & Data Flow](#6-service-communication--data-flow)
 7. [Development ALM — Workflows & PRs](#7-development-alm--workflows--prs)
 8. [Deployment Pipeline](#8-deployment-pipeline)
@@ -167,11 +170,15 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 
 ```
 Customer
-  └── HiredAgent          (one hire of one agent type)
-        └── Skill          (capability declared on the agent type)
-              └── GoalRun  (one execution triggered by Scheduler)
-                    └── Deliverable  (the output — one per GoalRun)
+  └── HiredAgent          (one runtime Agent hired by one customer)
+    └── Skill         (smallest customer-visible value-producing capability)
+      └── SkillRun (one execution record of one Skill)
+        └── Deliverable / Approval outcome
 ```
+
+**Canonical runtime rule:** external docs, route contracts, and new APIs should use `Agent`, `Skill`, `Component`, `SkillRun`, and `Goal` as the default runtime language.
+
+**Legacy compatibility note:** the codebase still contains `GoalRun` and `flow_runs` storage names. Treat those as internal compatibility and persistence terms, not the preferred public vocabulary.
 
 **Constructs** are internal building blocks. Customers never interact with them — only with the Skill API surface (configure → run → approve → receive deliverable).
 
@@ -204,6 +211,34 @@ AgentSpec (blueprint — in-memory)
 | **Processor** | **Agent-Specific** | The AI reasoning, LLM calls, domain logic — only this varies |
 
 **Invariant:** Constructs are stateless. State lives in the database. A construct reads from DB on entry, writes on exit.
+
+### 4.7 Canonical Runtime Vocabulary
+
+Use this vocabulary in plans, route reviews, API design, and code comments to prevent future drift.
+
+| Term | Canonical meaning | Avoid drifting to |
+|---|---|---|
+| **Agent** | The customer-hired runtime worker that owns lifecycle state, schedule defaults, budget, payment linkage, and enabled Skills | Treating Agent as a single Skill or a one-off workflow |
+| **Skill** | The smallest customer-visible, value-producing capability inside an Agent | Using generic `workflow` or `tool` for customer-facing capability |
+| **Component** | A stateless execution unit inside a Skill | Stateful mini-agents or ad hoc plugin terminology |
+| **Connector** | External integration boundary: credentials, auth, protocol, transport | Data-source synonym or publisher substitute |
+| **Pump** | Reads or assembles input data for execution | Hidden business logic processor |
+| **Processor** | Performs domain logic, AI reasoning, or transformation | Scheduler, connector, or publisher work |
+| **Validator** | Evaluates quality, policy, constraints, and goal attainment | An invisible post-step buried inside Processor |
+| **Publisher** | Writes, posts, or submits outputs to external systems | Generic connector or processor logic |
+| **Platform Configuration** | PP-managed certified structure, bindings, limits, and governance fields | Customer-editable business inputs |
+| **Customer Configuration** | Customer-managed runtime inputs within certified limits | PP-owned structural configuration |
+| **Skill Run** | One execution record of one Skill, including run context, component history, status, approval state, outputs, and metrics | Publicly naming it a Flow when the business unit is a Skill |
+| **Goal** | Expected business result measured at Skill or Agent level | Component-owned business outcome |
+
+#### Anti-drift rules
+
+| Rule | Why it matters |
+|---|---|
+| Prefer `SkillRun` in new public APIs and portal contracts | Keeps product language aligned with the customer-facing unit of value |
+| Keep `flow_runs` and `GoalRun` as compatibility/storage names until a deliberate migration is approved | Avoids breaking persistence while converging public contracts |
+| Every customer-facing business capability should fit `Agent -> Skill -> Component -> Skill Run -> Goal` | Makes architecture review and story planning consistent |
+| Components remain stateless; state belongs in Agent, Skill configuration, SkillRun, and persisted records | Prevents hidden runtime state and easier debugging failures |
 
 #### Key Agent Mold Files
 
@@ -295,8 +330,8 @@ class ConstraintPolicy(BaseModel):
 | **Frontend** | React 18 + TypeScript + Vite on port 3002→8080; dark-themed marketplace UI |
 | **Key paths** | `src/CP/BackEnd/`, `src/CP/FrontEnd/` |
 | **BE entry** | `src/CP/BackEnd/main.py` (245 lines) — thin proxy to Plant Gateway |
-| **BE routes** | `src/CP/BackEnd/api/` — auth/, cp_registration.py, cp_otp.py, hire_wizard.py, payments_razorpay.py, trading.py, exchange_setup.py, subscriptions.py, invoices.py, receipts.py, cp_scheduler.py |
-| **Construct-facing routes** | `GET /cp/hired-agents/{id}/scheduler-summary`, `GET /cp/hired-agents/{id}/trial-budget`, `GET /cp/hired-agents/{id}/approval-queue`, `GET /cp/hired-agents/{id}/notifications-config`, `POST /cp/hired-agents/{id}/pause` — proposed in AGENT-CONSTRUCT-DESIGN §13.4; partially implemented in MOULD-GAP-1 |
+| **BE routes** | `src/CP/BackEnd/api/` — auth/, cp_registration.py, cp_otp.py, hire_wizard.py, payments_razorpay.py, trading.py, exchange_setup.py, subscriptions.py, invoices.py, receipts.py, `cp_skills.py`, `cp_flow_runs.py`, `cp_approvals_proxy.py`, `cp_scheduler.py` |
+| **Runtime-facing routes** | `GET /cp/hired-agents/{id}/skills`, `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config`, `GET /cp/flow-runs`, `GET /cp/component-runs`, `GET /cp/hired-agents/{id}/approval-queue`, `POST /cp/hired-agents/{id}/approval-queue/{deliverable_id}/approve|reject` |
 | **BE services** | `src/CP/BackEnd/services/` — auth_service.py, cp_registrations.py, cp_2fa.py, cp_otp.py, plant_gateway_client.py, trading_strategy.py |
 | **FE pages** | `src/CP/FrontEnd/src/pages/` — LandingPage, AgentDiscovery, AgentDetail, SignIn, SignUp, HireSetupWizard, TrialDashboard, AuthenticatedPortal, HireReceipt |
 | **FE services** | `src/CP/FrontEnd/src/services/` — 23 service files (auth, agents, trading, payments, subscriptions, etc.) |
@@ -363,6 +398,41 @@ class ConstraintPolicy(BaseModel):
          │ :5432  │  │ :6379  │  │ APIs │
          └────────┘  └────────┘  └──────┘
 ```
+
+### 5.1 Platform Runtime Layout
+
+| Layer | Primary responsibility | Entry files | Notes |
+|---|---|---|---|
+| **CP FrontEnd** | Customer UI, service selection, request shaping | `src/CP/FrontEnd/src/pages/`, `src/CP/FrontEnd/src/services/` | First place to inspect when the portal calls the wrong CP route |
+| **CP BackEnd** | Thin proxy only: auth/registration local, runtime requests forwarded to Plant Gateway | `src/CP/BackEnd/main.py`, `src/CP/BackEnd/api/` | Must not own business logic or data storage |
+| **Plant Gateway** | Public API ingress, JWT validation, RBAC, policy, budget, audit, proxy to Plant | `src/Plant/Gateway/main.py`, `src/Plant/Gateway/middleware/` | Customer-facing public routes live under `/api/v1/...` |
+| **Plant BackEnd** | Runtime business logic, persistence, scheduling, approvals, hired-agent state, skill execution | `src/Plant/BackEnd/main.py`, `src/Plant/BackEnd/api/v1/`, `src/Plant/BackEnd/services/` | Source of truth for hired agents, skills, deliverables, approvals, and execution history |
+| **PostgreSQL** | Durable system state | `src/Plant/BackEnd/models/`, Alembic migrations | Holds hired agents, skills, skill configs, deliverables, and current run backing tables |
+| **Redis** | Caching, throttling, scheduler/support state | service-level integrations | Not the source of truth for runtime business records |
+| **External systems** | OAuth, payments, exchanges, social publish targets | adapters and integrations | Should be reached via Connector/Publisher boundaries, not portal business logic |
+
+### 5.2 Route Ownership And Debug Order
+
+When a CP customer flow fails, trace it in this order so route drift is classified correctly.
+
+| Step | Layer | Start here | What you are confirming |
+|---|---|---|---|
+| 1 | CP FrontEnd | `src/CP/FrontEnd/src/services/` | The frontend is calling the intended CP route |
+| 2 | CP BackEnd | `src/CP/BackEnd/api/` | The thin proxy points to the canonical Plant path |
+| 3 | Plant Gateway | mounted `/api/v1/...` route inventory | The public route is actually exposed |
+| 4 | Plant BackEnd | `src/Plant/BackEnd/api/v1/` + `services/` | The handler implements the expected runtime semantics |
+| 5 | Persistence | `models/` + live DB row shape | The identifiers and stored fields match the contract being probed |
+
+#### Runtime route ownership map
+
+| Customer capability | CP FrontEnd service | CP BackEnd proxy | Plant public route | Plant implementation file |
+|---|---|---|---|---|
+| Hired-agent skills list | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `src/CP/BackEnd/api/cp_skills.py` | `GET /api/v1/hired-agents/{hired_instance_id}/skills` | `src/Plant/BackEnd/api/v1/agent_skills.py` |
+| Save customer skill config | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `src/CP/BackEnd/api/cp_skills.py` | `PATCH /api/v1/hired-agents/{hired_instance_id}/skills/{skill_id}/customer-config` | `src/Plant/BackEnd/api/v1/skill_configs.py` |
+| Skill run history | CP consumer of `/api/cp/flow-runs` | `src/CP/BackEnd/api/cp_flow_runs.py` | `GET /api/v1/skill-runs`, `GET /api/v1/skill-runs/{skill_run_id}` | `src/Plant/BackEnd/api/v1/flow_runs.py` |
+| Component run history | CP consumer of `/api/cp/component-runs` | `src/CP/BackEnd/api/cp_flow_runs.py` | `GET /api/v1/component-runs?flow_run_id=...` | `src/Plant/BackEnd/api/v1/flow_runs.py` |
+| Approval queue | CP approvals panel | `src/CP/BackEnd/api/cp_approvals_proxy.py` | `GET /api/v1/hired-agents/{hired_agent_id}/deliverables?...` | `src/Plant/BackEnd/api/v1/deliverables_simple.py` |
+| Approve/reject deliverable | CP approvals panel | `src/CP/BackEnd/api/cp_approvals_proxy.py` | `POST /api/v1/deliverables/{deliverable_id}/review` | `src/Plant/BackEnd/api/v1/deliverables_simple.py` |
 
 ### Technology stack
 
@@ -1458,6 +1528,19 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 ## 13. Code File Index
 
+### Fast-path index for runtime routing and vocabulary
+
+Use this shortlist first when the task is about Agent/Skill/Component runtime behaviour or CP route drift.
+
+| Need | First file | Then inspect | Why |
+|---|---|---|---|
+| Canonical runtime vocabulary | `main/Foundation/genesis_foundational_governance_agent.md` §3a–3c | `docs/CONTEXT_AND_INDEX.md` §4.7 | Source of truth for Agent, Skill, Component, Skill Run, and Goal vocabulary |
+| CP hired-agent skills flow | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `src/CP/BackEnd/api/cp_skills.py` → `src/Plant/BackEnd/api/v1/agent_skills.py` | Full FE → proxy → Plant chain |
+| Customer skill config save | `src/CP/BackEnd/api/cp_skills.py` | `src/Plant/BackEnd/api/v1/skill_configs.py` | Canonical hired-agent skill config write path |
+| Skill/component run history | `src/CP/BackEnd/api/cp_flow_runs.py` | `src/Plant/BackEnd/api/v1/flow_runs.py` | CP proxy and Plant route registration meet here |
+| Approval queue and review actions | `src/CP/BackEnd/api/cp_approvals_proxy.py` | `src/Plant/BackEnd/api/v1/deliverables_simple.py` | Prevents drift back to nonexistent deliverable status patch paths |
+| Hired-agent identity lookup | `src/Plant/BackEnd/api/v1/hired_agents_simple.py` | `src/Plant/BackEnd/tests/unit/test_hired_agents_api.py` | Canonical by-id surface and validation entry point |
+
 ### Root directory
 
 | File | Purpose |
@@ -1496,17 +1579,19 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `agent_mold.py` | Agent mold/template endpoints |
 | `customers.py` | Customer registration, profile |
 | `genesis.py` | Skill/JobRole certification (genesis flow) |
-| `hired_agents_simple.py` | Hired agent management |
+| `hired_agents_simple.py` | Hired agent management — includes direct lookup `GET /hired-agents/by-id/{hired_instance_id}` and hired-agent lifecycle/config endpoints |
 | `trial_status_simple.py` | Trial status endpoints |
 | `audit.py` | Audit log endpoints |
 | `auth.py` | Authentication endpoints — `POST /auth/google/verify`, `POST /auth/validate`, `POST /auth/register` (mobile registration), `POST /auth/otp/start` (mobile OTP challenge), `POST /auth/otp/verify` (mobile OTP → JWT) |
 | `otp.py` | OTP session lifecycle — create session, deliver email/SMS, verify code, revoke (added PR #822) |
-| `agent_skills.py` | Agent-Skill relationships — `GET /agents/{id}/skills` (returns `goal_config`+`goal_schema`), `POST` attach, `DELETE` detach, `PATCH /{id}/skills/{skill_id}/goal-config` (CP-SKILLS-2) |
+| `agent_skills.py` | Agent and hired-agent skill surfaces — legacy `GET /agents/{id}/skills` plus canonical `GET /hired-agents/{hired_instance_id}/skills`; includes normalized runtime Skill response helpers |
 | `feature_flags.py` | Feature flag CRUD — create, enable/disable, query flags |
 | `invoices_simple.py` | Invoice generation |
 | `payments_simple.py` | Payment processing |
 | `receipts_simple.py` | Receipt management |
 | `deliverables_simple.py` | Deliverable tracking |
+| `skill_configs.py` | Customer-editable hired-agent skill config routes — legacy `/skill-configs/{hired_instance_id}/{skill_id}` plus canonical `/hired-agents/{hired_instance_id}/skills/{skill_id}/customer-config` |
+| `flow_runs.py` | Flow-run backing store plus public runtime aliases — `/flow-runs`, `/skill-runs`, `/component-runs` |
 | `campaigns.py` | Campaign management — 12 endpoints: `POST /campaigns` (create with ContentCreatorSkill theme generation), `GET /campaigns`, `GET /campaigns/{id}`, `POST .../themes/approve`, `POST .../posts/generate`, `POST .../posts`, `GET .../posts`, `POST .../posts/{post_id}/approve`, `POST .../posts/{post_id}/publish`; in-memory stores `_campaigns`, `_theme_items`, `_posts` (Phase 1 — PLANT-CONTENT-2 will persist to PostgreSQL). |
 | `marketing_drafts.py` | Marketing content drafts |
 | `notifications.py` | Notification endpoints |
@@ -1528,6 +1613,8 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `deliverable.py` | Deliverable model |
 | `trial.py` | Trial model |
 | `goal_run.py` | GoalRun model |
+| `flow_run.py` | FlowRunModel — current backing store for public SkillRun aliases |
+| `component_run.py` | ComponentRunModel — per-step execution trace backing `/api/v1/component-runs` |
 | `scheduled_goal_run.py` | ScheduledGoalRun model |
 | `scheduler_dlq.py` | DeadLetterQueue model |
 | `scheduler_state.py` | SchedulerState model |
@@ -1672,7 +1759,10 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `api/platform_credentials.py` | Platform credential management (social, exchange) |
 | `api/feature_flags_proxy.py` | Proxy feature flag queries to Plant Backend |
 | `api/internal_plant_credential_resolver.py` | Internal credential resolution for Plant → CP calls |
-| `api/cp_skills.py` | CP skills thin proxy — `GET` list skills (two-hop: resolve agent_id → fetch skills), `GET` skill, `POST`/`DELETE` platform connections, `GET` performance stats, `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` (CP-SKILLS-1 #834, CP-SKILLS-2 #836, PLANT-SKILLS-1 It3 #846). `POST` platform connection writes raw credentials to GCP Secret Manager via `SecretManagerAdapter`, forwards only opaque `secret_ref` to Plant — credentials never touch the Plant DB directly. |
+| `api/cp_skills.py` | CP skills thin proxy — hired-agent skills list, hired-agent customer-config save, skill lookup, platform connections, and performance stats. Canonical Plant targets are `/api/v1/hired-agents/{hired_instance_id}/skills` and `/api/v1/hired-agents/{hired_instance_id}/skills/{skill_id}/customer-config`. `POST` platform connection writes raw credentials to GCP Secret Manager via `SecretManagerAdapter`, forwards only opaque `secret_ref` to Plant — credentials never touch the Plant DB directly. |
+| `api/cp_flow_runs.py` | CP thin proxy for SkillRun and ComponentRun history — `/api/cp/flow-runs`, `/api/cp/component-runs`, `/api/cp/approvals/{flow_run_id}/approve|reject`; Plant targets must use `/api/v1/skill-runs`, `/api/v1/component-runs`, `/api/v1/approvals/...` |
+| `api/cp_approvals_proxy.py` | CP approval queue thin proxy — `/api/cp/hired-agents/{id}/approval-queue` and approve/reject actions; canonical Plant write target is `POST /api/v1/deliverables/{deliverable_id}/review` |
+| `api/cp_scheduler.py` | CP thin proxy for trial budget, scheduler summary, and pause/resume actions on hired agents |
 | `api/campaigns.py` | CP BackEnd thin proxy for campaign endpoints — 8 routes (`POST /cp/campaigns`, `GET /cp/campaigns`, `GET /cp/campaigns/{id}`, `POST .../themes/approve`, `POST .../posts/generate`, `GET .../posts`, `POST .../posts/{post_id}/approve`, `POST .../posts/{post_id}/publish`) forwarding to Plant Backend campaign API; registered in `main_proxy.py` (PLANT-CONTENT-1 It4 #872). |
 | `api/cp_profile.py` | `GET /cp/profile` and `PATCH /cp/profile` — two-hop via Plant Gateway; reads/updates customer profile data; registered in `main_proxy.py` (CP-NAV-1 It2 #829). |
 | `api/feature_flag_dependency.py` | `require_flag("flag_name")` dependency factory — returns 404 if flag is off |
@@ -1737,9 +1827,9 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 | `components/auth/CaptchaWidget.tsx` | Cloudflare Turnstile CAPTCHA integration |
 | `components/auth/GoogleLoginButton.tsx` | Google OAuth login button |
 | `components/SkillsPanel.tsx` | Skills tab — skill cards with expand/collapse, `GoalConfigForm` seeded from `skill.goal_config`, async Save (Saving…/Saved ✓/error), `PlatformConnectionsPanel` (CP-SKILLS-1 #835, CP-SKILLS-2 #836). Updated to use `conn.id` + `conn.platform_key` matching Plant BE field names (PLANT-SKILLS-1 It3 #846) |
-| `services/agentSkills.service.ts` | Skills API — `listHiredAgentSkills()`, `getSkill()`, `saveGoalConfig()` via `PATCH /cp/.../goal-config` (CP-SKILLS-1 #835, CP-SKILLS-2 #836) |
+| `services/agentSkills.service.ts` | Skills API — `listHiredAgentSkills()`, `getSkill()`, `saveGoalConfig()` via `PATCH /api/cp/hired-agents/{id}/skills/{skill_id}/goal-config`; first FE file to inspect for hired-agent skill drift |
 | `services/performanceStats.service.ts` | Performance stats API — `listPerformanceStats()` (CP-SKILLS-1 #835) |
-| `services/platformConnections.service.ts` | Platform connections API — `listPlatformConnections()`, `createPlatformConnection()`, `deletePlatformConnection()` (CP-SKILLS-1 #835). Interface fields aligned to Plant BE response: `PlatformConnection.id` (not `connection_id`), `platform_key` (not `platform_name`); `CreateConnectionBody` now sends `{skill_id, platform_key, credentials}` (PLANT-SKILLS-1 It3 #846) |
+| `services/platformConnections.service.ts` | Platform connections API — `listPlatformConnections()`, `createPlatformConnection()`, `deletePlatformConnection()`; inspect this immediately after `agentSkills.service.ts` when a hired-agent configuration flow fails |
 | `services/profile.service.ts` | Profile read/update API calls — `getProfile()` and `updateProfile()` via `GET|PATCH /cp/profile` (CP-NAV-1 It2 #829) |
 | `services/auth.service.ts` | Auth API calls |
 | `services/registration.service.ts` | Registration API calls |
@@ -2540,6 +2630,85 @@ terraform plan -var-file=environments/demo.tfvars            # Plan changes
 | Secret not reaching container | `gcloud run services describe <service> --region=asia-south1 --format='yaml(spec.template.spec.containers[0].env)'` |
 | Port already in use | `lsof -i :<port>` or `docker ps --filter publish=<port>` |
 | Redis connectivity | `docker-compose -f docker-compose.local.yml exec redis redis-cli ping` |
+
+### Runtime Validation Playbook — verified on demo (9 Mar 2026)
+
+Use this when validating `PLANT-RUNTIME-1` or any CP FrontEnd -> CP BackEnd -> Plant runtime contract.
+
+#### 1. Validate in this order
+
+| Step | Root cause avoided | Impact if skipped | Best possible solution/fix |
+|------|--------------------|-------------------|----------------------------|
+| 1. Plant Gateway public route | CP proxy can hide upstream route drift behind nested 404s | You misclassify a Plant defect as a CP defect | Probe `waooaw-plant-gateway-{env}` first for the canonical Plant path |
+| 2. CP Backend proxy route | CP proxy may still target stale upstream paths | You miss thin-proxy breakage even when Plant is healthy | Probe `waooaw-cp-backend-{env}` second with the same business identifier |
+| 3. CP FrontEnd service file | Frontend may still call an outdated CP route | You blame backend only and miss the actual caller | Confirm the exact frontend service path before classifying the defect |
+| 4. Live DB row shape | Demo data mixes UUID-backed and external-id-backed records | False negatives from invalid identifiers | Pull one real row from Cloud SQL before testing non-list endpoints |
+
+#### 2. Use the correct public surface
+
+| Surface | Use for | Notes |
+|---------|---------|-------|
+| `waooaw-plant-gateway-{env}` | Public validation of Plant customer-facing runtime routes | Preferred first hop for deployed runtime validation |
+| `waooaw-cp-backend-{env}` | CP proxy validation (`/api/cp/*`, `/api/auth/*`) | Use after Plant Gateway so you can separate proxy drift from upstream drift |
+| `waooaw-plant-backend-{env}` | Logs, revision inspection, service metadata | Direct HTTP access is Cloud Run IAM-protected; do not expect anonymous curl from Codespace to work |
+
+#### 3. Cloud SQL proxy gotchas that were verified live
+
+| Root cause | Impact | Best possible solution/fix |
+|------------|--------|----------------------------|
+| `gcp-auth.sh` completed but Cloud SQL proxy could not attach because the instance had no `PUBLIC` IP | `psql` hangs or fails even though auth setup appears complete | Check `/tmp/cloud-sql-proxy.log`; if it says `instance does not have IP of type PUBLIC`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, wait for the operation to finish, then rerun `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh` |
+| Proxy process exists but tunnel is stale | Ad hoc SQL checks return misleading connection failures | `pgrep -fa cloud-sql-proxy`, `cat /tmp/cloud-sql-proxy.log`, then restart the auth script |
+| Assuming docs imply direct DB connectivity on `5432` | Wasted time debugging the wrong socket | Always use `source /root/.env.db && psql` or `psql -h 127.0.0.1 -p 15432 -U plant_app plant` |
+
+#### 4. Schema assumptions that caused false starts
+
+Inspect `information_schema.columns` before writing ad hoc queries. Demo schema contains these verified shapes:
+
+| Table | Verified column(s) to use | Do not assume |
+|-------|---------------------------|---------------|
+| `customer_entity` | `id`, `email`, `full_name`, `business_name` | `customer_id` does not exist in this table |
+| `hired_agents` | `hired_instance_id`, `agent_id`, `customer_id`, `active`, `configured`, `goals_completed` | A generic `status` column |
+| `agent_skills` | `agent_id`, `skill_id`, `goal_config` | Skill config lives only in a separate logical surface |
+| `skill_configs` | `hired_instance_id`, `skill_id`, `customer_fields`, `pp_locked_fields` | Free-form names without checking the table first |
+
+#### 5. Identifier discipline for live probes
+
+| Root cause | Impact | Best possible solution/fix |
+|------------|--------|----------------------------|
+| Mixing external ids like `AGT-MKT-001` with UUID-backed routes | `422 Invalid UUID` can look like a route defect | Query the live row first and probe with the exact identifier type stored in the route contract |
+| Demo hired agents are mixed: some point to UUID `agent_id`, others to external ids | One sample works, another fails for unrelated reasons | Treat every probe id as data-dependent until confirmed in SQL |
+| Assuming a hired-agent route is equivalent to an agent route | False confidence because legacy `/api/v1/agents/{agent_id}/skills` still exists | Test the canonical hired-agent route separately; legacy agent routes do not prove Iteration 1 is deployed |
+
+#### 6. CP request-chain tracing entry points
+
+Start here when a CP UI flow fails and you need the exact hop sequence.
+
+| Surface | First file to inspect | What it controls |
+|---------|-----------------------|------------------|
+| CP FrontEnd hired-agent skills | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `/api/cp/hired-agents/{id}/skills` and goal-config save calls |
+| CP FrontEnd platform connections | `src/CP/FrontEnd/src/services/platformConnections.service.ts` | Hired-agent platform-connection calls |
+| CP BackEnd hired-agent skills proxy | `src/CP/BackEnd/api/cp_skills.py` | CP -> Plant translation for hired-agent skills and goal-config |
+| CP BackEnd flow/component runs proxy | `src/CP/BackEnd/api/cp_flow_runs.py` | CP -> Plant flow-runs and component-runs targets |
+| CP BackEnd scheduler proxy | `src/CP/BackEnd/api/cp_scheduler.py` | Trial budget, scheduler summary, pause/resume |
+| CP BackEnd approvals proxy | `src/CP/BackEnd/api/cp_approvals_proxy.py` | Approval queue, approve, reject |
+
+#### 7. Known runtime drift patterns observed on demo
+
+These are environment findings, not normative architecture. Re-check before acting on them.
+
+| Root cause | Impact | Best possible solution/fix |
+|------------|--------|----------------------------|
+| Plant Gateway exposes legacy `/api/v1/agents/{agent_id}/skills` but not canonical hired-agent skills route | Iteration 1 hired-agent skill surface fails even though a nearby legacy route still works | Deploy the hired-agent route from `PLANT-RUNTIME-1` and do not treat the legacy agent route as equivalent |
+| Plant Gateway does not expose `/api/v1/hired-agents/by-id/{id}`, `/api/v1/skill-runs`, or `/api/v1/component-runs` on demo | Iteration 2 CP proxy routes fail with nested upstream 404s | Deploy the normalized Plant runtime surface before debugging CP behavior |
+| Some route inventories still include malformed paths like `/api/v1/v1/...` | Proxy construction bugs are harder to spot during manual validation | Inspect OpenAPI and route inventories for duplicated version prefixes whenever route-not-found responses look inconsistent |
+
+#### 8. Auth guidance for runtime validation
+
+| Use case | Recommended method |
+|----------|--------------------|
+| Plant Gateway customer-route validation | Mint a short-lived customer access JWT from `JWT_SECRET` and call the gateway directly |
+| CP proxy validation | Prefer a real CP session or a known-good refresh token captured from the deployed flow; do not assume an ad hoc signed refresh token will always satisfy CP refresh semantics |
+| Direct Plant Backend validation | Use logs/OpenAPI/service metadata unless you also have Cloud Run IAM invocation rights |
 
 ### GitHub CLI (gh) commands
 

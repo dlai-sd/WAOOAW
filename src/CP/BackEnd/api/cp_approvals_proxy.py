@@ -4,9 +4,9 @@ Thin proxy: forwards deliverable approval requests to Plant BackEnd.
 No business logic here — CP BackEnd is a proxy only.
 
 Routes (prefix /cp/hired-agents):
-  GET  /cp/hired-agents/{id}/approval-queue                              → GET  /api/v1/hired-agents/{id}/deliverables?status=pending_review
-  POST /cp/hired-agents/{id}/approval-queue/{deliverable_id}/approve     → PATCH /api/v1/deliverables/{deliverable_id}/status {"status":"approved"}
-  POST /cp/hired-agents/{id}/approval-queue/{deliverable_id}/reject      → PATCH /api/v1/deliverables/{deliverable_id}/status {"status":"rejected"}
+    GET  /cp/hired-agents/{id}/approval-queue                              → GET  /api/v1/hired-agents/{id}/deliverables?status=pending_review&customer_id={user.id}
+    POST /cp/hired-agents/{id}/approval-queue/{deliverable_id}/approve     → POST /api/v1/deliverables/{deliverable_id}/review {"decision":"approved","customer_id":user.id}
+    POST /cp/hired-agents/{id}/approval-queue/{deliverable_id}/reject      → POST /api/v1/deliverables/{deliverable_id}/review {"decision":"rejected","customer_id":user.id}
 """
 from __future__ import annotations
 
@@ -14,9 +14,11 @@ import logging
 import os
 
 import httpx
-from fastapi import Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request
 
+from api.auth.dependencies import get_current_user
 from core.routing import waooaw_router
+from models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ async def _plant_get_json(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-async def _plant_patch_json(
+async def _plant_post_json(
     *, url: str, body: dict, authorization: str | None, correlation_id: str | None
 ) -> dict | list:
     headers: dict[str, str] = {"Content-Type": "application/json"}
@@ -62,7 +64,7 @@ async def _plant_patch_json(
         headers["X-Correlation-ID"] = correlation_id
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.patch(url, json=body, headers=headers)
+            resp = await client.post(url, json=body, headers=headers)
         if resp.status_code >= 400:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
         return resp.json()
@@ -79,6 +81,7 @@ async def get_approval_queue(
     hired_agent_id: str,
     request: Request,
     authorization: str | None = Header(None),
+    current_user: User = Depends(get_current_user),
 ) -> dict | list:
     """Returns deliverables with status=pending_review for this hired agent.
 
@@ -92,7 +95,7 @@ async def get_approval_queue(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     return await _plant_get_json(
-        url=f"{base}/api/v1/hired-agents/{hired_agent_id}/deliverables?status=pending_review",
+        url=f"{base}/api/v1/hired-agents/{hired_agent_id}/deliverables?status=pending_review&customer_id={current_user.id}",
         authorization=authorization,
         correlation_id=request.headers.get("X-Correlation-ID"),
     )
@@ -104,11 +107,12 @@ async def approve_deliverable(
     deliverable_id: str,
     request: Request,
     authorization: str | None = Header(None),
+    current_user: User = Depends(get_current_user),
 ) -> dict | list:
     """Customer approves a pending deliverable — triggers publish to the channel.
 
-    Proxies to Plant PATCH /v1/deliverables/{deliverable_id}/status
-    with body {"status": "approved"}.
+    Proxies to Plant POST /api/v1/deliverables/{deliverable_id}/review
+    with body {"decision": "approved", "customer_id": current_user.id}.
     """
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header required")
@@ -116,9 +120,13 @@ async def approve_deliverable(
         base = _plant_base_url()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    return await _plant_patch_json(
-        url=f"{base}/api/v1/deliverables/{deliverable_id}/status",
-        body={"status": "approved", "hired_agent_id": hired_agent_id},
+    return await _plant_post_json(
+        url=f"{base}/api/v1/deliverables/{deliverable_id}/review",
+        body={
+            "customer_id": current_user.id,
+            "decision": "approved",
+            "notes": "",
+        },
         authorization=authorization,
         correlation_id=request.headers.get("X-Correlation-ID"),
     )
@@ -130,11 +138,12 @@ async def reject_deliverable(
     deliverable_id: str,
     request: Request,
     authorization: str | None = Header(None),
+    current_user: User = Depends(get_current_user),
 ) -> dict | list:
     """Customer rejects a deliverable — marks it as rejected, no publish.
 
-    Proxies to Plant PATCH /v1/deliverables/{deliverable_id}/status
-    with body {"status": "rejected"}.
+    Proxies to Plant POST /api/v1/deliverables/{deliverable_id}/review
+    with body {"decision": "rejected", "customer_id": current_user.id}.
     """
     if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header required")
@@ -142,9 +151,13 @@ async def reject_deliverable(
         base = _plant_base_url()
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    return await _plant_patch_json(
-        url=f"{base}/api/v1/deliverables/{deliverable_id}/status",
-        body={"status": "rejected", "hired_agent_id": hired_agent_id},
+    return await _plant_post_json(
+        url=f"{base}/api/v1/deliverables/{deliverable_id}/review",
+        body={
+            "customer_id": current_user.id,
+            "decision": "rejected",
+            "notes": "",
+        },
         authorization=authorization,
         correlation_id=request.headers.get("X-Correlation-ID"),
     )

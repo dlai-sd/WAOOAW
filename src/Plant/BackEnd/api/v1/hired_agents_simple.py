@@ -913,6 +913,29 @@ async def get_by_subscription(
 
     return _to_response(record, subscription_status=subscription_status, ended_at=ended_at)
 
+
+@router.get("/by-id/{hired_instance_id}", response_model=HiredAgentInstanceResponse)
+async def get_by_id(
+    hired_instance_id: str,
+    as_of: datetime | None = None,
+    customer_id: str | None = None,
+    db: AsyncSession | None = Depends(_get_read_hired_agents_db_session),
+) -> HiredAgentInstanceResponse:
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if not record:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    normalized_customer_id = (customer_id or "").strip()
+    if normalized_customer_id:
+        _assert_customer_owns_record(record, normalized_customer_id)
+        await _assert_readable(record, db=db, as_of=as_of)
+
+    subscription_status, ended_at = await _subscription_status_and_ended_at(
+        subscription_id=record.subscription_id,
+        db=db,
+    )
+    return _to_response(record, subscription_status=subscription_status, ended_at=ended_at)
+
 @router.get("/by-customer/{customer_id}", response_model=HiredAgentsByCustomerResponse)
 async def list_hired_agents_by_customer(
     customer_id: str,

@@ -44,6 +44,10 @@ def test_hired_agent_draft_and_resume_by_subscription(test_client, monkeypatch):
     assert resumed_body["hired_instance_id"] == body["hired_instance_id"]
     assert resumed_body["config"]["foo"] == "bar"
 
+    by_id = test_client.get(f"/api/v1/hired-agents/by-id/{body['hired_instance_id']}?customer_id=cust-1")
+    assert by_id.status_code == 200
+    assert by_id.json()["subscription_id"] == subscription_id
+
 
 @pytest.mark.unit
 @pytest.mark.asyncio

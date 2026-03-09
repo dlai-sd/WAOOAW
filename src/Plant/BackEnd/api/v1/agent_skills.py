@@ -12,20 +12,24 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, delete
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.v1 import hired_agents_simple
 from core.database import get_db, get_read_db_session
 from core.routing import waooaw_router
+from models.agent import Agent
 from models.agent_skill import AgentSkillModel
 from models.skill import Skill
+from models.skill_config import SkillConfigModel
 
 router = waooaw_router(prefix="/agents", tags=["agent-skills"])
 skills_router = waooaw_router(prefix="/skills", tags=["skills"])
+hired_agent_skills_router = waooaw_router(prefix="/hired-agents", tags=["hired-agent-skills"])
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -80,6 +84,118 @@ class SkillResponse(BaseModel):
         from_attributes = True
 
 
+class RuntimeSkillResponse(BaseModel):
+    skill_id: str
+    name: str
+    display_name: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    platform_fields: dict[str, Any] = {}
+    customer_fields: dict[str, Any] = {}
+    goal_schema: Optional[dict] = None
+    goal_config: Optional[dict] = None
+    status: str = "active"
+
+
+def _skill_filters(skill_id: str) -> list[Any]:
+    clauses: list[Any] = [Skill.external_id == skill_id]
+    try:
+        clauses.append(Skill.id == _to_uuid(skill_id))
+    except HTTPException:
+        pass
+    return clauses
+
+
+async def _resolve_agent_uuid(agent_id: str, db: AsyncSession) -> uuid.UUID:
+    try:
+        return _to_uuid(agent_id)
+    except HTTPException:
+        pass
+
+    result = await db.execute(select(Agent.id).where(Agent.external_id == agent_id))
+    resolved = result.scalar_one_or_none()
+    if resolved is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return resolved
+
+
+def _runtime_goal_config(
+    *,
+    link_goal_config: dict | None,
+    customer_fields: dict[str, Any] | None,
+) -> dict | None:
+    if link_goal_config is not None:
+        return link_goal_config
+    if customer_fields:
+        return customer_fields
+    return None
+
+
+def build_runtime_skill_response(
+    *,
+    skill: Skill,
+    skill_config: SkillConfigModel | None,
+    goal_config: dict | None,
+    status: str = "active",
+) -> RuntimeSkillResponse:
+    customer_fields = dict(getattr(skill_config, "customer_fields", {}) or {})
+    platform_fields = dict(getattr(skill_config, "pp_locked_fields", {}) or {})
+    return RuntimeSkillResponse(
+        skill_id=str(skill.external_id or skill.id),
+        name=skill.name,
+        display_name=skill.name,
+        description=skill.description,
+        category=skill.category,
+        platform_fields=platform_fields,
+        customer_fields=customer_fields,
+        goal_schema=skill.goal_schema,
+        goal_config=_runtime_goal_config(
+            link_goal_config=goal_config,
+            customer_fields=customer_fields,
+        ),
+        status=status,
+    )
+
+
+async def get_runtime_skill_response_for_hire(
+    *,
+    hired_instance_id: str,
+    skill_id: str,
+    db: AsyncSession,
+) -> RuntimeSkillResponse:
+    record = await hired_agents_simple._get_record_by_id(
+        hired_instance_id=hired_instance_id,
+        db=db,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    agent_uuid = await _resolve_agent_uuid(record.agent_id, db)
+    result = await db.execute(
+        select(AgentSkillModel, Skill)
+        .join(Skill, AgentSkillModel.skill_id == Skill.id)
+        .where(AgentSkillModel.agent_id == agent_uuid)
+        .where(or_(*_skill_filters(skill_id)))
+    )
+    row = result.one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Skill not attached to this hired agent")
+
+    config_result = await db.execute(
+        select(SkillConfigModel).where(
+            SkillConfigModel.hired_instance_id == hired_instance_id,
+            SkillConfigModel.skill_id == skill_id,
+        )
+    )
+    skill_config = config_result.scalar_one_or_none()
+
+    return build_runtime_skill_response(
+        skill=row.Skill,
+        skill_config=skill_config,
+        goal_config=row.AgentSkillModel.goal_config,
+    )
+
+
 # ── Agent-Skill endpoints ─────────────────────────────────────────────────────
 
 @router.get("/{agent_id}/skills", response_model=List[AgentSkillResponse])
@@ -88,10 +204,11 @@ async def list_agent_skills(
     db: AsyncSession = Depends(get_read_db_session),  # read replica — never primary on GETs
 ) -> List[AgentSkillResponse]:
     """List all skills attached to an agent, ordered by ordinal."""
+    agent_uuid = await _resolve_agent_uuid(agent_id, db)
     result = await db.execute(
         select(AgentSkillModel, Skill)
         .join(Skill, AgentSkillModel.skill_id == Skill.id)
-        .where(AgentSkillModel.agent_id == _to_uuid(agent_id))
+        .where(AgentSkillModel.agent_id == agent_uuid)
         .order_by(AgentSkillModel.ordinal)
     )
     rows = result.all()
@@ -235,3 +352,42 @@ async def update_goal_schema(
     skill.goal_schema = body.goal_schema
     await db.commit()
     return {"skill_id": skill_id, "goal_schema": skill.goal_schema}
+
+
+@hired_agent_skills_router.get("/{hired_instance_id}/skills", response_model=List[RuntimeSkillResponse])
+async def list_hired_agent_skills(
+    hired_instance_id: str,
+    db: AsyncSession = Depends(get_read_db_session),
+) -> List[RuntimeSkillResponse]:
+    record = await hired_agents_simple._get_record_by_id(
+        hired_instance_id=hired_instance_id,
+        db=db,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    agent_uuid = await _resolve_agent_uuid(record.agent_id, db)
+    result = await db.execute(
+        select(AgentSkillModel, Skill)
+        .join(Skill, AgentSkillModel.skill_id == Skill.id)
+        .where(AgentSkillModel.agent_id == agent_uuid)
+        .order_by(AgentSkillModel.ordinal)
+    )
+    rows = result.all()
+
+    config_result = await db.execute(
+        select(SkillConfigModel).where(SkillConfigModel.hired_instance_id == hired_instance_id)
+    )
+    configs = {
+        str(config.skill_id): config
+        for config in config_result.scalars().all()
+    }
+
+    return [
+        build_runtime_skill_response(
+            skill=row.Skill,
+            skill_config=configs.get(str(row.Skill.external_id or row.Skill.id)),
+            goal_config=row.AgentSkillModel.goal_config,
+        )
+        for row in rows
+    ]
