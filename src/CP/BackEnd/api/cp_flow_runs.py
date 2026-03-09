@@ -4,11 +4,11 @@ Thin proxy: forwards flow-run and approval requests to Plant Gateway.
 No business logic here — CP BackEnd is a proxy only.
 
 Routes (prefix /cp):
-  GET  /cp/flow-runs                                     → GET  /v1/flow-runs?customer_id={user.id}&...
-  GET  /cp/flow-runs/{flow_run_id}                       → GET  /v1/flow-runs/{id} (ownership checked)
-  POST /cp/approvals/{flow_run_id}/approve               → POST /v1/approvals/{id}/approve (ownership checked)
-  POST /cp/approvals/{flow_run_id}/reject                → POST /v1/approvals/{id}/reject (ownership checked)
-  GET  /cp/component-runs                                → GET  /v1/component-runs?flow_run_id={id} (ownership checked)
+    GET  /cp/flow-runs                                     → GET  /api/v1/skill-runs?customer_id={user.id}&...
+    GET  /cp/flow-runs/{flow_run_id}                       → GET  /api/v1/skill-runs/{id} (ownership checked)
+    POST /cp/approvals/{flow_run_id}/approve               → POST /api/v1/approvals/{id}/approve (ownership checked)
+    POST /cp/approvals/{flow_run_id}/reject                → POST /api/v1/approvals/{id}/reject (ownership checked)
+    GET  /cp/component-runs                                → GET  /api/v1/component-runs?flow_run_id={id} (ownership checked)
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ async def list_flow_runs(
 ) -> dict | list:
     """List flow runs owned by the authenticated customer.
 
-    Proxies to Plant GET /v1/flow-runs with customer_id injected automatically.
+    Proxies to Plant GET /api/v1/skill-runs with customer_id injected automatically.
     """
     try:
         base = _plant_base_url()
@@ -111,7 +111,7 @@ async def list_flow_runs(
     authorization = request.headers.get("Authorization")
     correlation_id = request.headers.get("X-Correlation-ID")
     return await _plant_get_json(
-        url=f"{base}/v1/flow-runs",
+        url=f"{base}/api/v1/skill-runs",
         authorization=authorization,
         correlation_id=correlation_id,
         params=params,
@@ -133,7 +133,7 @@ async def get_flow_run(
     authorization = request.headers.get("Authorization")
     correlation_id = request.headers.get("X-Correlation-ID")
     data = await _plant_get_json(
-        url=f"{base}/v1/flow-runs/{flow_run_id}",
+        url=f"{base}/api/v1/skill-runs/{flow_run_id}",
         authorization=authorization,
         correlation_id=correlation_id,
     )
@@ -158,7 +158,7 @@ async def approve_flow_run(
     correlation_id = request.headers.get("X-Correlation-ID")
 
     fr = await _plant_get_json(
-        url=f"{base}/v1/flow-runs/{flow_run_id}",
+        url=f"{base}/api/v1/skill-runs/{flow_run_id}",
         authorization=authorization,
         correlation_id=correlation_id,
     )
@@ -166,7 +166,7 @@ async def approve_flow_run(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     return await _plant_post_json(
-        url=f"{base}/v1/approvals/{flow_run_id}/approve",
+        url=f"{base}/api/v1/approvals/{flow_run_id}/approve",
         authorization=authorization,
         correlation_id=correlation_id,
     )
@@ -188,7 +188,7 @@ async def reject_flow_run(
     correlation_id = request.headers.get("X-Correlation-ID")
 
     fr = await _plant_get_json(
-        url=f"{base}/v1/flow-runs/{flow_run_id}",
+        url=f"{base}/api/v1/skill-runs/{flow_run_id}",
         authorization=authorization,
         correlation_id=correlation_id,
     )
@@ -196,7 +196,7 @@ async def reject_flow_run(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     return await _plant_post_json(
-        url=f"{base}/v1/approvals/{flow_run_id}/reject",
+        url=f"{base}/api/v1/approvals/{flow_run_id}/reject",
         authorization=authorization,
         correlation_id=correlation_id,
     )
@@ -218,7 +218,7 @@ async def list_component_runs(
     correlation_id = request.headers.get("X-Correlation-ID")
 
     fr = await _plant_get_json(
-        url=f"{base}/v1/flow-runs/{flow_run_id}",
+        url=f"{base}/api/v1/skill-runs/{flow_run_id}",
         authorization=authorization,
         correlation_id=correlation_id,
     )
@@ -226,7 +226,7 @@ async def list_component_runs(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     return await _plant_get_json(
-        url=f"{base}/v1/component-runs",
+        url=f"{base}/api/v1/component-runs",
         authorization=authorization,
         correlation_id=correlation_id,
         params={"flow_run_id": flow_run_id},

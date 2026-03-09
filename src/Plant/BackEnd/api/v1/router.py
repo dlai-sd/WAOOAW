@@ -38,12 +38,16 @@ api_v1_router.include_router(otp.router)
 api_v1_router.include_router(feature_flags.router)  # E2-S1 (Iteration 7)
 api_v1_router.include_router(agent_skills.router)               # PLANT-SKILLS-1 E1-S2
 api_v1_router.include_router(agent_skills.skills_router)        # PLANT-SKILLS-1 E1-S2
+api_v1_router.include_router(agent_skills.hired_agent_skills_router)  # PLANT-RUNTIME-1 It1 E1-S1
 api_v1_router.include_router(platform_connections.router)       # PLANT-SKILLS-1 E4-S1
 api_v1_router.include_router(performance_stats.router)          # PLANT-SKILLS-1 E4-S2
 api_v1_router.include_router(campaigns.router)                  # PLANT-CONTENT-1 Iteration 2
 api_v1_router.include_router(construct_diagnostics_router)      # PLANT-MOULD-1 E4: per-construct health
 api_v1_router.include_router(construct_ops_router)              # PLANT-MOULD-1 E4: ops DLQ console
 api_v1_router.include_router(skill_configs.router)              # EXEC-ENGINE-001 E1-S3: skill config PATCH
+api_v1_router.include_router(skill_configs.hired_agent_router)  # PLANT-RUNTIME-1 It1 E1-S2
 api_v1_router.include_router(flow_runs.router)                  # EXEC-ENGINE-001 E6-S1: flow-runs endpoints
+api_v1_router.include_router(flow_runs.skill_runs_router)       # PLANT-RUNTIME-1 It2 E3-S2
+api_v1_router.include_router(flow_runs.component_runs_router)   # PLANT-RUNTIME-1 It2 E3-S1
 api_v1_router.include_router(approvals.router)                  # EXEC-ENGINE-001 E8-S2: approve/reject gate
 

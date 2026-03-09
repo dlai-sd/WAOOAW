@@ -2541,6 +2541,85 @@ terraform plan -var-file=environments/demo.tfvars            # Plan changes
 | Port already in use | `lsof -i :<port>` or `docker ps --filter publish=<port>` |
 | Redis connectivity | `docker-compose -f docker-compose.local.yml exec redis redis-cli ping` |
 
+### Runtime Validation Playbook — verified on demo (9 Mar 2026)
+
+Use this when validating `PLANT-RUNTIME-1` or any CP FrontEnd -> CP BackEnd -> Plant runtime contract.
+
+#### 1. Validate in this order
+
+| Step | Root cause avoided | Impact if skipped | Best possible solution/fix |
+|------|--------------------|-------------------|----------------------------|
+| 1. Plant Gateway public route | CP proxy can hide upstream route drift behind nested 404s | You misclassify a Plant defect as a CP defect | Probe `waooaw-plant-gateway-{env}` first for the canonical Plant path |
+| 2. CP Backend proxy route | CP proxy may still target stale upstream paths | You miss thin-proxy breakage even when Plant is healthy | Probe `waooaw-cp-backend-{env}` second with the same business identifier |
+| 3. CP FrontEnd service file | Frontend may still call an outdated CP route | You blame backend only and miss the actual caller | Confirm the exact frontend service path before classifying the defect |
+| 4. Live DB row shape | Demo data mixes UUID-backed and external-id-backed records | False negatives from invalid identifiers | Pull one real row from Cloud SQL before testing non-list endpoints |
+
+#### 2. Use the correct public surface
+
+| Surface | Use for | Notes |
+|---------|---------|-------|
+| `waooaw-plant-gateway-{env}` | Public validation of Plant customer-facing runtime routes | Preferred first hop for deployed runtime validation |
+| `waooaw-cp-backend-{env}` | CP proxy validation (`/api/cp/*`, `/api/auth/*`) | Use after Plant Gateway so you can separate proxy drift from upstream drift |
+| `waooaw-plant-backend-{env}` | Logs, revision inspection, service metadata | Direct HTTP access is Cloud Run IAM-protected; do not expect anonymous curl from Codespace to work |
+
+#### 3. Cloud SQL proxy gotchas that were verified live
+
+| Root cause | Impact | Best possible solution/fix |
+|------------|--------|----------------------------|
+| `gcp-auth.sh` completed but Cloud SQL proxy could not attach because the instance had no `PUBLIC` IP | `psql` hangs or fails even though auth setup appears complete | Check `/tmp/cloud-sql-proxy.log`; if it says `instance does not have IP of type PUBLIC`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, wait for the operation to finish, then rerun `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh` |
+| Proxy process exists but tunnel is stale | Ad hoc SQL checks return misleading connection failures | `pgrep -fa cloud-sql-proxy`, `cat /tmp/cloud-sql-proxy.log`, then restart the auth script |
+| Assuming docs imply direct DB connectivity on `5432` | Wasted time debugging the wrong socket | Always use `source /root/.env.db && psql` or `psql -h 127.0.0.1 -p 15432 -U plant_app plant` |
+
+#### 4. Schema assumptions that caused false starts
+
+Inspect `information_schema.columns` before writing ad hoc queries. Demo schema contains these verified shapes:
+
+| Table | Verified column(s) to use | Do not assume |
+|-------|---------------------------|---------------|
+| `customer_entity` | `id`, `email`, `full_name`, `business_name` | `customer_id` does not exist in this table |
+| `hired_agents` | `hired_instance_id`, `agent_id`, `customer_id`, `active`, `configured`, `goals_completed` | A generic `status` column |
+| `agent_skills` | `agent_id`, `skill_id`, `goal_config` | Skill config lives only in a separate logical surface |
+| `skill_configs` | `hired_instance_id`, `skill_id`, `customer_fields`, `pp_locked_fields` | Free-form names without checking the table first |
+
+#### 5. Identifier discipline for live probes
+
+| Root cause | Impact | Best possible solution/fix |
+|------------|--------|----------------------------|
+| Mixing external ids like `AGT-MKT-001` with UUID-backed routes | `422 Invalid UUID` can look like a route defect | Query the live row first and probe with the exact identifier type stored in the route contract |
+| Demo hired agents are mixed: some point to UUID `agent_id`, others to external ids | One sample works, another fails for unrelated reasons | Treat every probe id as data-dependent until confirmed in SQL |
+| Assuming a hired-agent route is equivalent to an agent route | False confidence because legacy `/api/v1/agents/{agent_id}/skills` still exists | Test the canonical hired-agent route separately; legacy agent routes do not prove Iteration 1 is deployed |
+
+#### 6. CP request-chain tracing entry points
+
+Start here when a CP UI flow fails and you need the exact hop sequence.
+
+| Surface | First file to inspect | What it controls |
+|---------|-----------------------|------------------|
+| CP FrontEnd hired-agent skills | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `/api/cp/hired-agents/{id}/skills` and goal-config save calls |
+| CP FrontEnd platform connections | `src/CP/FrontEnd/src/services/platformConnections.service.ts` | Hired-agent platform-connection calls |
+| CP BackEnd hired-agent skills proxy | `src/CP/BackEnd/api/cp_skills.py` | CP -> Plant translation for hired-agent skills and goal-config |
+| CP BackEnd flow/component runs proxy | `src/CP/BackEnd/api/cp_flow_runs.py` | CP -> Plant flow-runs and component-runs targets |
+| CP BackEnd scheduler proxy | `src/CP/BackEnd/api/cp_scheduler.py` | Trial budget, scheduler summary, pause/resume |
+| CP BackEnd approvals proxy | `src/CP/BackEnd/api/cp_approvals_proxy.py` | Approval queue, approve, reject |
+
+#### 7. Known runtime drift patterns observed on demo
+
+These are environment findings, not normative architecture. Re-check before acting on them.
+
+| Root cause | Impact | Best possible solution/fix |
+|------------|--------|----------------------------|
+| Plant Gateway exposes legacy `/api/v1/agents/{agent_id}/skills` but not canonical hired-agent skills route | Iteration 1 hired-agent skill surface fails even though a nearby legacy route still works | Deploy the hired-agent route from `PLANT-RUNTIME-1` and do not treat the legacy agent route as equivalent |
+| Plant Gateway does not expose `/api/v1/hired-agents/by-id/{id}`, `/api/v1/skill-runs`, or `/api/v1/component-runs` on demo | Iteration 2 CP proxy routes fail with nested upstream 404s | Deploy the normalized Plant runtime surface before debugging CP behavior |
+| Some route inventories still include malformed paths like `/api/v1/v1/...` | Proxy construction bugs are harder to spot during manual validation | Inspect OpenAPI and route inventories for duplicated version prefixes whenever route-not-found responses look inconsistent |
+
+#### 8. Auth guidance for runtime validation
+
+| Use case | Recommended method |
+|----------|--------------------|
+| Plant Gateway customer-route validation | Mint a short-lived customer access JWT from `JWT_SECRET` and call the gateway directly |
+| CP proxy validation | Prefer a real CP session or a known-good refresh token captured from the deployed flow; do not assume an ad hoc signed refresh token will always satisfy CP refresh semantics |
+| Direct Plant Backend validation | Use logs/OpenAPI/service metadata unless you also have Cloud Run IAM invocation rights |
+
 ### GitHub CLI (gh) commands
 
 ```bash

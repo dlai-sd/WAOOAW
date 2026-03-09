@@ -33,18 +33,14 @@ def _mock_httpx_get(status_code: int, json_body: dict | list) -> AsyncMock:
 @pytest.mark.unit
 def test_list_hired_agent_skills_success(client, auth_headers, monkeypatch):
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway-test:8000")
-    hop1_response = {"agent_id": "AGT-001", "hired_instance_id": "HIRED-001"}
-    hop2_response = [{"skill_id": "SK-001", "name": "content-publisher"}]
-
-    call_count = 0
+    skills_response = [{"skill_id": "SK-001", "name": "content-publisher"}]
 
     def side_effect_get(url, **kwargs):
-        nonlocal call_count
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.text = "ok"
         mock_resp.status_code = 200
-        mock_resp.json.return_value = hop1_response if call_count == 0 else hop2_response
-        call_count += 1
+        mock_resp.json.return_value = skills_response
+        assert url.endswith("/api/v1/hired-agents/HIRED-001/skills")
         return mock_resp
 
     mock_client = AsyncMock()
@@ -247,34 +243,27 @@ def test_missing_plant_gateway_url_returns_5xx(client, auth_headers, monkeypatch
 
 @pytest.mark.unit
 def test_save_goal_config_success(client, auth_headers, monkeypatch):
-    """Two-hop PATCH: hop-1 resolves agent_id, hop-2 persists goal_config."""
+    """PATCH forwards to the canonical hired-agent customer-config route."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway-test:8000")
-    hire_payload = {"agent_id": "AGT-001", "hired_instance_id": "HIRED-001"}
     patch_response = {
-        "id": "LINK-1",
-        "agent_id": "AGT-001",
         "skill_id": "SK-001",
-        "is_primary": True,
-        "ordinal": 0,
-        "skill_name": "Content Writer",
-        "skill_category": "marketing",
+        "name": "Content Writer",
+        "display_name": "Content Writer",
+        "customer_fields": {"topic": "AI trends"},
         "goal_schema": {"type": "object"},
         "goal_config": {"topic": "AI trends"},
     }
 
-    call_count = 0
-
     def _side_effect(url, **kwargs):
-        nonlocal call_count
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 200
         mock_resp.text = "ok"
-        mock_resp.json.return_value = hire_payload if call_count == 0 else patch_response
-        call_count += 1
+        mock_resp.json.return_value = patch_response
+        assert url.endswith("/api/v1/hired-agents/HIRED-001/skills/SK-001/customer-config")
+        assert kwargs.get("json") == {"customer_fields": {"topic": "AI trends"}}
         return mock_resp
 
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(side_effect=_side_effect)
     mock_client.patch = AsyncMock(side_effect=_side_effect)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -289,12 +278,12 @@ def test_save_goal_config_success(client, auth_headers, monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert data["goal_config"] == {"topic": "AI trends"}
-    assert data["skill_name"] == "Content Writer"
+    assert data["display_name"] == "Content Writer"
 
 
 @pytest.mark.unit
 def test_save_goal_config_hired_agent_not_found(client, auth_headers, monkeypatch):
-    """When hop-1 (hired agent lookup) returns 404 the route must propagate 404."""
+    """Canonical customer-config PATCH propagates upstream 404s."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway-test:8000")
     mock_resp = MagicMock(spec=httpx.Response)
     mock_resp.status_code = 404
@@ -302,7 +291,7 @@ def test_save_goal_config_hired_agent_not_found(client, auth_headers, monkeypatc
     mock_resp.text = "not found"
 
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(return_value=mock_resp)
+    mock_client.patch = AsyncMock(return_value=mock_resp)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
@@ -318,28 +307,18 @@ def test_save_goal_config_hired_agent_not_found(client, auth_headers, monkeypatc
 
 @pytest.mark.unit
 def test_save_goal_config_skill_not_attached(client, auth_headers, monkeypatch):
-    """When hop-2 (plant PATCH) returns 404 the route must propagate 404."""
+    """Canonical customer-config PATCH propagates skill-level 404s."""
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway-test:8000")
-    hire_payload = {"agent_id": "AGT-001"}
     not_found_resp = {"detail": "Skill not attached to this agent"}
 
-    call_count = 0
-
     def _side_effect(url, **kwargs):
-        nonlocal call_count
         mock_resp = MagicMock(spec=httpx.Response)
-        if call_count == 0:
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = hire_payload
-        else:
-            mock_resp.status_code = 404
-            mock_resp.json.return_value = not_found_resp
+        mock_resp.status_code = 404
+        mock_resp.json.return_value = not_found_resp
         mock_resp.text = str(mock_resp.json.return_value)
-        call_count += 1
         return mock_resp
 
     mock_client = AsyncMock()
-    mock_client.get = AsyncMock(side_effect=_side_effect)
     mock_client.patch = AsyncMock(side_effect=_side_effect)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)

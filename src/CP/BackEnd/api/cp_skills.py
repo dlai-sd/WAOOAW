@@ -147,30 +147,13 @@ async def list_hired_agent_skills(
     _user: User = Depends(get_current_user),
 ) -> dict | list:
     """
-    Two-hop proxy:
-    1. Resolve agent_id: GET /api/v1/hired-agents/by-subscription/{hired_instance_id}
-       (hired_instance_id is used directly as the identifier)
-    2. Fetch skills: GET /api/v1/agents/{agent_id}/skills
+    Direct proxy to the canonical Plant hired-agent runtime skills route.
     """
     base = _plant_base_url()
-    auth = request.headers.get("Authorization")
-    cid = request.headers.get("X-Correlation-ID")
-
-    # Hop 1: resolve hired agent to get agent_id
-    hired_data = await _plant_get_json(
-        url=f"{base}/api/v1/hired-agents/by-id/{hired_instance_id}",
-        authorization=auth,
-        correlation_id=cid,
-    )
-    agent_id = (hired_data or {}).get("agent_id") or ""
-    if not agent_id:
-        raise HTTPException(status_code=404, detail="Hired agent or agent_id not found")
-
-    # Hop 2: fetch skills
     return await _plant_get_json(
-        url=f"{base}/api/v1/agents/{agent_id}/skills",
-        authorization=auth,
-        correlation_id=cid,
+        url=f"{base}/api/v1/hired-agents/{hired_instance_id}/skills",
+        authorization=request.headers.get("Authorization"),
+        correlation_id=request.headers.get("X-Correlation-ID"),
     )
 
 
@@ -283,28 +266,13 @@ async def save_goal_config(
 ) -> dict:
     """Persist goal config for a specific skill on a hired agent.
 
-    CP-SKILLS-2 E2-S1 — two-hop proxy:
-      Hop 1: GET /api/v1/hired-agents/by-id/{hired_instance_id}  → resolve agent_id
-      Hop 2: PATCH /api/v1/agents/{agent_id}/skills/{skill_id}/goal-config
+    CP-SKILLS-2 E2-S1 — forwards to the canonical Plant customer-config route
+    while preserving the CP/FrontEnd `goal-config` endpoint name.
     """
     base = _plant_base_url()
-    auth = request.headers.get("Authorization")
-    cid = request.headers.get("X-Correlation-ID")
-
-    # Hop 1: resolve hired agent → agent_id
-    hired_data = await _plant_get_json(
-        url=f"{base}/api/v1/hired-agents/by-id/{hired_instance_id}",
-        authorization=auth,
-        correlation_id=cid,
-    )
-    agent_id = (hired_data or {}).get("agent_id") or ""
-    if not agent_id:
-        raise HTTPException(status_code=404, detail="Hired agent or agent_id not found")
-
-    # Hop 2: persist goal config
     return await _plant_patch_json(  # type: ignore[return-value]
-        url=f"{base}/api/v1/agents/{agent_id}/skills/{skill_id}/goal-config",
-        body={"goal_config": body.goal_config},
-        authorization=auth,
-        correlation_id=cid,
+        url=f"{base}/api/v1/hired-agents/{hired_instance_id}/skills/{skill_id}/customer-config",
+        body={"customer_fields": body.goal_config},
+        authorization=request.headers.get("Authorization"),
+        correlation_id=request.headers.get("X-Correlation-ID"),
     )
