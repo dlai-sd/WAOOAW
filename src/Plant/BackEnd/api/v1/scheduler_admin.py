@@ -6,12 +6,14 @@ from typing import Optional
 from fastapi import Depends, HTTPException
 from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from core.database import get_db
+from core.database import get_db, get_read_db_session
 from services.scheduler_admin_service import SchedulerAdminService
 from services.goal_scheduler_service import GoalSchedulerService
 from services.idempotency_service import IdempotencyService
+from services.skill_runtime_resolver import SkillRuntimeResolver
 
 router = waooaw_router(prefix="/scheduler", tags=["scheduler-admin"])
 
@@ -192,6 +194,7 @@ async def trigger_goal_run(
     request: TriggerGoalRequest,
     admin_service: SchedulerAdminService = Depends(get_admin_service),
     scheduler_service: GoalSchedulerService = Depends(get_scheduler_service),
+    db: AsyncSession = Depends(get_read_db_session),
 ) -> GoalRunResponse:
     """Manually trigger a goal run.
     
@@ -220,6 +223,11 @@ async def trigger_goal_run(
     try:
         scheduled_time = request.scheduled_time or datetime.now()
         
+        # Resolve agent_spec + goal_config via SkillRuntimeResolver (E3 PLANT-RUNTIME-1).
+        # Soft-fail: if the bundle is None, fall through to the legacy path.
+        resolver = SkillRuntimeResolver(db)
+        bundle = await resolver.resolve_for_goal(goal_instance_id)
+        
         # Register as running
         admin_service.register_running_goal(goal_instance_id)
         
@@ -228,6 +236,8 @@ async def trigger_goal_run(
                 goal_instance_id=goal_instance_id,
                 scheduled_time=scheduled_time,
                 correlation_id=f"manual-trigger-{goal_instance_id}",
+                agent_spec=bundle.agent_spec if bundle is not None else None,
+                goal_config=bundle.goal_config if bundle is not None else None,
             )
             
             if goal_result.status.value != "completed":
