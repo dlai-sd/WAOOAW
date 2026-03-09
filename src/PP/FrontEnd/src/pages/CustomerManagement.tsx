@@ -110,7 +110,7 @@ export default function CustomerManagement() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <Text as="h1" size={900} weight="semibold">Customer Management</Text>
+        <Text as="h1" size={900} weight="semibold">Usage Events</Text>
         <Body1>View customer usage events (Plant)</Body1>
       </div>
 

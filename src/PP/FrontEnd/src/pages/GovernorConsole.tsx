@@ -128,7 +128,7 @@ export default function GovernorConsole() {
   return (
     <div className="page-container">
       <div className="page-header">
-        <Text as="h1" size={900} weight="semibold">Governor Console</Text>
+        <Text as="h1" size={900} weight="semibold">Reference Agents</Text>
         <Body1>Approval queue and operational decisions</Body1>
       </div>
 

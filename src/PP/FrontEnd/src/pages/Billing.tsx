@@ -32,7 +32,7 @@ export default function Billing() {
     <div className="page-container">
       <div className="page-header">
         <Text as="h1" size={900} weight="semibold">
-          Billing & Revenue
+          Subscription Overview
         </Text>
         <Body1>Live subscription data from Plant API</Body1>
       </div>

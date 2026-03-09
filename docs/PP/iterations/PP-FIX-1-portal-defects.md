@@ -63,7 +63,7 @@
 |---|---|---|---|---|---|
 | 1 | Critical backend path fixes unblocking the OPS portal | E1, E2, E3 | 4 | 2.5h | ✅ Done |
 | 2 | Missing Plant endpoint + Demo Login button + hardcoded ID fix | E4, E5, E6 | 3 | 1.5h | ✅ Done |
-| 3 | Nav/label accuracy + email customer lookup | E7, E8, E9 | 3 | 2h | 2026-03-09 10:00 IST |
+| 3 | Nav/label accuracy + email customer lookup | E7, E8, E9 | 3 | 2h | ✅ Done |
 | 4 | Dashboard live data + agent ID audit | E10, E11 | 2 | 1.5h | 2026-03-09 11:30 IST |
 
 **Estimate basis:** FE wiring = 30 min | New BE endpoint = 45 min | Path fix = 15–30 min | PR = 10 min. Add 20% buffer for zero-cost model context loading.
@@ -349,9 +349,9 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E4-S1 | 2 | E4: Operators fetch a hired agent by instance ID | Add GET /hired-agents/{id} to Plant | 🟢 Done | — |
 | E5-S1 | 2 | E5: Demo Login button appears on pp.demo.waooaw.com | Fix allowDemoLogin condition in App.tsx | 🟢 Done | — |
 | E6-S1 | 2 | E6: Review Queue requires explicit IDs | Clear hardcoded demo IDs in ReviewQueue.tsx | 🟢 Done | — |
-| E7-S1 | 3 | E7: Nav labels match actual page content | Fix nav labels and page titles | 🔴 Not Started | — |
-| E8-S1 | 3 | E8: Nav icons are distinct and pages are grouped | Assign unique icons + section headers | 🔴 Not Started | — |
-| E9-S1 | 3 | E9: Operators look up customers by email | Add email lookup to HiredAgentsOps | 🔴 Not Started | — |
+| E7-S1 | 3 | E7: Nav labels match actual page content | Fix nav labels and page titles | 🟢 Done | — |
+| E8-S1 | 3 | E8: Nav icons are distinct and pages are grouped | Assign unique icons + section headers | 🟢 Done | — |
+| E9-S1 | 3 | E9: Operators look up customers by email | Add email lookup to HiredAgentsOps | 🟢 Done | — |
 | E10-S1 | 4 | E10: Dashboard shows real agent count | Wire listAgents, null fake MRR/Churn/Customers | 🔴 Not Started | — |
 | E11-S1 | 4 | E11: No hardcoded agent type IDs + section divider | Audit AgentManagement.tsx for hardcoded IDs | 🔴 Not Started | — |
 
@@ -1041,6 +1041,8 @@ cd src/PP/FrontEnd && npx vitest run --no-coverage
 
 **Done signal:** `"E7-S1 done. Tests: T1 ✅ T2 ✅"`
 
+**Epic E7 complete ✅**
+
 <!-- END CHUNK 11 -->
 
 ---
@@ -1170,6 +1172,8 @@ cd src/PP/FrontEnd && npx vitest run --no-coverage
 
 **Done signal:** `"E8-S1 done. Tests: T1 ✅ T2 ✅"`
 
+**Epic E8 complete ✅**
+
 <!-- END CHUNK 12 -->
 
 ---
@@ -1275,6 +1279,8 @@ cd src/PP/FrontEnd && npx vitest run --no-coverage
 **Commit message:** `feat(PP-FIX-1): add email-to-customer-id lookup on HiredAgentsOps page`
 
 **Done signal:** `"E9-S1 done. Tests: T1 ✅ T2 ✅"`
+
+**Epic E9 complete ✅**
 
 ---
 

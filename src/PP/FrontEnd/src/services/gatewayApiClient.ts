@@ -409,6 +409,11 @@ export const gatewayApiClient = {
       `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/scheduler-diagnostics`
     ),
 
+  lookupCustomerByEmail: (email: string) =>
+    gatewayRequestJson<{ customer_id: string; email: string; full_name?: string }>(
+      `/v1/customers/lookup?email=${encodeURIComponent(email)}`
+    ),
+
   pauseOpsScheduler: (hiredInstanceId: string) =>
     gatewayRequestJson<unknown>(
       `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/scheduler/pause`,
