@@ -1,6 +1,6 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.3  
+**Version**: 2.4  
 **Date**: 2026-03-09  
 **Purpose**: Single-source context document for any AI agent (including lower-cost models) to efficiently navigate, understand, and modify the WAOOAW codebase.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
@@ -10,6 +10,7 @@
 
 ## Table of Contents
 
+0. [How To Use This Document](#0-how-to-use-this-document)
 1. [Problem Statement & Vision](#1-problem-statement--vision)
 2. [Solution Hypothesis](#2-solution-hypothesis)
 3. [Constitutional Design Pattern](#3-constitutional-design-pattern)
@@ -19,6 +20,9 @@
 5. [Architecture & Technical Stack](#5-architecture--technical-stack)
   - [5.1 Platform Runtime Layout](#51-platform-runtime-layout)
   - [5.2 Route Ownership And Debug Order](#52-route-ownership-and-debug-order)
+  - [5.3 Service Ownership Map](#53-service-ownership-map)
+  - [5.4 Ops, Infra, And Deployment Control Plane](#54-ops-infra-and-deployment-control-plane)
+  - [5.5 Logging, Metrics, And Debugging Spine](#55-logging-metrics-and-debugging-spine)
   - [5.6 Platform NFR Standards — Mandatory Patterns for Every New Route](#56-platform-nfr-standards--mandatory-patterns-for-every-new-route)
 6. [Service Communication & Data Flow](#6-service-communication--data-flow)
 7. [Development ALM — Workflows & PRs](#7-development-alm--workflows--prs)
@@ -43,6 +47,43 @@
 26. [Agent Construct Design — Quick Reference](#26-agent-construct-design--quick-reference)
 
 ---
+
+## 0. How To Use This Document
+
+Treat this file as the platform operating manual, not as a changelog dump. It should answer three questions fast: what WAOOAW is, where each responsibility lives, and which files are the canonical edit points for a task.
+
+### Reading order by task
+
+| If you are doing... | Read first | Then read | Outcome |
+|---|---|---|---|
+| First-time repo orientation | §1, §4, §5.1 | §13, §15, §16 | You understand product shape, service layout, ports, and start commands |
+| CP or PP route bug | §5.2 | §13 CP/PP + Plant sections | You trace FE/BE/Gateway/Plant ownership without guessing |
+| Plant runtime or hired-agent work | §4.6, §4.7 | §5.1, §13 Plant section | You use the correct Agent/Skill/Component/SkillRun vocabulary and files |
+| Mobile work | §6, §23 | §13 mobile section, §15 | You know when mobile talks directly to Gateway vs through CP Backend |
+| Docker, Terraform, deploy, or image-promotion work | §8, §8.1, §9 | §13 infra sections, §21 | You avoid baking environment logic into images or templates |
+| Database, migration, or seed work | §10 | §13 Plant models/core sections | You know the DB entrypoints, migration path, and local/demo access pattern |
+| Logging, tracing, or production debugging | §5.5, §9, §21, §22 | §13 Plant/Gateway/PP core sections | You start from the actual logging/metrics/observability files |
+
+### Source-of-truth rules
+
+| Content type | Canonical home in this document | What should stay out |
+|---|---|---|
+| Stable product and constitutional truths | §§1–4 | PR-by-PR storytelling |
+| Current service ownership and runtime layout | §5 | Deep historical implementation notes |
+| Deployment, Terraform, image promotion, secrets | §§8–9 | Environment-specific hacks or temporary overrides |
+| Database, testing, ports, common commands | §§10–16 | Repeated command snippets copied into many other sections |
+| Rapid code navigation | §13 | Narrative explanations better suited for architecture sections |
+| Time-sensitive history | §12 | Permanent design guidance |
+
+### Maintenance rules for keeping this document authoritative
+
+| Rule | Why |
+|---|---|
+| Update the section that owns the truth instead of adding a new disconnected note | Prevents contradictions and duplicated guidance |
+| Prefer stable entrypoints and central files over leaf implementation details | Makes the document usable for new engineers and small-context agents |
+| Add temporary findings to §12 or §17, not to core architecture sections, unless the architecture actually changed | Keeps the bible durable instead of noisy |
+| When a route or workflow changes, update both the ownership map and the file index in the same PR | Prevents navigation drift |
+| If a concept has one canonical term, use it everywhere here even if code still carries a legacy name | Keeps public/runtime language converged |
 
 ## 1. Problem Statement & Vision
 
@@ -433,6 +474,51 @@ When a CP customer flow fails, trace it in this order so route drift is classifi
 | Component run history | CP consumer of `/api/cp/component-runs` | `src/CP/BackEnd/api/cp_flow_runs.py` | `GET /api/v1/component-runs?flow_run_id=...` | `src/Plant/BackEnd/api/v1/flow_runs.py` |
 | Approval queue | CP approvals panel | `src/CP/BackEnd/api/cp_approvals_proxy.py` | `GET /api/v1/hired-agents/{hired_agent_id}/deliverables?...` | `src/Plant/BackEnd/api/v1/deliverables_simple.py` |
 | Approve/reject deliverable | CP approvals panel | `src/CP/BackEnd/api/cp_approvals_proxy.py` | `POST /api/v1/deliverables/{deliverable_id}/review` | `src/Plant/BackEnd/api/v1/deliverables_simple.py` |
+
+### 5.3 Service Ownership Map
+
+Use this table when deciding where a change belongs before you open any file.
+
+| Domain | Primary responsibility | Edit here first | Route/API entrypoint | Test home |
+|---|---|---|---|---|
+| CP FrontEnd | Customer-facing web UX and request shaping | `src/CP/FrontEnd/src/pages/`, `src/CP/FrontEnd/src/services/` | Browser calls `/api/cp/...` or Gateway-backed endpoints | `src/CP/FrontEnd/src/__tests__/`, Playwright in `tests/` |
+| CP BackEnd | Thin proxy and customer-auth support flows | `src/CP/BackEnd/api/`, `src/CP/BackEnd/services/plant_gateway_client.py` | `/api/cp/...` | `src/CP/BackEnd/tests/` |
+| PP FrontEnd | Internal operator UX, governor/admin tools | `src/PP/FrontEnd/src/pages/`, `src/PP/FrontEnd/src/components/` | Browser calls `/pp/...` or PP proxy routes | `src/PP/FrontEnd/src/` tests |
+| PP BackEnd | Operator thin proxy, admin workflows, observability hooks | `src/PP/BackEnd/api/`, `src/PP/BackEnd/clients/plant_client.py` | `/pp/...` | `src/PP/BackEnd/tests/` |
+| Plant Gateway | Auth, RBAC, policy, audit, public ingress | `src/Plant/Gateway/main.py`, `src/Plant/Gateway/middleware/` | `/api/v1/...` public surface | `src/Plant/Gateway/tests/`, root `tests/` |
+| Plant BackEnd | Runtime business logic, persistence, scheduling, approvals | `src/Plant/BackEnd/api/v1/`, `src/Plant/BackEnd/services/`, `src/Plant/BackEnd/models/` | Handlers behind Gateway `/api/v1/...` | `src/Plant/BackEnd/tests/` |
+| Mobile | Customer mobile UX, direct Gateway consumption, device integrations | `src/mobile/src/` | Mostly Plant Gateway `/api/v1/...`, not CP BackEnd, unless a CP-only capability is required | `src/mobile/__tests__/`, `src/mobile/e2e/` |
+| Terraform/Cloud Run | Environment wiring, service deployment, secrets injection, scaling | `cloud/terraform/`, `.github/workflows/waooaw-deploy.yml` | Cloud Run services + LB | Manual validation + targeted infra tests |
+
+### 5.4 Ops, Infra, And Deployment Control Plane
+
+These are the canonical files for delivery, environments, and operational behavior. If a task touches deployment or runtime wiring, start here before making service-level edits.
+
+| Concern | Primary source files | Why these files matter | Edit rule |
+|---|---|---|---|
+| Local full-stack startup | `docker-compose.local.yml`, `start-local-no-docker.sh` | Defines local service topology and fallback non-Docker startup | Keep Docker as the default development path |
+| Regression test topology | `docker-compose.test.yml`, `tests/` | Defines isolated test containers and cross-service checks | Never replace with venv-only commands |
+| Mobile local/dev flow | `src/mobile/CODESPACE_DEV.md`, `src/mobile/start-codespace.sh`, `src/mobile/Dockerfile.test` | Owns mobile dev/test startup and Codespace behavior | Keep mobile instructions aligned with actual Expo/EAS files |
+| CI validation | `.github/workflows/waooaw-ci.yml`, `.github/workflows/cp-pipeline.yml` | Gate lint, tests, and branch quality | CI edits must preserve Docker-first validation |
+| Deploy + image promotion | `.github/workflows/waooaw-deploy.yml`, `cloud/terraform/`, §8.1 | Owns build once, promote unchanged flow | Never bake env-specific values into image or Dockerfile |
+| Environment tfvars and scaling | `cloud/terraform/environments/`, `cloud/terraform/variables.tf` | Own safe defaults and per-env overrides | Defaults in `variables.tf`, overrides in tfvars |
+| Service stacks | `cloud/terraform/stacks/` | Service-specific Cloud Run, secrets, env vars, IAM wiring | Avoid duplicating logic already present in modules/root |
+| Monitoring assets | `infrastructure/monitoring/`, `cloud/monitoring/` | Prometheus, Grafana, alert rules, dashboards | Keep monitoring changes traceable to a service need |
+| Supplemental Docker/K8s assets | `infrastructure/docker/`, `infrastructure/kubernetes/` | Secondary deployment/support assets outside the Cloud Run path | Treat as infra support, not the primary promotion path |
+
+### 5.5 Logging, Metrics, And Debugging Spine
+
+Start with these files when the problem is observability, production diagnosis, or request tracing.
+
+| Capability | Primary files | What they own |
+|---|---|---|
+| Plant structured logging + PII masking | `src/Plant/BackEnd/core/logging.py` | Global logger setup and `PIIMaskingFilter` |
+| Plant metrics and observability wiring | `src/Plant/BackEnd/core/metrics.py`, `src/Plant/BackEnd/core/observability.py` | Metrics export and observability bootstrap |
+| Gateway operational middleware | `src/Plant/Gateway/middleware/audit.py`, `src/Plant/Gateway/middleware/error_handler.py`, `src/Plant/Gateway/middleware/circuit_breaker.py` | Audit trail, RFC 7807 errors, upstream protection |
+| CP request correlation and audit | `src/CP/BackEnd/core/dependencies.py`, `src/CP/BackEnd/services/audit_dependency.py`, `src/CP/BackEnd/services/plant_gateway_client.py` | Correlation IDs, audit emission, gateway client resilience |
+| PP tracing and metrics | `src/PP/BackEnd/core/observability.py`, `src/PP/BackEnd/core/metrics.py`, `src/PP/BackEnd/services/audit_dependency.py` | OTel spans, Prometheus metrics, PP audit integration |
+| Infra monitoring and dashboards | `infrastructure/monitoring/`, `cloud/monitoring/` | Alert rules, dashboards, Prometheus/Grafana assets |
+| Cloud Run / GCP diagnosis | §9, §21, §22 | Logs, service-account access, and standard recovery commands |
 
 ### Technology stack
 
@@ -1541,12 +1627,30 @@ Use this shortlist first when the task is about Agent/Skill/Component runtime be
 | Approval queue and review actions | `src/CP/BackEnd/api/cp_approvals_proxy.py` | `src/Plant/BackEnd/api/v1/deliverables_simple.py` | Prevents drift back to nonexistent deliverable status patch paths |
 | Hired-agent identity lookup | `src/Plant/BackEnd/api/v1/hired_agents_simple.py` | `src/Plant/BackEnd/tests/unit/test_hired_agents_api.py` | Canonical by-id surface and validation entry point |
 
+### Fast-path index for platform ownership and operations
+
+Use this shortlist when the task is broader than runtime routes.
+
+| Need | First file | Then inspect | Why |
+|---|---|---|---|
+| CP page bug or wrong API call | `src/CP/FrontEnd/src/services/` | `src/CP/BackEnd/api/` | Most CP breakage starts with the FE service calling the wrong proxy |
+| PP operator workflow issue | `src/PP/FrontEnd/src/pages/` | `src/PP/BackEnd/api/` | PP remains a UI + thin-proxy/admin stack |
+| Gateway auth/RBAC/policy issue | `src/Plant/Gateway/main.py` | `src/Plant/Gateway/middleware/` | Gateway owns ingress enforcement, not Plant BackEnd |
+| Plant business-logic bug | `src/Plant/BackEnd/api/v1/router.py` | `src/Plant/BackEnd/services/`, `src/Plant/BackEnd/models/` | Confirms mounted route, service path, and persistence layer |
+| Mobile feature or auth issue | `src/mobile/src/` | §23 + Plant Gateway auth endpoints | Mobile often talks to Gateway directly |
+| Docker/local stack issue | `docker-compose.local.yml` | `docker-compose.test.yml`, `infrastructure/docker/` | Distinguishes dev stack from regression stack and support assets |
+| Deploy, Cloud Run, or Terraform issue | `.github/workflows/waooaw-deploy.yml` | `cloud/terraform/`, `cloud/terraform/stacks/`, `cloud/terraform/environments/` | Build/push/apply ownership lives here |
+| Logging/metrics/debug work | `src/Plant/BackEnd/core/logging.py` | `src/Plant/BackEnd/core/metrics.py`, `src/PP/BackEnd/core/observability.py`, `infrastructure/monitoring/` | Fastest path into observability ownership |
+| Database or migration issue | `src/Plant/BackEnd/core/database.py` | `src/Plant/BackEnd/models/`, `src/Plant/BackEnd/database/migrations/`, §10 | DB truth belongs to Plant, not to portal services |
+
 ### Root directory
 
 | File | Purpose |
 |------|---------|
 | `README.md` | Project overview, quick start, architecture |
 | `docker-compose.local.yml` | Full local dev stack (Postgres, Redis, Plant, PP, CP, Gateway) |
+| `docker-compose.test.yml` | Dedicated regression stack — backend, frontend, E2E, perf, security test containers |
+| `docker-compose.mobile.yml` | Mobile-specific local/test stack support |
 | `pytest.ini` | Root pytest configuration |
 | `.env.example` | Template for environment variables |
 | `.env.docker` | Docker-specific env vars |
@@ -1914,6 +2018,23 @@ Use this shortlist first when the task is about Agent/Skill/Component runtime be
 | `FrontEnd/src/services/useHookTrace.ts` | React hook for hook trace endpoint |
 | `FrontEnd/src/services/useAgentTypeSetup.ts` | React hook for agent setup CRUD |
 
+### src/mobile/ — CP Mobile
+
+| File | Purpose |
+|------|---------|
+| `App.tsx` | Mobile app root |
+| `index.ts` | Expo/React Native entrypoint |
+| `src/navigation/` | Main navigation graph and screen registration |
+| `src/screens/` | Customer-facing mobile screens |
+| `src/hooks/` | React Query and screen-level hooks |
+| `src/lib/cpApiClient.ts` | Mobile HTTP client — correlation ID propagation, retries, auth headers |
+| `src/stores/authStore.ts` | Auth/session state |
+| `src/config/sentry.config.ts` | Sentry and environment-aware mobile observability wiring |
+| `eas.json` | EAS build profiles |
+| `app.config.js` | Expo app config per environment/build |
+| `__tests__/`, `e2e/` | Unit and device/e2e tests |
+| `CODESPACE_DEV.md`, `QUICKSTART.md`, `BUILD_INSTRUCTIONS.md`, `DEPLOYMENT_GUIDE.md` | Mobile developer/operator docs |
+
 ### .github/ — CI/CD & ALM
 
 | File | Purpose |
@@ -1960,6 +2081,19 @@ Use this shortlist first when the task is about Agent/Skill/Component runtime be
 | `modules/networking/` | NEG module |
 | `modules/vpc-connector/` | VPC connector module |
 | `environments/` | Per-environment tfvars |
+
+### infrastructure/ — Supplemental Ops Assets
+
+| File | Purpose |
+|------|---------|
+| `monitoring/README.md` | Monitoring stack overview |
+| `monitoring/prometheus.yml` | Prometheus scrape configuration |
+| `monitoring/prometheus-alerts-orchestration.yml` | Alert rules for orchestration/runtime health |
+| `monitoring/grafana/` | Grafana dashboards and provisioning assets |
+| `docker/docker-compose.yml` | Supplemental Docker stack outside the primary local/test compose files |
+| `docker/*.Dockerfile` | Support Docker images for gateway/event-bus/orchestration assets |
+| `kubernetes/` | K8s manifests/support files for non-Cloud-Run deployment paths |
+| `gcp/`, `nginx/`, `opa/`, `ssl/` | Infra support assets for platform networking, policy, and certificates |
 
 ### tests/ — Cross-service tests
 
