@@ -50,6 +50,63 @@ def test_hired_agent_draft_and_resume_by_subscription(test_client, monkeypatch):
 
 
 @pytest.mark.unit
+def test_trial_budget_pause_and_resume_routes(test_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+
+    customer_id = "cust-scheduler-1"
+    checkout = test_client.post(
+        "/api/v1/payments/coupon/checkout",
+        json={
+            "coupon_code": "WAOOAW100",
+            "agent_id": "agent-123",
+            "duration": "monthly",
+            "customer_id": customer_id,
+        },
+    )
+    subscription_id = checkout.json()["subscription_id"]
+
+    draft = test_client.put(
+        "/api/v1/hired-agents/draft",
+        json={
+            "subscription_id": subscription_id,
+            "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
+            "customer_id": customer_id,
+            "nickname": "Sched Agent",
+            "theme": "dark",
+        },
+    )
+    hired_instance_id = draft.json()["hired_instance_id"]
+
+    budget = test_client.get(
+        f"/api/v1/hired-agents/{hired_instance_id}/trial-budget",
+        params={"customer_id": customer_id},
+    )
+    assert budget.status_code == 200
+    budget_body = budget.json()
+    assert budget_body["hired_instance_id"] == hired_instance_id
+    assert budget_body["tasks_used"] == 0
+    assert budget_body["trial_task_limit"] == 10
+
+    paused = test_client.post(
+        f"/api/v1/hired-agents/{hired_instance_id}/pause",
+        params={"customer_id": customer_id},
+    )
+    assert paused.status_code == 200
+    assert paused.json()["scheduler_paused"] is True
+    assert paused.json()["status"] == "paused"
+
+    resumed = test_client.post(
+        f"/api/v1/hired-agents/{hired_instance_id}/resume",
+        params={"customer_id": customer_id},
+    )
+    assert resumed.status_code == 200
+    assert resumed.json()["scheduler_paused"] is False
+    assert resumed.json()["status"] == "running"
+
+
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_subscription_status_helper_uses_db_lookup_in_db_mode(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")

@@ -141,6 +141,58 @@ def test_scheduler_diagnostics_returns_200_for_known():
     app.dependency_overrides.clear()
 
 
+def test_scheduler_diagnostics_reflects_paused_state():
+    from main import app
+    from core.database import get_read_db_session
+
+    async def _fake_db_hire():
+        mock_session = AsyncMock()
+        mock_model = MagicMock()
+        mock_model.hired_instance_id = "hire-003"
+        mock_model.subscription_id = "sub-003"
+        mock_model.agent_id = "agent-003"
+        mock_model.agent_type_id = "marketing.digital_marketing.v1"
+        mock_model.customer_id = "cust-003"
+        mock_model.nickname = None
+        mock_model.theme = None
+        mock_model.config = {"scheduler_paused": True}
+        mock_model.configured = True
+        mock_model.goals_completed = False
+        mock_model.active = True
+        mock_model.trial_status = "not_started"
+        mock_model.trial_start_at = None
+        mock_model.trial_end_at = None
+        mock_model.created_at = __import__("datetime").datetime.utcnow()
+        mock_model.updated_at = __import__("datetime").datetime.utcnow()
+
+        exists_result = MagicMock()
+        exists_result.scalar.return_value = "hire-003"
+
+        rows_result = MagicMock()
+        rows_result.scalar_one_or_none.return_value = None
+        rows_result.scalars.return_value.all.return_value = []
+
+        model_result = MagicMock()
+        model_result.scalar_one_or_none.return_value = mock_model
+
+        mock_session.execute = AsyncMock(
+            side_effect=[exists_result, rows_result, rows_result, rows_result, model_result]
+        )
+        yield mock_session
+
+    app.dependency_overrides[get_read_db_session] = _fake_db_hire
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        resp = client.get(
+            "/api/v1/hired-agents/hire-003/scheduler-diagnostics",
+            headers={"X-Correlation-ID": "test-cid-paused"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["pause_state"] == "PAUSED"
+
+    app.dependency_overrides.clear()
+
+
 # ---------------------------------------------------------------------------
 # DLQ endpoint tests
 # ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ def test_import_platform_connections_router():
 
 def test_router_prefix():
     from api.v1.platform_connections import router
-    assert router.prefix == "/v1/hired-agents"
+    assert router.prefix == "/hired-agents"
 
 
 def test_router_tags():

@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.v1 import hired_agents_simple
 from core.routing import waooaw_router                # ← MANDATORY: never bare APIRouter
 from core.database import get_db_session, get_read_db_session  # ← GET→read, POST→write
 from core.dependencies import _correlation_id
@@ -273,13 +274,16 @@ async def get_scheduler_diagnostics(
         for row in dlq_rows
     ]
 
+    record = await hired_agents_simple._get_record_by_id(hired_instance_id=hired_agent_id, db=db)
+    pause_state = "PAUSED" if record and hired_agents_simple._scheduler_paused(record) else "RUNNING"
+
     return SchedulerDiagnosticsResponse(
         hired_agent_id=hired_agent_id,
         cron_expression="not_configured",
         next_run_at=pending.scheduled_time.isoformat() if pending else "",
         last_run_at=last_completed.scheduled_time.isoformat() if last_completed else None,
         lag_seconds=0,
-        pause_state="RUNNING",
+        pause_state=pause_state,
         dlq_depth=len(dlq_entries),
         tasks_used_today=0,
         trial_task_limit=None,

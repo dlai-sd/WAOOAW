@@ -22,7 +22,7 @@ from uuid import UUID, uuid4
 from fastapi import Depends, HTTPException
 from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.v1 import payments_simple
@@ -148,6 +148,7 @@ TrialStatus = Literal["not_started", "active", "ended_converted", "ended_not_con
 
 ALLOWED_THEMES: set[str] = {"default", "dark", "light"}
 DEFAULT_TRIAL_DAYS = 7
+DEFAULT_TRIAL_TASK_LIMIT = 10
 
 SUPPORTED_TRADING_EXCHANGES: set[str] = {"delta_exchange_india"}
 
@@ -297,6 +298,20 @@ class HiredAgentsByCustomerResponse(BaseModel):
     instances: list[HiredAgentInstanceResponse] = Field(default_factory=list)
 
 
+class TrialBudgetResponse(BaseModel):
+    hired_instance_id: str
+    trial_task_limit: int | None = None
+    tasks_used: int = 0
+    tasks_remaining: int | None = None
+    trial_ends_at: datetime | None = None
+
+
+class SchedulerPauseResumeResponse(BaseModel):
+    hired_instance_id: str
+    scheduler_paused: bool
+    status: str
+
+
 class ProcessTrialEndRequest(BaseModel):
     now: datetime | None = None
 
@@ -351,6 +366,69 @@ async def _get_record_by_id(*, hired_instance_id: str, db: AsyncSession | None) 
     model = await repo.get_by_id(hired_instance_id)
     if model is None:
         return None
+    return _db_model_to_record(model)
+
+
+def _scheduler_paused(record: _HiredAgentRecord) -> bool:
+    if not isinstance(record.config, dict):
+        return False
+    raw = record.config.get("scheduler_paused")
+    return bool(raw)
+
+
+def _trial_task_limit(record: _HiredAgentRecord) -> int | None:
+    if isinstance(record.config, dict):
+        raw = record.config.get("trial_task_limit")
+        if raw is not None:
+            try:
+                limit = int(raw)
+                return limit if limit >= 0 else None
+            except Exception:
+                return None
+    return DEFAULT_TRIAL_TASK_LIMIT
+
+
+async def _tasks_used_for_record(*, hired_instance_id: str, db: AsyncSession | None) -> int:
+    if db is None:
+        from api.v1 import deliverables_simple
+
+        instance_map = deliverables_simple._deliverables_by_hired_instance.get(hired_instance_id) or {}
+        return len(instance_map)
+
+    from models.deliverable import DeliverableModel
+
+    result = await db.execute(
+        select(func.count())
+        .select_from(DeliverableModel)
+        .where(DeliverableModel.hired_instance_id == hired_instance_id)
+    )
+    count_value = result.scalar_one() or 0
+    return int(count_value)
+
+
+async def _set_scheduler_paused(
+    *, hired_instance_id: str, paused: bool, db: AsyncSession | None
+) -> _HiredAgentRecord | None:
+    if db is None:
+        record = _by_id.get(hired_instance_id)
+        if record is None:
+            return None
+        config = dict(record.config or {})
+        config["scheduler_paused"] = paused
+        updated = record.model_copy(update={"config": config, "updated_at": datetime.now(timezone.utc)})
+        _by_id[hired_instance_id] = updated
+        return updated
+
+    repo = HiredAgentRepository(db)
+    model = await repo.get_by_id(hired_instance_id)
+    if model is None:
+        return None
+    config = dict(model.config or {})
+    config["scheduler_paused"] = paused
+    model.config = config
+    model.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(model)
     return _db_model_to_record(model)
 
 _by_id: dict[str, _HiredAgentRecord] = {}
@@ -1021,6 +1099,80 @@ async def get_hired_agent_by_id(
     if record is None:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
     return _to_response(record)
+
+
+@router.get("/{hired_instance_id}/trial-budget", response_model=TrialBudgetResponse)
+async def get_trial_budget(
+    hired_instance_id: str,
+    customer_id: str | None = None,
+    as_of: datetime | None = None,
+    db: AsyncSession | None = Depends(_get_read_hired_agents_db_session),
+) -> TrialBudgetResponse:
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if not record:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    if (customer_id or "").strip():
+        _assert_customer_owns_record(record, str(customer_id or ""))
+    await _assert_readable(record, db=db, as_of=as_of)
+
+    tasks_used = await _tasks_used_for_record(hired_instance_id=hired_instance_id, db=db)
+    trial_task_limit = _trial_task_limit(record)
+    tasks_remaining = None
+    if trial_task_limit is not None:
+        tasks_remaining = max(trial_task_limit - tasks_used, 0)
+
+    return TrialBudgetResponse(
+        hired_instance_id=hired_instance_id,
+        trial_task_limit=trial_task_limit,
+        tasks_used=tasks_used,
+        tasks_remaining=tasks_remaining,
+        trial_ends_at=record.trial_end_at,
+    )
+
+
+@router.post("/{hired_instance_id}/pause", response_model=SchedulerPauseResumeResponse)
+async def pause_hired_agent_scheduler(
+    hired_instance_id: str,
+    customer_id: str | None = None,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+) -> SchedulerPauseResumeResponse:
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if not record:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    if (customer_id or "").strip():
+        _assert_customer_owns_record(record, str(customer_id or ""))
+    updated = await _set_scheduler_paused(hired_instance_id=hired_instance_id, paused=True, db=db)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+    return SchedulerPauseResumeResponse(
+        hired_instance_id=hired_instance_id,
+        scheduler_paused=True,
+        status="paused",
+    )
+
+
+@router.post("/{hired_instance_id}/resume", response_model=SchedulerPauseResumeResponse)
+async def resume_hired_agent_scheduler(
+    hired_instance_id: str,
+    customer_id: str | None = None,
+    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+) -> SchedulerPauseResumeResponse:
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if not record:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    if (customer_id or "").strip():
+        _assert_customer_owns_record(record, str(customer_id or ""))
+    updated = await _set_scheduler_paused(hired_instance_id=hired_instance_id, paused=False, db=db)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+    return SchedulerPauseResumeResponse(
+        hired_instance_id=hired_instance_id,
+        scheduler_paused=False,
+        status="running",
+    )
 
 @router.get("/{hired_instance_id}/goals", response_model=GoalsListResponse)
 async def list_goals(
