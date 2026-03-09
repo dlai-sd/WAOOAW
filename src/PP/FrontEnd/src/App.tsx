@@ -82,7 +82,8 @@ function AppShell() {
     setShowLoginDialog(false)
   }
 
-  const allowDemoLogin = config.name === 'codespace' || config.name === 'development'
+  // PP-FIX-1 DEF-011: demo env also shows the Dev Token login button
+  const allowDemoLogin = config.name === 'codespace' || config.name === 'development' || config.name === 'demo'
 
   return (
     <FluentProvider theme={theme === 'light' ? waooawLightTheme : waooawDarkTheme}>

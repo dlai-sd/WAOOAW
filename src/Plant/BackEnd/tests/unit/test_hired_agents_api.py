@@ -339,3 +339,45 @@ def test_refs_only_validation_rejects_raw_secrets_in_config(test_client, monkeyp
         },
     )
     assert rejected.status_code == 400
+
+
+@pytest.mark.unit
+def test_get_hired_agent_by_id_returns_200(test_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+
+    checkout = test_client.post(
+        "/api/v1/payments/coupon/checkout",
+        json={"coupon_code": "WAOOAW100", "agent_id": "agent-123", "duration": "monthly", "customer_id": "cust-1"},
+    )
+    assert checkout.status_code == 200
+    subscription_id = checkout.json()["subscription_id"]
+
+    draft = test_client.put(
+        "/api/v1/hired-agents/draft",
+        json={
+            "subscription_id": subscription_id,
+            "agent_id": "agent-123",
+            "agent_type_id": "marketing.digital_marketing.v1",
+            "customer_id": "cust-1",
+            "nickname": "Test Agent",
+            "theme": "dark",
+            "config": {},
+        },
+    )
+    assert draft.status_code == 200
+    hired_instance_id = draft.json()["hired_instance_id"]
+
+    resp = test_client.get(f"/api/v1/hired-agents/{hired_instance_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["hired_instance_id"] == hired_instance_id
+
+
+@pytest.mark.unit
+def test_get_hired_agent_by_id_returns_404(test_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+
+    resp = test_client.get("/api/v1/hired-agents/nonexistent-id")
+    assert resp.status_code == 404

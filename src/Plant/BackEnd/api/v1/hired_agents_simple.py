@@ -988,6 +988,17 @@ async def list_hired_agents_by_customer(
 
     return HiredAgentsByCustomerResponse(customer_id=customer_id, instances=instances)
 
+@router.get("/{hired_instance_id}", response_model=HiredAgentInstanceResponse)
+async def get_hired_agent_by_id(
+    hired_instance_id: str,
+    db: AsyncSession | None = Depends(_get_read_hired_agents_db_session),
+) -> HiredAgentInstanceResponse:
+    """Get a single hired agent instance by its ID (read-replica, no auth required for PP ops)."""
+    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+    return _to_response(record)
+
 @router.get("/{hired_instance_id}/goals", response_model=GoalsListResponse)
 async def list_goals(
     hired_instance_id: str,
