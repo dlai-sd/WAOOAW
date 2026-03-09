@@ -28,7 +28,10 @@ async def list_subscriptions(
 ):
     """List all subscriptions — forwards all query params to Plant (Redis-cached)."""
     params = dict(request.query_params)
-    plant_path = "/api/v1/subscriptions"
+    customer_id = params.pop("customer_id", None)
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="customer_id is required")
+    plant_path = f"/api/v1/payments/subscriptions/by-customer/{customer_id}"
 
     cached = await cache_get("subs", plant_path, params)
     if cached is not None:
@@ -59,7 +62,7 @@ async def get_subscription(
     audit: AuditLogger = Depends(get_audit_logger),
 ):
     """Get a single subscription by ID (Redis-cached)."""
-    plant_path = f"/api/v1/subscriptions/{subscription_id}"
+    plant_path = f"/api/v1/payments/subscriptions/{subscription_id}"
 
     cached = await cache_get("sub", plant_path)
     if cached is not None:

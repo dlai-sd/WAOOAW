@@ -38,10 +38,10 @@ def _make_test_client():
 
 
 def test_construct_health_returns_404_for_unknown_hire():
-    """GET /api/v1/v1/hired-agents/{id}/construct-health → 404 for unknown ID."""
+    """GET /api/v1/hired-agents/{id}/construct-health → 404 for unknown ID."""
     for client in _make_test_client():
         resp = client.get(
-            "/api/v1/v1/hired-agents/unknown-hire-id/construct-health",
+            "/api/v1/hired-agents/unknown-hire-id/construct-health",
             headers={"X-Correlation-ID": "test-cid-1"},
         )
         assert resp.status_code == 404
@@ -70,7 +70,7 @@ def test_construct_health_returns_200_for_known_hire():
 
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.get(
-            "/api/v1/v1/hired-agents/hire-001/construct-health",
+            "/api/v1/hired-agents/hire-001/construct-health",
             headers={"X-Correlation-ID": "test-cid-2"},
         )
         assert resp.status_code == 200
@@ -106,7 +106,7 @@ def test_mask_secret_ref_short():
 def test_scheduler_diagnostics_returns_404_for_unknown():
     for client in _make_test_client():
         resp = client.get(
-            "/api/v1/v1/hired-agents/no-such-id/scheduler-diagnostics",
+            "/api/v1/hired-agents/no-such-id/scheduler-diagnostics",
             headers={"X-Correlation-ID": "test-cid-3"},
         )
         assert resp.status_code == 404
@@ -129,7 +129,7 @@ def test_scheduler_diagnostics_returns_200_for_known():
 
     with TestClient(app, raise_server_exceptions=False) as client:
         resp = client.get(
-            "/api/v1/v1/hired-agents/hire-002/scheduler-diagnostics",
+            "/api/v1/hired-agents/hire-002/scheduler-diagnostics",
             headers={"X-Correlation-ID": "test-cid-4"},
         )
         assert resp.status_code == 200
@@ -149,7 +149,7 @@ def test_scheduler_diagnostics_returns_200_for_known():
 def test_dlq_endpoint_returns_empty_list_when_no_entries():
     for client in _make_test_client():
         resp = client.get(
-            "/api/v1/v1/ops/dlq",
+            "/api/v1/ops/dlq",
             headers={"X-Correlation-ID": "test-cid-5"},
         )
         assert resp.status_code == 200
@@ -159,7 +159,7 @@ def test_dlq_endpoint_returns_empty_list_when_no_entries():
 def test_dlq_endpoint_accepts_hired_agent_id_filter():
     for client in _make_test_client():
         resp = client.get(
-            "/api/v1/v1/ops/dlq?hired_agent_id=ha-xyz",
+            "/api/v1/ops/dlq?hired_agent_id=ha-xyz",
             headers={"X-Correlation-ID": "test-cid-6"},
         )
         assert resp.status_code == 200

@@ -41,7 +41,15 @@ async def list_hired_agents(
 ):
     """List all hired agent instances — forwards all query params to Plant (Redis-cached)."""
     params = dict(request.query_params)
-    plant_path = "/api/v1/hired-agents"
+    subscription_id = params.pop("subscription_id", None)
+    customer_id = params.pop("customer_id", None)
+
+    if subscription_id:
+        plant_path = f"/api/v1/hired-agents/by-subscription/{subscription_id}"
+    elif customer_id:
+        plant_path = f"/api/v1/hired-agents/by-customer/{customer_id}"
+    else:
+        raise HTTPException(status_code=400, detail="subscription_id or customer_id is required")
 
     cached = await cache_get("hired", plant_path, params)
     if cached is not None:
@@ -56,6 +64,9 @@ async def list_hired_agents(
         )
         if resp.status_code == 200:
             body = resp.json()
+            # by-subscription returns a single object; normalize to list
+            if isinstance(body, dict):
+                body = [body]
             await cache_set("hired", plant_path, body, params)
             await audit.log("pp_ops", "hired_agents_listed", "success")
             return body

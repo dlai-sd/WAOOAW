@@ -61,7 +61,7 @@
 
 | Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
 |---|---|---|---|---|---|
-| 1 | Critical backend path fixes unblocking the OPS portal | E1, E2, E3 | 4 | 2.5h | 2026-03-08 17:00 IST |
+| 1 | Critical backend path fixes unblocking the OPS portal | E1, E2, E3 | 4 | 2.5h | ✅ Done |
 | 2 | Missing Plant endpoint + Demo Login button + hardcoded ID fix | E4, E5, E6 | 3 | 1.5h | 2026-03-08 18:30 IST |
 | 3 | Nav/label accuracy + email customer lookup | E7, E8, E9 | 3 | 2h | 2026-03-09 10:00 IST |
 | 4 | Dashboard live data + agent ID audit | E10, E11 | 2 | 1.5h | 2026-03-09 11:30 IST |
@@ -342,10 +342,10 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | E1: Construct health reaches Plant without 401 | Fix construct_diagnostics.py double-v1 prefixes | 🔴 Not Started | — |
-| E2-S1 | 1 | E2: Operators see live subscription list | Fix ops_subscriptions.py list route path | 🔴 Not Started | — |
-| E2-S2 | 1 | E2: Operators see live subscription list | Fix ops_subscriptions.py single-get route path | 🔴 Not Started | — |
-| E3-S1 | 1 | E3: Operators see live hired-agent list | Fix ops_hired_agents.py list route path | 🔴 Not Started | — |
+| E1-S1 | 1 | E1: Construct health reaches Plant without 401 | Fix construct_diagnostics.py double-v1 prefixes | 🟢 Done | — |
+| E2-S1 | 1 | E2: Operators see live subscription list | Fix ops_subscriptions.py list route path | 🟢 Done | — |
+| E2-S2 | 1 | E2: Operators see live subscription list | Fix ops_subscriptions.py single-get route path | 🟢 Done | — |
+| E3-S1 | 1 | E3: Operators see live hired-agent list | Fix ops_hired_agents.py list route path | 🟢 Done | — |
 | E4-S1 | 2 | E4: Operators fetch a hired agent by instance ID | Add GET /hired-agents/{id} to Plant | 🔴 Not Started | — |
 | E5-S1 | 2 | E5: Demo Login button appears on pp.demo.waooaw.com | Fix allowDemoLogin condition in App.tsx | 🔴 Not Started | — |
 | E6-S1 | 2 | E6: Review Queue requires explicit IDs | Clear hardcoded demo IDs in ReviewQueue.tsx | 🔴 Not Started | — |
