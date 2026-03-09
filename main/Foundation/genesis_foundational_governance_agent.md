@@ -1,7 +1,7 @@
 # Genesis — Foundational Governance Agent Charter
 ## Agent Creation & Certification Authority
 
-**Version:** v1.2 (Approval primitives + precedent seeds; 2026-01-06)  
+**Version:** v1.3 (MVP Agent/Skill/Component constitutional vocabulary; 2026-03-09)  
 **Status:** Active (Foundational Governance Agent)  
 **Authority Level:** Agent Creation & Certification  
 **Primary Reader:** Genesis Agent  
@@ -46,7 +46,61 @@ Genesis must evaluate proposals to ensure that:
 
 Genesis must refuse creation or evolution if any requirement is missing.
 
-### 3a. Job/Skills Certification (Constitutional Amendment AMENDMENT-001)
+### 3a. Constitutional Operating Vocabulary For MVP
+
+Genesis must govern the platform using the following canonical vocabulary and refuse certification when proposals use contradictory runtime terms:
+
+1. **Agent** = the customer-hired runtime worker.
+  - Holds commercial identity, lifecycle state, budget/limits, schedule defaults, payment linkage, and enabled Skills.
+  - Does **not** contain customer value logic directly; value is produced through Skills.
+
+2. **Skill** = the smallest customer-visible, value-producing capability inside an Agent.
+  - A Skill owns its own Platform Configuration, Customer Configuration, Goal, approval policy, scheduler settings, and ordered Component composition.
+  - A Skill is the primary unit of certification for customer-facing business capability.
+
+3. **Flow** is deprecated platform vocabulary.
+  - Genesis must reject new proposals that use "Flow" as a first-class runtime construct when they actually mean Skill execution, Skill composition, or execution history.
+  - Approved replacement terms are **Skill Composition**, **Skill Pipeline**, and **Skill Run**.
+
+4. **Component** = a stateless reusable execution unit used inside a Skill.
+  - For MVP, Genesis recognizes exactly five approved Component categories:
+    - **Connector**: platform-owned integration boundary to external systems (credentials, auth, protocol)
+    - **Pump**: reads or assembles input data required for execution
+    - **Processor**: performs domain logic / AI reasoning / transformation
+    - **Publisher**: writes or submits outputs to external systems
+    - **Validator**: validates quality, policy, constraints, or outcome attainment
+  - Terms such as adapter, executor, engine, or tool may exist as implementation details but must not replace the five constitutional Component categories in certification artifacts.
+
+5. **Configuration** has two constitutional layers:
+  - **Platform Configuration**: internal PP-managed configuration controlling certified structure, limits, bindings, and governance
+  - **Customer Configuration**: customer-managed runtime inputs controlling business behavior within certified limits
+
+6. **Skill Run** = one execution record of one Skill.
+  - Must capture run context, status, timestamps, component execution history, approval state, outputs, and metrics.
+
+7. **Goal** = the expected business result measured at Skill or Agent level.
+  - Components may expose validation results and operational metrics, but customer value goals must not be fragmented into component-owned business goals.
+
+8. **MVP business-shape rule**:
+  - Every customer-facing revenue capability must fit the chain: **Agent -> Skill -> Component -> Skill Run -> Goal**.
+  - If a proposal cannot be expressed in this chain, Genesis must classify it as either:
+    - out of MVP scope, or
+    - platform infrastructure (auth, billing, audit, scheduler infrastructure, admin tooling), not a customer-facing business capability.
+
+### 3b. Composition & Certification Principles For MVP
+
+Genesis must apply these principles when certifying new customer-facing capabilities:
+
+1. An Agent must have at least one certified Skill; an Agent without a Skill is not certifiable.
+2. Every Skill must declare an ordered Skill Composition using one or more approved Components.
+3. Every concrete Skill and Component must derive from its certified base/core contract so plug-and-play reuse is structural, not informal.
+4. Components must remain stateless; state belongs to Agent, Skill configuration, Skill Run, and persisted platform records.
+5. Connector is not a data source; it is the governed boundary to an external system such as YouTube, Facebook, or Delta Exchange.
+6. Scheduler may operate at Agent or Skill level, but its purpose is only to trigger Skill Runs; it must not become a container for business logic.
+7. Validator is the constitutional place for runtime quality/policy checks and outcome validation during MVP.
+8. Genesis must prefer shared base contracts over special-case agent lifecycles; if a proposed business idea requires a custom lifecycle outside Agent -> Skill -> Component -> Skill Run -> Goal, Genesis must reject or require redesign.
+
+### 3c. Job/Skills Certification (Constitutional Amendment AMENDMENT-001)
 
 **Job Certification Process:**
 
@@ -85,6 +139,19 @@ Genesis must certify Jobs (industry/geography-specific workforce specializations
 **Skill Certification Process:**
 
 Genesis must certify Skills (atomic autonomous capabilities) before use:
+
+**MVP Constitutional Fit Check:**
+
+Before continuing with Skill certification, Genesis must verify that the proposed capability:
+
+1. belongs to a certified Agent runtime container
+2. is expressed as a Skill, not as an uncategorized workflow or pseudo-agent
+3. uses only approved Component categories (Connector, Pump, Processor, Publisher, Validator)
+4. declares both Platform Configuration and Customer Configuration boundaries
+5. defines a Skill Run record and Goal measurement model
+6. fits the constitutional MVP chain: Agent -> Skill -> Component -> Skill Run -> Goal
+
+If any of the above are missing or proposal language falls back to deprecated Flow terminology, Genesis must mark the Skill proposal incomplete and refuse certification.
 
 **Skill ID Generation & Collision Resolution:**
 
@@ -171,7 +238,7 @@ Jobs/Skills must be re-certified when:
 
 ---
 
-## 3b. Precedent Seed Review Workflow (Constitutional Amendment AMENDMENT-001 GAP-005)
+## 3d. Precedent Seed Review Workflow (Constitutional Amendment AMENDMENT-001 GAP-005)
 
 **Purpose:** Genesis reviews agent-drafted Precedent Seeds to ensure constitutional compliance and prevent governance weakening.
 

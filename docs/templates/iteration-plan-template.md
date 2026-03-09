@@ -57,6 +57,8 @@ with limited context windows. Every structural decision in this plan exists to p
 - [ ] Each iteration has a complete GitHub agent launch block
 - [ ] STUCK PROTOCOL is in Agent Execution Rules section
 - [ ] Stories sequenced: backend (S1) before frontend (S2)
+- [ ] Iteration count minimized for PR-only delivery (default 1-2; Iteration 3 only if explicitly justified)
+- [ ] Related backend/frontend work kept in the same iteration unless merge-to-main is a hard dependency
 - [ ] No placeholders remain
 
 ---
@@ -67,9 +69,16 @@ with limited context windows. Every structural decision in this plan exists to p
 |---|---|---|---|---|---|
 | 1 | [Lane A/B — one sentence] | [N] | [N] | [Xh] | [DATE HH:MM TZ] |
 | 2 | [description] | [N] | [N] | [Xh] | [DATE HH:MM TZ] |
-| 3 | [description] | [N] | [N] | [Xh] | [DATE HH:MM TZ] |
 
 **Estimate basis:** FE wiring = 30 min | New BE endpoint = 45 min | Full-stack = 90 min | Docker test = 15 min | PR = 10 min. Add 20% buffer for zero-cost model context loading.
+
+### PR-Overhead Optimization Rules
+
+- Default to 2 iterations maximum.
+- Size each iteration so one merge unlocks a meaningful product slice: target 4-6 stories / 4-6 hours of agent work.
+- Prefer vertical slices within the same iteration over extra merge gates.
+- Only add Iteration 3 if the user explicitly accepts the overhead or if the scoped work still exceeds 12 atomic stories after aggressive splitting.
+- Assume deployment happens through the `waooaw deploy` workflow after the final merged iteration, not after every iteration.
 
 ---
 
@@ -162,39 +171,9 @@ EXECUTION ORDER:
 
 ---
 
-### Iteration 3
+### Iteration 3 (optional — include only if explicitly justified)
 
-> ⚠️ Do NOT launch until Iteration 2 PR is merged to `main`.
-
-**Verify merge:** `git log --oneline origin/main | head -3` → must show Iteration 2 merge commit.
-
-**Steps to launch:** same as above (VS Code → Copilot Chat → Agent mode → platform-engineer)
-
-**Iteration 3 agent task** (paste verbatim):
-
-```
-You are executing a pre-planned iteration on the WAOOAW platform.
-
-EXPERT PERSONAS: [PM fills — e.g. "Senior Python/FastAPI engineer + Senior GitHub Actions engineer"]
-Activate these personas NOW. Begin each epic with:
-  "Acting as a [persona], I will [what] by [approach]."
-
-PLAN FILE: docs/[path/to/this/plan.md]
-YOUR SCOPE: Iteration 3 only — Epics [E6, E7]. Do not touch other content.
-TIME BUDGET: [Xh].
-
-PREREQUISITE CHECK:
-  Run: git log --oneline origin/main | head -5
-  Must show: feat([plan-id]): iteration 2 — [summary]
-  If not: post "Blocked: Iteration 2 not merged to main." and HALT.
-
-EXECUTION ORDER:
-1. git checkout main && git pull
-2. Read "Agent Execution Rules" and "Iteration 3" sections. Read nothing else.
-3. Execute epics in order. Open iteration PR when done. Post URL. HALT.
-```
-
-**Come back at:** [DATE HH:MM TZ]
+> Add this section only when 2 iterations are provably insufficient after aggressive story splitting and merge-overhead optimization.
 
 ---
 
