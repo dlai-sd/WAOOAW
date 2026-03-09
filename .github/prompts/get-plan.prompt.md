@@ -59,12 +59,16 @@ Once the vision intake is confirmed:
 - Save the plan to `docs/[service]/iterations/[PLAN-ID]-[short-name].md`
 - Fill every `[PLACEHOLDER]` — zero placeholders in the saved file
 - Tick every item in the PM Review Checklist before reporting the plan as ready
+- **Optimize for PR-only delivery:** default to 1-2 iterations total. Only create Iteration 3 when the user explicitly accepts the extra merge overhead or the scoped work still exceeds 12 atomic stories after aggressive splitting.
+- **Iteration sizing rule:** target 4-6 stories and roughly 4-6 hours of agent execution per iteration so one merge to `main` unlocks meaningful product progress.
+- **Merge-overhead rule:** prefer vertical slices inside the same iteration over technically pure but merge-heavy sequencing. Do not add an extra iteration just to separate closely related backend/frontend work unless `BLOCKED UNTIL: merged to main` is truly unavoidable.
 - Max 6 stories per iteration, story size ≤ 90 min (split if larger)
 - Lane A epics precede Lane B epics in iteration ordering
 - Backend story (S1) always before its frontend counterpart (S2); mark S2 `BLOCKED UNTIL: S1 merged`
 - Every story card is self-contained: exact file paths, 2-3 sentence context, no "see above"
 - **Zero-cost agent rule:** Story cards must embed all required NFR code snippets inline — do NOT write "see NFRReusable.md §3". Pull the relevant 10-20 line snippet from `docs/CP/iterations/NFRReusable.md` (which you read in Step 1) and paste it into the story card's "Code patterns to copy exactly" block. The executing agent has an 8K-32K context window and cannot afford to read external reference files mid-execution.
 - **CP BackEnd is a thin proxy — not a business logic layer.** Before writing any CP story, check: (a) if a `/cp/<resource>` route already exists in `src/CP/BackEnd/api/cp_*.py`, use it from FE via `gatewayRequestJson`; (b) if not, create a thin proxy route in `api/cp_<resource>.py` using `waooaw_router` + `PlantGatewayClient` (Lane B story, 45 min); (c) for existing Plant endpoints at `/v1/*`, call directly via `gatewayRequestJson` — no new CP BackEnd file needed. Never put computation or data storage in CP BackEnd; that belongs in Plant BackEnd.
+- **Deployment workflow note:** assume deployment happens via the `waooaw deploy` GitHub workflow after merge to `main`. Do not add per-iteration deploy steps unless the scope changes infrastructure, environment variables, or database migrations.
 
 ## Step 4 — Report to user
 
@@ -108,6 +112,10 @@ Same steps above (VS Code → Copilot Chat → Agent mode → @platform-engineer
 ```
 
 Come back at: **[DATE HH:MM TZ]**
+
+---
+
+After final iteration merge: trigger the `waooaw deploy` workflow if the merged scope needs deployment validation.
 
 ---
 
