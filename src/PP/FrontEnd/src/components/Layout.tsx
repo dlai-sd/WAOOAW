@@ -7,12 +7,15 @@ import {
   People24Regular, 
   Money24Regular,
   Database24Regular,
-  ShieldTask24Regular,
   Certificate24Regular,
   Beaker24Regular,
   WeatherMoon24Regular,
   WeatherSunny24Regular,
-  SignOut24Regular
+  SignOut24Regular,
+  DocumentCheckmark24Regular,
+  DocumentEdit24Regular,
+  ClipboardTask24Regular,
+  AlertBadge24Regular,
 } from '@fluentui/react-icons'
 import waooawLogo from '../Waooaw-Logo.png'
 
@@ -23,27 +26,35 @@ interface LayoutProps {
   onLogout: () => void
 }
 
+type NavItem =
+  | { type?: undefined; path: string; label: string; icon: ReactNode }
+  | { type: 'section'; label: string }
+
+const navItems: NavItem[] = [
+  { type: 'section', label: 'Operations' },
+  { path: '/', label: 'Dashboard', icon: <Home24Regular /> },
+  { path: '/hired-agents', label: 'Hired Agents', icon: <People24Regular /> },
+  { path: '/customers', label: 'Usage Events', icon: <Database24Regular /> },
+  { path: '/billing', label: 'Subscriptions', icon: <Money24Regular /> },
+  { type: 'section', label: 'Management' },
+  { path: '/agents', label: 'Agent Management', icon: <Bot24Regular /> },
+  { path: '/agent-setup', label: 'Agent Setup', icon: <Bot24Regular /> },
+  { path: '/agent-type-setup', label: 'Agent Type Setup', icon: <Certificate24Regular /> },
+  { path: '/governor', label: 'Reference Agents', icon: <Beaker24Regular /> },
+  { path: '/genesis', label: 'Genesis', icon: <Certificate24Regular /> },
+  { type: 'section', label: 'Compliance' },
+  { path: '/approvals-queue', label: 'Approvals Queue', icon: <DocumentCheckmark24Regular /> },
+  { path: '/review-queue', label: 'Draft Review', icon: <DocumentEdit24Regular /> },
+  { path: '/audit', label: 'Audit', icon: <ClipboardTask24Regular /> },
+  { path: '/policy-denials', label: 'Policy Denials', icon: <AlertBadge24Regular /> },
+  { type: 'section', label: 'Tools' },
+  { path: '/agent-spec-tools', label: 'AgentSpec Tools', icon: <Certificate24Regular /> },
+  { path: '/db-updates', label: 'DB Updates', icon: <Database24Regular /> },
+  { path: '/reference-agents', label: 'Reference Data', icon: <Beaker24Regular /> },
+]
+
 export default function Layout({ children, theme, onThemeToggle, onLogout }: LayoutProps) {
   const location = useLocation()
-
-  const navItems = [
-    { path: '/', label: 'Dashboard', icon: <Home24Regular /> },
-    { path: '/agents', label: 'Agent Management', icon: <Bot24Regular /> },
-    { path: '/agent-setup', label: 'Agent Setup', icon: <Bot24Regular /> },
-    { path: '/agent-type-setup', label: 'Agent Type Setup', icon: <Bot24Regular /> },
-    { path: '/approvals-queue', label: 'Approvals Queue', icon: <ShieldTask24Regular /> },
-    { path: '/review-queue', label: 'Review Queue', icon: <ShieldTask24Regular /> },
-    { path: '/hired-agents', label: 'Hired Agents', icon: <People24Regular /> },
-    { path: '/customers', label: 'Customers', icon: <People24Regular /> },
-    { path: '/billing', label: 'Billing', icon: <Money24Regular /> },
-    { path: '/db-updates', label: 'DB Updates', icon: <Database24Regular /> },
-    { path: '/audit', label: 'Audit', icon: <ShieldTask24Regular /> },
-    { path: '/policy-denials', label: 'Policy Denials', icon: <ShieldTask24Regular /> },
-    { path: '/agent-spec-tools', label: 'AgentSpec Tools', icon: <Certificate24Regular /> },
-    { path: '/governor', label: 'Governor', icon: <ShieldTask24Regular /> },
-    { path: '/reference-agents', label: 'Reference Agents', icon: <Beaker24Regular /> },
-    { path: '/genesis', label: 'Genesis', icon: <Certificate24Regular /> },
-  ]
 
   return (
     <div className="layout">
@@ -54,21 +65,30 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
         </div>
 
         <div className="nav-items">
-          {navItems.map(item => (
-            (() => {
-              const active = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+          {navItems.map((item, idx) => {
+            if (item.type === 'section') {
               return (
-            <Link 
-              key={item.path} 
-              to={item.path} 
-              className={`nav-item ${active ? 'active' : ''}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
+                <Text
+                  key={`section-${idx}`}
+                  size={100}
+                  style={{ padding: '12px 16px 4px', color: 'var(--colorNeutralForeground3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}
+                >
+                  {item.label}
+                </Text>
               )
-            })()
-          ))}
+            }
+            const active = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`nav-item ${active ? 'active' : ''}`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
         </div>
 
         <div className="sidebar-footer">

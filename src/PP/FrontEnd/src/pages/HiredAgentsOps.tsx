@@ -115,6 +115,8 @@ type HiredRow = {
 export default function HiredAgentsOps() {
   const [customerId, setCustomerId] = useState('')
   const [asOf, setAsOf] = useState('')
+  const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   const [rows, setRows] = useState<HiredRow[]>([])
   const [selected, setSelected] = useState<HiredRow | null>(null)
@@ -133,6 +135,18 @@ export default function HiredAgentsOps() {
   const [detailTab, setDetailTab] = useState<'overview' | 'scheduler' | 'hooks'>('overview')
 
   const normalizedAsOf = useMemo(() => (asOf || '').trim() || undefined, [asOf])
+
+  const lookupByEmail = useCallback(async () => {
+    const e = email.trim()
+    if (!e) return
+    setEmailError(null)
+    try {
+      const result = await gatewayApiClient.lookupCustomerByEmail(e) as { customer_id: string }
+      setCustomerId(result.customer_id)
+    } catch {
+      setEmailError('Customer not found for this email address.')
+    }
+  }, [email])
 
   const load = useCallback(async () => {
     const cust = customerId.trim()
@@ -259,6 +273,19 @@ export default function HiredAgentsOps() {
         />
 
         <div style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <Field label="Customer Email">
+                <Input
+                  placeholder="email@example.com"
+                  value={email}
+                  onChange={(_, d) => setEmail(d.value)}
+                />
+              </Field>
+              <Button appearance="secondary" onClick={() => void lookupByEmail()}>Lookup</Button>
+            </div>
+            {emailError && <Text style={{ color: 'var(--colorPaletteRedForeground1)', fontSize: 12 }}>{emailError}</Text>}
+          </div>
           <Field label="Customer ID">
             <Input value={customerId} onChange={(_, d) => setCustomerId(d.value)} placeholder="CUST-..." />
           </Field>

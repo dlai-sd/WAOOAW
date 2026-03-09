@@ -27,8 +27,8 @@ type DraftBatch = {
 }
 
 export default function ReviewQueue() {
-  const [customerId, setCustomerId] = useState('CUST-001')
-  const [agentId, setAgentId] = useState('AGT-MKT-HEALTH-001')
+  const [customerId, setCustomerId] = useState('')
+  const [agentId, setAgentId] = useState('')
   const [batches, setBatches] = useState<DraftBatch[]>([])
   const [scheduledAtByPostId, setScheduledAtByPostId] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)

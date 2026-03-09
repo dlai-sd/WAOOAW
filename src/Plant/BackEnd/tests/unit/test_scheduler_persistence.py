@@ -453,6 +453,8 @@ class TestSchedulerPersistenceService:
             goal_instance_id="goal1",
             hired_instance_id="hired1",
             scheduled_time=missed_time,
+            agent_spec=None,
+            goal_config=None,
         )
         assert missed_run.status == "completed"
     
