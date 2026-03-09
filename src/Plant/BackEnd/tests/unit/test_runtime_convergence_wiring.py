@@ -58,6 +58,16 @@ def _make_spec() -> AgentSpec:
     )
 
 
+def _make_fast_fail_scheduler():
+    from services.goal_scheduler_service import GoalSchedulerService
+
+    return GoalSchedulerService(
+        max_retries=1,
+        initial_backoff_seconds=0,
+        hook_bus=HookBus(),
+    )
+
+
 # ── E2 tests ──────────────────────────────────────────────────────────────────
 
 
@@ -113,34 +123,35 @@ async def test_run_goal_with_retry_default_goal_config_is_empty_dict():
 
 
 @pytest.mark.asyncio
-async def test_run_goal_with_retry_no_agent_spec_raises_not_implemented():
-    """When agent_spec is None (default), legacy path raises NotImplementedError."""
-    from services.goal_scheduler_service import GoalSchedulerService
+async def test_run_goal_with_retry_no_agent_spec_returns_failed_result():
+    """When agent_spec is None, the retry wrapper returns a failed result immediately."""
+    scheduler = _make_fast_fail_scheduler()
 
-    scheduler = GoalSchedulerService(hook_bus=HookBus())
+    result = await scheduler.run_goal_with_retry(
+        goal_instance_id="goal-rt-legacy",
+        scheduled_time=datetime.now(timezone.utc),
+    )
 
-    with pytest.raises(NotImplementedError):
-        await scheduler.run_goal_with_retry(
-            goal_instance_id="goal-rt-legacy",
-            scheduled_time=datetime.now(timezone.utc),
-        )
+    assert result.status.name == "FAILED"
+    assert result.error_message == "Goal execution logic not yet implemented"
+    assert result.attempts == 1
 
 
 @pytest.mark.asyncio
-async def test_run_goal_with_retry_agent_spec_without_bindings_raises_not_implemented():
-    """An AgentSpec with bindings=None still uses the legacy path."""
+async def test_run_goal_with_retry_agent_spec_without_bindings_returns_failed_result():
+    """An AgentSpec with bindings=None still returns a failed result via the legacy path."""
     spec = AgentSpec(agent_id="AGT-NO-BINDINGS", agent_type="legacy_type")
+    scheduler = _make_fast_fail_scheduler()
 
-    from services.goal_scheduler_service import GoalSchedulerService
+    result = await scheduler.run_goal_with_retry(
+        goal_instance_id="goal-rt-nobind",
+        scheduled_time=datetime.now(timezone.utc),
+        agent_spec=spec,
+    )
 
-    scheduler = GoalSchedulerService(hook_bus=HookBus())
-
-    with pytest.raises(NotImplementedError):
-        await scheduler.run_goal_with_retry(
-            goal_instance_id="goal-rt-nobind",
-            scheduled_time=datetime.now(timezone.utc),
-            agent_spec=spec,
-        )
+    assert result.status.name == "FAILED"
+    assert result.error_message == "Goal execution logic not yet implemented"
+    assert result.attempts == 1
 
 
 @pytest.mark.asyncio
