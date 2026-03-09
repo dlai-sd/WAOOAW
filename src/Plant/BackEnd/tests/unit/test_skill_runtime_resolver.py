@@ -47,8 +47,10 @@ def _make_db(query_results: list) -> AsyncMock:
     db = AsyncMock()
     results = []
     for item in query_results:
-        result = AsyncMock()
-        result.scalar_one_or_none = AsyncMock(return_value=item)
+        # Use MagicMock (not AsyncMock) for the result object:
+        # db.execute() IS async (awaited), but .scalar_one_or_none() is NOT.
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = item
         results.append(result)
     db.execute = AsyncMock(side_effect=results)
     return db
