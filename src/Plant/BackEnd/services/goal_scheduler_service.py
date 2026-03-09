@@ -116,18 +116,32 @@ class GoalSchedulerService:
         scheduled_time: datetime,
         hired_instance_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
+        agent_spec: Optional["AgentSpec"] = None,
+        goal_config: Optional[dict] = None,
     ) -> GoalRunResult:
         """Execute a goal with automatic retry on transient failures.
-        
+
+        When ``agent_spec`` is supplied (with ``ConstructBindings`` set), the
+        typed pump → processor pipeline introduced in PLANT-MOULD-1 is used.
+        ``goal_config`` carries the customer's saved goal configuration
+        (resolved from ``AgentSkillModel.goal_config`` by the caller via
+        ``SkillRuntimeResolver`` — PLANT-RUNTIME-1 E1).
+
         Args:
             goal_instance_id: Unique identifier for the goal instance
             scheduled_time: Scheduled execution time (UTC) for idempotency key
             hired_instance_id: ID of hired agent instance (for DLQ tracking)
             correlation_id: Request correlation ID for tracing
-            
+            agent_spec: Optional pre-resolved AgentSpec with ConstructBindings.
+                When provided and bindings are present, the typed pump→processor
+                path is used instead of the legacy stub path.
+            goal_config: Optional goal configuration dict resolved from
+                AgentSkillModel.goal_config.  Passed through to the pump.
+                Defaults to {} when agent_spec is provided but goal_config is None.
+
         Returns:
             GoalRunResult with execution status and details
-            
+
         Raises:
             PermanentError: For non-recoverable errors (no retry)
         """
@@ -203,8 +217,15 @@ class GoalSchedulerService:
                     f"goal_instance_id={goal_instance_id} attempt={attempt}/{self.max_retries}"
                 )
                 
-                # Execute the goal
-                deliverable_id = await self._execute_goal(goal_instance_id, correlation_id)
+                # Execute the goal — pass agent_spec + goal_config when available so
+                # the typed pump→processor pipeline (PLANT-MOULD-1) is used.
+                deliverable_id = await self._execute_goal(
+                    goal_instance_id,
+                    correlation_id,
+                    hired_agent_id=hired_instance_id,
+                    goal_config=goal_config,
+                    agent_spec=agent_spec,
+                )
                 
                 # Success - reset failure counter
                 self._consecutive_failures.pop(goal_instance_id, None)

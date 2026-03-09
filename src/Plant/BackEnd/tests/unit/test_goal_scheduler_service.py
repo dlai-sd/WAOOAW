@@ -84,7 +84,10 @@ class TestGoalExecutionSuccess:
             assert result.attempts == 1
             assert result.error_message is None
             assert result.total_duration_ms is not None
-            mock_execute.assert_called_once_with("goal-456", None)
+            mock_execute.assert_called_once_with(
+                "goal-456", None,
+                hired_agent_id=None, goal_config=None, agent_spec=None,
+            )
     
     @pytest.mark.asyncio
     async def test_successful_execution_with_correlation_id(self, scheduled_time):
@@ -102,7 +105,10 @@ class TestGoalExecutionSuccess:
             
             assert result.status == GoalRunStatus.COMPLETED
             assert result.deliverable_id == "deliverable-789"
-            mock_execute.assert_called_once_with("goal-123", "test-corr-456")
+            mock_execute.assert_called_once_with(
+                "goal-123", "test-corr-456",
+                hired_agent_id=None, goal_config=None, agent_spec=None,
+            )
 
 
 class TestTransientErrorRetry:
