@@ -230,10 +230,64 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               >
                 Agents Earn Your Business
               </Text>
+
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontFamily: typography.fontFamily.body,
+                  fontSize: 14,
+                  textAlign: 'center',
+                  marginTop: spacing.md,
+                  maxWidth: 320,
+                  lineHeight: 20,
+                }}
+              >
+                Use mobile as your fastest decision surface for approvals, spend awareness, and agent operations.
+              </Text>
+
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md, justifyContent: 'center' }}>
+                {['1-tap sign in', 'Customer-safe', 'Ops-ready'].map((pill) => (
+                  <View
+                    key={pill}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: colors.textSecondary + '25',
+                      backgroundColor: colors.card,
+                    }}
+                  >
+                    <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
 
             {/* Sign In Button Section */}
             <View style={[styles.buttonSection, { marginTop: spacing.xxl }]}>
+              <View
+                style={{
+                  width: '100%',
+                  borderRadius: 16,
+                  padding: spacing.lg,
+                  borderWidth: 1,
+                  borderColor: colors.textSecondary + '20',
+                  backgroundColor: colors.card,
+                  marginBottom: spacing.lg,
+                }}
+              >
+                <Text style={{ color: colors.neonCyan, fontSize: 12, marginBottom: 6, fontFamily: typography.fontFamily.bodyBold }}>
+                  Why this screen matters
+                </Text>
+                <Text style={{ color: colors.textPrimary, fontSize: 15, fontFamily: typography.fontFamily.bodyBold, marginBottom: 4 }}>
+                  Customers should feel oriented, not dumped into OAuth.
+                </Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.body }}>
+                  Sign in is the front door to hiring, approvals, billing visibility, and profile control.
+                </Text>
+              </View>
+
               <GoogleSignInButton
                 onPress={handleGoogleSignIn}
                 loading={isLoading}

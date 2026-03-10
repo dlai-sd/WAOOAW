@@ -2222,3 +2222,425 @@ section[id] {
   }
 }
 
+.portal-brand-copy {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.portal-brand-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.portal-brand-subtitle {
+  font-size: 0.85rem;
+  color: var(--colorNeutralForeground2);
+}
+
+.portal-header-chip {
+  border: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground2);
+  color: var(--colorNeutralForeground1);
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.portal-header-chip--success {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #10b981;
+}
+
+.portal-sidebar-card {
+  margin: 0 12px 18px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(0, 120, 212, 0.12), rgba(0, 120, 212, 0.04));
+  border: 1px solid var(--colorNeutralStroke2);
+}
+
+.portal-sidebar-card-label,
+.sidebar-section-title,
+.portal-hero-eyebrow,
+.discover-kicker,
+.usage-billing-overview-kicker,
+.profile-settings-hero-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--colorBrandForeground1);
+}
+
+.portal-sidebar-card-title {
+  margin-top: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.portal-sidebar-card-body {
+  margin-top: 0.35rem;
+  color: var(--colorNeutralForeground2);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.sidebar-section-title {
+  padding: 0 12px 6px;
+}
+
+.portal-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: end;
+  padding: 24px 28px;
+  border-radius: 24px;
+  margin-bottom: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(0, 120, 212, 0.18), transparent 35%),
+    linear-gradient(160deg, var(--colorNeutralBackground2), var(--colorNeutralBackground1));
+  border: 1px solid var(--colorNeutralStroke2);
+}
+
+.portal-hero-title {
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1.02;
+  margin: 0.4rem 0 0.75rem;
+}
+
+.portal-hero-description {
+  color: var(--colorNeutralForeground2);
+  max-width: 62ch;
+  font-size: 1rem;
+}
+
+.portal-hero-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.portal-hero-metric {
+  padding: 0.75rem 0.95rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--colorNeutralStroke2);
+  font-weight: 600;
+}
+
+.portal-page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.command-centre-grid,
+.usage-billing-overview,
+.profile-settings-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.command-centre-panel,
+.usage-billing-overview-card,
+.usage-billing-summary-card,
+.usage-billing-confidence-card,
+.profile-settings-hero-card,
+.profile-settings-summary-card,
+.profile-settings-section-card,
+.discover-spotlight-card {
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.command-centre-panel--accent,
+.usage-billing-overview-card--accent,
+.profile-settings-hero-card--accent,
+.discover-spotlight-card {
+  background:
+    radial-gradient(circle at top right, rgba(0, 242, 254, 0.16), transparent 30%),
+    linear-gradient(160deg, var(--colorNeutralBackground2), var(--colorNeutralBackground1));
+}
+
+.command-centre-checklist {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 18px;
+}
+
+.command-centre-checklist-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--colorNeutralForeground1);
+}
+
+.command-centre-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.command-centre-pulse-grid,
+.usage-billing-summary-grid,
+.profile-settings-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.command-centre-pulse-value,
+.usage-billing-summary-value,
+.profile-settings-summary-value {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.command-centre-pulse-label,
+.usage-billing-summary-label,
+.profile-settings-summary-label {
+  color: var(--colorNeutralForeground2);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.command-centre-pulse-body,
+.usage-billing-summary-note,
+.profile-settings-summary-note,
+.usage-billing-confidence-grid p,
+.profile-settings-hero-card p,
+.usage-billing-overview-card p,
+.discover-spotlight-body {
+  color: var(--colorNeutralForeground2);
+  line-height: 1.55;
+}
+
+.discover-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.discover-proof-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.discover-proof-pill,
+.discover-active-filter {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: var(--colorNeutralBackground2);
+  border: 1px solid var(--colorNeutralStroke2);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.discover-spotlight-label {
+  color: var(--colorBrandForeground1);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.discover-spotlight-value {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  margin: 0.55rem 0;
+}
+
+.discover-active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.usage-billing-confidence-card {
+  margin-top: 16px;
+}
+
+.usage-billing-confidence-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+}
+
+.usage-billing-confidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.usage-billing-confidence-grid strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.auth-side-kicker,
+.hire-wizard-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--colorBrandForeground1);
+  margin-bottom: 0.75rem;
+}
+
+.auth-proof-grid,
+.hire-wizard-proof-grid,
+.hire-wizard-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.auth-proof-card,
+.hire-wizard-proof-card,
+.hire-wizard-bottom-card,
+.auth-confidence-card {
+  border-radius: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground2);
+}
+
+.auth-proof-value,
+.hire-wizard-proof-value {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.auth-proof-label,
+.hire-wizard-proof-label,
+.hire-wizard-step-body,
+.auth-confidence-body,
+.hire-wizard-bottom-card p,
+.hire-wizard-inline-note {
+  color: var(--colorNeutralForeground2);
+  line-height: 1.5;
+}
+
+.auth-milestone-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.auth-milestone-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground2);
+}
+
+.auth-milestone-item.active {
+  border-color: rgba(0, 120, 212, 0.45);
+  background: rgba(0, 120, 212, 0.12);
+}
+
+.auth-milestone-index {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.auth-confidence-title,
+.hire-wizard-step-title,
+.hire-wizard-bottom-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.hire-wizard-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 20px;
+}
+
+.hire-wizard-step-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.hire-wizard-step-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hire-wizard-step-pill {
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--colorNeutralStroke2);
+  color: var(--colorNeutralForeground2);
+}
+
+.hire-wizard-step-pill.active {
+  border-color: rgba(0, 120, 212, 0.45);
+  color: var(--colorBrandForeground1);
+  background: rgba(0, 120, 212, 0.12);
+}
+
+@media (max-width: 980px) {
+  .portal-hero,
+  .command-centre-grid,
+  .usage-billing-overview,
+  .profile-settings-hero,
+  .discover-hero,
+  .hire-wizard-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-hero-metrics {
+    justify-content: flex-start;
+  }
+
+  .command-centre-pulse-grid,
+  .usage-billing-summary-grid,
+  .profile-settings-summary-grid,
+  .usage-billing-confidence-grid,
+  .auth-proof-grid,
+  .hire-wizard-proof-grid,
+  .hire-wizard-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hire-wizard-step-header {
+    flex-direction: column;
+  }
+}
+

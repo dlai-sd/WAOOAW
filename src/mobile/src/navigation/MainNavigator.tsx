@@ -156,7 +156,7 @@ export const MainNavigator = () => {
         name="HomeTab"
         component={HomeNavigator}
         options={{
-          title: "Home",
+          title: "Today",
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
@@ -202,7 +202,7 @@ export const MainNavigator = () => {
         name="MyAgentsTab"
         component={MyAgentsNavigator}
         options={{
-          title: "My Agents",
+          title: "Ops",
           tabBarIcon: ({ color, size }) => (
             <View
               style={{

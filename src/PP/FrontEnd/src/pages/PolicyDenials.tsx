@@ -91,6 +91,22 @@ export default function PolicyDenials() {
         <Body1>Audit log of Plant policy enforcement denials</Body1>
       </div>
 
+      <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+          <div className="pp-dashboard-kicker">Governance signal</div>
+          <Text as="h2" size={700} weight="semibold">Explain why the platform said no.</Text>
+          <p className="pp-dashboard-body-copy">
+            Policy denials should help ops, infra, and governance contributors diagnose intent, policy, and input mistakes fast enough to unblock the right action.
+          </p>
+        </Card>
+        <Card className="pp-dashboard-panel">
+          <Text as="h3" size={600} weight="semibold">Useful denial UX</Text>
+          <p className="pp-dashboard-body-copy">
+            Show the denial, the likely fix, and the correlation path clearly enough that a helpdesk person can route or explain it without escalation roulette.
+          </p>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader
           header={<Text weight="semibold">Denials</Text>}
@@ -103,6 +119,9 @@ export default function PolicyDenials() {
         />
 
         <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+          <Text size={200} style={{ gridColumn: '1 / -1', opacity: 0.8 }}>
+            Search by correlation, customer, or agent to reconstruct the denial storyline before recommending a retry.
+          </Text>
           <div>
             <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Correlation ID</Text>
             <Input value={correlationId} onChange={(_, d) => setCorrelationId(d.value)} placeholder="corr-..." />

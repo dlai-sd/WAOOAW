@@ -55,6 +55,7 @@ const navItems: NavItem[] = [
 
 export default function Layout({ children, theme, onThemeToggle, onLogout }: LayoutProps) {
   const location = useLocation()
+  const sectionTitle = navItems.find((item) => item.type !== 'section' && (item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)))
 
   return (
     <div className="layout">
@@ -62,6 +63,12 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
         <div className="sidebar-header">
           <img src={waooawLogo} alt="WAOOAW Logo" className="sidebar-logo-image" />
           <Text size={200}>Platform Portal</Text>
+        </div>
+
+        <div className="sidebar-workspace-card">
+          <div className="sidebar-workspace-label">Contributor cockpit</div>
+          <div className="sidebar-workspace-title">WAOOAW Control Plane</div>
+          <div className="sidebar-workspace-body">Ops, compliance, agent design, and incident response in one surface.</div>
         </div>
 
         <div className="nav-items">
@@ -114,6 +121,18 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
       </nav>
 
       <main className="main-content">
+        <div className="pp-shell-hero">
+          <div>
+            <div className="pp-shell-eyebrow">Platform Mission</div>
+            <h1 className="pp-shell-title">{sectionTitle && sectionTitle.type !== 'section' ? sectionTitle.label : 'Operations'}</h1>
+            <p className="pp-shell-description">Keep the marketplace healthy, the runtime controlled, and every contributor clear on what to do next.</p>
+          </div>
+          <div className="pp-shell-chip-row">
+            <div className="pp-shell-chip">Audit-first</div>
+            <div className="pp-shell-chip">Thin PP, strong Plant runtime</div>
+            <div className="pp-shell-chip pp-shell-chip--success">Platform healthy</div>
+          </div>
+        </div>
         {children}
       </main>
     </div>

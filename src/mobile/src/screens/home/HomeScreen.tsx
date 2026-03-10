@@ -15,12 +15,14 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useCurrentUser } from '../../store/authStore';
 
 export const HomeScreen = () => {
   const { colors, spacing, typography } = useTheme();
   const user = useCurrentUser();
+  const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = React.useCallback(() => {
@@ -135,8 +137,62 @@ export const HomeScreen = () => {
               },
             ]}
           >
-            Try any AI agent for 7 days. Keep the results, even if you don't hire.
+            Use mobile as your decision cockpit: what needs approval, what is running well, and where you should act next.
           </Text>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+            {['1 approval waiting', '2 hires live', 'Spend in control'].map((pill) => (
+              <View
+                key={pill}
+                style={{
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: colors.neonCyan + '40',
+                  backgroundColor: colors.black + '20',
+                }}
+              >
+                <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={[styles.section, { marginBottom: spacing.xl }]}> 
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                color: colors.textPrimary,
+                fontSize: 20,
+                fontFamily: typography.fontFamily.bodyBold,
+                marginBottom: spacing.md,
+              },
+            ]}
+          >
+            Today&apos;s priorities
+          </Text>
+          <View style={{ gap: spacing.md }}>
+            {[
+              'Approve queued work before your agent misses a publish window.',
+              'Review spend and receipts if a billing cycle is closing this week.',
+              'Open My Agents to tune one more goal for your highest-value hire.',
+            ].map((item) => (
+              <View
+                key={item}
+                style={{
+                  backgroundColor: colors.card,
+                  borderRadius: spacing.md,
+                  padding: spacing.lg,
+                  borderWidth: 1,
+                  borderColor: colors.textSecondary + '20',
+                }}
+              >
+                <Text style={{ color: colors.textPrimary, fontSize: 14, fontFamily: typography.fontFamily.body }}>{item}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Quick Actions */}
@@ -165,6 +221,7 @@ export const HomeScreen = () => {
                   flex: 1,
                 },
               ]}
+              onPress={() => navigation.navigate('DiscoverTab')}
             >
               <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>🔍</Text>
               <Text
@@ -203,6 +260,7 @@ export const HomeScreen = () => {
                   flex: 1,
                 },
               ]}
+              onPress={() => navigation.navigate('MyAgentsTab')}
             >
               <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>🚀</Text>
               <Text
@@ -272,7 +330,7 @@ export const HomeScreen = () => {
                   },
                 ]}
               >
-                0
+                1
               </Text>
               <Text
                 style={[
@@ -284,7 +342,7 @@ export const HomeScreen = () => {
                   },
                 ]}
               >
-                Active Trials
+                Approvals waiting
               </Text>
             </View>
 
@@ -311,7 +369,7 @@ export const HomeScreen = () => {
                   },
                 ]}
               >
-                0
+                ₹6.4K
               </Text>
               <Text
                 style={[
@@ -323,7 +381,7 @@ export const HomeScreen = () => {
                   },
                 ]}
               >
-                Hired Agents
+                Spend this week
               </Text>
             </View>
           </View>

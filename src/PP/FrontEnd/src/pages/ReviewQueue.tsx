@@ -101,11 +101,30 @@ export default function ReviewQueue() {
         <Body1>Ops-assisted approvals for marketing draft batches</Body1>
       </div>
 
+      <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+          <div className="pp-dashboard-kicker">Approval desk</div>
+          <Text as="h2" size={700} weight="semibold">Help contributors move customer work, not just read draft rows.</Text>
+          <p className="pp-dashboard-body-copy">
+            The queue should make obvious what needs review, what is already approved, and what is still blocking publish or schedule.
+          </p>
+        </Card>
+        <Card className="pp-dashboard-panel">
+          <Text as="h3" size={600} weight="semibold">Best operator habit</Text>
+          <p className="pp-dashboard-body-copy">
+            Filter quickly, approve only what is safe, and leave the customer with a cleaner next state than when the ticket arrived.
+          </p>
+        </Card>
+      </div>
+
       {!!error && <ApiErrorPanel title="Review Queue error" error={error} />}
 
       <Card>
         <CardHeader header={<Text weight="semibold">Draft batches</Text>} />
         <div style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+          <Text size={200} style={{ width: '100%', opacity: 0.8 }}>
+            Narrow the queue by customer or agent so approvals feel operationally precise instead of noisy.
+          </Text>
           <Field label="Customer ID">
             <Input value={customerId} onChange={(_, data) => setCustomerId(data.value)} />
           </Field>

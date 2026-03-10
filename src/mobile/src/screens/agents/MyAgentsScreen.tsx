@@ -178,6 +178,18 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
       {/* Header with Tabs */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenPadding.horizontal, paddingVertical: spacing.screenPadding.vertical }]}>
         <Text
+          style={{
+            color: colors.neonCyan,
+            fontSize: 12,
+            fontFamily: typography.fontFamily.bodyBold,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            marginBottom: spacing.xs,
+          }}
+        >
+          Runtime cockpit
+        </Text>
+        <Text
           style={[
             styles.title,
             {
@@ -190,6 +202,38 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
         >
           My Agents
         </Text>
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontSize: 14,
+            fontFamily: typography.fontFamily.body,
+            marginBottom: spacing.md,
+          }}
+        >
+          Keep trials, hired agents, and the next decision in one place instead of switching mental models.
+        </Text>
+
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          {[
+            `${trialAgents?.length || 0} trials`,
+            `${hiredAgents.length} hired`,
+            `${allAgents?.filter((agent: any) => (agent as any).approvalQueueCount).length || 0} need attention`,
+          ].map((pill) => (
+            <View
+              key={pill}
+              style={{
+                backgroundColor: colors.card,
+                borderRadius: 999,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.xs,
+                borderWidth: 1,
+                borderColor: colors.textSecondary + '25',
+              }}
+            >
+              <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
+            </View>
+          ))}
+        </View>
 
         {/* Tab Selector */}
         <View

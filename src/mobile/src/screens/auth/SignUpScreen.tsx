@@ -596,6 +596,18 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
           {/* ── Step headline ── */}
           <View style={[styles.stepHeader, { marginTop: spacing.xl }]}>
             <Text
+              style={{
+                color: colors.neonCyan,
+                fontSize: 12,
+                fontFamily: typography.fontFamily.bodyBold,
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+                marginBottom: spacing.xs,
+              }}
+            >
+              Start with clarity
+            </Text>
+            <Text
               style={[
                 styles.stepLabel,
                 { color: colors.textSecondary, fontFamily: typography.fontFamily.body },
@@ -615,6 +627,35 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                 ? "Tell us about your business"
                 : "How should we reach you?"}
             </Text>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontFamily: typography.fontFamily.body,
+                fontSize: 14,
+                lineHeight: 20,
+                marginTop: spacing.sm,
+              }}
+            >
+              Mobile signup should explain the business journey quickly: identify the customer, understand the business,
+              and set up a reliable contact route for agent work.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+              {['Free trial', 'Keep results', 'Fast onboarding'].map((pill) => (
+                <View
+                  key={pill}
+                  style={{
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: colors.textSecondary + '25',
+                    backgroundColor: colors.gray900,
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.xs,
+                  }}
+                >
+                  <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           {/* Form */}
