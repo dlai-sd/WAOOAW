@@ -193,6 +193,42 @@ async def approve_draft_post(
 
     return ApproveDraftPostResponse(post_id=post_id, review_status="approved", approval_id=approval_id)
 
+
+class RejectDraftPostResponse(BaseModel):
+    post_id: str
+    review_status: str
+
+
+@router.post("/draft-posts/{post_id}/reject", response_model=RejectDraftPostResponse)
+async def reject_draft_post(
+    post_id: str,
+    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+) -> RejectDraftPostResponse:
+    found = store.find_post(post_id)
+    if found is None:
+        raise PolicyEnforcementError(
+            "Unknown draft post",
+            reason="unknown_post_id",
+            details={"post_id": post_id},
+        )
+
+    updated = store.update_post(
+        post_id,
+        review_status="rejected",
+        approval_id=None,
+        execution_status="not_scheduled",
+        scheduled_at=None,
+        last_error=None,
+    )
+    if not updated:
+        raise PolicyEnforcementError(
+            "Unable to update draft post",
+            reason="update_failed",
+            details={"post_id": post_id},
+        )
+
+    return RejectDraftPostResponse(post_id=post_id, review_status="rejected")
+
 class ScheduleDraftPostRequest(BaseModel):
     scheduled_at: datetime
     approval_id: Optional[str] = None

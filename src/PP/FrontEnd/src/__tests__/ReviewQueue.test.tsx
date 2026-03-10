@@ -7,9 +7,9 @@ import ReviewQueue from '../pages/ReviewQueue'
 
 vi.mock('../services/gatewayApiClient', () => ({
   gatewayApiClient: {
-    listMarketingDraftBatches: vi.fn(async () => []),
+    listReviewQueueApprovals: vi.fn(async () => ({ approvals: [] })),
     approveMarketingDraftPost: vi.fn(async () => ({})),
-    scheduleMarketingDraftPost: vi.fn(async () => ({})),
+    rejectMarketingDraftPost: vi.fn(async () => ({})),
   },
 }))
 

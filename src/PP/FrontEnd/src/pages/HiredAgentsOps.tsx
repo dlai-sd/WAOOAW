@@ -518,9 +518,10 @@ export default function HiredAgentsOps() {
                   onClick={() => navigate(`/review-queue?${buildHiredAgentsSearch({
                     customerId,
                     agentId: selected.hired.agent_id,
+                    correlationId,
                   }).toString()}`)}
                 >
-                  Open Draft Review
+                  Open Review Queue
                 </Button>
                 <Button
                   appearance="secondary"

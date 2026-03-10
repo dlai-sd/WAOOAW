@@ -171,10 +171,10 @@ test('HiredAgentsOps preserves handoff context and links to the next operator su
   expect(screen.getByText(/Customer CUST-1 • Agent AGT-MKT-HEALTH-001 • Runtime HIRE-1/)).toBeInTheDocument()
   expect(screen.getByDisplayValue('corr-1')).toBeInTheDocument()
 
-  await user.click(screen.getByRole('button', { name: 'Open Draft Review' }))
+  await user.click(screen.getByRole('button', { name: 'Open Review Queue' }))
 
   await waitFor(() => {
-    expect(screen.getByTestId('location-display')).toHaveTextContent('/review-queue?customer_id=CUST-1&agent_id=AGT-MKT-HEALTH-001')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/review-queue?customer_id=CUST-1&agent_id=AGT-MKT-HEALTH-001&correlation_id=corr-1')
   })
 })
 
