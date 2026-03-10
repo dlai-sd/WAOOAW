@@ -276,6 +276,12 @@ describe("SignUpScreen", () => {
         "OTP-123",
         "email",
         "t***t@example.com",
+        {
+          full_name: "Test User",
+          email: "test@example.com",
+          phone: "+919876543210",
+          business_name: "ACME Inc",
+        },
       );
     });
   });
