@@ -94,6 +94,16 @@ This same structure must also be able to host a Share Trader later with a differ
 | 4 | PP `AgentManagement.tsx` | PP sees readiness and either block reasons or publish-for-hire action |
 | 5 | PP `HiredAgentsOps.tsx` | after customers hire, PP monitors health, approvals, diagnostics, and policy denials |
 
+**Dry run with sample data**
+
+| Step | User action | Route or system hop | Expected visible outcome |
+|---|---|---|---|
+| 1 | Create `marketing.content_operator.v1` | `PUT /pp/agent-setups` | setup saved |
+| 2 | Validate readiness | Plant readiness contract | PP sees missing or valid bindings |
+| 3 | Run draft simulation | `POST /pp/agent-setups/{id}/simulate` | preview SkillRun output shown in PP |
+| 4 | Publish for hire | PP publish action | agent marked hireable |
+| 5 | Monitor live hire later | `GET /pp/ops/hired-agents` | ops view shows health and approvals |
+
 #### Simulation B — CP paying customer workflow
 
 | Step | Screen or route | Expected behavior |
@@ -104,6 +114,16 @@ This same structure must also be able to host a Share Trader later with a differ
 | 4 | CP `MyAgents.tsx` + `SkillsPanel.tsx` | customer configures skill-level settings and sees runtime outputs |
 | 5 | CP approval queue routes | customer approves content drafts or trade plans and then sees resulting deliverables |
 
+**Dry run with sample data**
+
+| Step | User action | Route or system hop | Expected visible outcome |
+|---|---|---|---|
+| 1 | Browse `marketing.content_operator.v1` | CP discovery + detail pages | customer understands skills and trial or paid setup |
+| 2 | Start hire wizard | `PUT /cp/hire/wizard/draft` | draft saved |
+| 3 | Pay and finalize | `POST /cp/hire/wizard/finalize` | hired agent created |
+| 4 | Configure skill goals | `PATCH /cp/hired-agents/{id}/skills/{skill_id}/goal-config` | settings saved |
+| 5 | Approve first content draft | approval queue approve route | publish receipt later appears |
+
 #### Simulation C — Mobile customer workflow
 
 | Step | Screen or route | Expected behavior |
@@ -113,6 +133,81 @@ This same structure must also be able to host a Share Trader later with a differ
 | 3 | mobile `MyAgentsScreen` | customer sees active trials and hired agents with clear next actions |
 | 4 | mobile `AgentOperationsScreen` | customer handles approvals, scheduler actions, and recent outputs |
 | 5 | mobile approval queue hooks | customer can approve urgent items from mobile and trust that CP reflects the same state |
+
+**Dry run with sample data**
+
+| Step | User action | Route or system hop | Expected visible outcome |
+|---|---|---|---|
+| 1 | Open hired agent | `MyAgentsScreen` -> `AgentOperationsScreen` | runtime hub opens |
+| 2 | Load approvals | `GET /cp/hired-agents/{id}/approval-queue` | pending items visible |
+| 3 | Approve post from phone | approve mutation route | approval succeeds |
+| 4 | Refresh runtime state | same CP-backed mobile hooks | recent output and receipt visible |
+
+### Sequence diagrams
+
+#### PP simulation sequence
+
+```mermaid
+sequenceDiagram
+	participant U as PP User
+	participant PPF as PP Frontend
+	participant PPB as PP Backend
+	participant PG as Plant Gateway
+	participant PB as Plant Backend
+	U->>PPF: Save agent setup
+	PPF->>PPB: PUT /pp/agent-setups
+	PPB->>PG: proxy request
+	PG->>PB: validate setup
+	PB-->>PPF: readiness result
+	U->>PPF: Run test simulation
+	PPF->>PPB: POST /pp/agent-setups/{id}/simulate
+	PPB->>PG: proxy draft SkillRun
+	PG->>PB: create draft simulation
+	PB-->>PPF: output preview
+	U->>PPF: Publish for hire
+```
+
+#### CP customer simulation sequence
+
+```mermaid
+sequenceDiagram
+	participant C as Customer
+	participant CPF as CP Frontend
+	participant CPB as CP Backend
+	participant PG as Plant Gateway
+	participant PB as Plant Backend
+	C->>CPF: Start hire wizard
+	CPF->>CPB: PUT /cp/hire/wizard/draft
+	CPB->>PG: proxy hire draft
+	PG->>PB: save draft hire
+	C->>CPF: Finalize paid hire
+	CPF->>CPB: POST /cp/hire/wizard/finalize
+	CPB->>PG: finalize hire
+	PG->>PB: create hired instance
+	PB-->>CPF: hired instance ready
+	C->>CPF: Approve first draft later
+```
+
+#### Mobile customer simulation sequence
+
+```mermaid
+sequenceDiagram
+	participant M as Mobile Customer
+	participant MF as Mobile App
+	participant CPB as CP Backend
+	participant PG as Plant Gateway
+	participant PB as Plant Backend
+	M->>MF: Open AgentOperationsScreen
+	MF->>CPB: GET approval queue
+	CPB->>PG: proxy request
+	PG->>PB: fetch pending items
+	PB-->>MF: queue data
+	M->>MF: Approve item
+	MF->>CPB: POST approve action
+	CPB->>PG: proxy approval
+	PG->>PB: continue run
+	PB-->>MF: receipt + updated state
+```
 
 #### Proof standard
 

@@ -332,6 +332,133 @@ This is the reference scenario the platform should be able to execute cleanly.
 
 If this single simulation is smooth, the same skeleton can later host Share Trader by swapping the processing, validation, and connector flavors.
 
+### 12A.5 Explicit simulation run — PP platform user
+
+Persona: platform operations manager creating a hireable content agent.
+
+Sample object:
+- Agent type: `marketing.content_operator.v1`
+- Skills: `content_creation`, `content_publishing`
+- Approval mode: `manual`
+
+Run:
+1. Open PP `AgentTypeSetupScreen`.
+2. Fill identity, processor, pump, connector, publisher, and constraint policy.
+3. Save setup and see readiness result.
+4. Click `Test Simulation`.
+5. Plant creates a draft SkillRun and returns preview output.
+6. PP user checks preview, warnings, and policy status.
+7. Click `Publish for Hire`.
+8. Agent becomes available in CP and mobile discovery.
+
+```mermaid
+sequenceDiagram
+    participant PP as PP User
+    participant PPF as PP Frontend
+    participant PPB as PP Backend
+    participant PG as Plant Gateway
+    participant PB as Plant Backend
+
+    PP->>PPF: Fill AgentTypeSetupScreen
+    PPF->>PPB: PUT /pp/agent-setups
+    PPB->>PG: proxy setup request
+    PG->>PB: validate + persist setup
+    PB-->>PG: readiness result
+    PG-->>PPB: readiness result
+    PPB-->>PPF: setup saved + readiness
+    PP->>PPF: Click Test Simulation
+    PPF->>PPB: POST /pp/agent-setups/{id}/simulate
+    PPB->>PG: proxy draft simulation
+    PG->>PB: create draft SkillRun
+    PB-->>PG: preview output + policy notes
+    PG-->>PPB: preview output + policy notes
+    PPB-->>PPF: simulation preview
+    PP->>PPF: Click Publish for Hire
+```
+
+### 12A.6 Explicit simulation run — CP paying customer
+
+Persona: small business owner hiring one content agent and paying for a working setup.
+
+Sample object:
+- Customer: `GlowRevive Wellness`
+- Agent hired: `marketing.content_operator.v1`
+- Channels: Instagram and LinkedIn
+
+Run:
+1. Open CP `AgentDiscovery`.
+2. Open `AgentDetail` and review skills and approval expectations.
+3. Click hire CTA.
+4. Complete `HireSetupWizard` with nickname, posting goals, channel connection, and approval choice.
+5. Pay and finalize hire.
+6. Open `MyAgents` and review `SkillsPanel`.
+7. Receive first content draft for approval.
+8. Approve and later see publish receipt in runtime view.
+
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant CPF as CP Frontend
+    participant CPB as CP Backend
+    participant PG as Plant Gateway
+    participant PB as Plant Backend
+
+    C->>CPF: Browse AgentDiscovery
+    C->>CPF: Open AgentDetail
+    C->>CPF: Start hire in HireSetupWizard
+    CPF->>CPB: PUT /cp/hire/wizard/draft
+    CPB->>PG: proxy hire draft
+    PG->>PB: save hired agent draft
+    PB-->>PG: draft hired instance
+    PG-->>CPB: draft hired instance
+    CPB-->>CPF: draft saved
+    C->>CPF: Pay and finalize
+    CPF->>CPB: POST /cp/hire/wizard/finalize
+    CPB->>PG: finalize hire
+    PG->>PB: create Team(1), Role(1), Hired Agent
+    PB-->>PG: finalized hired instance
+    PG-->>CPB: finalized hired instance
+    CPB-->>CPF: hire complete
+    C->>CPF: Open My Agents and approve draft
+```
+
+### 12A.7 Explicit simulation run — mobile customer
+
+Persona: same paying customer using phone for approvals and quick operations.
+
+Run:
+1. Open mobile app and view hired agent in `MyAgentsScreen`.
+2. Tap into `AgentOperationsScreen`.
+3. See pending approval badge.
+4. Open approval item and review content preview.
+5. Approve from mobile.
+6. See updated recent activity and publish receipt.
+
+```mermaid
+sequenceDiagram
+    participant M as Mobile Customer
+    participant MF as Mobile App
+    participant CPB as CP Backend
+    participant PG as Plant Gateway
+    participant PB as Plant Backend
+
+    M->>MF: Open MyAgentsScreen
+    M->>MF: Open AgentOperationsScreen
+    MF->>CPB: GET /cp/hired-agents/{id}/approval-queue
+    CPB->>PG: proxy approval queue
+    PG->>PB: fetch pending deliverables
+    PB-->>PG: approval items
+    PG-->>CPB: approval items
+    CPB-->>MF: approval items
+    M->>MF: Approve content draft
+    MF->>CPB: POST /cp/hired-agents/{id}/approval-queue/{deliverableId}/approve
+    CPB->>PG: proxy approval action
+    PG->>PB: mark approved and continue publish flow
+    PB-->>PG: approval result + receipt
+    PG-->>CPB: approval result + receipt
+    CPB-->>MF: updated runtime state
+```
+
 ## 13. Low-Level Design
 
 This section defines the old-school modular design shape.
