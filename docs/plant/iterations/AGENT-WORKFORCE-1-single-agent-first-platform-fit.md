@@ -82,6 +82,42 @@ The reference walkthrough for acceptance should be a single customer hiring one 
 
 This same structure must also be able to host a Share Trader later with a different Processor, Validator, and Connector flavor.
 
+### Walkthrough Simulation — PP, CP, and Mobile Proof Runs
+
+#### Simulation A — PP platform team member daily workflow
+
+| Step | Screen or route | Expected behavior |
+|---|---|---|
+| 1 | PP `AgentTypeSetupScreen.tsx` + `PUT /pp/agent-setups` | platform user defines agent identity, construct bindings, and constraint policy in one place |
+| 2 | Plant `POST /api/v1/agent-mold/spec/validate` | PP sees whether the setup is structurally valid |
+| 3 | New PP draft simulation action | PP runs a safe SkillRun preview without external publish or trade execution |
+| 4 | PP `AgentManagement.tsx` | PP sees readiness and either block reasons or publish-for-hire action |
+| 5 | PP `HiredAgentsOps.tsx` | after customers hire, PP monitors health, approvals, diagnostics, and policy denials |
+
+#### Simulation B — CP paying customer workflow
+
+| Step | Screen or route | Expected behavior |
+|---|---|---|
+| 1 | CP `AgentDiscovery.tsx` / `AgentDetail.tsx` | customer understands the agent as a bundle of skills with clear outcomes |
+| 2 | CP `HireSetupWizard.tsx` + `hire_wizard.py` | customer sets nickname, connections, goals, and approval preference |
+| 3 | payment and finalize route | customer completes paid hire or trial start without seeing team complexity |
+| 4 | CP `MyAgents.tsx` + `SkillsPanel.tsx` | customer configures skill-level settings and sees runtime outputs |
+| 5 | CP approval queue routes | customer approves content drafts or trade plans and then sees resulting deliverables |
+
+#### Simulation C — Mobile customer workflow
+
+| Step | Screen or route | Expected behavior |
+|---|---|---|
+| 1 | mobile `DiscoverScreen` / `AgentDetailScreen` | customer discovers and starts hire from phone |
+| 2 | mobile `HireWizardScreen` | customer completes lightweight setup flow |
+| 3 | mobile `MyAgentsScreen` | customer sees active trials and hired agents with clear next actions |
+| 4 | mobile `AgentOperationsScreen` | customer handles approvals, scheduler actions, and recent outputs |
+| 5 | mobile approval queue hooks | customer can approve urgent items from mobile and trust that CP reflects the same state |
+
+#### Proof standard
+
+This plan is only considered proven when these three simulations are coherent without inventing separate business logic for PP, CP, and mobile. All three must sit on the same Plant runtime contracts.
+
 ---
 
 ## Iteration Summary

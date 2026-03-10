@@ -268,6 +268,70 @@ Typical result:
 | Content Publishing | Share Trader | both are approval-driven external action skills |
 | Share Trader | Content Publishing | both need controlled execution and receipt tracking |
 
+## 12A. Surface Simulation
+
+This section shows how the design should feel in real daily use.
+
+### 12A.1 PP platform team member — day-to-day flow
+
+The PP user should not jump between unrelated screens to define, test, and publish an agent. Their normal day should feel like one controlled manufacturing flow.
+
+```text
+Open PP -> review agent readiness -> update skill and constraint setup -> run draft simulation -> inspect output -> publish for hire -> monitor live hired agents
+```
+
+Typical PP work:
+- open Agent Type Setup and review construct bindings
+- certify or attach reusable skills
+- adjust approval mode and policy limits
+- run a safe draft SkillRun to preview output
+- publish the agent for marketplace hiring
+- use Hired Agents Ops for health, approvals, diagnostics, and incidents
+
+### 12A.2 CP customer — paid hiring and operations flow
+
+The CP customer should feel like they are hiring talent, not configuring a backend system.
+
+```text
+Discover agent -> read skill-based value proposition -> start trial or paid hire -> complete setup -> approve drafts or actions -> receive outcomes -> manage runtime
+```
+
+Typical CP work:
+- browse agent discovery cards
+- open agent detail and understand its skills
+- complete hire wizard with nickname, goals, and connections
+- pay where required and finalize hire
+- open My Agents and configure skill-level goals
+- approve content drafts or trade plans when prompted
+- view results, performance, and ongoing activity
+
+### 12A.3 Mobile customer — lightweight runtime flow
+
+Mobile should mirror the same runtime truth as CP, just with a smaller and faster interaction model.
+
+```text
+Open mobile -> browse or reopen hired agent -> check approvals and activity -> approve or reject -> view status and recent outputs
+```
+
+Typical mobile work:
+- discover agent and start hire flow
+- finish hire setup with reduced-friction screens
+- open My Agents for active trials or hired agents
+- jump into Agent Operations for approvals, scheduler actions, and recent outputs
+- approve urgent trade or content items without opening the web portal
+
+### 12A.4 One reference simulation
+
+This is the reference scenario the platform should be able to execute cleanly.
+
+| Actor | Simulation |
+|---|---|
+| PP user | creates `marketing.content_operator.v1`, attaches Content Creation + Content Publishing, tests with a draft SkillRun, then publishes it |
+| CP customer | hires that agent, connects Instagram, sets posting goals, pays, and approves first content draft |
+| Mobile customer | later receives approval-required notification, opens Agent Operations, approves a queued post, and sees the publish receipt |
+
+If this single simulation is smooth, the same skeleton can later host Share Trader by swapping the processing, validation, and connector flavors.
+
 ## 13. Low-Level Design
 
 This section defines the old-school modular design shape.
