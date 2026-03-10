@@ -101,6 +101,11 @@ export default function HireSetupWizard() {
     },
   }
 
+  const selectedAgentSummary = useMemo(() => {
+    if (!agentId) return 'Agent not identified'
+    return agentId
+  }, [agentId])
+
   const canNext = useMemo(() => {
     if (step === 1) return Boolean(nickname.trim())
     if (step === 2) return Boolean(theme.trim())
@@ -375,7 +380,16 @@ export default function HireSetupWizard() {
       })
       setDraft(finalized)
 
-      navigate('/portal')
+      navigate('/portal', {
+        state: {
+          portalEntry: {
+            page: 'my-agents',
+            agentId,
+            source: 'trial-activated',
+            subscriptionId,
+          },
+        },
+      })
     } catch (e: any) {
       setError(e?.message || 'Failed to activate trial')
     }
@@ -390,6 +404,7 @@ export default function HireSetupWizard() {
   }
 
   const reviewSummary = [
+    { label: 'Selected agent', value: selectedAgentSummary },
     { label: 'Agent nickname', value: nickname || 'Not set' },
     { label: 'Theme', value: theme || 'Default' },
     {
@@ -419,6 +434,10 @@ export default function HireSetupWizard() {
           </p>
         </div>
         <div className="hire-wizard-proof-grid">
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">Agent</div>
+            <div className="hire-wizard-proof-label">{selectedAgentSummary}</div>
+          </div>
           <div className="hire-wizard-proof-card">
             <div className="hire-wizard-proof-value">4</div>
             <div className="hire-wizard-proof-label">Simple steps</div>
@@ -630,7 +649,13 @@ export default function HireSetupWizard() {
             </Button>
           )}
 
-          <Button appearance="subtle" onClick={() => navigate('/portal')} disabled={saving}>
+          <Button
+            appearance="subtle"
+            onClick={() =>
+              navigate(agentId ? `/agent/${encodeURIComponent(agentId)}` : '/portal')
+            }
+            disabled={saving}
+          >
             Exit
           </Button>
         </div>

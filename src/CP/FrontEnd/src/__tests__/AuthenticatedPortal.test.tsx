@@ -53,13 +53,14 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-function renderPortal() {
+function renderPortal(props?: Partial<React.ComponentProps<typeof AuthenticatedPortal>>) {
   return render(
     <BrowserRouter>
       <AuthenticatedPortal
         theme="light"
         toggleTheme={() => {}}
         onLogout={() => {}}
+        {...props}
       />
     </BrowserRouter>
   )
@@ -141,7 +142,7 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     fireEvent.click(screen.getByText('Subscriptions & Billing'))
 
     expect(screen.getByRole('heading', { name: 'Understand What You Are Paying For' })).toBeTruthy()
-    expect(screen.getByText('Subscription view')).toBeTruthy()
+    expect(screen.getByText('Live subscription view')).toBeTruthy()
     expect(screen.getByTestId('page-billing')).toBeTruthy()
   })
 
@@ -154,5 +155,50 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('page-agent-detail')).toBeTruthy()
     expect(screen.getByText('Agent Detail AGT-42')).toBeTruthy()
     expect(screen.getByTestId('cp-nav-discover').className).toContain('active')
+  })
+
+  it('uses truthful shell copy instead of fake runtime counters', () => {
+    renderPortal()
+
+    expect(screen.getByText('Customer shell')).toBeTruthy()
+    expect(screen.getByText('Truthful state first')).toBeTruthy()
+    expect(screen.getByText('Open My Agents for runtime truth')).toBeTruthy()
+    expect(screen.queryByText('1 approval waiting')).toBeNull()
+    expect(screen.queryByText('2 active hires')).toBeNull()
+  })
+
+  it('shows a resume-setup banner when entering from payment confirmation', () => {
+    renderPortal({
+      initialPage: 'my-agents',
+      initialAgentId: 'AGT-MKT-001',
+      initialJourneyContext: {
+        source: 'payment-confirmed',
+        subscriptionId: 'SUB-123',
+      },
+    })
+
+    expect(screen.getByTestId('cp-portal-entry-banner')).toBeTruthy()
+    expect(screen.getByText('Setup is still required for AGT-MKT-001')).toBeTruthy()
+    expect(screen.getByText('Agent: AGT-MKT-001')).toBeTruthy()
+    expect(screen.getByText('Subscription: SUB-123')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('cp-portal-entry-primary'))
+
+    expect(navigateMock).toHaveBeenCalledWith('/hire/setup/SUB-123?agentId=AGT-MKT-001')
+  })
+
+  it('lands on My Agents with truthful post-activation guidance', () => {
+    renderPortal({
+      initialPage: 'my-agents',
+      initialAgentId: 'AGT-TRD-001',
+      initialJourneyContext: {
+        source: 'trial-activated',
+        subscriptionId: 'SUB-456',
+      },
+    })
+
+    expect(screen.getByTestId('page-my-agents')).toBeTruthy()
+    expect(screen.getByText('AGT-TRD-001 is now in runtime setup')).toBeTruthy()
+    expect(screen.getByText('Agent: AGT-TRD-001')).toBeTruthy()
   })
 })

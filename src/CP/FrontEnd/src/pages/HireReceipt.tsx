@@ -12,6 +12,7 @@ export default function HireReceipt() {
   const agentId = searchParams.get('agentId') || ''
 
   const canContinue = useMemo(() => Boolean(subscriptionId && agentId), [subscriptionId, agentId])
+  const selectedAgentSummary = useMemo(() => agentId || 'Agent reference unavailable', [agentId])
 
   return (
     <div className="hire-receipt-page" style={{ maxWidth: '920px', margin: '0 auto', padding: '2rem 1rem' }}>
@@ -24,6 +25,10 @@ export default function HireReceipt() {
           </p>
         </div>
         <div className="hire-wizard-proof-grid">
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">Agent</div>
+            <div className="hire-wizard-proof-label">{selectedAgentSummary}</div>
+          </div>
           <div className="hire-wizard-proof-card">
             <div className="hire-wizard-proof-value">Paid</div>
             <div className="hire-wizard-proof-label">Order captured</div>
@@ -45,6 +50,16 @@ export default function HireReceipt() {
           <div className="hire-receipt-reference-label">Order ID</div>
           <div className="hire-receipt-reference-value">{orderId}</div>
         </div>
+        {subscriptionId ? (
+          <div className="hire-receipt-reference-card">
+            <div className="hire-receipt-reference-label">Subscription ID</div>
+            <div className="hire-receipt-reference-value">{subscriptionId}</div>
+          </div>
+        ) : null}
+        <div className="hire-receipt-reference-card">
+          <div className="hire-receipt-reference-label">Selected Agent</div>
+          <div className="hire-receipt-reference-value">{selectedAgentSummary}</div>
+        </div>
 
         <div className="hire-wizard-bottom-grid" style={{ marginTop: '1.5rem' }}>
           <Card className="hire-wizard-bottom-card">
@@ -58,7 +73,23 @@ export default function HireReceipt() {
         </div>
 
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Button appearance="secondary" onClick={() => navigate('/portal')}>Go to Portal</Button>
+          <Button
+            appearance="secondary"
+            onClick={() =>
+              navigate('/portal', {
+                state: {
+                  portalEntry: {
+                    page: 'my-agents',
+                    agentId,
+                    source: 'payment-confirmed',
+                    subscriptionId,
+                  },
+                },
+              })
+            }
+          >
+            Go to My Agents
+          </Button>
           <Button appearance="primary" onClick={() => navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?agentId=${encodeURIComponent(agentId)}`)} disabled={!canContinue}>
             Continue Setup
           </Button>

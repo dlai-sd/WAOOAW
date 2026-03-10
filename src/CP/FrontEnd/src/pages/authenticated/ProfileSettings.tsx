@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card } from '@fluentui/react-components'
-import { updateProfile, type ProfileUpdatePayload } from '../../services/profile.service'
+import { getProfile, updateProfile, type ProfileData, type ProfileUpdatePayload } from '../../services/profile.service'
 
 export default function ProfileSettings() {
   const [editOpen, setEditOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<ProfileData | null>(null)
   const [form, setForm] = useState<ProfileUpdatePayload>({
     full_name: '',
     phone: '',
@@ -12,6 +14,38 @@ export default function ProfileSettings() {
   })
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      setLoading(true)
+      setErrorMsg('')
+      try {
+        const data = await getProfile()
+        if (cancelled) return
+        setProfile(data)
+        setForm({
+          full_name: data.full_name || data.name || '',
+          phone: data.phone || '',
+          business_name: data.business_name || '',
+          industry: data.industry || '',
+        })
+      } catch (e: any) {
+        if (!cancelled) {
+          setErrorMsg(e?.message || 'Failed to load profile. Please try again.')
+          setProfile(null)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleEditClick = () => {
     setSaveStatus('idle')
@@ -32,7 +66,14 @@ export default function ProfileSettings() {
       if (form.phone?.trim()) payload.phone = form.phone.trim()
       if (form.business_name?.trim()) payload.business_name = form.business_name.trim()
       if (form.industry?.trim()) payload.industry = form.industry.trim()
-      await updateProfile(payload)
+      const updated = await updateProfile(payload)
+      setProfile(updated)
+      setForm({
+        full_name: updated.full_name || updated.name || '',
+        phone: updated.phone || '',
+        business_name: updated.business_name || '',
+        industry: updated.industry || '',
+      })
       setSaveStatus('success')
       setEditOpen(false)
     } catch {
@@ -45,13 +86,47 @@ export default function ProfileSettings() {
     window.location.href = 'mailto:support@waooaw.com?subject=WAOOAW%20Customer%20Support'
   }
 
+  const profileCompletion = useMemo(() => {
+    const fields = [
+      profile?.full_name || profile?.name,
+      profile?.phone,
+      profile?.business_name,
+      profile?.industry,
+    ]
+    return fields.filter((value) => String(value || '').trim()).length
+  }, [profile])
+
+  const businessProfileStatus = loading
+    ? 'Loading…'
+    : profileCompletion >= 3
+      ? 'Mostly configured'
+      : profileCompletion > 0
+        ? 'Needs review'
+        : 'Action needed'
+
+  const businessProfileNote = loading
+    ? 'Loading the editable business profile from CP'
+    : profileCompletion >= 3
+      ? 'Core business identity is present and can be updated here.'
+      : 'Add or confirm business identity fields before relying on this workspace as your operating brief.'
+
+  const preferenceStatus = loading ? 'Loading…' : 'Partial today'
+  const preferenceNote = loading
+    ? 'Checking what preferences are actually customer-editable'
+    : 'Profile edits are live here today. Notification, language, and richer account controls are still separate future work.'
+
+  const supportStatus = loading ? 'Loading…' : 'Support email live'
+  const supportNote = loading
+    ? 'Checking current support routes'
+    : 'Direct support contact is available now. Help center and legal pages are not yet exposed as dedicated CP routes.'
+
   const sections = [
     {
       title: 'Account',
       icon: '👤',
       items: [
         { label: 'Edit Profile', action: handleEditClick, status: 'Action available' },
-        { label: 'Business Information', description: 'Managed from your profile and hire setup details', status: 'Read-only context' },
+        { label: 'Business Information', description: profile?.business_name ? `Current business: ${profile.business_name}` : 'Managed from your profile and hire setup details', status: profile?.business_name ? 'Loaded from CP' : 'Needs confirmation' },
         { label: 'Team Members', description: 'Reserved for a later multi-user customer workspace flow', status: 'Planned next' },
       ],
     },
@@ -81,7 +156,7 @@ export default function ProfileSettings() {
       <div className="page-header" style={{ marginBottom: '24px' }}>
         <h1>Profile & Settings</h1>
         <p style={{ color: 'var(--colorNeutralForeground2)', marginTop: '4px' }}>
-          Manage your business identity, team members, and preferences.
+          Confirm what the customer profile actually knows today, then edit only the fields WAOOAW already supports.
         </p>
       </div>
 
@@ -91,28 +166,40 @@ export default function ProfileSettings() {
           <h2>Keep your account aligned with how WAOOAW works for your business.</h2>
           <p>
             Customers should feel that their profile is the operating brief for their agent workforce,
-            not just a settings form hidden after signup.
+            but only when the data has actually been loaded and confirmed.
           </p>
         </Card>
 
         <div className="profile-settings-summary-grid">
           <Card className="profile-settings-summary-card">
             <div className="profile-settings-summary-label">Business profile</div>
-            <div className="profile-settings-summary-value">Ready</div>
-            <div className="profile-settings-summary-note">Name, phone, and company details are editable here.</div>
+            <div className="profile-settings-summary-value">{businessProfileStatus}</div>
+            <div className="profile-settings-summary-note">{businessProfileNote}</div>
           </Card>
           <Card className="profile-settings-summary-card">
             <div className="profile-settings-summary-label">Preferences</div>
-            <div className="profile-settings-summary-value">In control</div>
-            <div className="profile-settings-summary-note">Notification, language, and operating preferences live in one place.</div>
+            <div className="profile-settings-summary-value">{preferenceStatus}</div>
+            <div className="profile-settings-summary-note">{preferenceNote}</div>
           </Card>
           <Card className="profile-settings-summary-card">
             <div className="profile-settings-summary-label">Support routes</div>
-            <div className="profile-settings-summary-value">Always visible</div>
-            <div className="profile-settings-summary-note">Help, privacy, and support should never feel hidden during a live issue.</div>
+            <div className="profile-settings-summary-value">{supportStatus}</div>
+            <div className="profile-settings-summary-note">{supportNote}</div>
           </Card>
         </div>
       </div>
+
+      {loading && (
+        <Card style={{ padding: '16px', marginBottom: '16px' }}>
+          Loading your current profile from CP before showing editable account truth.
+        </Card>
+      )}
+
+      {!loading && errorMsg && (
+        <Card style={{ padding: '16px', marginBottom: '16px', color: 'var(--colorStatusDangerForeground1)' }}>
+          {errorMsg}
+        </Card>
+      )}
 
       {/* Edit Profile Modal */}
       {editOpen && (
