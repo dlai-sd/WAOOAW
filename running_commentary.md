@@ -42,7 +42,7 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 | 3 | Structured QA pass on mobile journeys | complete | chunks 3A and 3B validated and checkpointed |
 | 4 | Fix defects from QA pass | complete | mobile residuals and PP usage-events first-load honesty fixed and checkpointed |
 | 5 | Add targeted frontend test coverage for new flows | complete | CP portal routing, PP hook trace stability, and mobile ops routing coverage added and validated |
-| 6 | Final smoke + PR prep | in progress | branch summary, residual risks, open PR |
+| 6 | Final smoke + PR prep | complete | focused smoke validation green, worktree clean, residual warnings recorded |
 
 ### Chunk 1A — CP QA sub-checkpoint
 
@@ -223,6 +223,22 @@ Files in Chunk 5B:
 ### Iteration 3 Status
 
 Focused frontend test hardening is complete. The final phase is smoke validation and PR-prep context so the branch can be handed off cleanly.
+
+### Iteration 4 — Final Smoke + PR Prep
+
+Validated and ready on branch after the final smoke pass.
+
+| Area | Result |
+|---|---|
+| Worktree state | `git status --short` returned clean |
+| CP smoke | `npm run build` and focused `vitest` for `AuthenticatedPortal` exited `0` |
+| PP smoke | `npm run build` and focused `vitest` for layout, hired-agent ops, review queue, hook trace, policy denials, and usage events exited `0` |
+| Mobile smoke | `npm run typecheck` and focused `jest` for navigation plus `MyAgentsScreen` exited `0` |
+| Residual warnings | Vite still warns about large frontend chunks in CP and PP builds; mobile Jest still emits upstream `react-test-renderer` deprecation noise; `ts-jest` warns to move `isolatedModules` into `tsconfig.json` |
+
+### Iteration 4 Status
+
+All four iterations are complete on `feat/ui-ux-revamp`. The branch is clean, checkpointed, and ready for PR handoff with residual warnings documented above.
 
 ---
 
