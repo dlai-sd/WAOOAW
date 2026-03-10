@@ -20,7 +20,11 @@ import {
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { registerPushToken } from '../../services/notifications/pushNotifications.service';
-import type { ProfileStackScreenProps } from '@/navigation/types';
+import type {
+  AgentOperationsFocusSection,
+  MyAgentsStackParamList,
+  ProfileStackScreenProps,
+} from '@/navigation/types';
 
 type Props = ProfileStackScreenProps<'Notifications'>;
 
@@ -28,6 +32,8 @@ type Props = ProfileStackScreenProps<'Notifications'>;
 
 export type NotificationType =
   | 'approval_required'    // → AgentOperationsScreen, section: "approvals"
+  | 'deliverable_approved' // → AgentOperationsScreen, section: "recent"
+  | 'deliverable_rejected' // → AgentOperationsScreen, section: "activity"
   | 'credential_expiring'  // → AgentOperationsScreen, section: "health"
   | 'agent_paused'         // → AgentOperationsScreen, section: "scheduler"
   | 'trial_ending'         // → AgentOperationsScreen, section: "spend"
@@ -49,6 +55,17 @@ function getRuntimeId(notification: Notification): string | undefined {
   return notification.hired_instance_id || notification.hired_agent_id;
 }
 
+const FOCUS_SECTION_LABELS: Record<AgentOperationsFocusSection, string> = {
+  activity: "today's activity",
+  approvals: 'pending approvals',
+  scheduler: 'schedule controls',
+  health: 'connection health',
+  goals: 'goal configuration',
+  spend: 'trial usage and spend',
+  recent: 'recent publications',
+  history: 'performance history',
+}
+
 function getNotificationDestinationLabel(notification: Notification): string {
   const runtimeId = getRuntimeId(notification)
   const target = resolveNavigationTarget(notification)
@@ -58,7 +75,11 @@ function getNotificationDestinationLabel(notification: Notification): string {
   }
 
   const focusSection = (target.params as { focusSection?: string }).focusSection
-  return `Opens ${focusSection || 'agent operations'} for runtime ${runtimeId}.`
+  const destinationLabel = focusSection && focusSection in FOCUS_SECTION_LABELS
+    ? FOCUS_SECTION_LABELS[focusSection as AgentOperationsFocusSection]
+    : 'agent operations'
+
+  return `Opens ${destinationLabel} for runtime ${runtimeId}.`
 }
 
 /**
@@ -67,7 +88,10 @@ function getNotificationDestinationLabel(notification: Notification): string {
  */
 export function resolveNavigationTarget(
   notification: Notification
-): { screen: string; params: object } | null {
+): {
+  screen: 'AgentOperations';
+  params: MyAgentsStackParamList['AgentOperations'];
+} | null {
   const runtimeId = getRuntimeId(notification)
   if (!runtimeId) return null;
   switch (notification.type) {
@@ -75,6 +99,16 @@ export function resolveNavigationTarget(
       return {
         screen: 'AgentOperations',
         params: { hiredAgentId: runtimeId, focusSection: 'approvals' },
+      };
+    case 'deliverable_approved':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: runtimeId, focusSection: 'recent' },
+      };
+    case 'deliverable_rejected':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: runtimeId, focusSection: 'activity' },
       };
     case 'credential_expiring':
       return {
@@ -120,11 +154,19 @@ export const NotificationsScreen = ({ navigation }: Props) => {
       created_at: 'Just now',
     },
     {
-      id: 'demo-health',
-      type: 'credential_expiring',
-      title: 'Credential expiring',
-      body: 'One connected account needs attention before the next run window.',
+      id: 'demo-approved',
+      type: 'deliverable_approved',
+      title: 'Deliverable approved and queued to publish',
+      body: 'Your approved draft is moving into the runtime stream so you can verify the publication outcome.',
       hired_instance_id: 'demo-hired-agent-1',
+      created_at: '42m ago',
+    },
+    {
+      id: 'demo-rejected',
+      type: 'deliverable_rejected',
+      title: 'Revision requested on a deliverable',
+      body: 'A deliverable was not approved. Open activity to see what changed before the next revision arrives.',
+      hired_instance_id: 'demo-hired-agent-2',
       created_at: '2h ago',
     },
   ];
@@ -247,10 +289,10 @@ export const NotificationsScreen = ({ navigation }: Props) => {
           }}
         >
           <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 6 }}>
-            Approval alerts should land you in the right Ops section.
+            Approval and deliverable alerts should land you in the right Ops section.
           </Text>
           <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13 }}>
-            Tap an alert preview below to jump into the agent operations hub with the relevant section already opened.
+            Tap an alert preview below to jump into the agent operations hub with the relevant section already opened for the event that just changed.
           </Text>
         </View>
         {actionableNotifications.map((notification) => (
