@@ -67,6 +67,7 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: () => ({
     params: {
       agentId: 'agent-123',
+      trialId: 'sub-123',
       trialData: {
         startDate: '2026-02-20',
         goals: 'Test marketing strategies and content performance',
@@ -261,7 +262,7 @@ describe('HireConfirmationScreen Component', () => {
     const dashboardButton = getByText('Go to Trial Dashboard');
     fireEvent.press(dashboardButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('TrialDashboard', { agentId: 'agent-123' });
+    expect(mockNavigate).toHaveBeenCalledWith('TrialDashboard', { trialId: 'sub-123' });
   });
 
   it('should navigate to My Agents when button pressed', () => {

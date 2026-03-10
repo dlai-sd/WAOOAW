@@ -5,7 +5,9 @@
  */
 
 import apiClient from '../../lib/apiClient';
+import cpApiClient from '../../lib/cpApiClient';
 import type {
+  Deliverable,
   HiredAgentInstance,
   MyAgentInstanceSummary,
   MyAgentsSummaryResponse,
@@ -47,7 +49,7 @@ class HiredAgentsService {
    * @returns Promise<MyAgentInstanceSummary[]> - List of hired agent summaries
    */
   async listMyAgents(): Promise<MyAgentInstanceSummary[]> {
-    const response = await apiClient.get<MyAgentsSummaryResponse>('/cp/my-agents/summary');
+    const response = await cpApiClient.get<MyAgentsSummaryResponse>('/cp/my-agents/summary');
     return response.data.instances || [];
   }
 
@@ -62,10 +64,24 @@ class HiredAgentsService {
    * @returns Promise<HiredAgentInstance> - Full hired agent instance
    */
   async getHiredAgentBySubscription(subscriptionId: string): Promise<HiredAgentInstance> {
-    const response = await apiClient.get<HiredAgentInstance>(
+    const response = await cpApiClient.get<HiredAgentInstance>(
       `/cp/hired-agents/by-subscription/${encodeURIComponent(subscriptionId)}`
     );
     return response.data;
+  }
+
+  async getHiredAgentById(hiredAgentId: string): Promise<HiredAgentInstance> {
+    const response = await apiClient.get<HiredAgentInstance>(
+      `/api/v1/hired-agents/by-id/${encodeURIComponent(hiredAgentId)}`
+    );
+    return response.data;
+  }
+
+  async getDeliverablesByHiredAgent(hiredAgentId: string): Promise<Deliverable[]> {
+    const response = await cpApiClient.get<{ deliverables?: Deliverable[] }>(
+      `/cp/hired-agents/${encodeURIComponent(hiredAgentId)}/deliverables`
+    );
+    return response.data.deliverables || [];
   }
 
   // ========== TRIAL STATUS (PLANT BACKEND) ==========

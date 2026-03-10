@@ -75,15 +75,15 @@ export const TrialDashboardScreen = ({ navigation, route }: Props) => {
 
   const progressPercentage = getProgressPercentage();
 
-  // Mock deliverables data (TODO: Replace with API call when backend is ready)
-    const { data: deliverables = [], isLoading: delivLoading } = useDeliverables(trialId);
+  const hiredAgentId = agent?.hired_instance_id;
+  const { data: deliverables = [], isLoading: delivLoading } = useDeliverables(hiredAgentId);
 
   // Approval queue — pending deliverables awaiting customer action
   const {
     deliverables: pendingApprovals,
     approve: approveDeliverable,
     reject: rejectDeliverable,
-  } = useApprovalQueue(trialId);
+  } = useApprovalQueue(hiredAgentId);
 
   // Get deliverable icon based on type
   const getDeliverableIcon = (type: DeliverableType): string => {

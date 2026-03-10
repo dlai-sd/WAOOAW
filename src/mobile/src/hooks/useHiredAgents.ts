@@ -6,6 +6,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { hiredAgentsService } from '../services/hiredAgents/hiredAgents.service';
 import type {
+  Deliverable,
   MyAgentInstanceSummary,
   HiredAgentInstance,
   TrialStatusRecord,
@@ -66,6 +67,20 @@ export function useHiredAgent(
   });
 }
 
+export function useHiredAgentById(
+  hiredAgentId: string | undefined
+): UseQueryResult<HiredAgentInstance, Error> {
+  return useQuery({
+    queryKey: ['hiredAgentById', hiredAgentId],
+    queryFn: () => hiredAgentsService.getHiredAgentById(hiredAgentId!),
+    staleTime: 1000 * 60 * 2,
+    gcTime: 1000 * 60 * 10,
+    enabled: !!hiredAgentId,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
+  });
+}
+
 /**
  * Hook for fetching all trial statuses for current customer
  * Lightweight view without full hired agent data
@@ -114,23 +129,11 @@ export function useTrialStatusBySubscription(
   });
 }
 
-// Fetch deliverables for a trial subscription
-import { Deliverable } from '../types/hiredAgents.types';
-import apiClient from '../lib/apiClient';
-// ...already imported above...
-
-const fetchDeliverables = async (subscriptionId: string): Promise<Deliverable[]> => {
-  const response = await apiClient.get<Deliverable[]>('/api/v1/deliverables', {
-    params: { subscription_id: subscriptionId },
-  });
-  return response.data;
-};
-
-export const useDeliverables = (subscriptionId: string) => {
+export const useDeliverables = (hiredAgentId: string | undefined) => {
   return useQuery({
-    queryKey: ['deliverables', subscriptionId],
-    queryFn: () => fetchDeliverables(subscriptionId),
-    enabled: !!subscriptionId,
+    queryKey: ['deliverables', hiredAgentId],
+    queryFn: () => hiredAgentsService.getDeliverablesByHiredAgent(hiredAgentId!),
+    enabled: !!hiredAgentId,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 10000),
   });

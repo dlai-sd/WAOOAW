@@ -10,8 +10,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   useHiredAgents,
   useHiredAgent,
+  useHiredAgentById,
   useTrialStatus,
   useTrialStatusBySubscription,
+  useDeliverables,
   useActiveHiredAgents,
   useAgentsInTrial,
   useAgentsNeedingSetup,
@@ -181,6 +183,69 @@ describe('useHiredAgent Hook', () => {
     });
 
     expect(result.current.error).toEqual(mockError);
+  });
+});
+
+describe('useHiredAgentById Hook', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should fetch hired agent by hired-instance ID', async () => {
+    const mockHiredAgent: HiredAgentInstance = {
+      hired_instance_id: 'HIRE-123',
+      subscription_id: 'SUB-123',
+      agent_id: 'AGT-MKT-001',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+    };
+
+    (hiredAgentsService.getHiredAgentById as any).mockResolvedValue(mockHiredAgent);
+
+    const { result } = renderHook(() => useHiredAgentById('HIRE-123'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toEqual(mockHiredAgent);
+    expect(hiredAgentsService.getHiredAgentById).toHaveBeenCalledWith('HIRE-123');
+  });
+});
+
+describe('useDeliverables Hook', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should fetch deliverables by hired-instance ID', async () => {
+    const mockDeliverables = [
+      {
+        deliverable_id: 'del-1',
+        hired_instance_id: 'HIRE-123',
+        agent_id: 'AGT-MKT-001',
+        title: 'Draft 1',
+        type: 'document',
+        review_status: 'pending_review',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      },
+    ];
+
+    (hiredAgentsService.getDeliverablesByHiredAgent as any).mockResolvedValue(mockDeliverables);
+
+    const { result } = renderHook(() => useDeliverables('HIRE-123'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data).toEqual(mockDeliverables);
+    expect(hiredAgentsService.getDeliverablesByHiredAgent).toHaveBeenCalledWith('HIRE-123');
   });
 });
 

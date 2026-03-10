@@ -881,6 +881,7 @@ export const HireWizardScreen = () => {
         console.log('Payment successful:', result);
         (navigation.navigate as any)('HireConfirmation', {
           agentId,
+          trialId: result.subscription_id,
           subscriptionId: result.subscription_id,
           paymentId: result.payment_id,
           trialData,

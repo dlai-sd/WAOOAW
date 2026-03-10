@@ -26,6 +26,9 @@ import { ErrorView } from '@/components/ErrorView';
 // Navigation types
 type HireConfirmationParams = {
   agentId: string;
+  trialId?: string;
+  subscriptionId?: string;
+  paymentId?: string;
   trialData?: {
     startDate: string;
     goals: string;
@@ -48,7 +51,8 @@ export const HireConfirmationScreen = () => {
   const route = useRoute<HireConfirmationRouteProp>();
   const navigation = useNavigation();
   const { colors, spacing } = useTheme();
-  const { agentId, trialData, paymentData } = route.params;
+  const { agentId, trialId, subscriptionId, trialData, paymentData } = route.params;
+  const resolvedTrialId = trialId || subscriptionId;
 
   // Fetch agent data
   const { data: agent, isLoading, error, refetch } = useAgentDetail(agentId);
@@ -71,7 +75,11 @@ export const HireConfirmationScreen = () => {
   };
 
   const handleGoToTrialDashboard = () => {
-    (navigation.navigate as any)('TrialDashboard', { agentId });
+    if (resolvedTrialId) {
+      (navigation.navigate as any)('TrialDashboard', { trialId: resolvedTrialId });
+      return;
+    }
+    (navigation.navigate as any)('MyAgents');
   };
 
   const handleGoHome = () => {

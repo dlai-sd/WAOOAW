@@ -7,7 +7,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../lib/apiClient';
+import cpApiClient from '../lib/cpApiClient';
 
 export interface DeliverableItem {
   id: string;
@@ -36,31 +36,31 @@ interface ApprovalQueueResult {
 }
 
 async function fetchApprovalQueue(hiredAgentId: string): Promise<DeliverableItem[]> {
-  const response = await apiClient.get<DeliverableItem[]>(
+  const response = await cpApiClient.get<DeliverableItem[]>(
     `/cp/hired-agents/${hiredAgentId}/approval-queue`
   );
   return response.data;
 }
 
 async function approveDeliverable(hiredAgentId: string, deliverableId: string): Promise<void> {
-  await apiClient.post(
+  await cpApiClient.post(
     `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/approve`
   );
 }
 
 async function rejectDeliverable(hiredAgentId: string, deliverableId: string): Promise<void> {
-  await apiClient.post(
+  await cpApiClient.post(
     `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/reject`
   );
 }
 
-export function useApprovalQueue(hiredAgentId: string): ApprovalQueueResult {
+export function useApprovalQueue(hiredAgentId: string | undefined): ApprovalQueueResult {
   const queryClient = useQueryClient();
   const queryKey = ['approvalQueue', hiredAgentId];
 
   const { data = [], isLoading, error } = useQuery({
     queryKey,
-    queryFn: () => fetchApprovalQueue(hiredAgentId),
+    queryFn: () => fetchApprovalQueue(hiredAgentId!),
     enabled: !!hiredAgentId,
     staleTime: 1000 * 60, // 1 minute
     retry: 2,
@@ -69,7 +69,7 @@ export function useApprovalQueue(hiredAgentId: string): ApprovalQueueResult {
 
   const approveMutation = useMutation({
     mutationFn: (deliverableId: string) =>
-      approveDeliverable(hiredAgentId, deliverableId),
+      approveDeliverable(hiredAgentId!, deliverableId),
     onMutate: async (deliverableId) => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<DeliverableItem[]>(queryKey);
@@ -90,7 +90,7 @@ export function useApprovalQueue(hiredAgentId: string): ApprovalQueueResult {
 
   const rejectMutation = useMutation({
     mutationFn: (deliverableId: string) =>
-      rejectDeliverable(hiredAgentId, deliverableId),
+      rejectDeliverable(hiredAgentId!, deliverableId),
     onMutate: async (deliverableId) => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<DeliverableItem[]>(queryKey);

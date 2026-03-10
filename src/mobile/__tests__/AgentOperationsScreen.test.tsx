@@ -44,7 +44,7 @@ jest.mock('@/hooks/useTheme', () => ({
 }));
 
 jest.mock('@/hooks/useHiredAgents', () => ({
-  useHiredAgent: jest.fn(() => ({
+  useHiredAgentById: jest.fn(() => ({
     data: { agent_id: 'agent-1', nickname: 'My Agent', hired_instance_id: 'hi-1' },
     isLoading: false,
     error: null,
@@ -61,7 +61,7 @@ jest.mock('@/hooks/useApprovalQueue', () => ({
   })),
 }));
 
-jest.mock('@/lib/apiClient', () => ({
+jest.mock('@/lib/cpApiClient', () => ({
   default: {
     post: jest.fn(() => Promise.resolve({ data: {} })),
   },

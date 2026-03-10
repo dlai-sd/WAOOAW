@@ -16,9 +16,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
-import { useHiredAgent } from '@/hooks/useHiredAgents';
+import { useHiredAgentById } from '@/hooks/useHiredAgents';
 import { useApprovalQueue } from '@/hooks/useApprovalQueue';
-import apiClient from '@/lib/apiClient';
+import cpApiClient from '@/lib/cpApiClient';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
 
 type Props = MyAgentsStackScreenProps<'AgentOperations'>;
@@ -120,7 +120,7 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
   const scrollRef = useRef<ScrollView>(null);
   const sectionRefs = useRef<Record<string, number>>({});
 
-  const { data: agent, isLoading } = useHiredAgent(hiredAgentId);
+  const { data: agent, isLoading } = useHiredAgentById(hiredAgentId);
   const { deliverables: pendingApprovals, approve, reject } = useApprovalQueue(hiredAgentId);
 
   // Expanded sections state — focusSection is pre-expanded on mount
@@ -159,7 +159,7 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
   const handlePause = async () => {
     setPauseLoading(true);
     try {
-      await apiClient.post(`/cp/hired-agents/${hiredAgentId}/pause`);
+      await cpApiClient.post(`/cp/hired-agents/${hiredAgentId}/pause`);
     } finally {
       setPauseLoading(false);
     }
@@ -168,7 +168,7 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
   const handleResume = async () => {
     setResumeLoading(true);
     try {
-      await apiClient.post(`/cp/hired-agents/${hiredAgentId}/resume`);
+      await cpApiClient.post(`/cp/hired-agents/${hiredAgentId}/resume`);
     } finally {
       setResumeLoading(false);
     }

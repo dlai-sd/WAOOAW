@@ -1,6 +1,6 @@
 # PP-MOBILE-DEFECTS-1 — Systematic Audit And Fix Program
 
-> **Status**: Discovery in progress  
+> **Status**: Mobile repair wave 1 validated  
 > **Branch**: `fix/pp-mobile-defect-program`  
 > **Created**: 2026-03-09  
 > **Author**: GitHub Copilot
@@ -33,7 +33,7 @@ This document is the live operating log for the program. If the session disconne
 |---|---|---|
 | 1. Surface mapping | Identify the exact PP and Mobile entrypoints, services, proxies, and tests | Canonical file set is listed in this document |
 | 2. Defect discovery | Inspect routes, payload contracts, and flow wiring; record only verified defects | Findings table is complete enough to fix in one batch |
-| 3. Fix bundle | Implement all approved PP + Mobile fixes together | Code and tests updated |
+| 3. Fix bundle | Implement the approved mobile repair bundle | Code and tests updated |
 | 4. Validation | Run targeted tests and summarize remaining risk | Repair bundle is ready for PR review |
 
 ---
@@ -63,13 +63,13 @@ This document is the live operating log for the program. If the session disconne
 
 | ID | Surface | Severity | File / flow | Root cause | Impact | Best fix | Status |
 |---|---|---|---|---|---|---|---|
-| DEF-PM-001 | Mobile | High | `src/mobile/src/services/hiredAgents/hiredAgents.service.ts` → My Agents summary + hired-agent detail flows | CP-backed routes (`/cp/my-agents/summary`, `/cp/hired-agents/by-subscription/{id}`) are called through `apiClient`, whose base URL comes from `apiBaseUrl` (`plant.*`), while the dedicated `cpApiClient` exists but is unused | Core My Agents and hired-agent detail flows are sent to the wrong service host and can 404 or bypass CP-specific behavior | Switch CP-backed hired-agent service calls to `cpApiClient` and keep Plant-only calls on `apiClient` | Open |
-| DEF-PM-002 | Mobile | High | `src/mobile/src/hooks/useApprovalQueue.ts` and `src/mobile/src/screens/agents/AgentOperationsScreen.tsx` | Approval queue and pause/resume CP routes are also sent through `apiClient` instead of `cpApiClient` | Pending approvals and scheduler actions in mobile operations screens target the wrong backend host | Move all `/cp/...` mobile calls to `cpApiClient`; keep Plant calls on `apiClient` | Open |
-| DEF-PM-003 | Mobile | High | `src/mobile/src/screens/agents/AgentOperationsScreen.tsx`, `src/mobile/src/navigation/types.ts`, `src/mobile/src/screens/profile/NotificationsScreen.tsx` | `AgentOperationsScreen` receives `hiredAgentId` but passes it into `useHiredAgent()`, which is explicitly a subscription-based hook that calls `/cp/hired-agents/by-subscription/{subscriptionId}` | Operations screen can fetch the wrong record or 404 because a hired-instance id is used where a subscription id is required | Add a hired-agent-by-id mobile fetch path or pass subscription id consistently into this screen and all deep links | Open |
-| DEF-PM-004 | Mobile | High | `src/mobile/src/screens/agents/TrialDashboardScreen.tsx` → approval queue | `TrialDashboardScreen` passes `trialId` (documented and typed as `subscription_id`) into `useApprovalQueue()`, which builds `/cp/hired-agents/{hiredAgentId}/approval-queue` paths that require a hired-instance id | Trial dashboard approval fetch, approve, and reject actions are called with the wrong identifier and can fail even if the CP route is healthy | Resolve the hired-instance id first from the loaded hired-agent record, then pass that value to the approval queue hook | Open |
-| DEF-PM-005 | Mobile | High | `src/mobile/src/hooks/useHiredAgents.ts` → `useDeliverables()` / `src/mobile/src/screens/agents/TrialDashboardScreen.tsx` | Deliverables are fetched from `GET /api/v1/deliverables?subscription_id=...`, but current Plant routes only expose hired-agent-scoped deliverables at `GET /api/v1/hired-agents/{hired_instance_id}/deliverables` plus item actions under `/api/v1/deliverables/{id}/...` | Trial dashboard deliverables section points at a route shape that does not exist in the current backend surface | Rewire deliverables loading to use the hired-instance id and the hired-agent-scoped deliverables endpoint, likely through CP or the correct Plant path | Open |
-| DEF-PM-006 | Mobile | Medium | `src/mobile/src/screens/hire/HireConfirmationScreen.tsx` | `handleGoToTrialDashboard()` navigates with `{ agentId }`, but navigation types and `TrialDashboardScreen` require `{ trialId }` | Post-hire success flow can navigate into the trial dashboard with the wrong param contract, breaking screen load or forcing fallback behavior | Pass the real `subscription_id` / trial id into navigation and align the screen params with the route type | Open |
-| DEF-PM-007 | Mobile tests / config | Medium | `src/mobile/__tests__/integration/api.test.ts` vs `src/mobile/src/config/api.config.ts` | The integration test refers to a non-existent `apiConfig` export and assumes one CP-only base URL, while runtime config now has separate `apiBaseUrl` and `cpApiBaseUrl` | Mobile API integration tests are stale and cannot validate the actual split-client architecture | Update the test asset to assert the current dual-client config and the intended host per route family | Open |
+| DEF-PM-001 | Mobile | High | `src/mobile/src/services/hiredAgents/hiredAgents.service.ts` → My Agents summary + hired-agent detail flows | CP-backed routes (`/cp/my-agents/summary`, `/cp/hired-agents/by-subscription/{id}`) were called through `apiClient` instead of `cpApiClient` | Core My Agents and hired-agent detail flows targeted the wrong service host | CP-backed hired-agent service calls were switched to `cpApiClient`, while Plant-only calls stayed on `apiClient` | Fixed |
+| DEF-PM-002 | Mobile | High | `src/mobile/src/hooks/useApprovalQueue.ts` and `src/mobile/src/screens/agents/AgentOperationsScreen.tsx` | Approval queue and pause/resume CP routes were sent through `apiClient` instead of `cpApiClient` | Pending approvals and scheduler actions in mobile operations screens targeted the wrong backend host | All `/cp/...` mobile calls in this slice now use `cpApiClient` | Fixed |
+| DEF-PM-003 | Mobile | High | `src/mobile/src/screens/agents/AgentOperationsScreen.tsx`, `src/mobile/src/navigation/types.ts`, `src/mobile/src/screens/profile/NotificationsScreen.tsx` | `AgentOperationsScreen` received a hired-instance id but used the subscription-based `useHiredAgent()` hook | Operations screen could fetch the wrong record or 404 | Added a hired-agent-by-id mobile fetch path and rewired the screen to use it | Fixed |
+| DEF-PM-004 | Mobile | High | `src/mobile/src/screens/agents/TrialDashboardScreen.tsx` → approval queue | `TrialDashboardScreen` passed `trialId` / subscription id into `useApprovalQueue()`, which requires a hired-instance id | Trial dashboard approval fetch, approve, and reject actions used the wrong identifier | The screen now resolves the hired-instance id from the loaded hired-agent record before invoking the approval queue hook | Fixed |
+| DEF-PM-005 | Mobile | High | `src/mobile/src/hooks/useHiredAgents.ts` → `useDeliverables()` / `src/mobile/src/screens/agents/TrialDashboardScreen.tsx` | Deliverables were fetched from a subscription-scoped route shape that does not exist in the current backend surface | Trial dashboard deliverables section targeted the wrong route family | Deliverables loading now uses the hired-instance id and the CP hired-agent deliverables endpoint | Fixed |
+| DEF-PM-006 | Mobile | Medium | `src/mobile/src/screens/hire/HireConfirmationScreen.tsx` | `handleGoToTrialDashboard()` navigated with `{ agentId }` instead of `{ trialId }` | Post-hire success flow could enter the dashboard with the wrong param contract | The hire flow now forwards `subscription_id` / `trialId` through confirmation into the dashboard navigation path | Fixed |
+| DEF-PM-007 | Mobile tests / config | Medium | `src/mobile/__tests__/integration/api.test.ts` vs `src/mobile/src/config/api.config.ts` | The integration test assumed a single `apiConfig` export instead of the split `apiBaseUrl` and `cpApiBaseUrl` model | Mobile API integration tests no longer validated the actual runtime config shape | The test asset now validates the split-client config and the intended CP vs Plant host separation | Fixed |
 
 ---
 
@@ -77,7 +77,7 @@ This document is the live operating log for the program. If the session disconne
 
 | Wave | Scope | Files | Tests | Status |
 |---|---|---|---|---|
-| Pending | To be defined after discovery | TBD | TBD | Not started |
+| 1 | Mobile client split, identifier handoff, and stale tests | `src/mobile/src/services/hiredAgents/hiredAgents.service.ts`, `src/mobile/src/hooks/useHiredAgents.ts`, `src/mobile/src/hooks/useApprovalQueue.ts`, `src/mobile/src/screens/agents/AgentOperationsScreen.tsx`, `src/mobile/src/screens/agents/TrialDashboardScreen.tsx`, `src/mobile/src/screens/hire/HireConfirmationScreen.tsx`, `src/mobile/src/screens/hire/HireWizardScreen.tsx`, `src/mobile/__tests__/AgentOperationsScreen.test.tsx`, `src/mobile/__tests__/hireConfirmationScreen.test.tsx`, `src/mobile/__tests__/hiredAgentsHooks.test.tsx`, `src/mobile/__tests__/hiredAgentsService.test.ts`, `src/mobile/__tests__/integration/api.test.ts` | `docker compose -f /workspaces/WAOOAW/docker-compose.mobile.yml run --rm mobile-typecheck`; `docker compose -f /workspaces/WAOOAW/docker-compose.mobile.yml run --rm mobile-test npm test -- --runInBand --runTestsByPath __tests__/AgentOperationsScreen.test.tsx __tests__/hireConfirmationScreen.test.tsx __tests__/hiredAgentsHooks.test.tsx __tests__/hiredAgentsService.test.ts __tests__/integration/api.test.ts` | Validated |
 
 ---
 
@@ -87,3 +87,4 @@ This document is the live operating log for the program. If the session disconne
 |---|---|
 | 2026-03-09 | Created program tracker and branch. Discovery will begin with PP and Mobile surface mapping. |
 | 2026-03-09 | First discovery wave completed. Verified seven mobile defects centered on wrong client selection, wrong identifier handoff, and stale test/config assumptions. PP ops slice inspected so far shows no verified defect yet. |
+| 2026-03-10 | Mobile repair wave 1 completed. Docker mobile typecheck passed, and the focused Jest subset for the touched mobile service/hooks/screens/tests passed after updating stale client mocks in the test assets. |
