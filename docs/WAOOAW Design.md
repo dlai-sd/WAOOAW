@@ -459,6 +459,40 @@ sequenceDiagram
     CPB-->>MF: updated runtime state
 ```
 
+### 12A.8 Simulation gap pass 1
+
+The first explicit run exposed three real target-state gaps. None of them require changing the single-agent-first product direction, but all three need to be made explicit in the runtime contract.
+
+| Surface | Root cause | Impact | Best possible solution/fix |
+|---|---|---|---|
+| PP | `Publish for Hire` was described as a UI action, but not as creation of an immutable hireable snapshot | CP could hire a moving definition and later PP edits could silently change what the customer bought | Publish must create `published_agent_type_version_id` plus a `readiness_snapshot` that discovery and hire flows read without mutation |
+| CP | hire finalize assumed a hireable type exists, but did not pin the hire to a published version or explain the receipt path after approval | customer runtime could drift from PP edits and the approval-to-receipt step was underspecified | finalize must store `published_agent_type_version_id`; approval success must expose `receipt_id`; CP shows the result through My Agents summary and the existing receipt door |
+| Mobile | mobile approval flow depended too much on the approve response itself and not enough on a stable summary refresh contract | small-screen operations could need too many endpoint-specific joins and feel inconsistent with CP | mobile should reuse the same CP-backed runtime summary contract and use `receipt_id` + summary refetch after approve or reject |
+
+### 12A.9 Corrected target-state rules
+
+The design is now considered correct only if these rules are true.
+
+| Contract | Required rule |
+|---|---|
+| Publish snapshot | PP publish creates an immutable hireable snapshot, not a mutable pointer to the latest draft |
+| Hire pinning | every finalized hire stores the exact published version it came from |
+| Approval result | approve or reject returns the deliverable decision plus any resulting `receipt_id` or next-state token |
+| Runtime summary | CP and mobile both read the same hired-agent runtime summary for skills, approvals, recent outputs, and receipt hints |
+| Receipt visibility | receipt detail stays behind the existing CP receipt surface so web and mobile do not invent a parallel receipt model |
+
+### 12A.10 Simulation rerun after gap closure
+
+With the corrected rules above, the same walkthrough reruns cleanly.
+
+| Surface | Rerun result |
+|---|---|
+| PP | platform user saves a draft, sees readiness, runs draft simulation, and publishes a frozen hireable snapshot with structured reasons and audit trail |
+| CP | customer hires a pinned published version, configures skill goals, approves a deliverable, and sees the resulting receipt through the runtime summary plus receipt surface |
+| Mobile | customer opens the same hired agent, approves from the queue, refetches runtime summary, and sees the same post-approval truth as CP |
+
+There are no remaining blocking gaps in the walkthrough design for the single-agent-first target state. Remaining work is implementation work already covered by the plan.
+
 ## 13. Low-Level Design
 
 This section defines the old-school modular design shape.

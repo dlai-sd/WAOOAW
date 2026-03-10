@@ -213,6 +213,27 @@ sequenceDiagram
 
 This plan is only considered proven when these three simulations are coherent without inventing separate business logic for PP, CP, and mobile. All three must sit on the same Plant runtime contracts.
 
+### Simulation rerun, gap closure, and target-state corrections
+
+The first simulation pass found contract gaps, not UX gaps. The plan below is corrected to close those gaps before implementation starts.
+
+| Root cause | Impact | Best possible solution/fix |
+|---|---|---|
+| Publish-for-hire had no immutable snapshot contract | hires could point to a mutable draft and drift after PP edits | Plant publish creates `published_agent_type_version_id` and `readiness_snapshot`; PP only exposes publish when that snapshot is valid |
+| Hire finalize did not explicitly pin the purchased version | CP customer could not be guaranteed the exact authored construct they reviewed | CP finalize stores `published_agent_type_version_id` on the hired instance and surfaces it in summaries |
+| Approval completion did not name a durable receipt path | CP/mobile could approve work but not have one stable way to show publish proof | approval result returns `receipt_id`; CP and mobile refresh the same runtime summary and reuse the existing CP receipt surface |
+| Mobile runtime depended on action responses more than summary refresh | mobile could become a special case instead of a thin CP-backed surface | mobile uses the same runtime summary contract as CP and treats approve/reject as mutations followed by summary refetch |
+
+### Rerun verdict after fixes
+
+| Surface | Verdict | Why it now holds |
+|---|---|---|
+| PP | pass | draft setup, readiness, simulation, and publish now resolve into one frozen hireable snapshot |
+| CP | pass | discovery hires a pinned version, post-hire config remains skill-centric, and receipt visibility is explicit |
+| Mobile | pass | approval queue and runtime summary sit on the same CP-backed truth, so mobile no longer needs its own runtime semantics |
+
+No further design-level blockers remain for the target state. The remaining gaps are implementation tasks already mapped into the stories below.
+
 ---
 
 ## Iteration Summary
@@ -265,8 +286,8 @@ This plan is only considered proven when these three simulations are coherent wi
 | BLOCKED UNTIL | E1-S1 merged |
 | Files to read first | `src/Plant/BackEnd/agent_mold/spec.py`, `src/Plant/BackEnd/api/v1/agent_mold.py`, `src/Plant/BackEnd/agent_mold/contracts.py` |
 | Files to create / modify | `src/Plant/BackEnd/agent_mold/spec.py`, `src/Plant/BackEnd/api/v1/agent_mold.py`, `src/Plant/BackEnd/tests/unit/test_agent_mold_enforcement_api.py` |
-| Change | Add a readiness contract that reports whether an agent type is safe to publish for hire based on required processor, validator, connector, approval mode, and hooks |
-| Acceptance | Plant exposes readiness reasons as structured JSON; missing pieces return actionable readiness failures; existing spec validation still passes |
+| Change | Add a readiness contract that reports whether an agent type is safe to publish for hire based on required processor, validator, connector, approval mode, and hooks; publish creates an immutable `published_agent_type_version_id` plus `readiness_snapshot` |
+| Acceptance | Plant exposes readiness reasons as structured JSON; missing pieces return actionable readiness failures; publish returns a frozen hireable snapshot ID; existing spec validation still passes |
 | Test command | `docker compose -f docker-compose.test.yml run --rm plant-backend-test pytest src/Plant/BackEnd/tests/unit/test_agent_mold_enforcement_api.py -x -v` |
 
 ### E2 — Make PP the coherent authoring, simulation, and publish surface
@@ -281,8 +302,8 @@ This plan is only considered proven when these three simulations are coherent wi
 | BLOCKED UNTIL | E1-S2 merged |
 | Files to read first | `src/PP/FrontEnd/src/pages/AgentTypeSetupScreen.tsx`, `src/PP/FrontEnd/src/services/useAgentTypeSetup.ts`, `src/PP/BackEnd/api/agent_setups.py` |
 | Files to create / modify | `src/PP/FrontEnd/src/pages/AgentTypeSetupScreen.tsx`, `src/PP/FrontEnd/src/services/useAgentTypeSetup.ts`, `src/PP/BackEnd/api/agent_setups.py`, `src/PP/BackEnd/tests/test_agent_setups.py` |
-| Change | PP setup screen shows construct readiness and adds a test-simulation action that calls Plant through PP without publishing externally |
-| Acceptance | PP user can save setup, read readiness, and trigger test run preview; audit emitted; failures visible inline |
+| Change | PP setup screen shows construct readiness and adds a test-simulation action that calls Plant through PP without publishing externally; the simulation response includes preview output plus the readiness snapshot it would publish |
+| Acceptance | PP user can save setup, read readiness, and trigger test run preview; audit emitted; failures visible inline; simulation preview identifies the exact snapshot that would become hireable |
 | Test command | `docker compose -f docker-compose.test.yml run --rm pp-backend-test pytest src/PP/BackEnd/tests/test_agent_setups.py -x -v` |
 
 #### Story E2-S2 — Add publish-for-hire gate in PP Agent Management
@@ -293,8 +314,8 @@ This plan is only considered proven when these three simulations are coherent wi
 | BLOCKED UNTIL | E2-S1 merged |
 | Files to read first | `src/PP/FrontEnd/src/pages/AgentManagement.tsx`, `src/PP/FrontEnd/src/App.tsx`, `src/PP/BackEnd/api/genesis.py` |
 | Files to create / modify | `src/PP/FrontEnd/src/pages/AgentManagement.tsx`, `src/PP/FrontEnd/src/App.tsx`, `src/PP/BackEnd/api/genesis.py`, `src/PP/FrontEnd/src/__tests__/AgentManagement.test.tsx` |
-| Change | Publish button becomes a guarded action: only ready agent types can be published for hire; PP shows why a type is blocked |
-| Acceptance | blocked publish shows readiness reasons; ready publish marks the type as hireable; PP navigation exposes the full lifecycle cleanly |
+| Change | Publish button becomes a guarded action: only ready agent types can be published for hire; PP shows why a type is blocked and, when successful, returns the immutable published version used by discovery |
+| Acceptance | blocked publish shows readiness reasons; ready publish marks the type as hireable with a visible published version; PP navigation exposes the full lifecycle cleanly |
 | Test command | `docker compose -f docker-compose.test.yml run --rm pp-frontend-test npm test -- AgentManagement.test.tsx` |
 
 ---
@@ -316,8 +337,8 @@ This plan is only considered proven when these three simulations are coherent wi
 | Pattern | CP BackEnd pattern A — existing `/cp/*` routes proxy to Plant via thin CP layer |
 | Files to read first | `src/CP/BackEnd/api/my_agents_summary.py`, `src/CP/BackEnd/api/cp_skills.py`, `src/CP/BackEnd/main.py` |
 | Files to create / modify | `src/CP/BackEnd/api/my_agents_summary.py`, `src/CP/BackEnd/api/cp_skills.py`, `src/CP/BackEnd/tests/test_my_agents_summary.py`, `src/CP/BackEnd/tests/test_cp_skills.py` |
-| Change | Summaries and skill routes expose skill-centric fields, publishability state, team/role envelope fields, and a durable approval queue contract |
-| Acceptance | CP can read current hired agents, skills, approvals, and new runtime fields without changing auth flow; all reads stay read-only where appropriate |
+| Change | Summaries and skill routes expose skill-centric fields, published version pinning, team/role envelope fields, approval queue state, and receipt hints for recently completed approvals |
+| Acceptance | CP can read current hired agents, skills, approvals, receipt hints, and new runtime fields without changing auth flow; all reads stay read-only where appropriate |
 | Test command | `docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest src/CP/BackEnd/tests/test_my_agents_summary.py src/CP/BackEnd/tests/test_cp_skills.py -x -v` |
 
 #### Story E3-S2 — Align CP discovery, hire, and My Agents walkthrough
@@ -344,8 +365,8 @@ This plan is only considered proven when these three simulations are coherent wi
 | BLOCKED UNTIL | E3-S2 merged |
 | Files to read first | `src/mobile/src/screens/discover/AgentDetailScreen.tsx`, `src/mobile/src/screens/hire/HireWizardScreen.tsx`, `src/mobile/src/screens/agents/MyAgentsScreen.tsx` |
 | Files to create / modify | `src/mobile/src/screens/discover/AgentDetailScreen.tsx`, `src/mobile/src/screens/hire/HireWizardScreen.tsx`, `src/mobile/src/screens/agents/MyAgentsScreen.tsx`, `src/mobile/src/screens/agents/AgentOperationsScreen.tsx`, `src/mobile/src/hooks/useHiredAgents.ts`, `src/mobile/src/navigation/types.ts` |
-| Change | mobile shows the same hire and operate story as CP: what the agent does, what setup is required, what approvals are pending, and what happened after approval |
-| Acceptance | hired agents route to the correct operations screen, not generic detail; approvals and operations reflect the same CP contract |
+| Change | mobile shows the same hire and operate story as CP: what the agent does, what setup is required, what approvals are pending, and what happened after approval; approve or reject mutations refetch the shared runtime summary instead of inventing mobile-only state |
+| Acceptance | hired agents route to the correct operations screen, not generic detail; approvals and operations reflect the same CP contract; receipt hints appear after approval using the shared summary model |
 | Test command | `docker compose -f docker-compose.test.yml run --rm mobile-test npm test -- MyAgentsScreen AgentOperationsScreen` |
 
 #### Story E4-S2 — Walkthrough proof, rollout flags, and release gate
