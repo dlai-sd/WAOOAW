@@ -21,9 +21,11 @@ import CommandCentre from './authenticated/CommandCentre'
 import MyAgents from './authenticated/MyAgents'
 import GoalsSetup from './authenticated/GoalsSetup'
 import Deliverables from './authenticated/Deliverables'
-import Inbox from './authenticated/Inbox'
+import Inbox, { type CustomerInboxItem } from './authenticated/Inbox'
 import UsageBilling from './authenticated/UsageBilling'
 import ProfileSettings from './authenticated/ProfileSettings'
+import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
+import { listHiredAgentDeliverables, type Deliverable } from '../services/hiredAgentDeliverables.service'
 
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
@@ -52,6 +54,49 @@ type PortalLocationState = {
   }
 }
 
+function formatCount(count: number, singular: string, plural?: string): string {
+  const label = count === 1 ? singular : plural || `${singular}s`
+  return `${count} ${label}`
+}
+
+function summarizePayload(payload: Record<string, unknown>): string {
+  const candidateKeys = ['summary', 'text_preview', 'preview', 'message', 'body', 'content']
+
+  for (const key of candidateKeys) {
+    const value = payload[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().slice(0, 180)
+    }
+  }
+
+  try {
+    const raw = JSON.stringify(payload || {})
+    return raw.length > 180 ? `${raw.slice(0, 177)}...` : raw
+  } catch {
+    return 'Deliverable content is available in My Agents.'
+  }
+}
+
+function toInboxItem(instance: MyAgentInstanceSummary, deliverable: Deliverable): CustomerInboxItem | null {
+  const normalizedStatus = String(deliverable.review_status || '').trim().toLowerCase()
+  if (!['pending_review', 'approved', 'rejected'].includes(normalizedStatus)) {
+    return null
+  }
+
+  return {
+    deliverableId: deliverable.deliverable_id,
+    hiredInstanceId: String(instance.hired_instance_id || '').trim(),
+    agentLabel: String(instance.nickname || instance.agent_id || 'Your agent').trim(),
+    title: String(deliverable.title || deliverable.deliverable_id || 'Untitled deliverable').trim(),
+    preview: summarizePayload(deliverable.payload || {}),
+    reviewStatus: normalizedStatus,
+    approvalId: deliverable.approval_id || null,
+    reviewNotes: deliverable.review_notes || null,
+    createdAt: deliverable.created_at || null,
+    updatedAt: deliverable.updated_at || null,
+  }
+}
+
 export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, initialPage, initialAgentId, initialJourneyContext }: AuthenticatedPortalProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -69,6 +114,9 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(derivedInitialAgentId)
   const [journeyContext, setJourneyContext] = useState<PortalJourneyContext | undefined>(derivedJourneyContext)
+  const [inboxItems, setInboxItems] = useState<CustomerInboxItem[]>([])
+  const [inboxLoading, setInboxLoading] = useState(false)
+  const [inboxError, setInboxError] = useState<string | null>(null)
 
   useEffect(() => {
     setCurrentPage(derivedInitialPage)
@@ -81,6 +129,68 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
   useEffect(() => {
     setJourneyContext(derivedJourneyContext)
   }, [derivedJourneyContext])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadInboxItems = async () => {
+      setInboxLoading(true)
+      setInboxError(null)
+
+      try {
+        const summary = await getMyAgentsSummary()
+        const instances = (summary?.instances || []).filter((instance) => String(instance.hired_instance_id || '').trim())
+
+        if (!instances.length) {
+          if (!cancelled) setInboxItems([])
+          return
+        }
+
+        const results = await Promise.allSettled(
+          instances.map(async (instance) => {
+            const hiredInstanceId = String(instance.hired_instance_id || '').trim()
+            const response = await listHiredAgentDeliverables(hiredInstanceId)
+            return {
+              instance,
+              deliverables: (response?.deliverables || []).slice(),
+            }
+          })
+        )
+
+        if (cancelled) return
+
+        const nextItems = results.flatMap((result) => {
+          if (result.status !== 'fulfilled') return []
+          return result.value.deliverables
+            .map((deliverable) => toInboxItem(result.value.instance, deliverable))
+            .filter((item): item is CustomerInboxItem => Boolean(item))
+        })
+
+        nextItems.sort((left, right) => {
+          const leftDate = new Date(left.updatedAt || left.createdAt || 0).getTime()
+          const rightDate = new Date(right.updatedAt || right.createdAt || 0).getTime()
+          return rightDate - leftDate
+        })
+
+        setInboxItems(nextItems)
+        if (results.some((result) => result.status === 'rejected') && nextItems.length === 0) {
+          setInboxError('We could not load your deliverable states just now.')
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setInboxItems([])
+          setInboxError(e?.message || 'Failed to load deliverable states')
+        }
+      } finally {
+        if (!cancelled) setInboxLoading(false)
+      }
+    }
+
+    void loadInboxItems()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const openPage = (page: Page) => {
     setJourneyContext(undefined)
@@ -101,7 +211,21 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
   // agent-detail is a sub-page of discover — keep Discover highlighted in sidebar
   const activeNavPage: Page = currentPage === 'agent-detail' ? 'discover' : currentPage
 
-  const inboxCount = 1 // Mock unread count
+  const inboxCounts = useMemo(
+    () =>
+      inboxItems.reduce(
+        (acc, item) => {
+          if (item.reviewStatus === 'approved') acc.approved += 1
+          else if (item.reviewStatus === 'rejected') acc.rejected += 1
+          else acc.pending += 1
+          return acc
+        },
+        { pending: 0, approved: 0, rejected: 0 }
+      ),
+    [inboxItems]
+  )
+
+  const inboxCount = inboxCounts.pending
 
   const menuSections: Array<{
     title: string
@@ -120,7 +244,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       title: 'Grow',
       items: [
         { id: 'discover', icon: <Search20Regular />, label: 'Discover' },
-        { id: 'inbox', icon: <Mail20Regular />, label: 'Inbox', badge: inboxCount },
+        { id: 'inbox', icon: <Mail20Regular />, label: 'Inbox', badge: inboxCount || undefined },
         { id: 'billing', icon: <Payment20Regular />, label: 'Subscriptions & Billing' },
         { id: 'profile-settings', icon: <Settings20Regular />, label: 'Profile & Settings' },
       ],
@@ -162,7 +286,11 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       eyebrow: 'Signal Centre',
       title: 'Keep Approvals And Requests From Falling Through',
       description: 'Prioritise the small number of decisions only you should make, then let the system move again.',
-      metrics: ['Approvals', 'Status changes', 'Customer-ready updates'],
+      metrics: [
+        formatCount(inboxCounts.pending, 'deliverable awaiting your decision'),
+        formatCount(inboxCounts.approved, 'approved deliverable still visible'),
+        formatCount(inboxCounts.rejected, 'rejected item still tracked'),
+      ],
     },
     'billing': {
       eyebrow: 'Spend & Proof',
@@ -176,7 +304,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       description: 'Keep your business profile, preferences, and team-facing details aligned with how WAOOAW operates for you.',
       metrics: ['Business identity loaded from CP', 'Only current controls shown as live', 'Support paths'],
     },
-  }), [])
+  }), [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected])
 
   const currentMeta = pageMeta[activeNavPage]
 
@@ -236,7 +364,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       case 'deliverables':
         return <Deliverables />
       case 'inbox':
-        return <Inbox />
+        return <Inbox items={inboxItems} loading={inboxLoading} error={inboxError} onOpenMyAgents={() => openPage('my-agents')} />
       case 'billing':
         return <UsageBilling />
       case 'profile-settings':
