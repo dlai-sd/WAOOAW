@@ -224,7 +224,7 @@ export const NotificationsScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }} testID="mobile-notifications-screen">
       <View
         style={{
           paddingHorizontal: spacing.screenPadding.horizontal,
@@ -308,6 +308,7 @@ export const NotificationsScreen = ({ navigation }: Props) => {
               backgroundColor: colors.card,
             }}
             onPress={() => handleNotificationPress(notification)}
+            testID={`mobile-notification-${notification.id}`}
           >
             <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 4 }}>
               {notification.title}
