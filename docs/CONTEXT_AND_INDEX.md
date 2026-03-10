@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.5  
-**Date**: 2026-03-09  
+**Version**: 2.6  
+**Date**: 2026-03-10  
 **Purpose**: Single-source operating manual for handing WAOOAW work to AI agents, especially zero-cost and small-context agents, so they can navigate, understand, plan, and execute complex platform tasks with minimal drift.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
@@ -1487,7 +1487,13 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `main` (PP-MOULD-1 construct diagnostic toolkit + MOULD-GAP-1 docs merged — 2026-03-07)
+### Current branch: `feat/ui-ux-revamp` (frontend UX revamp + QA/test/smoke complete, PR #916 in review — 2026-03-10)
+
+### In review — 2026-03-10
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#916** | `feat/ui-ux-revamp` | **Cross-frontend UX revamp complete in 4 iterations** — Iteration 1 completed journey QA across CP, PP, and mobile with shell/navigation/handoff fixes; Iteration 2 closed residual defects (truthful PP usage-event loading, mobile hired-tab auto-switch, sign-out confirmation, test-safe push registration); Iteration 3 added focused FE coverage for CP portal routing, PP hook-trace/ops flows, and mobile My Agents routing; Iteration 4 finished final smoke validation and PR prep. Review this branch as the current frontend MVP pass for customer portal, contributor portal, and mobile customer runtime. | `running_commentary.md`, `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`, `src/CP/FrontEnd/src/__tests__/AuthenticatedPortal.test.tsx`, `src/PP/FrontEnd/src/pages/CustomerManagement.tsx`, `src/PP/FrontEnd/src/__tests__/HookTracePanel.test.tsx`, `src/mobile/src/screens/agents/MyAgentsScreen.tsx`, `src/mobile/src/screens/agents/__tests__/MyAgentsScreen.test.tsx` |
 
 ### Recently merged — 2026-03-07
 
