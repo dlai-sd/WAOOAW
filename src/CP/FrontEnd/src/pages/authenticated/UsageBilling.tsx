@@ -118,6 +118,35 @@ export default function UsageBilling() {
       </div>
 
       <Card className="plan-comparison-card" style={{ padding: '1.25rem' }}>
+        <h2>Live subscriptions</h2>
+        {loading ? (
+          <div style={{ padding: '0.5rem 0' }}>Loading…</div>
+        ) : activeSubscriptions.length ? (
+          <div style={{ display: 'grid', gap: '0.75rem', paddingTop: '0.5rem', marginBottom: '1rem' }}>
+            {activeSubscriptions
+              .slice()
+              .sort((a, b) => String(a.current_period_end || '').localeCompare(String(b.current_period_end || '')))
+              .map((subscription) => (
+                <Card key={subscription.subscription_id} style={{ padding: '0.9rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{subscription.agent_id || subscription.subscription_id}</div>
+                      <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>
+                        Status: {subscription.status || 'active'} · Duration: {subscription.duration || '—'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.82rem', opacity: 0.8 }}>Next billing</div>
+                      <div style={{ fontWeight: 700 }}>{subscription.current_period_end ? formatDate(subscription.current_period_end) : '—'}</div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+          </div>
+        ) : (
+          <div style={{ padding: '0.5rem 0 1rem' }}>No active subscriptions yet.</div>
+        )}
+
         <h2>Invoices</h2>
         {loading ? (
           <div style={{ padding: '0.5rem 0' }}>Loading…</div>

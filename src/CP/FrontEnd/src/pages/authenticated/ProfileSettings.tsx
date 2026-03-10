@@ -41,21 +41,38 @@ export default function ProfileSettings() {
     }
   }
 
+  const openSupport = () => {
+    window.location.href = 'mailto:support@waooaw.com?subject=WAOOAW%20Customer%20Support'
+  }
+
   const sections = [
     {
       title: 'Account',
       icon: '👤',
-      items: ['Edit Profile', 'Business Information', 'Team Members'],
+      items: [
+        { label: 'Edit Profile', action: handleEditClick, status: 'Action available' },
+        { label: 'Business Information', description: 'Managed from your profile and hire setup details', status: 'Read-only context' },
+        { label: 'Team Members', description: 'Reserved for a later multi-user customer workspace flow', status: 'Planned next' },
+      ],
     },
     {
       title: 'Preferences',
       icon: '⚙️',
-      items: ['Notification Settings', 'Agent Preferences', 'Language & Region'],
+      items: [
+        { label: 'Notification Settings', description: 'Customer notification tuning is grouped into the next account-control pass', status: 'Planned next' },
+        { label: 'Agent Preferences', description: 'Current agent behavior is configured inside hire setup and runtime screens', status: 'Available elsewhere' },
+        { label: 'Language & Region', description: 'Regional display controls are not yet exposed in CP', status: 'Planned next' },
+      ],
     },
     {
       title: 'Support',
       icon: '💬',
-      items: ['Help Center', 'Contact Support', 'Privacy Policy', 'Terms of Service'],
+      items: [
+        { label: 'Contact Support', action: openSupport, status: 'Action available' },
+        { label: 'Help Center', description: 'Guided help content will land in the next customer support pass', status: 'Planned next' },
+        { label: 'Privacy Policy', description: 'Legal copy is referenced in auth and will be surfaced as a dedicated CP page later', status: 'Planned next' },
+        { label: 'Terms of Service', description: 'Legal copy is referenced in auth and will be surfaced as a dedicated CP page later', status: 'Planned next' },
+      ],
     },
   ]
 
@@ -207,8 +224,9 @@ export default function ProfileSettings() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {section.items.map((item) => (
                 <button
-                  key={item}
-                  onClick={item === 'Edit Profile' ? handleEditClick : undefined}
+                  key={item.label}
+                  onClick={item.action}
+                  disabled={!item.action}
                   style={{
                     textAlign: 'left',
                     padding: '10px 12px',
@@ -216,12 +234,21 @@ export default function ProfileSettings() {
                     borderRadius: '6px',
                     background: 'var(--colorNeutralBackground1)',
                     color: 'var(--colorNeutralForeground1)',
-                    cursor: 'pointer',
+                    cursor: item.action ? 'pointer' : 'default',
                     fontSize: '14px',
                     transition: 'background 0.15s',
+                    opacity: item.action ? 1 : 0.88,
                   }}
                 >
-                  {item}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+                    <span>{item.label}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--colorNeutralForeground2)' }}>{item.status}</span>
+                  </div>
+                  {item.description && (
+                    <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--colorNeutralForeground2)' }}>
+                      {item.description}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

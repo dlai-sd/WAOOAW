@@ -389,6 +389,24 @@ export default function HireSetupWizard() {
     )
   }
 
+  const reviewSummary = [
+    { label: 'Agent nickname', value: nickname || 'Not set' },
+    { label: 'Theme', value: theme || 'Default' },
+    {
+      label: 'Connected systems',
+      value: isTradingAgent
+        ? `${exchangeProvider || 'Exchange not selected'}${exchangeCredentialRef ? ' · credential ready' : apiKey.trim() ? ' · credential staged' : ''}`
+        : isMarketingAgent
+          ? marketingPlatforms.length
+            ? `${marketingPlatforms.length} platform${marketingPlatforms.length === 1 ? '' : 's'} connected`
+            : marketingAccessToken.trim()
+              ? `${marketingPlatform} token staged`
+              : 'No platform connected yet'
+          : 'Custom config provided',
+    },
+    { label: 'Activation readiness', value: goalsCompleted ? 'Goals confirmed' : 'Waiting for goal confirmation' },
+  ]
+
   return (
     <div className="hire-wizard-page" style={{ maxWidth: 920, margin: '0 auto', padding: '2rem 1rem' }}>
       <div className="hire-wizard-hero">
@@ -571,6 +589,16 @@ export default function HireSetupWizard() {
             <div className="hire-wizard-inline-note" style={{ marginBottom: '1rem' }}>
               Review your setup and activate trial.
             </div>
+
+            <div className="hire-wizard-review-grid">
+              {reviewSummary.map((item) => (
+                <div key={item.label} className="hire-wizard-review-card">
+                  <div className="hire-wizard-review-label">{item.label}</div>
+                  <div className="hire-wizard-review-value">{item.value}</div>
+                </div>
+              ))}
+            </div>
+
             <Checkbox
               checked={goalsCompleted}
               onChange={(_, data) => setGoalsCompleted(Boolean(data.checked))}

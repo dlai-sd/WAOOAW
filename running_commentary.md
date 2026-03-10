@@ -37,7 +37,7 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 
 | Chunk | Goal | Status | Notes |
 |---|---|---|---|
-| 1 | Structured QA pass on CP user journeys | in progress | first validated sub-chunk complete |
+| 1 | Structured QA pass on CP user journeys | complete | chunks 1A and 1B validated and checkpointed |
 | 2 | Structured QA pass on PP contributor journeys | planned | landing, dashboard, agent setup, hired agents ops, review queue, policy denials, audit |
 | 3 | Structured QA pass on mobile journeys | planned | sign in, sign up, today, ops, profile, approvals |
 | 4 | Fix defects from QA pass | planned | focus on layout, interaction, empty/loading/error states |
@@ -60,6 +60,23 @@ Files in Chunk 1A:
 - `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`
 - `src/CP/FrontEnd/src/pages/HireReceipt.tsx`
 - `src/CP/FrontEnd/src/pages/authenticated/CommandCentre.tsx`
+- `src/CP/FrontEnd/src/styles/globals.css`
+
+### Chunk 1B — CP QA sub-checkpoint
+
+Validated and ready on branch after the second CP journey slice.
+
+| Area | Result |
+|---|---|
+| Hire setup review | fixed so the final step now shows a real summary of what the customer configured before activation |
+| Billing clarity | fixed so active subscriptions are visible, not just aggregate invoice and receipt totals |
+| Profile honesty | fixed misleading dead buttons by making only real actions clickable and labeling the rest truthfully |
+| CP validation | `npm run build` + `npm run test:run` exited `0` after these fixes |
+
+Files in Chunk 1B:
+- `src/CP/FrontEnd/src/pages/HireSetupWizard.tsx`
+- `src/CP/FrontEnd/src/pages/authenticated/UsageBilling.tsx`
+- `src/CP/FrontEnd/src/pages/authenticated/ProfileSettings.tsx`
 - `src/CP/FrontEnd/src/styles/globals.css`
 
 ---

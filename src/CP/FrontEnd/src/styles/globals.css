@@ -2633,6 +2633,33 @@ section[id] {
   background: rgba(0, 120, 212, 0.12);
 }
 
+.hire-wizard-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.hire-wizard-review-card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground2);
+}
+
+.hire-wizard-review-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--colorBrandForeground1);
+  margin-bottom: 6px;
+}
+
+.hire-wizard-review-value {
+  font-weight: 600;
+}
+
 @media (max-width: 980px) {
   .portal-hero,
   .command-centre-grid,
@@ -2659,6 +2686,10 @@ section[id] {
 
   .hire-wizard-step-header {
     flex-direction: column;
+  }
+
+  .hire-wizard-review-grid {
+    grid-template-columns: 1fr;
   }
 }
 
