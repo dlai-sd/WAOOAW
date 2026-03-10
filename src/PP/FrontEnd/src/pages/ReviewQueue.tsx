@@ -152,7 +152,7 @@ export default function ReviewQueue() {
   }, [approvals, selectedApproval])
 
   return (
-    <div className="page-container">
+    <div className="page-container" data-testid="pp-review-queue-page">
       <div className="page-header">
         <Text as="h1" size={900} weight="semibold">Review Queue</Text>
         <Body1>Operator decision workspace for enriched approval context</Body1>
@@ -178,20 +178,20 @@ export default function ReviewQueue() {
 
       <Card>
         <CardHeader header={<Text weight="semibold">Review queue filters</Text>} />
-        <div style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+        <div style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }} data-testid="pp-review-queue-filters">
           <Text size={200} style={{ width: '100%', opacity: 0.8 }}>
             Narrow the queue by customer, agent, or correlation id so the operator sees one actionable decision list instead of a noisy backlog.
           </Text>
           <Field label="Customer ID">
-            <Input value={customerId} onChange={(_, data) => setCustomerId(data.value)} />
+            <Input value={customerId} onChange={(_, data) => setCustomerId(data.value)} data-testid="pp-review-queue-customer-id" />
           </Field>
           <Field label="Agent ID">
-            <Input value={agentId} onChange={(_, data) => setAgentId(data.value)} />
+            <Input value={agentId} onChange={(_, data) => setAgentId(data.value)} data-testid="pp-review-queue-agent-id" />
           </Field>
           <Field label="Correlation ID">
-            <Input value={correlationId} onChange={(_, data) => setCorrelationId(data.value)} />
+            <Input value={correlationId} onChange={(_, data) => setCorrelationId(data.value)} data-testid="pp-review-queue-correlation-id" />
           </Field>
-          <Button appearance="primary" onClick={handleLoad} disabled={isBusy}>Load</Button>
+          <Button appearance="primary" onClick={handleLoad} disabled={isBusy} data-testid="pp-review-queue-load">Load</Button>
         </div>
       </Card>
 
@@ -209,6 +209,7 @@ export default function ReviewQueue() {
                 appearance="secondary"
                 disabled={!customerId.trim()}
                 onClick={() => navigate(`/hired-agents?${reviewQueueContextString}`)}
+                data-testid="pp-review-queue-open-hired-agents"
               >
                 Open Hired Agents
               </Button>
@@ -246,7 +247,7 @@ export default function ReviewQueue() {
               header={<Text weight="semibold">Decision queue</Text>}
               description={<Text size={200}>{approvals.length} items waiting for review</Text>}
             />
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }} data-testid="pp-review-queue-list">
               {approvals.map(item => {
                 const isSelected = selectedApproval?.approval_id === item.approval_id
                 return (
@@ -254,6 +255,7 @@ export default function ReviewQueue() {
                     key={item.approval_id}
                     type="button"
                     onClick={() => setSelectedApprovalId(item.approval_id)}
+                    data-testid={`pp-review-queue-item-${item.approval_id}`}
                     style={{
                       textAlign: 'left',
                       background: isSelected ? 'rgba(0, 242, 254, 0.08)' : 'transparent',
@@ -277,7 +279,7 @@ export default function ReviewQueue() {
           </Card>
 
           {selectedApproval && (
-            <Card>
+            <Card data-testid="pp-review-queue-workspace">
               <CardHeader
                 header={<Text weight="semibold">Decision workspace</Text>}
                 description={<Text size={200}>{selectedApproval.customer_label} • {selectedApproval.agent_label}</Text>}
@@ -323,6 +325,7 @@ export default function ReviewQueue() {
                       appearance="primary"
                       disabled={isBusy || !selectedApproval.deliverable_preview?.post_id}
                       onClick={() => void handleApprove(selectedApproval)}
+                      data-testid="pp-review-queue-approve"
                     >
                       Approve and remove
                     </Button>
@@ -330,6 +333,7 @@ export default function ReviewQueue() {
                       appearance="secondary"
                       disabled={isBusy || !selectedApproval.deliverable_preview?.post_id}
                       onClick={() => void handleReject(selectedApproval)}
+                      data-testid="pp-review-queue-deny"
                     >
                       Deny and remove
                     </Button>
@@ -341,6 +345,7 @@ export default function ReviewQueue() {
                         selectedApproval.agent_id,
                         selectedApproval.correlation_id || correlationId
                       ).toString()}&selected_hired_instance_id=${encodeURIComponent(selectedApproval.hired_instance_id || '')}`)}
+                      data-testid="pp-review-queue-open-runtime-context"
                     >
                       Open runtime context
                     </Button>

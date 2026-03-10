@@ -349,7 +349,7 @@ export default function HiredAgentsOps() {
     : ''
 
   return (
-    <div className="page-container">
+    <div className="page-container" data-testid="pp-hired-agents-page">
       <div className="page-header">
         <Text as="h1" size={900} weight="semibold">Hired Agents</Text>
         <Body1>Ops view of customer hired agents, goals, drafts, approvals and denials</Body1>
@@ -400,17 +400,18 @@ export default function HiredAgentsOps() {
                   placeholder="email@example.com"
                   value={email}
                   onChange={(_, d) => setEmail(d.value)}
+                  data-testid="pp-hired-agents-email"
                 />
               </Field>
-              <Button appearance="secondary" onClick={() => void lookupByEmail()}>Lookup</Button>
+              <Button appearance="secondary" onClick={() => void lookupByEmail()} data-testid="pp-hired-agents-lookup">Lookup</Button>
             </div>
             {emailError && <Text style={{ color: 'var(--colorPaletteRedForeground1)', fontSize: 12 }}>{emailError}</Text>}
           </div>
           <Field label="Customer ID">
-            <Input value={customerId} onChange={(_, d) => setCustomerId(d.value)} placeholder="CUST-..." />
+            <Input value={customerId} onChange={(_, d) => setCustomerId(d.value)} placeholder="CUST-..." data-testid="pp-hired-agents-customer-id" />
           </Field>
           <Field label="as_of (ISO 8601, optional)">
-            <Input value={asOf} onChange={(_, d) => setAsOf(d.value)} placeholder="2026-02-10T00:00:00Z" />
+            <Input value={asOf} onChange={(_, d) => setAsOf(d.value)} placeholder="2026-02-10T00:00:00Z" data-testid="pp-hired-agents-as-of" />
           </Field>
         </div>
       </Card>
@@ -438,6 +439,7 @@ export default function HiredAgentsOps() {
             {rows.map(r => (
               <TableRow
                 key={r.hired.hired_instance_id}
+                data-testid={`pp-hired-agents-row-${r.hired.hired_instance_id}`}
                 onClick={() => {
                   setSelected(r)
                   setCorrelationId('')
@@ -520,6 +522,7 @@ export default function HiredAgentsOps() {
                     agentId: selected.hired.agent_id,
                     correlationId,
                   }).toString()}`)}
+                  data-testid="pp-hired-agents-open-review-queue"
                 >
                   Open Review Queue
                 </Button>
@@ -573,6 +576,7 @@ export default function HiredAgentsOps() {
                   value={correlationId}
                   onChange={(_, d) => setCorrelationId(d.value)}
                   placeholder="corr-..."
+                  data-testid="pp-hired-agents-correlation-id"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void loadDetails(selected)
                   }}
@@ -583,6 +587,7 @@ export default function HiredAgentsOps() {
                   appearance="secondary"
                   disabled={isDetailLoading}
                   onClick={() => void loadDetails(selected)}
+                  data-testid="pp-hired-agents-apply-correlation"
                 >
                   Apply correlation filter
                 </Button>
