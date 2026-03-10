@@ -152,7 +152,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       case 'profile-settings':
         return <ProfileSettings />
       default:
-        return <CommandCentre />
+        return <CommandCentre onOpenDiscover={() => setCurrentPage('discover')} onOpenBilling={() => setCurrentPage('billing')} onOpenMyAgents={() => setCurrentPage('my-agents')} />
     }
   }
 
