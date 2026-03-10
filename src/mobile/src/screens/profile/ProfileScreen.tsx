@@ -234,7 +234,7 @@ export const ProfileScreen = () => {
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md, justifyContent: 'center' }}>
             {['Customer profile ready', 'Billing access', 'Support always visible'].map((pill) => (
               <View
                 key={pill}

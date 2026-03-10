@@ -36,6 +36,14 @@ export const DiscoverScreen = () => {
   const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(null);
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
 
+  const navigateToMainTab = React.useCallback(
+    (tabName: 'HomeTab' | 'MyAgentsTab' | 'ProfileTab', screen: 'Home' | 'MyAgents' | 'Profile') => {
+      const parentNavigation = navigation.getParent() as any;
+      parentNavigation?.navigate(tabName, { screen });
+    },
+    [navigation]
+  );
+
   // Performance monitoring
   usePerformanceMonitoring('Discover');
 
@@ -70,14 +78,14 @@ export const DiscoverScreen = () => {
   const handleVoiceNavigate = React.useCallback(
     (screen: string) => {
       if (screen === 'Home') {
-        navigation.navigate('Home' as never);
+        navigateToMainTab('HomeTab', 'Home');
       } else if (screen === 'MyAgents') {
-        navigation.navigate('MyAgents' as never);
+        navigateToMainTab('MyAgentsTab', 'MyAgents');
       } else if (screen === 'Profile') {
-        navigation.navigate('Profile' as never);
+        navigateToMainTab('ProfileTab', 'Profile');
       }
     },
-    [navigation]
+    [navigateToMainTab]
   );
 
   const handleVoiceSearch = React.useCallback(

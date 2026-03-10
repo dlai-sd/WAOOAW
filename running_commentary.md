@@ -39,7 +39,7 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 |---|---|---|---|
 | 1 | Structured QA pass on CP user journeys | complete | chunks 1A and 1B validated and checkpointed |
 | 2 | Structured QA pass on PP contributor journeys | complete | chunks 2A and 2B validated and checkpointed |
-| 3 | Structured QA pass on mobile journeys | planned | sign in, sign up, today, ops, profile, approvals |
+| 3 | Structured QA pass on mobile journeys | in progress | first validated mobile slice complete |
 | 4 | Fix defects from QA pass | planned | focus on layout, interaction, empty/loading/error states |
 | 5 | Add targeted frontend test coverage for new flows | planned | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
 | 6 | Final smoke + PR prep | planned | branch summary, residual risks, open PR |
@@ -113,6 +113,25 @@ Files in Chunk 2B:
 - `src/PP/FrontEnd/src/pages/PolicyDenials.test.tsx`
 - `src/PP/FrontEnd/src/__tests__/Layout.test.tsx`
 - `src/PP/FrontEnd/src/__tests__/HiredAgentsOps.test.tsx`
+
+### Chunk 3A — Mobile QA sub-checkpoint
+
+Validated and ready on branch after the first mobile journey slice.
+
+| Area | Result |
+|---|---|
+| Cross-tab navigation reliability | fixed Today, Discover, and Ops flows to jump through the tab navigator instead of trying stack-local route names that could miss the intended tab |
+| Home action honesty | changed the second Today quick action so it truthfully opens Ops instead of claiming to start a trial while sending users elsewhere |
+| Ops list routing | fixed hired-agent rows so active hires open the operations hub by default, while trials still open the trial dashboard |
+| Small-screen fit | wrapped profile and ops pill rows so the mobile shell stays readable on narrow devices |
+| Mobile validation | `npm run typecheck` exited `0`; targeted `jest` coverage for navigation config exited `0`; full mobile Jest remains noisy from an unrelated localhost push-token registration side effect |
+
+Files in Chunk 3A:
+- `src/mobile/src/screens/home/HomeScreen.tsx`
+- `src/mobile/src/screens/agents/MyAgentsScreen.tsx`
+- `src/mobile/src/screens/discover/DiscoverScreen.tsx`
+- `src/mobile/src/screens/discover/AgentDetailScreen.tsx`
+- `src/mobile/src/screens/profile/ProfileScreen.tsx`
 
 ---
 

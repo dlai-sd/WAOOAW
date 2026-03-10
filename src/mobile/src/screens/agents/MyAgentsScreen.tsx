@@ -63,6 +63,13 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
   const [sortOption, setSortOption] = React.useState<SortOption>('attention');
 
+  const navigateToMainTab = React.useCallback(
+    (tabName: 'HomeTab' | 'DiscoverTab' | 'ProfileTab', screen: 'Home' | 'Discover' | 'Profile') => {
+      navigation.getParent()?.navigate(tabName, { screen });
+    },
+    [navigation]
+  );
+
   // Performance monitoring
   usePerformanceMonitoring('MyAgents');
 
@@ -112,29 +119,33 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
       navigation.navigate('TrialDashboard', {
         trialId: agent.subscription_id,
       });
+    } else if (agent.hired_instance_id) {
+      navigation.navigate('AgentOperations', {
+        hiredAgentId: agent.hired_instance_id,
+      });
     } else {
-      // Hired - go to agent detail
+      // Fallback when runtime instance data has not been hydrated yet
       navigation.navigate('AgentDetail', { agentId: agent.agent_id });
     }
   };
 
   // Navigate to discover screen
   const handleDiscoverPress = () => {
-    navigation.navigate('Discover' as any);
+    navigateToMainTab('DiscoverTab', 'Discover');
   };
 
   // Voice command handlers
   const handleVoiceNavigate = React.useCallback(
     (screen: string) => {
       if (screen === 'Home') {
-        navigation.navigate('Home' as any);
+        navigateToMainTab('HomeTab', 'Home');
       } else if (screen === 'Discover') {
-        navigation.navigate('Discover' as any);
+        navigateToMainTab('DiscoverTab', 'Discover');
       } else if (screen === 'Profile') {
-        navigation.navigate('Profile' as any);
+        navigateToMainTab('ProfileTab', 'Profile');
       }
     },
-    [navigation]
+    [navigateToMainTab]
   );
 
   const handleVoiceAction = React.useCallback(
@@ -213,7 +224,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
           Keep trials, hired agents, and the next decision in one place instead of switching mental models.
         </Text>
 
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
           {[
             `${trialAgents?.length || 0} trials`,
             `${hiredAgents.length} hired`,

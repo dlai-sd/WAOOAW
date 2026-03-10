@@ -25,6 +25,13 @@ export const HomeScreen = () => {
   const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = React.useState(false);
 
+  const navigateToTab = React.useCallback(
+    (tabName: 'DiscoverTab' | 'MyAgentsTab', screen: 'Discover' | 'MyAgents') => {
+      navigation.getParent()?.navigate(tabName, { screen });
+    },
+    [navigation]
+  );
+
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
     // TODO: Fetch data from API
@@ -221,7 +228,7 @@ export const HomeScreen = () => {
                   flex: 1,
                 },
               ]}
-              onPress={() => navigation.navigate('DiscoverTab')}
+              onPress={() => navigateToTab('DiscoverTab', 'Discover')}
             >
               <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>🔍</Text>
               <Text
@@ -260,7 +267,7 @@ export const HomeScreen = () => {
                   flex: 1,
                 },
               ]}
-              onPress={() => navigation.navigate('MyAgentsTab')}
+              onPress={() => navigateToTab('MyAgentsTab', 'MyAgents')}
             >
               <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>🚀</Text>
               <Text
@@ -273,7 +280,7 @@ export const HomeScreen = () => {
                   },
                 ]}
               >
-                Start Trial
+                Open Ops
               </Text>
               <Text
                 style={[
@@ -285,7 +292,7 @@ export const HomeScreen = () => {
                   },
                 ]}
               >
-                7-day free trial
+                Review trials and hired agents
               </Text>
             </TouchableOpacity>
           </View>
