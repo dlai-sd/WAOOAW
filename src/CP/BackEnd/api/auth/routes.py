@@ -6,9 +6,10 @@ Handles Google OAuth login, token management, and user info
 import logging
 import os
 import secrets
+import uuid
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Query, Request, status
+from fastapi import Depends, Header, HTTPException, Query, Request, status
 from core.routing import waooaw_router  # P-3
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
@@ -99,6 +100,33 @@ class GoogleTokenRequest(BaseModel):
     id_token: str
     source: str = "cp"  # cp, pp, or mobile
     totp_code: str | None = None
+
+
+class E2ESessionRequest(BaseModel):
+    """Request payload for deterministic E2E session bootstrapping."""
+
+    email: str = "e2e.cp@waooaw.com"
+    name: str | None = "CP E2E User"
+    user_id: str | None = None
+    provider_id: str | None = None
+
+
+def _verify_e2e_secret(x_e2e_secret: str | None = Header(None)) -> None:
+    """Enable a secret-guarded auth bootstrap path for automated smoke tests."""
+    if not settings.ENABLE_E2E_HOOKS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if not settings.E2E_SHARED_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="E2E hooks are enabled without E2E_SHARED_SECRET",
+        )
+    if not x_e2e_secret or not secrets.compare_digest(x_e2e_secret, settings.E2E_SHARED_SECRET):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+
+def _default_e2e_user_id(email: str) -> str:
+    email_lower = email.strip().lower()
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"waooaw-cp-e2e:{email_lower}"))
 
 # Helper functions for Google OAuth flow
 async def google_login(source: str):
@@ -288,6 +316,29 @@ async def refresh_access_token(
             )
         )
     user = user_store.normalize_user_id(user, token_data.user_id)
+    return Token(**create_tokens(user.id, user.email))
+
+
+@router.post("/e2e/session", response_model=Token)
+async def create_e2e_session(
+    payload: E2ESessionRequest,
+    user_store: UserStore = Depends(get_user_store),
+    _: None = Depends(_verify_e2e_secret),
+):
+    """Mint a deterministic CP session for smoke tests when explicitly enabled."""
+    email = payload.email.strip().lower()
+    canonical_user_id = (payload.user_id or "").strip() or _default_e2e_user_id(email)
+    provider_id = (payload.provider_id or "").strip() or canonical_user_id
+
+    user = user_store.get_or_create_user(
+        UserCreate(
+            email=email,
+            name=payload.name,
+            provider="e2e",
+            provider_id=provider_id,
+        )
+    )
+    user = user_store.normalize_user_id(user, canonical_user_id)
     return Token(**create_tokens(user.id, user.email))
 
 @router.post("/logout")

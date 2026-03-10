@@ -91,7 +91,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
   }
 
   return (
-    <div className="authenticated-portal">
+    <div className="authenticated-portal" data-testid="cp-portal-root">
       {/* Header */}
       <header className="portal-header">
         <div className="portal-header-content">
@@ -109,6 +109,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
               appearance="subtle" 
               icon={<SignOut20Regular />}
               onClick={onLogout}
+              data-testid="cp-signout-button"
             >
               Sign Out
             </Button>
@@ -125,6 +126,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
                 key={item.id}
                 className={`sidebar-item ${activeNavPage === item.id ? 'active' : ''}`}
                 onClick={() => setCurrentPage(item.id)}
+                data-testid={`cp-nav-${item.id}`}
               >
                 <span className="sidebar-icon">{item.icon}</span>
                 {!sidebarCollapsed && (

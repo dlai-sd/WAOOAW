@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import secrets
 import time
 from typing import Any, Dict, List, Optional
 
 import jwt
-from fastapi import Depends, HTTPException, Response, status
+from fastapi import Depends, Header, HTTPException, Response, status
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 from pydantic import BaseModel
@@ -49,6 +50,12 @@ class UserProfile(BaseModel):
     name: str | None = None
     provider: str = "google"
     environment: str
+
+
+class E2EAdminTokenRequest(BaseModel):
+    email: str = "admin@waooaw.com"
+    user_id: str = "pp-e2e-admin"
+    roles: List[str] = ["admin"]
 
 
 @router.get("/me", response_model=UserProfile)
@@ -141,7 +148,13 @@ async def _verify_google_id_token(app_settings: settings.__class__, credential: 
     return claims
 
 
-def _issue_waooaw_access_token(app_settings: settings.__class__, *, user_id: str, email: str) -> TokenResponse:
+def _issue_waooaw_access_token(
+    app_settings: settings.__class__,
+    *,
+    user_id: str,
+    email: str,
+    roles: Optional[List[str]] = None,
+) -> TokenResponse:
     if not app_settings.JWT_SECRET:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -153,12 +166,12 @@ def _issue_waooaw_access_token(app_settings: settings.__class__, *, user_id: str
     issuer = getattr(app_settings, "JWT_ISSUER", "waooaw.com")
 
     # Default roles: admin for PP console. Make this configurable later.
-    roles: List[str] = ["admin"]
+    effective_roles: List[str] = roles or ["admin"]
 
     payload: Dict[str, Any] = {
         "user_id": user_id,
         "email": email,
-        "roles": roles,
+        "roles": effective_roles,
         "iat": now,
         "exp": exp,
         "iss": issuer,
@@ -174,8 +187,23 @@ def _issue_waooaw_access_token(app_settings: settings.__class__, *, user_id: str
     return TokenResponse(
         access_token=token,
         expires_in=exp - now,
-        user={"id": user_id, "email": email, "roles": roles},
+        user={"id": user_id, "email": email, "roles": effective_roles},
     )
+
+
+def _verify_e2e_secret(
+    x_e2e_secret: str | None = Header(None),
+    app_settings: settings.__class__ = Depends(get_settings),
+) -> None:
+    if not app_settings.ENABLE_E2E_HOOKS:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    if not app_settings.E2E_SHARED_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="E2E hooks are enabled without E2E_SHARED_SECRET",
+        )
+    if not x_e2e_secret or not secrets.compare_digest(x_e2e_secret, app_settings.E2E_SHARED_SECRET):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
 @router.post("/google/verify", response_model=TokenResponse)
@@ -208,6 +236,21 @@ async def dev_token(app_settings: settings.__class__ = Depends(get_settings)) ->
     if not app_settings.ENABLE_DEV_TOKEN:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return _issue_waooaw_access_token(app_settings, user_id="demo-user", email="demo@waooaw.com")
+
+
+@router.post("/e2e/admin-token", response_model=TokenResponse)
+async def e2e_admin_token(
+    payload: E2EAdminTokenRequest,
+    _: None = Depends(_verify_e2e_secret),
+    app_settings: settings.__class__ = Depends(get_settings),
+) -> TokenResponse:
+    """Mint an admin token for deterministic PP smoke tests when explicitly enabled."""
+    return _issue_waooaw_access_token(
+        app_settings,
+        user_id=payload.user_id,
+        email=payload.email.strip().lower(),
+        roles=payload.roles,
+    )
 
 
 @router.post("/logout")

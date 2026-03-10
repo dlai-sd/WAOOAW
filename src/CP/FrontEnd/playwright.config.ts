@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4173';
+const useExternalBaseUrl = Boolean(process.env.PLAYWRIGHT_BASE_URL);
+
 /**
  * Playwright Test Configuration
  * See https://playwright.dev/docs/test-configuration
@@ -29,7 +32,7 @@ export default defineConfig({
   /* Shared settings for all the projects below */
   use: {
     /* Base URL to use in actions like `await page.goto('/')` */
-    baseURL: 'http://localhost:4173',
+    baseURL,
     
     /* Collect trace when retrying the failed test */
     trace: 'on-first-retry',
@@ -84,10 +87,12 @@ export default defineConfig({
   })(),
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run build && npm run preview',
-    url: 'http://localhost:4173',
-    reuseExistingServer: !!process.env.CI, // In CI, reuse the manually-started server
-    timeout: 120 * 1000,
-  },
+  webServer: useExternalBaseUrl
+    ? undefined
+    : {
+        command: 'npm run build && npm run preview',
+        url: 'http://localhost:4173',
+        reuseExistingServer: true,
+        timeout: 120 * 1000,
+      },
 });

@@ -22,6 +22,7 @@ interface GoogleSignInButtonProps {
   loading?: boolean;
   disabled?: boolean;
   style?: any;
+  testID?: string;
 }
 
 /**
@@ -38,6 +39,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
   loading = false,
   disabled = false,
   style,
+  testID,
 }) => {
   const { colors, spacing } = useTheme();
 
@@ -54,6 +56,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
       accessibilityLabel="Sign in with Google"
       accessibilityRole="button"
       accessibilityState={{ disabled: disabled || loading }}
+      testID={testID}
     >
       {loading ? (
         <ActivityIndicator color="#4285F4" size="small" />

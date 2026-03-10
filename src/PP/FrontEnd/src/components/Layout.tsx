@@ -83,6 +83,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
                 key={item.path}
                 to={item.path}
                 className={`nav-item ${active ? 'active' : ''}`}
+                data-testid={`pp-nav-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}
               >
                 {item.icon}
                 <span>{item.label}</span>
@@ -105,6 +106,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
             icon={<SignOut24Regular />}
             onClick={onLogout}
             style={{ width: '100%', justifyContent: 'flex-start' }}
+            data-testid="pp-logout-button"
           >
             Logout
           </Button>

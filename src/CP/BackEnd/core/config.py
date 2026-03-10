@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     JWT_ISSUER: str = "waooaw.com"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ENABLE_E2E_HOOKS: bool = False
+    E2E_SHARED_SECRET: str = ""
 
     # URLs
     API_URL: str = "http://localhost:8000"
@@ -67,6 +69,11 @@ class Settings(BaseSettings):
     def refresh_token_expire_seconds(self) -> int:
         """Get refresh token expiry in seconds"""
         return self.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+
+    @property
+    def e2e_hooks_ready(self) -> bool:
+        """Return True only when E2E hooks are enabled and properly configured."""
+        return self.ENABLE_E2E_HOOKS and bool(self.E2E_SHARED_SECRET)
 
 
 # Global settings instance

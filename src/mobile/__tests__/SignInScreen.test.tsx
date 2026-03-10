@@ -76,11 +76,13 @@ describe("SignInScreen", () => {
   });
 
   it("should render correctly", () => {
-    const { getByText, getByLabelText, queryByText } = render(<SignInScreen />);
+    const { getByText, getByLabelText, getByTestId, queryByText } = render(<SignInScreen />);
 
     // Logo is now an Image with accessibilityLabel, not a Text node
     expect(queryByText("WAOOAW")).toBeNull();
     expect(getByLabelText("WAOOAW")).toBeTruthy();
+    expect(getByTestId("mobile-signin-screen")).toBeTruthy();
+    expect(getByTestId("mobile-google-signin-button")).toBeTruthy();
     expect(getByText("Welcome Back")).toBeTruthy();
     expect(getByText("Agents Earn Your Business")).toBeTruthy();
     expect(getByText("Sign in with Google")).toBeTruthy();
@@ -90,11 +92,11 @@ describe("SignInScreen", () => {
   });
 
   it("should call onSignUpPress when sign up link is pressed", () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <SignInScreen onSignUpPress={mockOnSignUpPress} />,
     );
 
-    fireEvent.press(getByText("Sign up"));
+    fireEvent.press(getByTestId("mobile-signup-link"));
     expect(mockOnSignUpPress).toHaveBeenCalledTimes(1);
   });
 

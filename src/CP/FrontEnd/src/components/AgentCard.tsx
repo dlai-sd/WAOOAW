@@ -49,7 +49,7 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
   }
 
   return (
-    <div className="agent-card">
+    <div className="agent-card" data-testid={`cp-agent-card-${agent.id}`}>
       <div className="agent-avatar-large">
         {getAvatar()}
       </div>
@@ -85,6 +85,7 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
             iconPosition="after"
             onClick={handleTryClick}
             disabled={!isTryEnabled}
+            data-testid={`cp-agent-card-cta-${agent.id}`}
           >
             {isTryEnabled ? 'Try Free 7 Days' : 'Unavailable'}
           </Button>

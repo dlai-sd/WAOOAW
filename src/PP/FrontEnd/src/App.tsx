@@ -95,7 +95,7 @@ function AppShell() {
           </main>
         </div>
       ) : !isAuthenticated ? (
-        <div className="app-shell-landing">
+        <div className="app-shell-landing" data-testid="pp-public-shell">
           <header className="header">
             <div className="container">
               <div className="header-content">
@@ -109,7 +109,7 @@ function AppShell() {
                     onClick={toggleTheme}
                     aria-label="Toggle theme"
                   />
-                  <Button appearance="primary" onClick={handleLoginClick}>
+                  <Button appearance="primary" onClick={handleLoginClick} data-testid="pp-signin-trigger">
                     Sign In
                   </Button>
                 </div>
@@ -122,7 +122,7 @@ function AppShell() {
 
           <Dialog open={showLoginDialog} onOpenChange={(_, data) => setShowLoginDialog(data.open)}>
             <DialogSurface>
-              <DialogBody>
+              <DialogBody data-testid="pp-login-dialog">
                 <DialogTitle>Sign in to Platform Portal</DialogTitle>
                 <DialogContent>
                   <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -161,6 +161,7 @@ function AppShell() {
                           appearance="secondary" 
                           style={{ width: '100%' }}
                           onClick={handleDemoLogin}
+                          data-testid="pp-demo-login-button"
                         >
                           Demo Login (Skip OAuth)
                         </Button>
