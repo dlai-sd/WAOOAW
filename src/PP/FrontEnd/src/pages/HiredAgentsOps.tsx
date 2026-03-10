@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Body1,
   Button,
@@ -15,6 +15,7 @@ import {
   TableRow,
   Text
 } from '@fluentui/react-components'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import ApiErrorPanel from '../components/ApiErrorPanel'
 import ConstructHealthPanel from '../components/ConstructHealthPanel'
@@ -112,10 +113,39 @@ type HiredRow = {
   goals: GoalInstance[]
 }
 
+function buildHiredAgentsSearch(filters: {
+  customerId?: string
+  email?: string
+  asOf?: string
+  agentId?: string
+  correlationId?: string
+  selectedHiredInstanceId?: string
+}): URLSearchParams {
+  const params = new URLSearchParams()
+  const values: Record<string, string | undefined> = {
+    customer_id: filters.customerId?.trim(),
+    email: filters.email?.trim(),
+    as_of: filters.asOf?.trim(),
+    agent_id: filters.agentId?.trim(),
+    correlation_id: filters.correlationId?.trim(),
+    selected_hired_instance_id: filters.selectedHiredInstanceId?.trim(),
+  }
+
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) params.set(key, value)
+  })
+
+  return params
+}
+
 export default function HiredAgentsOps() {
-  const [customerId, setCustomerId] = useState('')
-  const [asOf, setAsOf] = useState('')
-  const [email, setEmail] = useState('')
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialContextLoadRef = useRef(Boolean(searchParams.get('customer_id') || searchParams.get('email')))
+
+  const [customerId, setCustomerId] = useState(() => searchParams.get('customer_id') || '')
+  const [asOf, setAsOf] = useState(() => searchParams.get('as_of') || '')
+  const [email, setEmail] = useState(() => searchParams.get('email') || '')
   const [emailError, setEmailError] = useState<string | null>(null)
 
   const [rows, setRows] = useState<HiredRow[]>([])
@@ -125,7 +155,7 @@ export default function HiredAgentsOps() {
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([])
   const [denials, setDenials] = useState<PolicyDenialRecord[]>([])
 
-  const [correlationId, setCorrelationId] = useState('')
+  const [correlationId, setCorrelationId] = useState(() => searchParams.get('correlation_id') || '')
   const [selectedDenial, setSelectedDenial] = useState<PolicyDenialRecord | null>(null)
 
   const [isLoading, setIsLoading] = useState(false)
@@ -135,6 +165,26 @@ export default function HiredAgentsOps() {
   const [detailTab, setDetailTab] = useState<'overview' | 'scheduler' | 'hooks'>('overview')
 
   const normalizedAsOf = useMemo(() => (asOf || '').trim() || undefined, [asOf])
+  const requestedAgentId = (searchParams.get('agent_id') || '').trim()
+  const requestedSelectedHiredInstanceId = (searchParams.get('selected_hired_instance_id') || '').trim()
+
+  const syncContext = useCallback((overrides?: Partial<{
+    customerId: string
+    email: string
+    asOf: string
+    agentId: string
+    correlationId: string
+    selectedHiredInstanceId: string
+  }>) => {
+    setSearchParams(buildHiredAgentsSearch({
+      customerId: overrides?.customerId ?? customerId,
+      email: overrides?.email ?? email,
+      asOf: overrides?.asOf ?? asOf,
+      agentId: overrides?.agentId ?? requestedAgentId,
+      correlationId: overrides?.correlationId ?? correlationId,
+      selectedHiredInstanceId: overrides?.selectedHiredInstanceId ?? requestedSelectedHiredInstanceId,
+    }), { replace: true })
+  }, [asOf, correlationId, customerId, email, requestedAgentId, requestedSelectedHiredInstanceId, setSearchParams])
 
   const lookupByEmail = useCallback(async () => {
     const e = email.trim()
@@ -143,14 +193,17 @@ export default function HiredAgentsOps() {
     try {
       const result = await gatewayApiClient.lookupCustomerByEmail(e) as { customer_id: string }
       setCustomerId(result.customer_id)
+      syncContext({ customerId: result.customer_id, email: e })
     } catch {
       setEmailError('Customer not found for this email address.')
     }
-  }, [email])
+  }, [email, syncContext])
 
   const load = useCallback(async () => {
     const cust = customerId.trim()
     if (!cust) return
+
+    syncContext({ customerId: cust, email, asOf, selectedHiredInstanceId: '', correlationId: '' })
 
     setIsLoading(true)
     setError(null)
@@ -202,7 +255,7 @@ export default function HiredAgentsOps() {
     } finally {
       setIsLoading(false)
     }
-  }, [customerId, normalizedAsOf])
+  }, [asOf, customerId, email, normalizedAsOf, syncContext])
 
   const loadDetails = useCallback(async (row: HiredRow, opts?: { correlation_id?: string }) => {
     const cust = customerId.trim()
@@ -213,6 +266,14 @@ export default function HiredAgentsOps() {
     setSelectedDenial(null)
     try {
       const corr = (opts?.correlation_id ?? correlationId).trim() || undefined
+      syncContext({
+        customerId: cust,
+        email,
+        asOf,
+        agentId: row.hired.agent_id,
+        selectedHiredInstanceId: row.hired.hired_instance_id,
+        correlationId: corr || '',
+      })
 
       const [deliverablesRes, approvalsRes, denialsRes] = await Promise.all([
         gatewayApiClient.listOpsHiredAgentDeliverables(row.hired.hired_instance_id, {
@@ -246,7 +307,27 @@ export default function HiredAgentsOps() {
     } finally {
       setIsDetailLoading(false)
     }
-  }, [customerId, correlationId, normalizedAsOf])
+  }, [asOf, correlationId, customerId, email, normalizedAsOf, syncContext])
+
+  useEffect(() => {
+    if (!initialContextLoadRef.current) return
+    initialContextLoadRef.current = false
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    if (!rows.length || selected) return
+
+    const rowFromContext = rows.find(r => r.hired.hired_instance_id === requestedSelectedHiredInstanceId)
+      || rows.find(r => requestedAgentId && r.hired.agent_id === requestedAgentId)
+
+    if (!rowFromContext) return
+
+    setSelected(rowFromContext)
+    void loadDetails(rowFromContext, {
+      correlation_id: (searchParams.get('correlation_id') || '').trim() || undefined,
+    })
+  }, [loadDetails, requestedAgentId, requestedSelectedHiredInstanceId, rows, searchParams, selected])
 
   const goalSummary = (goals: GoalInstance[]): string => {
     if (!goals.length) return '—'
@@ -255,6 +336,17 @@ export default function HiredAgentsOps() {
       .map(g => `${g.goal_template_id} (${g.frequency})`)
       .join(', ') + (goals.length > 3 ? ` +${goals.length - 3} more` : '')
   }
+
+  const handoffContext = selected
+    ? buildHiredAgentsSearch({
+        customerId,
+        email,
+        asOf,
+        agentId: selected.hired.agent_id,
+        correlationId,
+        selectedHiredInstanceId: selected.hired.hired_instance_id,
+      }).toString()
+    : ''
 
   return (
     <div className="page-container">
@@ -349,6 +441,14 @@ export default function HiredAgentsOps() {
                 onClick={() => {
                   setSelected(r)
                   setCorrelationId('')
+                  syncContext({
+                    customerId,
+                    email,
+                    asOf,
+                    agentId: r.hired.agent_id,
+                    selectedHiredInstanceId: r.hired.hired_instance_id,
+                    correlationId: '',
+                  })
                   void loadDetails(r)
                 }}
                 style={{ cursor: 'pointer' }}
@@ -404,6 +504,34 @@ export default function HiredAgentsOps() {
 
       {selected && (
         <>
+          <Card style={{ marginTop: 16 }}>
+            <CardHeader
+              header={<Text weight="semibold">Operator handoff context</Text>}
+              description={<Text size={200}>Customer {customerId.trim()} • Agent {selected.hired.agent_id} • Runtime {selected.hired.hired_instance_id}</Text>}
+            />
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Text size={200}>What happened: the hired runtime, approvals, denials, and diagnostics are pinned to the selected customer storyline.</Text>
+              <Text size={200}>What next: inspect deliverables here, jump to draft review to unblock content, or open policy denials with the same runtime context.</Text>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <Button
+                  appearance="secondary"
+                  onClick={() => navigate(`/review-queue?${buildHiredAgentsSearch({
+                    customerId,
+                    agentId: selected.hired.agent_id,
+                  }).toString()}`)}
+                >
+                  Open Draft Review
+                </Button>
+                <Button
+                  appearance="secondary"
+                  onClick={() => navigate(`/policy-denials?${handoffContext}`)}
+                >
+                  Open Policy Denials
+                </Button>
+              </div>
+            </div>
+          </Card>
+
           <Card style={{ marginTop: 16 }}>
             <CardHeader
               header={<Text weight="semibold">Selected instance</Text>}

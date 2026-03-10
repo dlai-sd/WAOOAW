@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 
 import ReviewQueue from '../pages/ReviewQueue'
@@ -17,14 +18,26 @@ vi.mock('../components/ApiErrorPanel', () => ({
 }))
 
 test('ReviewQueue renders with empty Customer ID input on load', () => {
-  render(<ReviewQueue />)
+  render(
+    <MemoryRouter initialEntries={['/review-queue']}>
+      <Routes>
+        <Route path="/review-queue" element={<ReviewQueue />} />
+      </Routes>
+    </MemoryRouter>
+  )
 
   const customerIdInput = screen.getByRole('textbox', { name: /customer id/i })
   expect(customerIdInput).toHaveValue('')
 })
 
 test('ReviewQueue renders with empty Agent ID input on load', () => {
-  render(<ReviewQueue />)
+  render(
+    <MemoryRouter initialEntries={['/review-queue']}>
+      <Routes>
+        <Route path="/review-queue" element={<ReviewQueue />} />
+      </Routes>
+    </MemoryRouter>
+  )
 
   const agentIdInput = screen.getByRole('textbox', { name: /agent id/i })
   expect(agentIdInput).toHaveValue('')

@@ -2,9 +2,15 @@ import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 
 import HiredAgentsOps from './HiredAgentsOps'
+
+function LocationEcho() {
+  const location = useLocation()
+  return <div data-testid="location-display">{`${location.pathname}${location.search}`}</div>
+}
 
 const mocks = vi.hoisted(() => {
   return {
@@ -99,7 +105,13 @@ vi.mock('../services/gatewayApiClient', () => {
 
 test('HiredAgentsOps loads instances and renders drilldown sections', async () => {
   const user = userEvent.setup()
-  render(React.createElement(HiredAgentsOps as any) as any)
+  render(
+    <MemoryRouter initialEntries={['/hired-agents']}>
+      <Routes>
+        <Route path="/hired-agents" element={React.createElement(HiredAgentsOps as any) as any} />
+      </Routes>
+    </MemoryRouter>
+  )
 
   await waitFor(() => {
     expect(screen.getByText('Hired Agents')).toBeInTheDocument()
@@ -128,9 +140,41 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
 
   expect(screen.getByText('Drafts (Deliverables)')).toBeInTheDocument()
   expect(screen.getByText('DEL-1')).toBeInTheDocument()
-  expect(screen.getByText('Approvals')).toBeInTheDocument()
+  expect(screen.getAllByText('Approvals').length).toBeGreaterThan(0)
   expect(screen.getByText('APR-1')).toBeInTheDocument()
   expect(screen.getByText('Policy Denials')).toBeInTheDocument()
   expect(screen.getByText('approval_required')).toBeInTheDocument()
+})
+
+test('HiredAgentsOps preserves handoff context and links to the next operator surface', async () => {
+  const user = userEvent.setup()
+
+  render(
+    <MemoryRouter initialEntries={['/hired-agents?customer_id=CUST-1&agent_id=AGT-MKT-HEALTH-001&selected_hired_instance_id=HIRE-1&correlation_id=corr-1']}>
+      <Routes>
+        <Route path="/hired-agents" element={React.createElement(HiredAgentsOps as any) as any} />
+        <Route path="/review-queue" element={<LocationEcho />} />
+      </Routes>
+    </MemoryRouter>
+  )
+
+  await waitFor(() => {
+    expect(mocks.listOpsSubscriptions).toHaveBeenCalledWith(
+      expect.objectContaining({ customer_id: 'CUST-1' })
+    )
+  })
+
+  await waitFor(() => {
+    expect(screen.getByText('Operator handoff context')).toBeInTheDocument()
+  })
+
+  expect(screen.getByText(/Customer CUST-1 • Agent AGT-MKT-HEALTH-001 • Runtime HIRE-1/)).toBeInTheDocument()
+  expect(screen.getByDisplayValue('corr-1')).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Open Draft Review' }))
+
+  await waitFor(() => {
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/review-queue?customer_id=CUST-1&agent_id=AGT-MKT-HEALTH-001')
+  })
 })
 

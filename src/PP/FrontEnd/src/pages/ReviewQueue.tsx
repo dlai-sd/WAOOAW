@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Body1, Button, Card, CardHeader, Field, Input, Text } from '@fluentui/react-components'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import ApiErrorPanel from '../components/ApiErrorPanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
@@ -26,16 +27,36 @@ type DraftBatch = {
   posts: DraftPost[]
 }
 
+function buildReviewQueueSearch(customerId: string, agentId: string): URLSearchParams {
+  const params = new URLSearchParams()
+  const normalizedCustomerId = customerId.trim()
+  const normalizedAgentId = agentId.trim()
+
+  if (normalizedCustomerId) params.set('customer_id', normalizedCustomerId)
+  if (normalizedAgentId) params.set('agent_id', normalizedAgentId)
+
+  return params
+}
+
 export default function ReviewQueue() {
-  const [customerId, setCustomerId] = useState('')
-  const [agentId, setAgentId] = useState('')
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialContextLoadRef = useRef(Boolean(searchParams.get('customer_id') || searchParams.get('agent_id')))
+
+  const [customerId, setCustomerId] = useState(() => searchParams.get('customer_id') || '')
+  const [agentId, setAgentId] = useState(() => searchParams.get('agent_id') || '')
   const [batches, setBatches] = useState<DraftBatch[]>([])
   const [hasLoaded, setHasLoaded] = useState(false)
   const [scheduledAtByPostId, setScheduledAtByPostId] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
+  function syncContext(nextCustomerId: string, nextAgentId: string) {
+    setSearchParams(buildReviewQueueSearch(nextCustomerId, nextAgentId), { replace: true })
+  }
+
   async function handleLoad() {
+    syncContext(customerId, agentId)
     setIsBusy(true)
     setError(null)
     try {
@@ -96,6 +117,16 @@ export default function ReviewQueue() {
     }
   }
 
+  useEffect(() => {
+    if (!initialContextLoadRef.current) return
+    initialContextLoadRef.current = false
+    void handleLoad()
+  }, [])
+
+  const reviewQueueContext = buildReviewQueueSearch(customerId, agentId)
+  const reviewQueueContextString = reviewQueueContext.toString()
+  const hasOperatorContext = Boolean(customerId.trim() || agentId.trim())
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -137,6 +168,35 @@ export default function ReviewQueue() {
         </div>
       </Card>
 
+      {hasOperatorContext && (
+        <Card style={{ marginTop: 16 }}>
+          <CardHeader
+            header={<Text weight="semibold">Operator handoff context</Text>}
+            description={<Text size={200}>Customer {customerId.trim() || 'not set'} • Agent {agentId.trim() || 'not set'}</Text>}
+          />
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <Text size={200}>What happened: this queue is already narrowed to the customer or agent the operator came in with.</Text>
+            <Text size={200}>What next: approve or schedule here, then jump to hired runtime or policy denials without re-entering filters.</Text>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <Button
+                appearance="secondary"
+                disabled={!customerId.trim()}
+                onClick={() => navigate(`/hired-agents?${reviewQueueContextString}`)}
+              >
+                Open Hired Agents
+              </Button>
+              <Button
+                appearance="secondary"
+                disabled={!customerId.trim() && !agentId.trim()}
+                onClick={() => navigate(`/policy-denials?${reviewQueueContextString}`)}
+              >
+                Open Policy Denials
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {hasLoaded && !isBusy && !error && batches.length === 0 && (
         <Card style={{ marginTop: 16, padding: 20 }}>
           <Text weight="semibold">No draft batches found</Text>
@@ -153,6 +213,12 @@ export default function ReviewQueue() {
             description={<Text size={200} style={{ opacity: 0.85 }}>{batch.brand_name} • {batch.theme} • {batch.status || 'pending_review'}</Text>}
           />
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Text size={200} style={{ opacity: 0.85 }}>
+              Customer {batch.customer_id || customerId.trim() || 'unknown'} • Agent {batch.agent_id || agentId.trim() || 'unknown'}
+            </Text>
+            <Text size={200} style={{ opacity: 0.85 }}>
+              Next operator move: approve safe draft content, schedule approved content, or open hired runtime if the customer asks what happens after publish.
+            </Text>
             {(batch.posts || []).map(post => (
               <Card key={post.post_id}>
                 <CardHeader

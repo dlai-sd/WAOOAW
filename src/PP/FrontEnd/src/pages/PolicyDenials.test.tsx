@@ -1,9 +1,15 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 
 import PolicyDenials from './PolicyDenials'
+
+function LocationEcho() {
+  const location = useLocation()
+  return <div data-testid="location-display">{`${location.pathname}${location.search}`}</div>
+}
 
 const mocks = vi.hoisted(() => {
   return {
@@ -40,7 +46,13 @@ vi.mock('../services/gatewayApiClient', () => {
 
 test('PolicyDenials renders policy denial records from API', async () => {
   const user = userEvent.setup()
-  render(<PolicyDenials />)
+  render(
+    <MemoryRouter initialEntries={['/policy-denials']}>
+      <Routes>
+        <Route path="/policy-denials" element={<PolicyDenials />} />
+      </Routes>
+    </MemoryRouter>
+  )
 
   await waitFor(() => {
     expect(screen.getByText('Policy Denials')).toBeInTheDocument()
@@ -72,4 +84,38 @@ test('PolicyDenials renders policy denial records from API', async () => {
   expect(screen.getByText('Denial Details')).toBeInTheDocument()
   expect(screen.getByText(/Recommended next action: Provide approval_id and retry the action\./)).toBeInTheDocument()
   expect(screen.getByText(/"missing": "approval_id"/)).toBeInTheDocument()
+})
+
+test('PolicyDenials auto-loads handoff filters and links to hired runtime', async () => {
+  const user = userEvent.setup()
+
+  render(
+    <MemoryRouter initialEntries={['/policy-denials?customer_id=CUST-1&agent_id=AGT-1&correlation_id=corr-abc']}>
+      <Routes>
+        <Route path="/policy-denials" element={<PolicyDenials />} />
+        <Route path="/hired-agents" element={<LocationEcho />} />
+      </Routes>
+    </MemoryRouter>
+  )
+
+  await waitFor(() => {
+    expect(mocks.listPolicyDenials).toHaveBeenCalledWith({
+      correlation_id: 'corr-abc',
+      customer_id: 'CUST-1',
+      agent_id: 'AGT-1',
+      limit: 100
+    })
+  })
+
+  expect(screen.getByText('Operator handoff context')).toBeInTheDocument()
+
+  await user.click(screen.getByText('corr-abc'))
+  await user.click(screen.getByRole('button', { name: 'Open hired agent runtime' }))
+
+  await waitFor(() => {
+    expect(screen.getByTestId('location-display')).toHaveTextContent('/hired-agents?')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('customer_id=CUST-1')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('agent_id=AGT-1')
+    expect(screen.getByTestId('location-display')).toHaveTextContent('correlation_id=corr-abc')
+  })
 })
