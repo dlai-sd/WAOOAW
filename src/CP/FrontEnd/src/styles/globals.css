@@ -2580,6 +2580,24 @@ section[id] {
   margin-bottom: 6px;
 }
 
+.hire-receipt-reference-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  background: var(--colorNeutralBackground2);
+  border: 1px solid var(--colorNeutralStroke2);
+}
+
+.hire-receipt-reference-label {
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.hire-receipt-reference-value {
+  font-family: monospace;
+  word-break: break-all;
+}
+
 .hire-wizard-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);

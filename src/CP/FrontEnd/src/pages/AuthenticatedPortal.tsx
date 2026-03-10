@@ -134,7 +134,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
   const renderPage = () => {
     switch (currentPage) {
       case 'command-centre':
-        return <CommandCentre onOpenDiscover={() => setCurrentPage('discover')} onOpenBilling={() => setCurrentPage('billing')} onOpenMyAgents={() => setCurrentPage('my-agents')} />
+        return <CommandCentre onOpenDiscover={() => setCurrentPage('discover')} onOpenBilling={() => setCurrentPage('billing')} onOpenMyAgents={() => setCurrentPage('my-agents')} onOpenGoals={() => setCurrentPage('goals')} />
       case 'my-agents':
         return <MyAgents onNavigateToDiscover={() => setCurrentPage('discover')} />
       case 'discover':
@@ -152,7 +152,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       case 'profile-settings':
         return <ProfileSettings />
       default:
-        return <CommandCentre onOpenDiscover={() => setCurrentPage('discover')} onOpenBilling={() => setCurrentPage('billing')} onOpenMyAgents={() => setCurrentPage('my-agents')} />
+        return <CommandCentre onOpenDiscover={() => setCurrentPage('discover')} onOpenBilling={() => setCurrentPage('billing')} onOpenMyAgents={() => setCurrentPage('my-agents')} onOpenGoals={() => setCurrentPage('goals')} />
     }
   }
 

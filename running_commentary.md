@@ -37,12 +37,30 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 
 | Chunk | Goal | Status | Notes |
 |---|---|---|---|
-| 1 | Structured QA pass on CP user journeys | planned | sign in, sign up, discovery, hire, command centre, billing, profile |
+| 1 | Structured QA pass on CP user journeys | in progress | first validated sub-chunk complete |
 | 2 | Structured QA pass on PP contributor journeys | planned | landing, dashboard, agent setup, hired agents ops, review queue, policy denials, audit |
 | 3 | Structured QA pass on mobile journeys | planned | sign in, sign up, today, ops, profile, approvals |
 | 4 | Fix defects from QA pass | planned | focus on layout, interaction, empty/loading/error states |
 | 5 | Add targeted frontend test coverage for new flows | planned | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
 | 6 | Final smoke + PR prep | planned | branch summary, residual risks, open PR |
+
+### Chunk 1A — CP QA sub-checkpoint
+
+Validated and ready on branch before moving to the next CP slice.
+
+| Area | Result |
+|---|---|
+| Discovery -> detail navigation | fixed so discovery uses the provided selection callback instead of bypassing the portal flow |
+| Command Centre quick action | fixed dead `Add New Goal` action by wiring it to the goals page |
+| Payment confirmation -> setup | upgraded `HireReceipt` so the user continues into setup instead of landing in a thin utility dead end |
+| CP validation | `npm run build` + `npm run test:run` exited `0` after these fixes |
+
+Files in Chunk 1A:
+- `src/CP/FrontEnd/src/pages/AgentDiscovery.tsx`
+- `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`
+- `src/CP/FrontEnd/src/pages/HireReceipt.tsx`
+- `src/CP/FrontEnd/src/pages/authenticated/CommandCentre.tsx`
+- `src/CP/FrontEnd/src/styles/globals.css`
 
 ---
 

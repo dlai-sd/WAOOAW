@@ -77,8 +77,10 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
   }
 
   const handleTryAgent = (agentId: string) => {
-    // Navigate to agent detail page
-    console.log('Try agent:', agentId)
+    if (onSelectAgent) {
+      onSelectAgent(agentId)
+      return
+    }
     navigate(`/agent/${agentId}`)
   }
 

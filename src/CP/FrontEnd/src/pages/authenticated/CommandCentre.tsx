@@ -4,9 +4,10 @@ interface CommandCentreProps {
   onOpenDiscover: () => void
   onOpenBilling: () => void
   onOpenMyAgents: () => void
+  onOpenGoals: () => void
 }
 
-export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyAgents }: CommandCentreProps) {
+export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyAgents, onOpenGoals }: CommandCentreProps) {
 
   const stats = [
     { label: '2 Agents', sublabel: 'Active', value: '🤖' },
@@ -128,7 +129,7 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
       <section className="quick-actions">
         <h2>Quick Actions</h2>
         <div className="action-grid">
-          <Card className="action-card">
+          <Card className="action-card" onClick={onOpenGoals}>
             <h3>🎯 Add New Goal</h3>
             <p>Configure goals for your agents</p>
           </Card>
