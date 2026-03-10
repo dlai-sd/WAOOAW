@@ -79,12 +79,51 @@ export default function UsageBilling() {
   const totalBilled = invoices.reduce((sum, invoice) => sum + (typeof invoice.total_amount === 'number' ? invoice.total_amount : 0), 0)
   const totalReceipted = receipts.reduce((sum, receipt) => sum + (typeof receipt.total_amount === 'number' ? receipt.total_amount : 0), 0)
 
+  const summaryCards = [
+    {
+      label: 'Active subscriptions',
+      value: loading ? 'Loading…' : String(activeSubscriptions.length),
+      note: loading
+        ? 'Connecting to live subscription records'
+        : activeSubscriptions.length
+          ? 'Live agent contracts currently billing'
+          : 'No active subscriptions yet. Your billing timeline starts after the first live hire.',
+    },
+    {
+      label: 'Invoices to date',
+      value: loading ? 'Loading…' : invoices.length ? `₹${totalBilled}` : 'None yet',
+      note: loading
+        ? 'Waiting for invoice history'
+        : invoices.length
+          ? `Across ${invoices.length} invoice records`
+          : 'Invoices appear only after a chargeable billing event completes.',
+    },
+    {
+      label: 'Receipts available',
+      value: loading ? 'Loading…' : receipts.length ? `₹${totalReceipted}` : 'None yet',
+      note: loading
+        ? 'Waiting for receipt history'
+        : receipts.length
+          ? `Across ${receipts.length} receipt records`
+          : 'Receipts appear after successful payment capture.',
+    },
+  ]
+
   return (
     <div className="usage-billing-page">
       <div className="page-header">
         <h1>Usage & Billing</h1>
         <div className="plan-info">
-          <div>Next Billing Date: <strong>{nextBillingDate ? formatDate(nextBillingDate) : '—'}</strong></div>
+          <div>
+            Billing status:{' '}
+            <strong>
+              {loading
+                ? 'Loading live billing state'
+                : nextBillingDate
+                  ? `Next billing ${formatDate(nextBillingDate)}`
+                  : 'No active billing cycle yet'}
+            </strong>
+          </div>
         </div>
       </div>
 
@@ -99,21 +138,13 @@ export default function UsageBilling() {
         </Card>
 
         <div className="usage-billing-summary-grid">
-          <Card className="usage-billing-summary-card">
-            <div className="usage-billing-summary-label">Active subscriptions</div>
-            <div className="usage-billing-summary-value">{activeSubscriptions.length}</div>
-            <div className="usage-billing-summary-note">Live agent contracts currently billing</div>
-          </Card>
-          <Card className="usage-billing-summary-card">
-            <div className="usage-billing-summary-label">Invoices to date</div>
-            <div className="usage-billing-summary-value">₹{totalBilled || 0}</div>
-            <div className="usage-billing-summary-note">Across {invoices.length} invoice records</div>
-          </Card>
-          <Card className="usage-billing-summary-card">
-            <div className="usage-billing-summary-label">Receipts available</div>
-            <div className="usage-billing-summary-value">₹{totalReceipted || 0}</div>
-            <div className="usage-billing-summary-note">Across {receipts.length} receipt records</div>
-          </Card>
+          {summaryCards.map((card) => (
+            <Card key={card.label} className="usage-billing-summary-card">
+              <div className="usage-billing-summary-label">{card.label}</div>
+              <div className="usage-billing-summary-value">{card.value}</div>
+              <div className="usage-billing-summary-note">{card.note}</div>
+            </Card>
+          ))}
         </div>
       </div>
 
@@ -144,7 +175,7 @@ export default function UsageBilling() {
               ))}
           </div>
         ) : (
-          <div style={{ padding: '0.5rem 0 1rem' }}>No active subscriptions yet.</div>
+          <div style={{ padding: '0.5rem 0 1rem' }}>No active subscriptions yet. Hire an agent and activate the trial before billing can become live here.</div>
         )}
 
         <h2>Invoices</h2>
@@ -181,7 +212,7 @@ export default function UsageBilling() {
               ))}
           </div>
         ) : (
-          <div style={{ padding: '0.5rem 0' }}>No invoices yet.</div>
+          <div style={{ padding: '0.5rem 0' }}>No invoices yet. WAOOAW will only show invoice records after an actual chargeable event occurs.</div>
         )}
 
         {error && <div style={{ paddingTop: '0.75rem', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div>}
@@ -222,7 +253,7 @@ export default function UsageBilling() {
               ))}
           </div>
         ) : (
-          <div style={{ padding: '0.5rem 0' }}>No receipts yet.</div>
+          <div style={{ padding: '0.5rem 0' }}>No receipts yet. Receipt proof appears only after payment succeeds.</div>
         )}
 
         {error && <div style={{ paddingTop: '0.75rem', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div>}
@@ -233,15 +264,15 @@ export default function UsageBilling() {
         <div className="usage-billing-confidence-grid">
           <div>
             <strong>What is live</strong>
-            <p>Which agents are active, paused, or in trial right now.</p>
+            <p>Which subscriptions are actually active right now, not what the shell assumes should exist.</p>
           </div>
           <div>
             <strong>What was charged</strong>
-            <p>Invoices should connect to live subscriptions without needing back-and-forth support.</p>
+            <p>Invoices should only appear when a real billing event completed, and every record should map back to a subscription.</p>
           </div>
           <div>
             <strong>What proves payment</strong>
-            <p>Receipts should be one click away whenever you need finance or compliance proof.</p>
+            <p>Receipts should be one click away whenever finance or compliance asks for evidence of payment.</p>
           </div>
         </div>
       </Card>

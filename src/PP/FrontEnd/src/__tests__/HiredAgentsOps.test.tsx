@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 
 const mockGatewayApiClient = vi.hoisted(() => ({
@@ -37,7 +38,13 @@ test('E9-S1-T1: Lookup button populates Customer ID when email resolves', async 
   mockGatewayApiClient.lookupCustomerByEmail.mockResolvedValueOnce({ customer_id: 'C1', email: 'test@example.com' })
   const user = userEvent.setup()
 
-  render(<HiredAgentsOps />)
+  render(
+    <MemoryRouter initialEntries={['/hired-agents']}>
+      <Routes>
+        <Route path="/hired-agents" element={<HiredAgentsOps />} />
+      </Routes>
+    </MemoryRouter>
+  )
 
   const emailInput = screen.getByRole('textbox', { name: /customer email/i })
   await user.type(emailInput, 'test@example.com')
@@ -53,7 +60,13 @@ test('E9-S1-T2: Lookup button shows error message when email not found', async (
   mockGatewayApiClient.lookupCustomerByEmail.mockRejectedValueOnce(new Error('Not found'))
   const user = userEvent.setup()
 
-  render(<HiredAgentsOps />)
+  render(
+    <MemoryRouter initialEntries={['/hired-agents']}>
+      <Routes>
+        <Route path="/hired-agents" element={<HiredAgentsOps />} />
+      </Routes>
+    </MemoryRouter>
+  )
 
   const emailInput = screen.getByRole('textbox', { name: /customer email/i })
   await user.type(emailInput, 'notfound@example.com')

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@fluentui/react-components'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { 
   WeatherMoon20Regular, 
   WeatherSunny20Regular,
@@ -20,9 +21,11 @@ import CommandCentre from './authenticated/CommandCentre'
 import MyAgents from './authenticated/MyAgents'
 import GoalsSetup from './authenticated/GoalsSetup'
 import Deliverables from './authenticated/Deliverables'
-import Inbox from './authenticated/Inbox'
+import Inbox, { type CustomerInboxItem } from './authenticated/Inbox'
 import UsageBilling from './authenticated/UsageBilling'
 import ProfileSettings from './authenticated/ProfileSettings'
+import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
+import { listHiredAgentDeliverables, type Deliverable } from '../services/hiredAgentDeliverables.service'
 
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
@@ -30,29 +33,199 @@ interface AuthenticatedPortalProps {
   onLogout: () => void
   initialPage?: Page
   initialAgentId?: string
+  initialJourneyContext?: PortalJourneyContext
 }
 
 type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail'
 
-export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, initialPage, initialAgentId }: AuthenticatedPortalProps) {
-  const [currentPage, setCurrentPage] = useState<Page>(initialPage ?? 'command-centre')
+type JourneySource = 'payment-confirmed' | 'trial-activated' | 'setup-incomplete'
+
+type PortalJourneyContext = {
+  source: JourneySource
+  subscriptionId?: string
+}
+
+type PortalLocationState = {
+  portalEntry?: {
+    page?: Page
+    agentId?: string
+    source?: JourneySource
+    subscriptionId?: string
+  }
+}
+
+function formatCount(count: number, singular: string, plural?: string): string {
+  const label = count === 1 ? singular : plural || `${singular}s`
+  return `${count} ${label}`
+}
+
+function summarizePayload(payload: Record<string, unknown>): string {
+  const candidateKeys = ['summary', 'text_preview', 'preview', 'message', 'body', 'content']
+
+  for (const key of candidateKeys) {
+    const value = payload[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim().slice(0, 180)
+    }
+  }
+
+  try {
+    const raw = JSON.stringify(payload || {})
+    return raw.length > 180 ? `${raw.slice(0, 177)}...` : raw
+  } catch {
+    return 'Deliverable content is available in My Agents.'
+  }
+}
+
+function toInboxItem(instance: MyAgentInstanceSummary, deliverable: Deliverable): CustomerInboxItem | null {
+  const normalizedStatus = String(deliverable.review_status || '').trim().toLowerCase()
+  if (!['pending_review', 'approved', 'rejected'].includes(normalizedStatus)) {
+    return null
+  }
+
+  return {
+    deliverableId: deliverable.deliverable_id,
+    hiredInstanceId: String(instance.hired_instance_id || '').trim(),
+    agentLabel: String(instance.nickname || instance.agent_id || 'Your agent').trim(),
+    title: String(deliverable.title || deliverable.deliverable_id || 'Untitled deliverable').trim(),
+    preview: summarizePayload(deliverable.payload || {}),
+    reviewStatus: normalizedStatus,
+    approvalId: deliverable.approval_id || null,
+    reviewNotes: deliverable.review_notes || null,
+    createdAt: deliverable.created_at || null,
+    updatedAt: deliverable.updated_at || null,
+  }
+}
+
+export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, initialPage, initialAgentId, initialJourneyContext }: AuthenticatedPortalProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const portalEntry = (location.state as PortalLocationState | null)?.portalEntry
+  const derivedInitialPage = portalEntry?.page ?? initialPage ?? 'command-centre'
+  const derivedInitialAgentId = portalEntry?.agentId ?? initialAgentId
+  const derivedJourneyContext = portalEntry?.source
+    ? {
+        source: portalEntry.source,
+        subscriptionId: portalEntry.subscriptionId,
+      }
+    : initialJourneyContext
+
+  const [currentPage, setCurrentPage] = useState<Page>(derivedInitialPage)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(initialAgentId)
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(derivedInitialAgentId)
+  const [journeyContext, setJourneyContext] = useState<PortalJourneyContext | undefined>(derivedJourneyContext)
+  const [inboxItems, setInboxItems] = useState<CustomerInboxItem[]>([])
+  const [inboxLoading, setInboxLoading] = useState(false)
+  const [inboxError, setInboxError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setCurrentPage(derivedInitialPage)
+  }, [derivedInitialPage])
+
+  useEffect(() => {
+    setSelectedAgentId(derivedInitialAgentId)
+  }, [derivedInitialAgentId])
+
+  useEffect(() => {
+    setJourneyContext(derivedJourneyContext)
+  }, [derivedJourneyContext])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadInboxItems = async () => {
+      setInboxLoading(true)
+      setInboxError(null)
+
+      try {
+        const summary = await getMyAgentsSummary()
+        const instances = (summary?.instances || []).filter((instance) => String(instance.hired_instance_id || '').trim())
+
+        if (!instances.length) {
+          if (!cancelled) setInboxItems([])
+          return
+        }
+
+        const results = await Promise.allSettled(
+          instances.map(async (instance) => {
+            const hiredInstanceId = String(instance.hired_instance_id || '').trim()
+            const response = await listHiredAgentDeliverables(hiredInstanceId)
+            return {
+              instance,
+              deliverables: (response?.deliverables || []).slice(),
+            }
+          })
+        )
+
+        if (cancelled) return
+
+        const nextItems = results.flatMap((result) => {
+          if (result.status !== 'fulfilled') return []
+          return result.value.deliverables
+            .map((deliverable) => toInboxItem(result.value.instance, deliverable))
+            .filter((item): item is CustomerInboxItem => Boolean(item))
+        })
+
+        nextItems.sort((left, right) => {
+          const leftDate = new Date(left.updatedAt || left.createdAt || 0).getTime()
+          const rightDate = new Date(right.updatedAt || right.createdAt || 0).getTime()
+          return rightDate - leftDate
+        })
+
+        setInboxItems(nextItems)
+        if (results.some((result) => result.status === 'rejected') && nextItems.length === 0) {
+          setInboxError('We could not load your deliverable states just now.')
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setInboxItems([])
+          setInboxError(e?.message || 'Failed to load deliverable states')
+        }
+      } finally {
+        if (!cancelled) setInboxLoading(false)
+      }
+    }
+
+    void loadInboxItems()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const openPage = (page: Page) => {
+    setJourneyContext(undefined)
+    setCurrentPage(page)
+  }
 
   const handleSelectAgent = (agentId: string) => {
+    setJourneyContext(undefined)
     setSelectedAgentId(agentId)
     setCurrentPage('agent-detail')
   }
 
   const handleBackToDiscovery = () => {
-    setSelectedAgentId(undefined)
+    setJourneyContext(undefined)
     setCurrentPage('discover')
   }
 
   // agent-detail is a sub-page of discover — keep Discover highlighted in sidebar
   const activeNavPage: Page = currentPage === 'agent-detail' ? 'discover' : currentPage
 
-  const inboxCount = 1 // Mock unread count
+  const inboxCounts = useMemo(
+    () =>
+      inboxItems.reduce(
+        (acc, item) => {
+          if (item.reviewStatus === 'approved') acc.approved += 1
+          else if (item.reviewStatus === 'rejected') acc.rejected += 1
+          else acc.pending += 1
+          return acc
+        },
+        { pending: 0, approved: 0, rejected: 0 }
+      ),
+    [inboxItems]
+  )
+
+  const inboxCount = inboxCounts.pending
 
   const menuSections: Array<{
     title: string
@@ -71,7 +244,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       title: 'Grow',
       items: [
         { id: 'discover', icon: <Search20Regular />, label: 'Discover' },
-        { id: 'inbox', icon: <Mail20Regular />, label: 'Inbox', badge: inboxCount },
+        { id: 'inbox', icon: <Mail20Regular />, label: 'Inbox', badge: inboxCount || undefined },
         { id: 'billing', icon: <Payment20Regular />, label: 'Subscriptions & Billing' },
         { id: 'profile-settings', icon: <Settings20Regular />, label: 'Profile & Settings' },
       ],
@@ -82,14 +255,14 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
     'command-centre': {
       eyebrow: 'Daily Mission',
       title: 'Run Your Agent Workforce With Confidence',
-      description: 'Review what moved, what needs approval, and where spend is going before the day gets away from you.',
-      metrics: ['2 active hires', '1 approval waiting', '7 goals in motion'],
+      description: 'Use this shell to decide what to check next, not to pretend live runtime data already exists.',
+      metrics: ['Open My Agents for runtime truth', 'Billing becomes real after subscriptions exist', 'Profile should reflect confirmed business data'],
     },
     'my-agents': {
       eyebrow: 'Runtime View',
       title: 'Every Hired Agent, One Clear Operating Surface',
       description: 'Track trials, active hires, deliverables, and configuration without switching mental models.',
-      metrics: ['Trial + paid agents', 'Skill-level controls', 'Recent outputs'],
+      metrics: ['Trial and paid runtime states', 'Skill-level controls', 'Recent outputs after runtime starts'],
     },
     'discover': {
       eyebrow: 'Marketplace',
@@ -113,30 +286,75 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       eyebrow: 'Signal Centre',
       title: 'Keep Approvals And Requests From Falling Through',
       description: 'Prioritise the small number of decisions only you should make, then let the system move again.',
-      metrics: ['Approvals', 'Status changes', 'Customer-ready updates'],
+      metrics: [
+        formatCount(inboxCounts.pending, 'deliverable awaiting your decision'),
+        formatCount(inboxCounts.approved, 'approved deliverable still visible'),
+        formatCount(inboxCounts.rejected, 'rejected item still tracked'),
+      ],
     },
     'billing': {
       eyebrow: 'Spend & Proof',
       title: 'Understand What You Are Paying For',
       description: 'Track subscriptions, invoices, receipts, and upcoming billing with less ambiguity and more trust.',
-      metrics: ['Subscription view', 'Invoice history', 'Receipt access'],
+      metrics: ['Live subscription view', 'Invoice history when available', 'Receipt access after payment'],
     },
     'profile-settings': {
       eyebrow: 'Identity & Controls',
       title: 'Shape The Account Your Agents Work For',
       description: 'Keep your business profile, preferences, and team-facing details aligned with how WAOOAW operates for you.',
-      metrics: ['Business identity', 'Preferences', 'Support paths'],
+      metrics: ['Business identity loaded from CP', 'Only current controls shown as live', 'Support paths'],
     },
-  }), [])
+  }), [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected])
 
   const currentMeta = pageMeta[activeNavPage]
+
+  const journeyBanner = useMemo(() => {
+    if (!journeyContext) return null
+
+    if (journeyContext.source === 'payment-confirmed') {
+      return {
+        eyebrow: 'Payment captured',
+        title: `Setup is still required for ${selectedAgentId || 'your selected agent'}`,
+        body: 'Payment is complete, but the agent is not ready to work until setup is finished. Resume setup to connect systems and activate the trial.',
+        primaryLabel: 'Resume setup',
+        onPrimary: () => {
+          if (!journeyContext.subscriptionId || !selectedAgentId) return
+          navigate(`/hire/setup/${encodeURIComponent(journeyContext.subscriptionId)}?agentId=${encodeURIComponent(selectedAgentId)}`)
+        },
+      }
+    }
+
+    if (journeyContext.source === 'trial-activated') {
+      return {
+        eyebrow: 'Trial activated',
+        title: `${selectedAgentId || 'Your selected agent'} is now in runtime setup`,
+        body: 'You landed in My Agents because that is the first truthful place to confirm the runtime, monitor hydration, and continue operating without guessing.',
+        primaryLabel: 'Open Deliverables',
+        onPrimary: () => openPage('deliverables'),
+      }
+    }
+
+    return {
+      eyebrow: 'Setup paused',
+      title: `You still have context for ${selectedAgentId || 'this agent'}`,
+      body: 'You left setup before activation. Return to the selected agent or resume setup when you are ready.',
+      primaryLabel: 'Back to agent detail',
+      onPrimary: () => {
+        if (!selectedAgentId) {
+          openPage('discover')
+          return
+        }
+        setCurrentPage('agent-detail')
+      },
+    }
+  }, [journeyContext, navigate, selectedAgentId])
 
   const renderPage = () => {
     switch (currentPage) {
       case 'command-centre':
-        return <CommandCentre onOpenDiscover={() => setCurrentPage('discover')} onOpenBilling={() => setCurrentPage('billing')} onOpenMyAgents={() => setCurrentPage('my-agents')} onOpenGoals={() => setCurrentPage('goals')} />
+        return <CommandCentre onOpenDiscover={() => openPage('discover')} onOpenBilling={() => openPage('billing')} onOpenMyAgents={() => openPage('my-agents')} onOpenGoals={() => openPage('goals')} />
       case 'my-agents':
-        return <MyAgents onNavigateToDiscover={() => setCurrentPage('discover')} />
+        return <MyAgents onNavigateToDiscover={() => openPage('discover')} />
       case 'discover':
         return <AgentDiscovery onSelectAgent={handleSelectAgent} />
       case 'agent-detail':
@@ -146,13 +364,13 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
       case 'deliverables':
         return <Deliverables />
       case 'inbox':
-        return <Inbox />
+        return <Inbox items={inboxItems} loading={inboxLoading} error={inboxError} onOpenMyAgents={() => openPage('my-agents')} />
       case 'billing':
         return <UsageBilling />
       case 'profile-settings':
         return <ProfileSettings />
       default:
-        return <CommandCentre onOpenDiscover={() => setCurrentPage('discover')} onOpenBilling={() => setCurrentPage('billing')} onOpenMyAgents={() => setCurrentPage('my-agents')} onOpenGoals={() => setCurrentPage('goals')} />
+        return <CommandCentre onOpenDiscover={() => openPage('discover')} onOpenBilling={() => openPage('billing')} onOpenMyAgents={() => openPage('my-agents')} onOpenGoals={() => openPage('goals')} />
     }
   }
 
@@ -171,8 +389,8 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
             </div>
           </div>
           <div className="portal-header-actions">
-            <div className="portal-header-chip">1 approval waiting</div>
-            <div className="portal-header-chip portal-header-chip--success">Systems healthy</div>
+            <div className="portal-header-chip">Customer shell</div>
+            <div className="portal-header-chip portal-header-chip--success">Truthful state first</div>
             <Button 
               appearance="subtle" 
               icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
@@ -197,8 +415,8 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
             <div className="portal-sidebar-card-label">Workspace</div>
             {!sidebarCollapsed && (
               <>
-                <div className="portal-sidebar-card-title">GlowRevive Wellness</div>
-                <div className="portal-sidebar-card-body">2 active agents · 1 decision waiting · next billing in 5 days</div>
+                <div className="portal-sidebar-card-title">Customer workspace</div>
+                <div className="portal-sidebar-card-body">Use My Agents, Billing, and Profile to confirm live state. This shell avoids fake runtime counters.</div>
               </>
             )}
           </div>
@@ -211,7 +429,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
                   <button
                     key={item.id}
                     className={`sidebar-item ${activeNavPage === item.id ? 'active' : ''}`}
-                    onClick={() => setCurrentPage(item.id)}
+                    onClick={() => openPage(item.id)}
                     data-testid={`cp-nav-${item.id}`}
                   >
                     <span className="sidebar-icon">{item.icon}</span>
@@ -249,6 +467,28 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
               ))}
             </div>
           </section>
+
+          {journeyBanner ? (
+            <section className="portal-entry-banner" data-testid="cp-portal-entry-banner">
+              <div>
+                <div className="portal-hero-eyebrow">{journeyBanner.eyebrow}</div>
+                <h2 className="portal-entry-banner-title">{journeyBanner.title}</h2>
+                <p className="portal-entry-banner-body">{journeyBanner.body}</p>
+                <div className="portal-entry-banner-meta">
+                  {selectedAgentId ? <span>Agent: {selectedAgentId}</span> : null}
+                  {journeyContext?.subscriptionId ? <span>Subscription: {journeyContext.subscriptionId}</span> : null}
+                </div>
+              </div>
+              <div className="portal-entry-banner-actions">
+                <Button appearance="primary" onClick={journeyBanner.onPrimary} data-testid="cp-portal-entry-primary">
+                  {journeyBanner.primaryLabel}
+                </Button>
+                <Button appearance="secondary" onClick={() => setJourneyContext(undefined)}>
+                  Dismiss
+                </Button>
+              </div>
+            </section>
+          ) : null}
 
           <div className="portal-page-shell">
             {renderPage()}

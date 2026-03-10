@@ -155,11 +155,22 @@ services:
 
   # ── Maestro (Mobile E2E) ──────────────────────────
   maestro:
-    image: mobile-dev-inc/maestro:latest
+    image: eclipse-temurin:17-jre-jammy
     working_dir: /tests
     volumes:
       - ./tests/e2e/mobile:/tests
     networks: [waooaw-test-network]
+    entrypoint:
+      - sh
+      - -lc
+      - |
+        set -e
+        apt-get update >/dev/null
+        apt-get install -y curl unzip >/dev/null
+        curl -Ls https://get.maestro.mobile.dev | bash >/dev/null
+        export PATH="$HOME/.maestro/bin:$PATH"
+        exec "$@"
+      - sh
 
   # ── Locust (Performance) ──────────────────────────
   locust:

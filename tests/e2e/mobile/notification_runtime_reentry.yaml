@@ -1,0 +1,24 @@
+appId: com.waooaw.app
+---
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: mobile-signin-screen
+- tapOn:
+    id: mobile-demo-signin-button
+- assertVisible:
+    id: mobile-main-root
+- tapOn:
+    id: mobile-profile-tab
+- assertVisible:
+    id: mobile-profile-screen
+- tapOn:
+    id: mobile-profile-notifications
+- assertVisible:
+    id: mobile-notifications-screen
+- tapOn:
+    id: mobile-notification-demo-approval
+- assertVisible:
+    id: mobile-agent-operations-screen
+- assertVisible:
+    id: agent-ops-section-body-approvals

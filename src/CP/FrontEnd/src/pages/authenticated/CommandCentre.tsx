@@ -9,46 +9,23 @@ interface CommandCentreProps {
 
 export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyAgents, onOpenGoals }: CommandCentreProps) {
 
-  const stats = [
-    { label: '2 Agents', sublabel: 'Active', value: '🤖' },
-    { label: '7/10 Goals', sublabel: 'Completed', value: '🎯' },
-    { label: '3 Messages', sublabel: 'In Inbox', value: '📬' },
-    { label: '₹24K/mo', sublabel: 'Current', value: '💰' },
-  ]
-
-  const activityFeed = [
-    {
-      time: '11:47 AM',
-      agent: 'Content Marketing Agent',
-      action: 'Published: "5 Ways to Manage Diabetes"',
-      quality: 4.8,
-      budget: 0.42
-    },
-    {
-      time: '11:32 AM',
-      agent: 'SDR Agent',
-      action: 'Needs Review: Send 3 LinkedIn connection requests',
-      status: 'pending'
-    },
-    {
-      time: '11:15 AM',
-      agent: 'Content Marketing Agent',
-      action: 'Executed: Fact-Check Medical Claims (8 sources)',
-      status: 'passed',
-      duration: '3.2 min'
-    }
+  const readinessCards = [
+    { label: 'Runtime summary', sublabel: 'Loads after your agents begin executing work', value: '⏳' },
+    { label: 'Billing proof', sublabel: 'Appears when subscriptions, invoices, or receipts exist', value: '🧾' },
+    { label: 'Approvals', sublabel: 'Only appears when your decision is actually required', value: '✅' },
+    { label: 'Profile control', sublabel: 'Confirm or update account identity before scaling hires', value: '👤' },
   ]
 
   const priorities = [
-    'Approve the SDR connection request so outbound work resumes.',
-    'Review today\'s spend trend before the next billing cycle closes.',
-    'Add one more growth goal for your content operator.',
+    'Open My Agents to confirm which hires are actually configured and active.',
+    'Review billing only after a live subscription or invoice record exists.',
+    'Use Goals to define the next business outcome instead of assuming runtime defaults.',
   ]
 
   return (
     <div className="dashboard-page">
       <div className="dashboard-stats">
-        {stats.map((stat, idx) => (
+        {readinessCards.map((stat, idx) => (
           <Card key={idx} className="stat-card">
             <div className="stat-icon">{stat.value}</div>
             <div className="stat-label">{stat.label}</div>
@@ -79,25 +56,25 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
 
         <Card className="command-centre-panel command-centre-panel--accent">
           <div className="section-header">
-            <h2>Business Pulse</h2>
-            <span className="live-indicator">Updated 2m ago</span>
+            <h2>Runtime Truth</h2>
+            <span className="live-indicator">Action-needed state</span>
           </div>
           <div className="command-centre-pulse-grid">
             <div>
-              <div className="command-centre-pulse-value">98%</div>
-              <div className="command-centre-pulse-label">Goal adherence</div>
-            </div>
-            <div>
-              <div className="command-centre-pulse-value">₹6.4K</div>
-              <div className="command-centre-pulse-label">Spend this week</div>
+              <div className="command-centre-pulse-value">0</div>
+              <div className="command-centre-pulse-label">Live KPIs shown without a fetch</div>
             </div>
             <div>
               <div className="command-centre-pulse-value">1</div>
-              <div className="command-centre-pulse-label">Blocked workflow</div>
+              <div className="command-centre-pulse-label">Place to confirm billing truth</div>
+            </div>
+            <div>
+              <div className="command-centre-pulse-value">3</div>
+              <div className="command-centre-pulse-label">Next actions before trust breaks</div>
             </div>
           </div>
           <p className="command-centre-pulse-body">
-            Your strongest momentum is in content publishing. Sales outreach is waiting on one approval, so that is the highest leverage unblock.
+            This shell does not have a live runtime feed yet. Use My Agents, Billing, and Profile to confirm real state instead of reading fake counters here.
           </p>
         </Card>
       </div>
@@ -105,24 +82,14 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
       <section className="activity-section">
         <div className="section-header">
           <h2>Agent Activity Feed</h2>
-          <span className="live-indicator">🔄 Live Feed</span>
+          <span className="live-indicator">Hydrates after runtime starts</span>
         </div>
         <div className="activity-feed">
-          {activityFeed.map((activity, idx) => (
-            <Card key={idx} className="activity-card">
-              <div className="activity-time">{activity.time}</div>
-              <div className="activity-agent">{activity.agent}</div>
-              <div className="activity-action">{activity.action}</div>
-              {activity.quality && (
-                <div className="activity-meta">
-                  Quality: ⭐ {activity.quality} | Budget: ${activity.budget}
-                </div>
-              )}
-              {activity.status && (
-                <div className="activity-status">{activity.status}</div>
-              )}
-            </Card>
-          ))}
+          <Card className="activity-card">
+            <div className="activity-agent">No live agent activity yet</div>
+            <div className="activity-action">Once a hired agent begins running, the latest output and approvals will appear here.</div>
+            <div className="activity-meta">What to do next: finish setup in My Agents or hire your first agent from Discover.</div>
+          </Card>
         </div>
       </section>
 

@@ -39,15 +39,37 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
   { key: 'recent', label: 'Recently active' },
 ];
 
+function getAttentionReasons(agent: MyAgentInstanceSummary): string[] {
+  const reasons: string[] = []
+
+  if (agent.cancel_at_period_end) {
+    reasons.push('Subscription ending soon')
+  }
+
+  if (agent.trial_status === 'active') {
+    if (agent.configured === false) {
+      reasons.push('Trial setup incomplete')
+    }
+    if (agent.goals_completed === false) {
+      reasons.push('Goal setup incomplete')
+    }
+  } else if (agent.hired_instance_id) {
+    if (agent.configured === false) {
+      reasons.push('Runtime configuration incomplete')
+    }
+    if (agent.goals_completed === false) {
+      reasons.push('Goals need review')
+    }
+  }
+
+  return reasons
+}
+
 function sortAgents(agents: MyAgentInstanceSummary[], sort: SortOption): MyAgentInstanceSummary[] {
   if (sort === 'attention') {
     return [...agents].sort((a, b) => {
-      const aScore =
-        ((a as any).approvalQueueCount ?? 0) +
-        ((a as any).healthStatus === 'degraded' ? 10 : 0);
-      const bScore =
-        ((b as any).approvalQueueCount ?? 0) +
-        ((b as any).healthStatus === 'degraded' ? 10 : 0);
+      const aScore = getAttentionReasons(a).length
+      const bScore = getAttentionReasons(b).length
       return bScore - aScore;
     });
   }
@@ -109,6 +131,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
     ? (trialAgents || [])
     : sortAgents(hiredAgents, sortOption);
   const count = agents.length;
+  const needsAttentionCount = (allAgents || []).filter((agent) => getAttentionReasons(agent).length > 0).length
 
   // Pull-to-refresh handler
   const [refreshing, setRefreshing] = React.useState(false);
@@ -234,7 +257,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
           {[
             `${trialAgents?.length || 0} trials`,
             `${hiredAgents.length} hired`,
-            `${allAgents?.filter((agent: any) => (agent as any).approvalQueueCount).length || 0} need attention`,
+            `${needsAttentionCount} need attention`,
           ].map((pill) => (
             <View
               key={pill}
@@ -616,11 +639,15 @@ const HiredAgentCard = ({
   onPress: () => void;
 }) => {
   const { colors, spacing, typography } = useTheme();
+  const attentionReasons = getAttentionReasons(agent)
 
   // Determine status badge
   const getStatusBadge = () => {
     if (agent.trial_status === 'active') {
       return { text: 'Trial Active', color: colors.success };
+    }
+    if (attentionReasons.length > 0) {
+      return { text: attentionReasons[0], color: colors.warning };
     }
     if (agent.trial_status === 'expired') {
       return { text: 'Trial Ended', color: colors.warning };
@@ -818,6 +845,18 @@ const HiredAgentCard = ({
       </View>
 
       {/* CTA hint */}
+      {attentionReasons.length > 0 && (
+        <Text
+          style={{
+            color: colors.warning,
+            fontSize: 12,
+            fontFamily: typography.fontFamily.body,
+            marginTop: spacing.md,
+          }}
+        >
+          {attentionReasons.join(' • ')}
+        </Text>
+      )}
       <Text
         style={[
           styles.ctaHint,
@@ -830,7 +869,7 @@ const HiredAgentCard = ({
           },
         ]}
       >
-        Tap to view {agent.trial_status === 'active' ? 'trial dashboard' : 'details'} →
+        Tap to view {agent.trial_status === 'active' ? 'trial dashboard' : agent.hired_instance_id ? 'operations' : 'agent details'} →
       </Text>
     </TouchableOpacity>
   );

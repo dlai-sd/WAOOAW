@@ -495,7 +495,7 @@ Use this table when deciding where a change belongs before you open any file.
 
 | Domain | Primary responsibility | Edit here first | Route/API entrypoint | Test home |
 |---|---|---|---|---|
-| CP FrontEnd | Customer-facing web UX and request shaping | `src/CP/FrontEnd/src/pages/`, `src/CP/FrontEnd/src/services/` | Browser calls `/api/cp/...` or Gateway-backed endpoints | `src/CP/FrontEnd/src/__tests__/`, Playwright in `tests/` |
+| CP FrontEnd | Customer-facing web UX and request shaping | `src/CP/FrontEnd/src/pages/`, `src/CP/FrontEnd/src/services/` | Browser calls `/api/cp/...` or Gateway-backed endpoints | `src/CP/FrontEnd/src/__tests__/`, `src/CP/FrontEnd/e2e/` |
 | CP BackEnd | Thin proxy and customer-auth support flows | `src/CP/BackEnd/api/`, `src/CP/BackEnd/services/plant_gateway_client.py` | `/api/cp/...` | `src/CP/BackEnd/tests/` |
 | PP FrontEnd | Internal operator UX, governor/admin tools | `src/PP/FrontEnd/src/pages/`, `src/PP/FrontEnd/src/components/` | Browser calls `/pp/...` or PP proxy routes | `src/PP/FrontEnd/src/` tests |
 | PP BackEnd | Operator thin proxy, admin workflows, observability hooks | `src/PP/BackEnd/api/`, `src/PP/BackEnd/clients/plant_client.py` | `/pp/...` | `src/PP/BackEnd/tests/` |
@@ -1343,8 +1343,8 @@ Steps:
 | **Property-based** | Plant Backend | `src/Plant/BackEnd/tests/property/` | pytest + Hypothesis | `plant-backend-test` | Invariant proofs: usage ledger, trial billing, hash chain |
 | **BDD** | Plant BackEnd, CP BackEnd | `src/Plant/BackEnd/tests/bdd/`, `src/CP/BackEnd/tests/bdd/` | pytest-bdd | `plant-backend-test`, `cp-backend-test` | Gherkin feature specs (trial lifecycle, hire wizard) |
 | **Contract (Pact)** | CP→Gateway, PP→Gateway, Mobile→Gateway | `src/CP/BackEnd/tests/pact/consumer/`, `src/Plant/Gateway/tests/pact/provider/` | pact-python | `cp-backend-test`, `plant-gateway-test` | Consumer/provider contract tests |
-| **Web E2E** | CP+PP+Plant stack | `tests/e2e/web/auth/`, `tests/e2e/web/hire/`, `tests/e2e/web/admin/` | Playwright | `playwright` | OTP auth, hire wizard, PP agent approval journeys |
-| **Mobile E2E** | Mobile | `tests/e2e/mobile/` | Maestro | `maestro` | OTP auth, hire agent, browse agents (YAML-driven) |
+| **Web E2E** | CP + PP frontends | `src/CP/FrontEnd/e2e/`, `src/PP/FrontEnd/e2e/` | Playwright | local frontend Playwright containers | CP hire journey and PP operator smoke |
+| **Mobile E2E** | Mobile | `tests/e2e/mobile/` | Maestro | device-backed opt-in lane | OTP auth, hire flow, and checkpointed notification runtime re-entry YAML |
 | **Performance** | Plant Gateway | `tests/performance/` | Locust | `locust` | p95 < 500 ms @ 50 rps, trial concurrency |
 | **Security SAST** | All Python | via `scripts/security-scan.sh` | Bandit + Safety + Semgrep | Any | High-severity findings block CI |
 
@@ -1358,8 +1358,8 @@ Steps:
 | `docker-compose.local.yml` → `cp-frontend-test` | CP frontend test container (Vitest) |
 | `docker-compose.local.yml` → `pp-frontend-test` | PP frontend test container (Vitest) |
 | `docker-compose.test.yml` | **Dedicated regression test stack** — includes plant-backend-test, cp-backend-test, pp-backend-test, playwright, maestro, locust, zap services |
-| `scripts/test-web.sh` | Convenience wrapper — runs full or `--quick` web regression via docker-compose.test.yml |
-| `scripts/test-mobile.sh` | Convenience wrapper — runs mobile regression (Jest + Maestro) |
+| `scripts/test-web.sh` | Convenience wrapper — runs backend regression plus the CP/PP Playwright journey specs in Docker |
+| `scripts/test-mobile.sh` | Convenience wrapper — runs mobile Jest/accessibility by default; native Maestro remains opt-in via `RUN_MOBILE_NATIVE_E2E=1` |
 | `.github/workflows/waooaw-regression.yml` | Manual `workflow_dispatch` regression — 9 stages, `scope=full\|quick` |
 | `.github/workflows/mobile-regression.yml` | Manual `workflow_dispatch` mobile regression — 6 stages |
 
@@ -1390,10 +1390,11 @@ docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest src/CP
 docker compose -f docker-compose.test.yml run --rm plant-gateway-test pytest src/Plant/Gateway/tests/pact/provider/
 
 # --- Web E2E (Playwright) ---
-docker compose -f docker-compose.test.yml run playwright npx playwright test
+docker run --rm -v "$PWD/src/CP/FrontEnd":/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -lc "npm install --silent && npx playwright test e2e/hire-journey.spec.ts --project=chromium"
+docker run --rm -v "$PWD/src/PP/FrontEnd":/work -w /work mcr.microsoft.com/playwright:v1.58.0-noble sh -lc "npm install --silent && npx playwright test e2e/operator-smoke.spec.ts --project=chromium"
 
-# --- Mobile E2E (Maestro) ---
-docker compose -f docker-compose.test.yml run maestro maestro test tests/e2e/mobile/auth_otp.yaml
+# --- Mobile E2E (Maestro, opt-in only when a real device/emulator target exists) ---
+RUN_MOBILE_NATIVE_E2E=1 bash scripts/test-mobile.sh
 
 # --- Performance (Locust) ---
 docker compose -f docker-compose.test.yml run locust --headless -u 50 -r 5 --run-time 60s
@@ -1487,13 +1488,13 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `feat/ui-ux-revamp` (frontend UX revamp + QA/test/smoke complete, PR #916 in review — 2026-03-10)
+### Current branch: `feat/ui-ux-revamp` (frontend UX revamp + QA/test/smoke complete, PR #917 in review — 2026-03-10)
 
 ### In review — 2026-03-10
 
 | PR | Branch | Summary | Key files |
 |----|--------|---------|----------|
-| **#916** | `feat/ui-ux-revamp` | **Cross-frontend UX revamp complete in 4 iterations** — Iteration 1 completed journey QA across CP, PP, and mobile with shell/navigation/handoff fixes; Iteration 2 closed residual defects (truthful PP usage-event loading, mobile hired-tab auto-switch, sign-out confirmation, test-safe push registration); Iteration 3 added focused FE coverage for CP portal routing, PP hook-trace/ops flows, and mobile My Agents routing; Iteration 4 finished final smoke validation and PR prep. Review this branch as the current frontend MVP pass for customer portal, contributor portal, and mobile customer runtime. | `running_commentary.md`, `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`, `src/CP/FrontEnd/src/__tests__/AuthenticatedPortal.test.tsx`, `src/PP/FrontEnd/src/pages/CustomerManagement.tsx`, `src/PP/FrontEnd/src/__tests__/HookTracePanel.test.tsx`, `src/mobile/src/screens/agents/MyAgentsScreen.tsx`, `src/mobile/src/screens/agents/__tests__/MyAgentsScreen.test.tsx` |
+| **#917** | `feat/ui-ux-revamp` | **Cross-frontend UX revamp + regression coverage** — Iteration 1 repaired CP, PP, and mobile journey continuity; Iteration 2 removed misleading runtime defaults across CP, PP, and mobile; Iteration 3 completed the PP operator loop and surfaced outcomes in CP/mobile; Iteration 4 added Docker-validated CP and PP Playwright journeys, checkpointed mobile runtime re-entry selectors/flow, and wired the real browser journeys into shared regression scripts and CI. | `src/CP/FrontEnd/e2e/hire-journey.spec.ts`, `src/PP/FrontEnd/e2e/operator-smoke.spec.ts`, `scripts/test-web.sh`, `scripts/test-mobile.sh`, `.github/workflows/waooaw-regression.yml`, `.github/workflows/mobile-regression.yml`, `docs/MVP1_Mar_10_2026.md` |
 
 ### Recently merged — 2026-03-07
 

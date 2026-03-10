@@ -81,7 +81,7 @@ export const ProfileScreen = () => {
   ];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]} testID="mobile-profile-screen">
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -300,6 +300,7 @@ export const ProfileScreen = () => {
                     },
                   ]}
                   onPress={item.action}
+                  testID={item.label === 'Notifications' ? 'mobile-profile-notifications' : undefined}
                 >
                   <View style={[styles.menuItemLeft, { flexDirection: 'row', alignItems: 'center' }]}>
                     <Text style={{ fontSize: 24, marginRight: spacing.md }}>

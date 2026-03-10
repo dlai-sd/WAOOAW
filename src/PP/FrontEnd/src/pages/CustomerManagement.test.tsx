@@ -63,6 +63,8 @@ test('CustomerManagement renders usage events from API', async () => {
 
   await screen.findByText('Start with a customer or agent filter')
   await screen.findByText('Load aggregates after choosing the scope')
+  expect(screen.queryByText('No usage events returned.')).not.toBeInTheDocument()
+  expect(screen.queryByText('No aggregate rows returned.')).not.toBeInTheDocument()
 
   const customerInput = screen.getByPlaceholderText('CUST-1')
   const loadUsageButton = screen.getByRole('button', { name: 'Load usage' })

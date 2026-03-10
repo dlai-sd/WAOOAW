@@ -1,19 +1,28 @@
-import React, { useEffect, useState } from 'react'
-import { Card, CardHeader, Text, Spinner } from '@fluentui/react-components'
+import React, { useState } from 'react'
+import { Button, Card, CardHeader, Text, Spinner } from '@fluentui/react-components'
 import { gatewayApiClient } from '../services/gatewayApiClient'
 
 export const Dashboard: React.FC = () => {
   const [agentCount, setAgentCount] = useState<number | null>(null)
+  const [hasLoadedAgentCount, setHasLoadedAgentCount] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadAgentCount = async () => {
     setLoading(true)
-    gatewayApiClient.listAgents()
-      .then((agents: unknown[]) => setAgentCount(agents.length))
-      .catch(() => setError('Failed to load'))
-      .finally(() => setLoading(false))
-  }, [])
+    setError(null)
+    try {
+      const agents = await gatewayApiClient.listAgents()
+      setAgentCount(agents.length)
+      setHasLoadedAgentCount(true)
+    } catch {
+      setAgentCount(null)
+      setHasLoadedAgentCount(true)
+      setError('Failed to load live count')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const priorities = [
     'Review blocked approvals before they affect customer-visible delivery.',
@@ -36,30 +45,45 @@ export const Dashboard: React.FC = () => {
 
         <div className="dashboard-grid">
           <Card className="metric-card">
-            <CardHeader header={<Text weight="semibold">Active agent definitions</Text>} />
+            <CardHeader
+              header={<Text weight="semibold">Active agent definitions</Text>}
+              action={
+                <Button appearance="subtle" size="small" onClick={() => void loadAgentCount()} disabled={loading}>
+                  {loading ? 'Loading…' : hasLoadedAgentCount ? 'Refresh' : 'Load live count'}
+                </Button>
+              }
+            />
             {loading ? (
               <Spinner size="tiny" />
             ) : error ? (
-              <Text style={{ color: 'red' }}>—</Text>
+              <Text size={700}>Unavailable</Text>
+            ) : !hasLoadedAgentCount ? (
+              <Text size={700}>Not loaded</Text>
             ) : (
               <Text size={700}>{agentCount ?? '—'}</Text>
             )}
-            <Text size={200}>Current authored supply in the marketplace</Text>
+            <Text size={200}>
+              {error
+                ? 'The live count request failed. Retry when the API path is healthy.'
+                : hasLoadedAgentCount
+                  ? 'Live authored supply loaded on demand.'
+                  : 'Load the current authored supply only when you need a live count.'}
+            </Text>
           </Card>
           <Card className="metric-card">
-            <CardHeader header={<Text weight="semibold">Approvals at risk</Text>} />
-            <Text size={700}>3</Text>
-            <Text size={200}>Customer-facing decisions waiting on ops review</Text>
+            <CardHeader header={<Text weight="semibold">Approval posture</Text>} />
+            <Text size={700}>Check live queues</Text>
+            <Text size={200}>Draft Review and Hired Agents Ops hold the real queue state. This dashboard does not preload those counts.</Text>
           </Card>
           <Card className="metric-card">
             <CardHeader header={<Text weight="semibold">Incident posture</Text>} />
-            <Text size={700}>Stable</Text>
-            <Text size={200}>No critical marketplace incidents in the last 24h</Text>
+            <Text size={700}>Needs verification</Text>
+            <Text size={200}>Use Audit Console or runtime ops to confirm failures. No global incident rollup is implied here.</Text>
           </Card>
           <Card className="metric-card">
             <CardHeader header={<Text weight="semibold">Operator focus</Text>} />
-            <Text size={700}>Publish safely</Text>
-            <Text size={200}>Design, validate, and release with strong runtime discipline</Text>
+            <Text size={700}>Choose a surface</Text>
+            <Text size={200}>Open the screen that matches the job: review drafts, inspect denials, or audit a scoped entity.</Text>
           </Card>
         </div>
       </div>
@@ -91,7 +115,7 @@ export const Dashboard: React.FC = () => {
           <Text as="h3" size={600} weight="semibold">Why the UX changed</Text>
           <p className="pp-dashboard-body-copy">
             The portal should feel like a real control plane, not a set of disconnected admin screens.
-            Contributors need hierarchy, next actions, and proof of impact before they need more raw tables.
+            Contributors need honest entry states, clear next actions, and deliberate loading before they trust the data in front of them.
           </p>
         </Card>
       </div>
