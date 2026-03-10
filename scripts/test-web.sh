@@ -56,12 +56,20 @@ run_stage "S3: Plant BackEnd — integration tests" \
 run_stage "S4: Plant BackEnd — e2e tests" \
   $DC run --rm plant-backend-test -m e2e --tb=short -q
 
+run_stage "S5: CP FrontEnd — Playwright hire journey" \
+  docker run --rm -v "$PWD/src/CP/FrontEnd":/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble \
+    sh -lc "npm install --silent && npx playwright test e2e/hire-journey.spec.ts --project=chromium"
+
+run_stage "S5: PP FrontEnd — Playwright operator smoke" \
+  docker run --rm -v "$PWD/src/PP/FrontEnd":/work -w /work mcr.microsoft.com/playwright:v1.58.0-noble \
+    sh -lc "npm install --silent && npx playwright test e2e/operator-smoke.spec.ts --project=chromium"
+
 if [[ "$QUICK" != "--quick" ]]; then
-  run_stage "S5: Performance — Locust load test" \
+  run_stage "S6: Performance — Locust load test" \
     $DC run --rm locust --headless -u 50 -r 5 --run-time 60s \
       --html /mnt/locust/reports/report.html
 
-  run_stage "S6: Security — OWASP ZAP DAST" \
+  run_stage "S7: Security — OWASP ZAP DAST" \
     $DC run --rm zap
 fi
 
