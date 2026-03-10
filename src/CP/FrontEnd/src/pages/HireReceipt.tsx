@@ -12,23 +12,90 @@ export default function HireReceipt() {
   const agentId = searchParams.get('agentId') || ''
 
   const canContinue = useMemo(() => Boolean(subscriptionId && agentId), [subscriptionId, agentId])
+  const selectedAgentSummary = useMemo(() => agentId || 'Agent reference unavailable', [agentId])
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
-      <Card style={{ padding: '2rem' }}>
-        <h1 style={{ marginTop: 0 }}>Payment confirmed</h1>
-        <p style={{ color: '#666' }}>
-          Your order is confirmed. Keep this reference for support.
-        </p>
+    <div className="hire-receipt-page" style={{ maxWidth: '920px', margin: '0 auto', padding: '2rem 1rem' }} data-testid="cp-hire-receipt-page">
+      <div className="hire-wizard-hero">
+        <div>
+          <div className="hire-wizard-kicker">Hire Payment</div>
+          <h1 style={{ marginTop: 0, marginBottom: '0.6rem' }}>Payment confirmed</h1>
+          <p style={{ color: 'var(--colorNeutralForeground2)', maxWidth: '58ch' }}>
+            Your order is confirmed. The next step is setup, not guesswork. Keep this reference for support and continue directly into activation.
+          </p>
+        </div>
+        <div className="hire-wizard-proof-grid">
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">Agent</div>
+            <div className="hire-wizard-proof-label">{selectedAgentSummary}</div>
+          </div>
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">Paid</div>
+            <div className="hire-wizard-proof-label">Order captured</div>
+          </div>
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">Next</div>
+            <div className="hire-wizard-proof-label">Finish setup</div>
+          </div>
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">Then</div>
+            <div className="hire-wizard-proof-label">Activate and operate</div>
+          </div>
+        </div>
+      </div>
 
-        <div style={{ marginTop: '1rem', padding: '1rem', background: '#f5f5f5', borderRadius: '0.5rem' }}>
-          <div style={{ fontWeight: 600 }}>Order ID</div>
-          <div style={{ fontFamily: 'monospace' }}>{orderId}</div>
+      <Card style={{ padding: '2rem' }}>
+        <div className="hire-wizard-step-title">Reference for support</div>
+        <div className="hire-receipt-reference-card">
+          <div className="hire-receipt-reference-label">Order ID</div>
+          <div className="hire-receipt-reference-value">{orderId}</div>
+        </div>
+        {subscriptionId ? (
+          <div className="hire-receipt-reference-card">
+            <div className="hire-receipt-reference-label">Subscription ID</div>
+            <div className="hire-receipt-reference-value">{subscriptionId}</div>
+          </div>
+        ) : null}
+        <div className="hire-receipt-reference-card">
+          <div className="hire-receipt-reference-label">Selected Agent</div>
+          <div className="hire-receipt-reference-value">{selectedAgentSummary}</div>
         </div>
 
-        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
-          <Button appearance="secondary" onClick={() => navigate('/portal')}>Go to Portal</Button>
-          <Button appearance="primary" onClick={() => navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?agentId=${encodeURIComponent(agentId)}`)} disabled={!canContinue}>
+        <div className="hire-wizard-bottom-grid" style={{ marginTop: '1.5rem' }}>
+          <Card className="hire-wizard-bottom-card">
+            <div className="hire-wizard-bottom-title">What happens next</div>
+            <p>Continue into setup, connect what the agent needs, and move into trial or runtime operations with fewer surprises.</p>
+          </Card>
+          <Card className="hire-wizard-bottom-card">
+            <div className="hire-wizard-bottom-title">If you stop here</div>
+            <p>The payment is confirmed, but the agent is not yet ready to work until setup is completed.</p>
+          </Card>
+        </div>
+
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <Button
+            appearance="secondary"
+            onClick={() =>
+              navigate('/portal', {
+                state: {
+                  portalEntry: {
+                    page: 'my-agents',
+                    agentId,
+                    source: 'payment-confirmed',
+                    subscriptionId,
+                  },
+                },
+              })
+            }
+          >
+            Go to My Agents
+          </Button>
+          <Button
+            appearance="primary"
+            onClick={() => navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?agentId=${encodeURIComponent(agentId)}`)}
+            disabled={!canContinue}
+            data-testid="cp-hire-receipt-continue"
+          >
             Continue Setup
           </Button>
         </div>

@@ -293,7 +293,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
 
   return (
     <Dialog open={isOpen} onOpenChange={(_, data) => data.open || handleClose()}>
-      <DialogSurface style={{ maxWidth: '500px' }}>
+      <DialogSurface style={{ maxWidth: '500px' }} data-testid="cp-booking-modal">
         <form onSubmit={handleSubmit}>
           <DialogBody>
             <DialogTitle
@@ -322,6 +322,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                       type="button"
                       onClick={() => setPaymentMethod('coupon')}
                       disabled={submitting}
+                      data-testid="cp-booking-method-coupon"
                       style={{
                         flex: 1,
                         padding: '0.75rem 1rem',
@@ -339,6 +340,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                       type="button"
                       onClick={() => setPaymentMethod('razorpay')}
                       disabled={submitting}
+                      data-testid="cp-booking-method-razorpay"
                       style={{
                         flex: 1,
                         padding: '0.75rem 1rem',
@@ -379,6 +381,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                   value={duration}
                   onChange={(_, data) => setDuration(String(data.value))}
                   disabled={submitting}
+                  data-testid="cp-booking-duration"
                 >
                   {allowedDurations.map((value) => (
                     <option key={value} value={value}>
@@ -396,6 +399,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                   onChange={(e) => handleChange('fullName', e.target.value)}
                   placeholder="Enter your full name"
                   disabled={submitting}
+                  data-testid="cp-booking-full-name"
                 />
                 {errors.fullName && <div className="field-error">{errors.fullName}</div>}
               </div>
@@ -408,6 +412,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                   onChange={(e) => handleChange('email', e.target.value)}
                   placeholder="you@company.com"
                   disabled={submitting}
+                  data-testid="cp-booking-email"
                 />
                 {errors.email && <div className="field-error">{errors.email}</div>}
               </div>
@@ -419,6 +424,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                   onChange={(e) => handleChange('company', e.target.value)}
                   placeholder="Your company name"
                   disabled={submitting}
+                  data-testid="cp-booking-company"
                 />
                 {errors.company && <div className="field-error">{errors.company}</div>}
               </div>
@@ -431,6 +437,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                   onChange={(e) => handleChange('phone', e.target.value)}
                   placeholder="+91 98765 43210"
                   disabled={submitting}
+                  data-testid="cp-booking-phone"
                 />
                 {errors.phone && <div className="field-error">{errors.phone}</div>}
               </div>
@@ -443,6 +450,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                     onChange={(e) => setCouponCode(e.target.value)}
                     placeholder="WAOOAW100"
                     disabled={submitting}
+                    data-testid="cp-booking-coupon-code"
                   />
                 </div>
               )}
@@ -515,6 +523,7 @@ export default function BookingModal({ agent, isOpen, onClose, onSuccess }: Book
                 type="submit"
                 disabled={!canSubmit}
                 icon={submitting ? <Spinner size="tiny" /> : undefined}
+                data-testid="cp-booking-submit"
               >
                 {submitting
                   ? (isCouponMode ? 'Starting Trial...' : 'Opening Payment...')
