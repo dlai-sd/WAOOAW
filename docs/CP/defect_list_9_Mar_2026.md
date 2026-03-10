@@ -1,7 +1,7 @@
 # Defect List — 9 March 2026
 ## Session: CP Portal Live Testing — Open Defects Only
 
-**Source:** Static code analysis pruned by live verification on demo after PR #912 deployment and CP repair wave 1
+**Source:** Static code analysis pruned by live verification on demo after PR #912 deployment and CP repair waves 1 and 2
 **Environment:** https://cp.demo.waooaw.com
 **Auth pattern used for live checks:** demo customer demo@waooaw.com (id = ce8cf044-b378-4d3d-b11d-4817074b08f6) with Docker-minted JWTs and live Cloud Run routes
 
@@ -33,7 +33,7 @@ These fixes were validated with targeted Docker tests in the Plant and CP backen
 
 ## Current Open Defects
 
-No currently open CP defects remain in this ledger.
+No currently open CP defects remain in this ledger. This tracker is code-complete and awaiting only post-deploy runtime revalidation.
 
 ---
 
