@@ -1,3 +1,114 @@
+# Running Commentary — 2026-03-10
+
+> **Purpose:** Track the UI/UX revamp follow-through on CP, PP, and mobile so connection issues do not lose the plan or checkpoint state.
+> **Branch:** `feat/ui-ux-revamp`
+> **Fallback checkpoint:** `9237c55` (`fix(frontend): wire command centre fallback nav props`)
+
+---
+
+## Current State
+
+The UI/UX revamp is implemented and pushed on `feat/ui-ux-revamp`.
+
+### Completed baseline
+
+| Area | Status | Notes |
+|---|---|---|
+| CP customer shell + discovery + command centre + spend/profile | ✅ Complete | visual hierarchy and customer operating surface upgraded |
+| CP auth + hire setup | ✅ Complete | sign in, sign up, and hire wizard upgraded |
+| PP shell + dashboard + contributor/ops pages | ✅ Complete | landing, dashboard, setup, ops, review, governance surfaces upgraded |
+| Mobile customer surfaces | ✅ Complete | home, my agents, ops, profile, sign in, sign up upgraded |
+| Node toolchain in container | ✅ Complete | `node v18.20.4`, `npm 9.2.0` on PATH |
+| Disk cleanup | ✅ Complete | Docker prune recovered space from ~1.5G free to ~11G free |
+| Validation checkpoint | ✅ Complete | CP build/test, PP build/test, mobile typecheck/test command path exited `0` |
+
+### Current branch checkpoints
+
+| Commit | Meaning |
+|---|---|
+| `2ddd8be` | main UI/UX revamp across CP, PP, and mobile |
+| `9237c55` | final CP fallback prop wiring fix after validation |
+
+---
+
+## Next Sequence
+
+The work should continue in small chunks, each ending in a checkpoint commit and push.
+
+| Chunk | Goal | Status | Notes |
+|---|---|---|---|
+| 1 | Structured QA pass on CP user journeys | planned | sign in, sign up, discovery, hire, command centre, billing, profile |
+| 2 | Structured QA pass on PP contributor journeys | planned | landing, dashboard, agent setup, hired agents ops, review queue, policy denials, audit |
+| 3 | Structured QA pass on mobile journeys | planned | sign in, sign up, today, ops, profile, approvals |
+| 4 | Fix defects from QA pass | planned | focus on layout, interaction, empty/loading/error states |
+| 5 | Add targeted frontend test coverage for new flows | planned | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
+| 6 | Final smoke + PR prep | planned | branch summary, residual risks, open PR |
+
+---
+
+## Iteration Guidance
+
+### Iteration 1 — Journey QA
+
+Do a real walkthrough of the revamped product surfaces and log defects by severity.
+
+- CP customer journey:
+  - sign in
+  - sign up
+  - discover
+  - hire setup
+  - command centre
+  - billing
+  - profile
+- PP contributor journey:
+  - landing
+  - dashboard
+  - agent type setup
+  - hired agents ops
+  - review queue
+  - policy denials
+  - audit console
+- Mobile customer journey:
+  - sign in
+  - sign up
+  - Today tab
+  - Ops tab
+  - profile
+  - approvals flow
+
+### Iteration 2 — Defect Fixes
+
+Address the specific issues found in Iteration 1.
+
+Priorities:
+- responsive breakpoints
+- spacing and hierarchy regressions
+- empty/loading/error states
+- language consistency across CP, PP, and mobile
+- navigation rough edges
+
+### Iteration 3 — Frontend Test Hardening
+
+Add focused tests to protect the revamp.
+
+Priority targets:
+- CP portal navigation and command-centre routing
+- CP hire/setup flow shell states
+- PP dashboard and contributor-page render coverage
+- mobile home, profile, and agent operations states
+
+---
+
+## Hygiene Rules For This Branch
+
+- Keep working in small chunks.
+- After each chunk, commit and push immediately.
+- Prefer checkpoint-style commit messages when a chunk is finished.
+- Do not start the next chunk before the previous one is validated.
+- If the session drops, resume from this file first, then `git log --oneline -5`.
+
+---
+
 # Running Commentary — 2026-03-05
 
 > **Purpose:** Fix 3 UI/payment defects: coupon checkout error (D2), sign-out landing page redirect (D3), sign-in screen dividers + 6-digit OTP (D4).
