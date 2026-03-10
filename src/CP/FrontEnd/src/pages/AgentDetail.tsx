@@ -140,13 +140,14 @@ export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = 
   }
 
   return (
-    <div className="agent-detail-page">
+    <div className="agent-detail-page" data-testid="cp-agent-detail-page">
       {/* Back Button */}
       <Button 
         appearance="subtle" 
         icon={<ArrowLeft20Regular />}
         onClick={handleBack}
         className="agent-detail-back"
+        data-testid="cp-agent-detail-back"
       >
         Back to Discovery
       </Button>
@@ -193,6 +194,7 @@ export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = 
                 size="large"
                 onClick={handleStartTrial}
                 disabled={agent.status !== 'active'}
+                data-testid="cp-agent-detail-start-trial"
               >
                 {agent.status === 'active' ? `Start ${trialDays}-Day Free Trial` : 'Currently Unavailable'}
               </Button>

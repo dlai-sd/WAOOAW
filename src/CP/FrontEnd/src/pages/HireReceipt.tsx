@@ -15,7 +15,7 @@ export default function HireReceipt() {
   const selectedAgentSummary = useMemo(() => agentId || 'Agent reference unavailable', [agentId])
 
   return (
-    <div className="hire-receipt-page" style={{ maxWidth: '920px', margin: '0 auto', padding: '2rem 1rem' }}>
+    <div className="hire-receipt-page" style={{ maxWidth: '920px', margin: '0 auto', padding: '2rem 1rem' }} data-testid="cp-hire-receipt-page">
       <div className="hire-wizard-hero">
         <div>
           <div className="hire-wizard-kicker">Hire Payment</div>
@@ -90,7 +90,12 @@ export default function HireReceipt() {
           >
             Go to My Agents
           </Button>
-          <Button appearance="primary" onClick={() => navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?agentId=${encodeURIComponent(agentId)}`)} disabled={!canContinue}>
+          <Button
+            appearance="primary"
+            onClick={() => navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?agentId=${encodeURIComponent(agentId)}`)}
+            disabled={!canContinue}
+            data-testid="cp-hire-receipt-continue"
+          >
             Continue Setup
           </Button>
         </div>

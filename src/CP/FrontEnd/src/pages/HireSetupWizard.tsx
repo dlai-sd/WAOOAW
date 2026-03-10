@@ -423,7 +423,7 @@ export default function HireSetupWizard() {
   ]
 
   return (
-    <div className="hire-wizard-page" style={{ maxWidth: 920, margin: '0 auto', padding: '2rem 1rem' }}>
+    <div className="hire-wizard-page" style={{ maxWidth: 920, margin: '0 auto', padding: '2rem 1rem' }} data-testid="cp-hire-setup-page">
       <div className="hire-wizard-hero">
         <div>
           <div className="hire-wizard-kicker">Hire Activation</div>
@@ -454,7 +454,7 @@ export default function HireSetupWizard() {
       </div>
 
       <Card style={{ padding: '1.5rem' }}>
-        <div className="hire-wizard-step-header">
+        <div className="hire-wizard-step-header" data-testid={`cp-hire-setup-step-${step}`}>
           <div>
             <div style={{ marginBottom: '0.35rem', fontWeight: 600 }}>Step {step} of 4</div>
             <div className="hire-wizard-step-title">{stepCopy[step].title}</div>
@@ -470,14 +470,14 @@ export default function HireSetupWizard() {
         {step === 1 && (
           <div className="form-group">
             <label>Agent nickname *</label>
-            <Input value={nickname} onChange={(_, data) => setNickname(data.value)} placeholder="e.g. Growth Copilot" />
+            <Input value={nickname} onChange={(_, data) => setNickname(data.value)} placeholder="e.g. Growth Copilot" data-testid="cp-hire-setup-nickname" />
           </div>
         )}
 
         {step === 2 && (
           <div className="form-group">
             <label>Theme *</label>
-            <Select value={theme} onChange={(_, data) => setTheme(String(data.value || 'default'))}>
+            <Select value={theme} onChange={(_, data) => setTheme(String(data.value || 'default'))} data-testid="cp-hire-setup-theme">
               {THEME_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -494,19 +494,19 @@ export default function HireSetupWizard() {
                 <div className="hire-wizard-inline-note">Connect the exchange once, then manage trading behaviour from the runtime view later.</div>
                 <div className="form-group">
                   <label>Exchange *</label>
-                  <Select value={exchangeProvider} onChange={(_, data) => setExchangeProvider(String(data.value || 'delta_exchange_india'))}>
+                  <Select value={exchangeProvider} onChange={(_, data) => setExchangeProvider(String(data.value || 'delta_exchange_india'))} data-testid="cp-hire-setup-exchange-provider">
                     <option value="delta_exchange_india">Delta India</option>
                   </Select>
                 </div>
 
                 <div className="form-group">
                   <label>Coins (comma-separated) *</label>
-                  <Input value={coinsRaw} onChange={(_, data) => setCoinsRaw(data.value)} placeholder="e.g. BTC, ETH" />
+                  <Input value={coinsRaw} onChange={(_, data) => setCoinsRaw(data.value)} placeholder="e.g. BTC, ETH" data-testid="cp-hire-setup-coins" />
                 </div>
 
                 <div className="form-group">
                   <label>Interval *</label>
-                  <Select value={intervalSeconds} onChange={(_, data) => setIntervalSeconds(String(data.value || '300'))}>
+                  <Select value={intervalSeconds} onChange={(_, data) => setIntervalSeconds(String(data.value || '300'))} data-testid="cp-hire-setup-interval">
                     <option value="60">1 minute</option>
                     <option value="300">5 minutes</option>
                     <option value="900">15 minutes</option>
@@ -516,7 +516,7 @@ export default function HireSetupWizard() {
 
                 <div className="form-group">
                   <label>{exchangeCredentialRef ? 'API key (optional to keep existing)' : 'API key *'}</label>
-                  <Input value={apiKey} onChange={(_, data) => setApiKey(data.value)} placeholder="Enter your exchange API key" />
+                  <Input value={apiKey} onChange={(_, data) => setApiKey(data.value)} placeholder="Enter your exchange API key" data-testid="cp-hire-setup-api-key" />
                 </div>
 
                 <div className="form-group">
@@ -526,6 +526,7 @@ export default function HireSetupWizard() {
                     value={apiSecret}
                     onChange={(_, data) => setApiSecret(data.value)}
                     placeholder="Enter your exchange API secret"
+                    data-testid="cp-hire-setup-api-secret"
                   />
                 </div>
               </>
@@ -537,7 +538,7 @@ export default function HireSetupWizard() {
 
                 <div className="form-group">
                   <label>Platform *</label>
-                  <Select value={marketingPlatform} onChange={(_, data) => setMarketingPlatform(String(data.value || 'instagram'))}>
+                  <Select value={marketingPlatform} onChange={(_, data) => setMarketingPlatform(String(data.value || 'instagram'))} data-testid="cp-hire-setup-platform">
                     {MARKETING_PLATFORM_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
@@ -552,6 +553,7 @@ export default function HireSetupWizard() {
                     value={marketingPostingIdentity}
                     onChange={(_, data) => setMarketingPostingIdentity(data.value)}
                     placeholder="e.g., DrSharmaClinic"
+                    data-testid="cp-hire-setup-posting-identity"
                   />
                 </div>
 
@@ -562,6 +564,7 @@ export default function HireSetupWizard() {
                     value={marketingAccessToken}
                     onChange={(_, data) => setMarketingAccessToken(data.value)}
                     placeholder="Paste token (stored server-side)"
+                    data-testid="cp-hire-setup-access-token"
                   />
                 </div>
 
@@ -572,6 +575,7 @@ export default function HireSetupWizard() {
                     value={marketingRefreshToken}
                     onChange={(_, data) => setMarketingRefreshToken(data.value)}
                     placeholder="Optional"
+                    data-testid="cp-hire-setup-refresh-token"
                   />
                 </div>
 
@@ -597,6 +601,7 @@ export default function HireSetupWizard() {
                   onChange={(_, data) => setConfigJson(data.value)}
                   resize="vertical"
                   rows={10}
+                  data-testid="cp-hire-setup-config-json"
                 />
               </div>
             )}
@@ -622,6 +627,7 @@ export default function HireSetupWizard() {
               checked={goalsCompleted}
               onChange={(_, data) => setGoalsCompleted(Boolean(data.checked))}
               label="I have completed the goal setting step"
+              data-testid="cp-hire-setup-goals-completed"
             />
 
             {draft?.trial_status === 'active' && (
@@ -635,16 +641,16 @@ export default function HireSetupWizard() {
         {error && <div style={{ marginTop: '1rem', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-          <Button appearance="outline" onClick={onBack} disabled={saving || step === 1}>
+          <Button appearance="outline" onClick={onBack} disabled={saving || step === 1} data-testid="cp-hire-setup-back">
             Back
           </Button>
 
           {step < 4 ? (
-            <Button appearance="primary" onClick={onNext} disabled={saving || !canNext}>
+            <Button appearance="primary" onClick={onNext} disabled={saving || !canNext} data-testid="cp-hire-setup-next">
               {saving ? 'Saving…' : 'Save & Continue'}
             </Button>
           ) : (
-            <Button appearance="primary" onClick={onActivate} disabled={saving || !goalsCompleted}>
+            <Button appearance="primary" onClick={onActivate} disabled={saving || !goalsCompleted} data-testid="cp-hire-setup-activate">
               {saving ? 'Saving…' : 'Activate trial'}
             </Button>
           )}
