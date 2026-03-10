@@ -41,8 +41,8 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 | 2 | Structured QA pass on PP contributor journeys | complete | chunks 2A and 2B validated and checkpointed |
 | 3 | Structured QA pass on mobile journeys | complete | chunks 3A and 3B validated and checkpointed |
 | 4 | Fix defects from QA pass | complete | mobile residuals and PP usage-events first-load honesty fixed and checkpointed |
-| 5 | Add targeted frontend test coverage for new flows | in progress | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
-| 6 | Final smoke + PR prep | planned | branch summary, residual risks, open PR |
+| 5 | Add targeted frontend test coverage for new flows | complete | CP portal routing, PP hook trace stability, and mobile ops routing coverage added and validated |
+| 6 | Final smoke + PR prep | in progress | branch summary, residual risks, open PR |
 
 ### Chunk 1A — CP QA sub-checkpoint
 
@@ -191,6 +191,38 @@ Files in Chunk 4B:
 ### Iteration 2 Status
 
 The consolidated defect pass is complete. The next phase is targeted frontend test hardening around the revised shells, routing, and first-load states.
+
+### Iteration 3 — Frontend Test Hardening
+
+#### Chunk 5A — CP portal + mobile ops coverage
+
+Validated and ready on branch after the first test-hardening slice.
+
+| Area | Result |
+|---|---|
+| CP portal shell | added coverage for billing hero copy and discover-to-agent-detail sidebar state in the authenticated portal |
+| Mobile ops routing | added coverage for auto-switching to hired agents when trials are empty and routing hires into the operations hub |
+| Validation | focused CP `vitest` and mobile `jest` targets exited `0` |
+
+Files in Chunk 5A:
+- `src/CP/FrontEnd/src/__tests__/AuthenticatedPortal.test.tsx`
+- `src/mobile/src/screens/agents/__tests__/MyAgentsScreen.test.tsx`
+
+#### Chunk 5B — PP hook-trace test stabilization
+
+Validated and ready on branch after the second test-hardening slice.
+
+| Area | Result |
+|---|---|
+| PP hook trace assertions | stabilized tests against duplicate option labels and header-row counts so the focused hook-trace suite reflects the actual contributor UI |
+| Validation | focused PP `vitest` for `HookTracePanel` exited `0` |
+
+Files in Chunk 5B:
+- `src/PP/FrontEnd/src/__tests__/HookTracePanel.test.tsx`
+
+### Iteration 3 Status
+
+Focused frontend test hardening is complete. The final phase is smoke validation and PR-prep context so the branch can be handed off cleanly.
 
 ---
 
