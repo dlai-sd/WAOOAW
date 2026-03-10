@@ -1,45 +1,56 @@
 import '@testing-library/jest-dom/vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 
-const mockListAgents = vi.fn()
+const mocks = vi.hoisted(() => ({
+  listAgents: vi.fn()
+}))
 
 vi.mock('../services/gatewayApiClient', () => ({
   gatewayApiClient: {
-    listAgents: mockListAgents,
-  },
+    listAgents: mocks.listAgents,
+  }
 }))
 
 import { Dashboard } from '../pages/Dashboard'
 
-test('E10-S1-T1: Active Agents card shows count when listAgents returns 5 items', async () => {
-  mockListAgents.mockResolvedValueOnce([{}, {}, {}, {}, {}])
+test('E10-S1-T1: dashboard does not auto-load live counts before the operator asks for them', () => {
+  render(<Dashboard />)
+
+  expect(mocks.listAgents).not.toHaveBeenCalled()
+  expect(screen.getByText('Not loaded')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Load live count' })).toBeInTheDocument()
+})
+
+test('E10-S1-T2: Active Agents card shows count when the operator explicitly loads it', async () => {
+  mocks.listAgents.mockResolvedValueOnce([{}, {}, {}, {}, {}])
 
   render(<Dashboard />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Load live count' }))
 
   await waitFor(() => {
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 })
 
-test('E10-S1-T2: Active Agents card shows "—" when listAgents throws', async () => {
-  mockListAgents.mockRejectedValueOnce(new Error('Network error'))
+test('E10-S1-T3: Active Agents card shows an unavailable state when the live load fails', async () => {
+  mocks.listAgents.mockRejectedValueOnce(new Error('Network error'))
 
   render(<Dashboard />)
 
+  fireEvent.click(screen.getByRole('button', { name: 'Load live count' }))
+
   await waitFor(() => {
-    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByText('Unavailable')).toBeInTheDocument()
   })
   expect(screen.queryByText('5')).not.toBeInTheDocument()
 })
 
-test('E10-S1-T3: MRR, Customers, and Churn Rate cards show "Coming soon" (3 times)', async () => {
-  mockListAgents.mockResolvedValueOnce([])
-
+test('E10-S1-T4: dashboard cards stay honest about live posture instead of showing fake metrics', () => {
   render(<Dashboard />)
 
-  await waitFor(() => {
-    const comingSoonItems = screen.getAllByText('Coming soon')
-    expect(comingSoonItems).toHaveLength(3)
-  })
+  expect(screen.getByText('Check live queues')).toBeInTheDocument()
+  expect(screen.getByText('Needs verification')).toBeInTheDocument()
+  expect(screen.getByText('Choose a surface')).toBeInTheDocument()
 })

@@ -7,13 +7,19 @@ export default function AuditConsole() {
   const [entityType, setEntityType] = useState('')
   const [entityId, setEntityId] = useState('')
   const [isRunning, setIsRunning] = useState(false)
+  const [hasRun, setHasRun] = useState(false)
   const [result, setResult] = useState<unknown>(null)
   const [error, setError] = useState<unknown>(null)
+
+  const scopeLabel = entityType.trim() || entityId.trim()
+    ? `Scoped to ${entityType.trim() || 'selected entity'}${entityId.trim() ? ` (${entityId.trim()})` : ''}`
+    : 'Broad platform audit'
 
   const runAudit = useCallback(async () => {
     setIsRunning(true)
     setError(null)
     setResult(null)
+    setHasRun(true)
 
     try {
       const data = await gatewayApiClient.runAudit({
@@ -48,6 +54,16 @@ export default function AuditConsole() {
           <p className="pp-dashboard-body-copy">
             Use this during release checks, runtime investigations, or whenever a construct change needs a stronger compliance proof before publish.
           </p>
+          <div className="pp-dashboard-role-grid" style={{ marginTop: 16 }}>
+            <div>
+              <strong>Current scope</strong>
+              <p>{scopeLabel}</p>
+            </div>
+            <div>
+              <strong>Status</strong>
+              <p>{isRunning ? 'Running now' : error ? 'Run failed' : hasRun ? 'Completed' : 'Not run yet'}</p>
+            </div>
+          </div>
         </Card>
       </div>
 
@@ -57,7 +73,7 @@ export default function AuditConsole() {
           description={<Text size={200}>Calls PP → Plant Gateway with your auth token</Text>}
           action={
             <Button appearance="primary" onClick={() => void runAudit()} disabled={isRunning}>
-              {isRunning ? 'Running…' : 'Run'}
+              {isRunning ? 'Running…' : scopeLabel === 'Broad platform audit' ? 'Run broad audit' : 'Run scoped audit'}
             </Button>
           }
         />
@@ -81,9 +97,11 @@ export default function AuditConsole() {
         {!result && !error && !isRunning && (
           <div style={{ padding: 16 }}>
             <Card className="pp-agent-setup-card">
-              <Text weight="semibold">Choose the audit scope deliberately</Text>
+              <Text weight="semibold">{scopeLabel === 'Broad platform audit' ? 'Nothing selected yet' : 'Scoped audit ready'}</Text>
               <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
-                Leave the fields empty for a broad platform check, or narrow to one entity when investigating a release, incident, or compliance concern.
+                {scopeLabel === 'Broad platform audit'
+                  ? 'Leave the fields empty for a broad platform check, or narrow to one entity when investigating a release, incident, or compliance concern.'
+                  : 'The fields above now define the audit target. Run the audit when you want evidence for this exact entity or release concern.'}
               </Text>
             </Card>
           </div>
