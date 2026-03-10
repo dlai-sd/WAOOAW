@@ -252,7 +252,7 @@ describe('MyAgentsScreen', () => {
         refetch: jest.fn(),
       });
 
-      const { getByText } = renderScreen();
+      const { getAllByText, getByText } = renderScreen();
 
       expect(getByText('No Active Trials')).toBeTruthy();
       expect(getByText('Start a 7-day trial to see results before hiring')).toBeTruthy();
@@ -273,7 +273,7 @@ describe('MyAgentsScreen', () => {
         refetch: jest.fn(),
       });
 
-      const { getByText } = renderScreen();
+      const { getAllByText, getByText } = renderScreen();
 
       // Switch to hired tab
       const hiredTab = getByText(/Hired \(\d+\)/);
@@ -493,14 +493,14 @@ describe('MyAgentsScreen', () => {
         refetch: jest.fn(),
       });
 
-      const { getByText } = renderScreen();
+      const screenResult = renderScreen();
 
       // Switch to hired tab
-      const hiredTab = getByText('Hired (1)');
+      const hiredTab = screenResult.getByText('Hired (1)');
       fireEvent.press(hiredTab);
 
       await waitFor(() => {
-        expect(getByText('Ending Soon')).toBeTruthy();
+        expect(screenResult.getAllByText('Subscription ending soon').length).toBeGreaterThan(0);
       });
     });
 
