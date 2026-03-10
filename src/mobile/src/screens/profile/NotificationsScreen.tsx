@@ -88,11 +88,29 @@ export function resolveNavigationTarget(
 
 export const NotificationsScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
-  const rootNavigation = useNavigation<any>();
+  const parentNavigation = navigation.getParent() as any;
   const [pushEnabled, setPushEnabled] = useState(false);
   const [trialUpdates, setTrialUpdates] = useState(true);
   const [deliverableAlerts, setDeliverableAlerts] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(false);
+  const actionableNotifications: Notification[] = [
+    {
+      id: 'demo-approval',
+      type: 'approval_required',
+      title: 'Approval waiting',
+      body: 'A deliverable needs your sign-off before publication can continue.',
+      hired_agent_id: 'demo-hired-agent-1',
+      created_at: 'Just now',
+    },
+    {
+      id: 'demo-health',
+      type: 'credential_expiring',
+      title: 'Credential expiring',
+      body: 'One connected account needs attention before the next run window.',
+      hired_agent_id: 'demo-hired-agent-1',
+      created_at: '2h ago',
+    },
+  ];
 
   const handlePushToggle = (value: boolean) => {
     setPushEnabled(value);
@@ -104,7 +122,7 @@ export const NotificationsScreen = ({ navigation }: Props) => {
   const handleNotificationPress = (notification: Notification) => {
     const target = resolveNavigationTarget(notification);
     if (target) {
-      rootNavigation.navigate('MyAgentsTab', {
+      parentNavigation?.navigate('MyAgentsTab', {
         screen: target.screen,
         params: target.params,
       });
@@ -198,6 +216,51 @@ export const NotificationsScreen = ({ navigation }: Props) => {
             thumbColor={pushEnabled ? colors.black : colors.textSecondary}
           />
         </View>
+
+        <Text style={sectionHeaderStyle}>Action Routing</Text>
+        <View
+          style={{
+            marginHorizontal: spacing.screenPadding.horizontal,
+            marginBottom: spacing.sm,
+            padding: spacing.md,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.border + '40',
+            backgroundColor: colors.card,
+          }}
+        >
+          <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 6 }}>
+            Approval alerts should land you in the right Ops section.
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13 }}>
+            Tap an alert preview below to jump into the agent operations hub with the relevant section already opened.
+          </Text>
+        </View>
+        {actionableNotifications.map((notification) => (
+          <TouchableOpacity
+            key={notification.id}
+            style={{
+              marginHorizontal: spacing.screenPadding.horizontal,
+              marginBottom: spacing.sm,
+              padding: spacing.md,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.border + '40',
+              backgroundColor: colors.card,
+            }}
+            onPress={() => handleNotificationPress(notification)}
+          >
+            <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 4 }}>
+              {notification.title}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13, marginBottom: 8 }}>
+              {notification.body}
+            </Text>
+            <Text style={{ color: colors.neonCyan, fontFamily: typography.fontFamily.bodyBold, fontSize: 12 }}>
+              Open Ops {resolveNavigationTarget(notification)?.params && '-> focused section'}
+            </Text>
+          </TouchableOpacity>
+        ))}
 
         {/* Alert types */}
         <Text style={sectionHeaderStyle}>Alert Types</Text>

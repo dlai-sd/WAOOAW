@@ -72,6 +72,12 @@ export interface SignUpScreenProps {
     otpId: string,
     channel: string,
     destinationMasked: string,
+    pendingProfile?: {
+      full_name: string;
+      email: string;
+      phone?: string;
+      business_name?: string;
+    },
   ) => void;
 }
 
@@ -459,11 +465,18 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
       const { registration, otp } = result;
 
       if (onRegistrationSuccess) {
+        const dialCode = selectedCountry.dialCode;
         onRegistrationSuccess(
           registration.registration_id,
           otp.otp_id,
           otp.channel,
           otp.destination_masked,
+          {
+            full_name: formData.fullName.trim(),
+            email: formData.email.trim().toLowerCase(),
+            phone: `${dialCode}${formData.phoneNationalNumber.trim()}`,
+            business_name: formData.businessName.trim() || undefined,
+          },
         );
       }
     } catch (error: any) {

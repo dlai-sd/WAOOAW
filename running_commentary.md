@@ -39,8 +39,8 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 |---|---|---|---|
 | 1 | Structured QA pass on CP user journeys | complete | chunks 1A and 1B validated and checkpointed |
 | 2 | Structured QA pass on PP contributor journeys | complete | chunks 2A and 2B validated and checkpointed |
-| 3 | Structured QA pass on mobile journeys | in progress | first validated mobile slice complete |
-| 4 | Fix defects from QA pass | planned | focus on layout, interaction, empty/loading/error states |
+| 3 | Structured QA pass on mobile journeys | complete | chunks 3A and 3B validated and checkpointed |
+| 4 | Fix defects from QA pass | in progress | focus on layout, interaction, empty/loading/error states |
 | 5 | Add targeted frontend test coverage for new flows | planned | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
 | 6 | Final smoke + PR prep | planned | branch summary, residual risks, open PR |
 
@@ -132,6 +132,29 @@ Files in Chunk 3A:
 - `src/mobile/src/screens/discover/DiscoverScreen.tsx`
 - `src/mobile/src/screens/discover/AgentDetailScreen.tsx`
 - `src/mobile/src/screens/profile/ProfileScreen.tsx`
+
+### Chunk 3B — Mobile QA sub-checkpoint
+
+Validated and ready on branch after the remaining auth, profile, and approval-flow slice.
+
+| Area | Result |
+|---|---|
+| Signup -> profile continuity | carried signup identity data through OTP verification so the post-verification mobile shell has the customer name, phone, and business context immediately |
+| Settings honesty | replaced the inert notifications toggle in settings with a real manage-notifications route |
+| Approval-entry clarity | improved the notifications surface so approval and health alerts clearly explain that they route into the ops hub, and fixed that route to switch tabs correctly |
+| Mobile validation | `npm run typecheck` exited `0`; targeted `jest` coverage for navigation config exited `0` |
+
+Files in Chunk 3B:
+- `src/mobile/src/navigation/types.ts`
+- `src/mobile/src/navigation/AuthNavigator.tsx`
+- `src/mobile/src/screens/auth/SignUpScreen.tsx`
+- `src/mobile/src/screens/auth/OTPVerificationScreen.tsx`
+- `src/mobile/src/screens/profile/SettingsScreen.tsx`
+- `src/mobile/src/screens/profile/NotificationsScreen.tsx`
+
+### Iteration 1 Status
+
+Journey QA is now complete across CP, PP, and mobile. The next phase is the consolidated defect pass so remaining rough edges can be fixed across products instead of one surface at a time.
 
 ---
 
