@@ -8,7 +8,7 @@
  * - NotificationsScreen renders without crashing
  */
 
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest } from '@jest/globals';
 import {
   resolveNavigationTarget,
   type Notification,
@@ -33,6 +33,18 @@ describe('resolveNavigationTarget', () => {
   it('returns null when hired_agent_id is missing', () => {
     const n: Notification = { ...baseNotification, type: 'approval_required', hired_agent_id: undefined };
     expect(resolveNavigationTarget(n)).toBeNull();
+  });
+
+  it('prefers hired_instance_id when present', () => {
+    const result = resolveNavigationTarget({
+      ...baseNotification,
+      type: 'approval_required',
+      hired_agent_id: 'legacy-id',
+      hired_instance_id: 'runtime-id',
+    });
+
+    expect(result).not.toBeNull();
+    expect((result!.params as any).hiredAgentId).toBe('runtime-id');
   });
 
   it.each<[NotificationType, string]>([

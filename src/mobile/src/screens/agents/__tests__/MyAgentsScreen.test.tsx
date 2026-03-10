@@ -153,4 +153,57 @@ describe('MyAgentsScreen', () => {
       hiredAgentId: 'hire-1',
     })
   })
+
+  it('derives the attention summary from supported runtime fields only', async () => {
+    useHiredAgents.mockReturnValue({
+      data: [
+        {
+          subscription_id: 'sub-1',
+          agent_id: 'AGT-OPS-1',
+          status: 'active',
+          duration: 'monthly',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'hire-1',
+          configured: true,
+          goals_completed: true,
+          nickname: 'Ops Agent',
+          trial_status: null,
+        },
+        {
+          subscription_id: 'sub-2',
+          agent_id: 'AGT-OPS-2',
+          status: 'active',
+          duration: 'monthly',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: true,
+          hired_instance_id: 'hire-2',
+          configured: false,
+          goals_completed: false,
+          nickname: 'Needs Setup',
+          trial_status: null,
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+    })
+    useAgentsInTrial.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+    })
+
+    render(<MyAgentsScreen navigation={navigation} route={{ key: 'my-agents', name: 'MyAgents' } as any} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('1 need attention')).toBeTruthy()
+    })
+
+    expect(screen.getByText('Subscription ending soon')).toBeTruthy()
+    expect(screen.getByText('Subscription ending soon • Runtime configuration incomplete • Goals need review')).toBeTruthy()
+  })
 })

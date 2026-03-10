@@ -21,7 +21,6 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { registerPushToken } from '../../services/notifications/pushNotifications.service';
 import type { ProfileStackScreenProps } from '@/navigation/types';
-import { useNavigation } from '@react-navigation/native';
 
 type Props = ProfileStackScreenProps<'Notifications'>;
 
@@ -40,9 +39,26 @@ export interface Notification {
   type: NotificationType;
   title: string;
   body: string;
+  hired_instance_id?: string;
   hired_agent_id?: string;
   read?: boolean;
   created_at?: string;
+}
+
+function getRuntimeId(notification: Notification): string | undefined {
+  return notification.hired_instance_id || notification.hired_agent_id;
+}
+
+function getNotificationDestinationLabel(notification: Notification): string {
+  const runtimeId = getRuntimeId(notification)
+  const target = resolveNavigationTarget(notification)
+
+  if (!runtimeId || !target) {
+    return 'No runtime action is attached to this alert.'
+  }
+
+  const focusSection = (target.params as { focusSection?: string }).focusSection
+  return `Opens ${focusSection || 'agent operations'} for runtime ${runtimeId}.`
 }
 
 /**
@@ -52,32 +68,33 @@ export interface Notification {
 export function resolveNavigationTarget(
   notification: Notification
 ): { screen: string; params: object } | null {
-  if (!notification.hired_agent_id) return null;
+  const runtimeId = getRuntimeId(notification)
+  if (!runtimeId) return null;
   switch (notification.type) {
     case 'approval_required':
       return {
         screen: 'AgentOperations',
-        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'approvals' },
+        params: { hiredAgentId: runtimeId, focusSection: 'approvals' },
       };
     case 'credential_expiring':
       return {
         screen: 'AgentOperations',
-        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'health' },
+        params: { hiredAgentId: runtimeId, focusSection: 'health' },
       };
     case 'agent_paused':
       return {
         screen: 'AgentOperations',
-        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'scheduler' },
+        params: { hiredAgentId: runtimeId, focusSection: 'scheduler' },
       };
     case 'trial_ending':
       return {
         screen: 'AgentOperations',
-        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'spend' },
+        params: { hiredAgentId: runtimeId, focusSection: 'spend' },
       };
     case 'goal_run_failed':
       return {
         screen: 'AgentOperations',
-        params: { hiredAgentId: notification.hired_agent_id, focusSection: 'activity' },
+        params: { hiredAgentId: runtimeId, focusSection: 'activity' },
       };
     default:
       return null;
@@ -99,7 +116,7 @@ export const NotificationsScreen = ({ navigation }: Props) => {
       type: 'approval_required',
       title: 'Approval waiting',
       body: 'A deliverable needs your sign-off before publication can continue.',
-      hired_agent_id: 'demo-hired-agent-1',
+      hired_instance_id: 'demo-hired-agent-1',
       created_at: 'Just now',
     },
     {
@@ -107,7 +124,7 @@ export const NotificationsScreen = ({ navigation }: Props) => {
       type: 'credential_expiring',
       title: 'Credential expiring',
       body: 'One connected account needs attention before the next run window.',
-      hired_agent_id: 'demo-hired-agent-1',
+      hired_instance_id: 'demo-hired-agent-1',
       created_at: '2h ago',
     },
   ];
@@ -257,7 +274,7 @@ export const NotificationsScreen = ({ navigation }: Props) => {
               {notification.body}
             </Text>
             <Text style={{ color: colors.neonCyan, fontFamily: typography.fontFamily.bodyBold, fontSize: 12 }}>
-              Open Ops {resolveNavigationTarget(notification)?.params && '-> focused section'}
+              {getNotificationDestinationLabel(notification)}
             </Text>
           </TouchableOpacity>
         ))}
