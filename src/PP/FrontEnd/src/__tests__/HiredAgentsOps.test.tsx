@@ -3,8 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 
-// Mock gatewayApiClient
-const mockGatewayApiClient = {
+const mockGatewayApiClient = vi.hoisted(() => ({
   listOpsSubscriptions: vi.fn(async () => []),
   listOpsHiredAgents: vi.fn(async () => []),
   lookupCustomerByEmail: vi.fn(),
@@ -13,7 +12,7 @@ const mockGatewayApiClient = {
   listOpsHiredAgentDeliverables: vi.fn(async () => ({ deliverables: [] })),
   listOpsApprovals: vi.fn(async () => ({ approvals: [] })),
   listOpsPolicyDenials: vi.fn(async () => ({ records: [] })),
-}
+}))
 
 vi.mock('../services/gatewayApiClient', () => ({
   gatewayApiClient: mockGatewayApiClient,

@@ -385,6 +385,15 @@ export default function HiredAgentsOps() {
         </Table>
       </Card>
 
+      {!selected && !isLoading && rows.length > 0 && (
+        <Card style={{ marginTop: 16, padding: 20 }}>
+          <Text weight="semibold">Select an instance to inspect the customer runtime story</Text>
+          <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+            Pick one hired agent row to inspect config, goals, approvals, denials, scheduler diagnostics, and hook trace in one place.
+          </Text>
+        </Card>
+      )}
+
       {healthPanelAgentId && (
         <ConstructHealthPanel
           hiredAgentId={healthPanelAgentId}
@@ -411,6 +420,24 @@ export default function HiredAgentsOps() {
             />
 
             <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{selected.goals.length}</div>
+                  <div className="pp-agent-setup-label">Goals</div>
+                </Card>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{deliverables.length}</div>
+                  <div className="pp-agent-setup-label">Deliverables</div>
+                </Card>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{approvals.length}</div>
+                  <div className="pp-agent-setup-label">Approvals</div>
+                </Card>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{denials.length}</div>
+                  <div className="pp-agent-setup-label">Policy denials</div>
+                </Card>
+              </div>
               <div>
                 <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Correlation ID (optional)</Text>
                 <Input

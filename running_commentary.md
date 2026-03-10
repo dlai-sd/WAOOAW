@@ -38,7 +38,7 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 | Chunk | Goal | Status | Notes |
 |---|---|---|---|
 | 1 | Structured QA pass on CP user journeys | complete | chunks 1A and 1B validated and checkpointed |
-| 2 | Structured QA pass on PP contributor journeys | in progress | first validated PP slice complete |
+| 2 | Structured QA pass on PP contributor journeys | complete | chunks 2A and 2B validated and checkpointed |
 | 3 | Structured QA pass on mobile journeys | planned | sign in, sign up, today, ops, profile, approvals |
 | 4 | Fix defects from QA pass | planned | focus on layout, interaction, empty/loading/error states |
 | 5 | Add targeted frontend test coverage for new flows | planned | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
@@ -94,6 +94,25 @@ Files in Chunk 2A:
 - `src/PP/FrontEnd/src/components/Layout.tsx`
 - `src/PP/FrontEnd/src/pages/AgentTypeSetupScreen.tsx`
 - `src/PP/FrontEnd/src/pages/ReviewQueue.tsx`
+
+### Chunk 2B — PP QA sub-checkpoint
+
+Validated and ready on branch after the PP ops/governance slice.
+
+| Area | Result |
+|---|---|
+| Hired agent runtime guidance | added a clear pre-selection state plus a compact selected-instance summary so ops can orient before drilling into tabs |
+| Policy denials workflow | changed denials from eager auto-load to a deliberate search action with a better first-load guidance state and more truthful empty state |
+| Audit console guidance | added a pre-run explanation card so contributors know when to run a broad audit versus a scoped investigation |
+| PP validation | `npm run build` exited `0`; targeted `vitest` coverage for layout, hired-agent ops, review queue, and policy denials exited `0` |
+
+Files in Chunk 2B:
+- `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx`
+- `src/PP/FrontEnd/src/pages/PolicyDenials.tsx`
+- `src/PP/FrontEnd/src/pages/AuditConsole.tsx`
+- `src/PP/FrontEnd/src/pages/PolicyDenials.test.tsx`
+- `src/PP/FrontEnd/src/__tests__/Layout.test.tsx`
+- `src/PP/FrontEnd/src/__tests__/HiredAgentsOps.test.tsx`
 
 ---
 

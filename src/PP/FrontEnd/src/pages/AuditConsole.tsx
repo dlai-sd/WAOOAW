@@ -78,6 +78,17 @@ export default function AuditConsole() {
 
         {error && <div style={{ padding: 16 }}><ApiErrorPanel title="Audit error" error={error} /></div>}
 
+        {!result && !error && !isRunning && (
+          <div style={{ padding: 16 }}>
+            <Card className="pp-agent-setup-card">
+              <Text weight="semibold">Choose the audit scope deliberately</Text>
+              <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+                Leave the fields empty for a broad platform check, or narrow to one entity when investigating a release, incident, or compliance concern.
+              </Text>
+            </Card>
+          </div>
+        )}
+
         {result && (
           <div style={{ padding: 16 }}>
             <Text weight="semibold">Result</Text>
