@@ -6,6 +6,7 @@
 
 import React from 'react';
 import {
+  Alert,
   View,
   Text,
   SafeAreaView,
@@ -23,11 +24,28 @@ export const SettingsScreen = ({ navigation }: Props) => {
   const logout = useAuthStore((state) => state.logout);
 
   const handleSignOut = async () => {
-    try {
-      await logout();
-    } catch {
-      // logout cleans up state regardless
-    }
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch {
+              // logout cleans up state regardless
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const rowStyle = {

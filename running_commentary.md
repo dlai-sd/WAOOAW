@@ -156,6 +156,24 @@ Files in Chunk 3B:
 
 Journey QA is now complete across CP, PP, and mobile. The next phase is the consolidated defect pass so remaining rough edges can be fixed across products instead of one surface at a time.
 
+### Iteration 2 — Defect Fixes
+
+#### Chunk 4A — Mobile residual defect fixes
+
+Validated and ready on branch after the first defect-fix slice.
+
+| Area | Result |
+|---|---|
+| Push-token test noise | guarded mobile push-token registration in test mode so Jest runs stop firing localhost requests as a login side effect |
+| My Agents landing behavior | switched the ops landing tab automatically to hired agents when a customer has no trials but does have active hires |
+| Settings sign-out safety | added logout confirmation in settings so the mobile account journey is consistent with profile sign-out behavior |
+| Validation | `npm run typecheck` exited `0`; targeted navigation Jest coverage still exited `0` |
+
+Files in Chunk 4A:
+- `src/mobile/src/services/notifications/pushNotifications.service.ts`
+- `src/mobile/src/screens/agents/MyAgentsScreen.tsx`
+- `src/mobile/src/screens/profile/SettingsScreen.tsx`
+
 ---
 
 ## Iteration Guidance

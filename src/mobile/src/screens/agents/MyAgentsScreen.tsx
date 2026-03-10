@@ -99,6 +99,12 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
     return allAgents.filter(agent => agent.trial_status !== 'active');
   }, [allAgents]);
 
+  React.useEffect(() => {
+    if (activeTab === 'trials' && (trialAgents?.length || 0) === 0 && hiredAgents.length > 0) {
+      setActiveTab('hired');
+    }
+  }, [activeTab, trialAgents, hiredAgents.length]);
+
   const agents = activeTab === 'trials'
     ? (trialAgents || [])
     : sortAgents(hiredAgents, sortOption);
