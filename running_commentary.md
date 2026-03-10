@@ -40,8 +40,8 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 | 1 | Structured QA pass on CP user journeys | complete | chunks 1A and 1B validated and checkpointed |
 | 2 | Structured QA pass on PP contributor journeys | complete | chunks 2A and 2B validated and checkpointed |
 | 3 | Structured QA pass on mobile journeys | complete | chunks 3A and 3B validated and checkpointed |
-| 4 | Fix defects from QA pass | in progress | focus on layout, interaction, empty/loading/error states |
-| 5 | Add targeted frontend test coverage for new flows | planned | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
+| 4 | Fix defects from QA pass | complete | mobile residuals and PP usage-events first-load honesty fixed and checkpointed |
+| 5 | Add targeted frontend test coverage for new flows | in progress | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
 | 6 | Final smoke + PR prep | planned | branch summary, residual risks, open PR |
 
 ### Chunk 1A — CP QA sub-checkpoint
@@ -173,6 +173,24 @@ Files in Chunk 4A:
 - `src/mobile/src/services/notifications/pushNotifications.service.ts`
 - `src/mobile/src/screens/agents/MyAgentsScreen.tsx`
 - `src/mobile/src/screens/profile/SettingsScreen.tsx`
+
+#### Chunk 4B — PP usage-events first-load honesty
+
+Validated and ready on branch after the second defect-fix slice.
+
+| Area | Result |
+|---|---|
+| Usage events first paint | removed the fake default customer load so contributors now choose scope deliberately instead of landing on placeholder data |
+| Aggregate honesty | changed usage aggregates to a deliberate load flow with guidance before the first query and truthful empty states after load |
+| Validation | `npm run build` exited `0`; targeted `vitest` coverage for usage events exited `0` |
+
+Files in Chunk 4B:
+- `src/PP/FrontEnd/src/pages/CustomerManagement.tsx`
+- `src/PP/FrontEnd/src/pages/CustomerManagement.test.tsx`
+
+### Iteration 2 Status
+
+The consolidated defect pass is complete. The next phase is targeted frontend test hardening around the revised shells, routing, and first-load states.
 
 ---
 

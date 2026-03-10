@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 
 import CustomerManagement from './CustomerManagement'
@@ -55,24 +55,43 @@ test('CustomerManagement renders usage events from API', async () => {
   render(<CustomerManagement />)
 
   await waitFor(() => {
-    expect(screen.getByText('Usage Events')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Usage Events' })).toBeInTheDocument()
+  })
+
+  expect(mocks.listUsageEvents).not.toHaveBeenCalled()
+  expect(mocks.aggregateUsageEvents).not.toHaveBeenCalled()
+
+  await screen.findByText('Start with a customer or agent filter')
+  await screen.findByText('Load aggregates after choosing the scope')
+
+  const customerInput = screen.getByPlaceholderText('CUST-1')
+  const loadUsageButton = screen.getByRole('button', { name: 'Load usage' })
+  const loadAggregatesButton = screen.getByRole('button', { name: 'Load aggregates' })
+
+  fireEvent.change(customerInput, { target: { value: 'CUST-1' } })
+
+  await waitFor(() => {
+    expect((customerInput as HTMLInputElement).value).toBe('CUST-1')
+  })
+
+  fireEvent.click(loadUsageButton)
+  fireEvent.click(loadAggregatesButton)
+
+  await waitFor(() => {
+    expect(mocks.listUsageEvents).toHaveBeenCalled()
   })
 
   await waitFor(() => {
-    expect(mocks.listUsageEvents).toHaveBeenCalledTimes(1)
+    expect(mocks.aggregateUsageEvents).toHaveBeenCalled()
   })
 
-  await waitFor(() => {
-    expect(mocks.aggregateUsageEvents).toHaveBeenCalledTimes(1)
-  })
-
-  expect(mocks.listUsageEvents).toHaveBeenCalledWith({
+  expect(mocks.listUsageEvents).toHaveBeenLastCalledWith({
     customer_id: 'CUST-1',
     agent_id: undefined,
     limit: 100
   })
 
-  expect(mocks.aggregateUsageEvents).toHaveBeenCalledWith({
+  expect(mocks.aggregateUsageEvents).toHaveBeenLastCalledWith({
     bucket: 'day',
     customer_id: 'CUST-1',
     agent_id: undefined
