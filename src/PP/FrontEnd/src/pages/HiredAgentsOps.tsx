@@ -263,6 +263,31 @@ export default function HiredAgentsOps() {
         <Body1>Ops view of customer hired agents, goals, drafts, approvals and denials</Body1>
       </div>
 
+      <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+          <div className="pp-dashboard-kicker">Ops mission</div>
+          <Text as="h2" size={700} weight="semibold">Find customer risk before it becomes a support incident.</Text>
+          <p className="pp-dashboard-body-copy">
+            This screen should help helpdesk and ops contributors connect hires, goals, approvals, denials, and runtime health
+            without forcing them to mentally stitch five systems together.
+          </p>
+        </Card>
+        <div className="pp-agent-setup-summary-grid">
+          <Card className="pp-agent-setup-card">
+            <div className="pp-agent-setup-metric">1</div>
+            <div className="pp-agent-setup-label">Customer storyline per row</div>
+          </Card>
+          <Card className="pp-agent-setup-card">
+            <div className="pp-agent-setup-metric">Ops</div>
+            <div className="pp-agent-setup-label">Approvals, denials, diagnostics</div>
+          </Card>
+          <Card className="pp-agent-setup-card">
+            <div className="pp-agent-setup-metric">Fast</div>
+            <div className="pp-agent-setup-label">Email lookup to runtime detail</div>
+          </Card>
+        </div>
+      </div>
+
       {!!error && <ApiErrorPanel title="Hired Agents error" error={error} />}
 
       <Card>
@@ -273,6 +298,9 @@ export default function HiredAgentsOps() {
         />
 
         <div style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+          <Text size={200} style={{ width: '100%', opacity: 0.8 }}>
+            Start from what ops usually has in hand: an email, a customer id, or a point-in-time incident report.
+          </Text>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <Field label="Customer Email">
@@ -357,6 +385,15 @@ export default function HiredAgentsOps() {
         </Table>
       </Card>
 
+      {!selected && !isLoading && rows.length > 0 && (
+        <Card style={{ marginTop: 16, padding: 20 }}>
+          <Text weight="semibold">Select an instance to inspect the customer runtime story</Text>
+          <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+            Pick one hired agent row to inspect config, goals, approvals, denials, scheduler diagnostics, and hook trace in one place.
+          </Text>
+        </Card>
+      )}
+
       {healthPanelAgentId && (
         <ConstructHealthPanel
           hiredAgentId={healthPanelAgentId}
@@ -383,6 +420,24 @@ export default function HiredAgentsOps() {
             />
 
             <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{selected.goals.length}</div>
+                  <div className="pp-agent-setup-label">Goals</div>
+                </Card>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{deliverables.length}</div>
+                  <div className="pp-agent-setup-label">Deliverables</div>
+                </Card>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{approvals.length}</div>
+                  <div className="pp-agent-setup-label">Approvals</div>
+                </Card>
+                <Card className="pp-agent-setup-card">
+                  <div className="pp-agent-setup-metric">{denials.length}</div>
+                  <div className="pp-agent-setup-label">Policy denials</div>
+                </Card>
+              </div>
               <div>
                 <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Correlation ID (optional)</Text>
                 <Input

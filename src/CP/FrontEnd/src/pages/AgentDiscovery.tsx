@@ -77,23 +77,40 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
   }
 
   const handleTryAgent = (agentId: string) => {
-    // Navigate to agent detail page
-    console.log('Try agent:', agentId)
+    if (onSelectAgent) {
+      onSelectAgent(agentId)
+      return
+    }
     navigate(`/agent/${agentId}`)
   }
 
   const filteredAgents = agents
+  const activeFilters = [searchQuery, industryFilter, statusFilter].filter(Boolean)
 
   return (
     <div className="discover-page" data-testid="cp-discover-page">
-      {/* Header */}
-      <div className="discover-header">
-        <h1 className="discover-title">
-          Discover AI Agents
-        </h1>
-        <p className="discover-subtitle">
-          Browse our marketplace of specialized AI agents. Try any agent free for 7 days.
-        </p>
+      <div className="discover-hero">
+        <div className="discover-header">
+          <div className="discover-kicker">WAOOAW Marketplace</div>
+          <h1 className="discover-title">
+            Discover AI Agents
+          </h1>
+          <p className="discover-subtitle">
+            Browse specialised agents the way you would hire talent: by outcome, vertical fit, and readiness to start.
+          </p>
+          <div className="discover-proof-row">
+            <span className="discover-proof-pill">7-day free trial</span>
+            <span className="discover-proof-pill">Keep the deliverables</span>
+            <span className="discover-proof-pill">Specialised by industry</span>
+          </div>
+        </div>
+        <Card className="discover-spotlight-card">
+          <div className="discover-spotlight-label">Hiring confidence</div>
+          <div className="discover-spotlight-value">Hire faster with less guesswork</div>
+          <p className="discover-spotlight-body">
+            Every agent profile should make clear what it does, what it needs from you, and how approval or payment works before you commit.
+          </p>
+        </Card>
       </div>
 
       {/* Search & Filters */}
@@ -183,6 +200,14 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
           Found {filteredAgents.length} agent{filteredAgents.length !== 1 ? 's' : ''}
           {industryFilter && ` in ${industryFilter}`}
           {statusFilter && ` (${statusFilter})`}
+        </div>
+      )}
+
+      {!loading && activeFilters.length > 0 && (
+        <div className="discover-active-filters">
+          {activeFilters.map((filter) => (
+            <span key={String(filter)} className="discover-active-filter">{String(filter)}</span>
+          ))}
         </div>
       )}
 

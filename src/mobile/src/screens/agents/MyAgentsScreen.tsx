@@ -63,6 +63,13 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
   const [sortOption, setSortOption] = React.useState<SortOption>('attention');
 
+  const navigateToMainTab = React.useCallback(
+    (tabName: 'HomeTab' | 'DiscoverTab' | 'ProfileTab', screen: 'Home' | 'Discover' | 'Profile') => {
+      navigation.getParent()?.navigate(tabName, { screen });
+    },
+    [navigation]
+  );
+
   // Performance monitoring
   usePerformanceMonitoring('MyAgents');
 
@@ -92,6 +99,12 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
     return allAgents.filter(agent => agent.trial_status !== 'active');
   }, [allAgents]);
 
+  React.useEffect(() => {
+    if (activeTab === 'trials' && (trialAgents?.length || 0) === 0 && hiredAgents.length > 0) {
+      setActiveTab('hired');
+    }
+  }, [activeTab, trialAgents, hiredAgents.length]);
+
   const agents = activeTab === 'trials'
     ? (trialAgents || [])
     : sortAgents(hiredAgents, sortOption);
@@ -112,29 +125,33 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
       navigation.navigate('TrialDashboard', {
         trialId: agent.subscription_id,
       });
+    } else if (agent.hired_instance_id) {
+      navigation.navigate('AgentOperations', {
+        hiredAgentId: agent.hired_instance_id,
+      });
     } else {
-      // Hired - go to agent detail
+      // Fallback when runtime instance data has not been hydrated yet
       navigation.navigate('AgentDetail', { agentId: agent.agent_id });
     }
   };
 
   // Navigate to discover screen
   const handleDiscoverPress = () => {
-    navigation.navigate('Discover' as any);
+    navigateToMainTab('DiscoverTab', 'Discover');
   };
 
   // Voice command handlers
   const handleVoiceNavigate = React.useCallback(
     (screen: string) => {
       if (screen === 'Home') {
-        navigation.navigate('Home' as any);
+        navigateToMainTab('HomeTab', 'Home');
       } else if (screen === 'Discover') {
-        navigation.navigate('Discover' as any);
+        navigateToMainTab('DiscoverTab', 'Discover');
       } else if (screen === 'Profile') {
-        navigation.navigate('Profile' as any);
+        navigateToMainTab('ProfileTab', 'Profile');
       }
     },
-    [navigation]
+    [navigateToMainTab]
   );
 
   const handleVoiceAction = React.useCallback(
@@ -178,6 +195,18 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
       {/* Header with Tabs */}
       <View style={[styles.header, { paddingHorizontal: spacing.screenPadding.horizontal, paddingVertical: spacing.screenPadding.vertical }]}>
         <Text
+          style={{
+            color: colors.neonCyan,
+            fontSize: 12,
+            fontFamily: typography.fontFamily.bodyBold,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            marginBottom: spacing.xs,
+          }}
+        >
+          Runtime cockpit
+        </Text>
+        <Text
           style={[
             styles.title,
             {
@@ -190,6 +219,38 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
         >
           My Agents
         </Text>
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontSize: 14,
+            fontFamily: typography.fontFamily.body,
+            marginBottom: spacing.md,
+          }}
+        >
+          Keep trials, hired agents, and the next decision in one place instead of switching mental models.
+        </Text>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
+          {[
+            `${trialAgents?.length || 0} trials`,
+            `${hiredAgents.length} hired`,
+            `${allAgents?.filter((agent: any) => (agent as any).approvalQueueCount).length || 0} need attention`,
+          ].map((pill) => (
+            <View
+              key={pill}
+              style={{
+                backgroundColor: colors.card,
+                borderRadius: 999,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.xs,
+                borderWidth: 1,
+                borderColor: colors.textSecondary + '25',
+              }}
+            >
+              <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
+            </View>
+          ))}
+        </View>
 
         {/* Tab Selector */}
         <View

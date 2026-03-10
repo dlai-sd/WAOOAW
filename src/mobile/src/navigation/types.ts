@@ -32,6 +32,12 @@ export type AuthStackParamList = {
     otpId: string;
     channel?: 'email' | 'phone';
     destinationMasked: string;
+    pendingProfile?: {
+      full_name: string;
+      email: string;
+      phone?: string;
+      business_name?: string;
+    };
   };
 };
 

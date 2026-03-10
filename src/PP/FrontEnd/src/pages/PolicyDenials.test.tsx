@@ -46,6 +46,10 @@ test('PolicyDenials renders policy denial records from API', async () => {
     expect(screen.getByText('Policy Denials')).toBeInTheDocument()
   })
 
+   expect(mocks.listPolicyDenials).not.toHaveBeenCalled()
+
+  await user.click(screen.getByRole('button', { name: 'Load denials' }))
+
   await waitFor(() => {
     expect(mocks.listPolicyDenials).toHaveBeenCalledTimes(1)
   })

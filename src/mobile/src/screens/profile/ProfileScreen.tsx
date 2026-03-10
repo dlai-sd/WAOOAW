@@ -59,23 +59,23 @@ export const ProfileScreen = () => {
       title: 'Account',
       items: [
         { label: 'Edit Profile', icon: '✏️', action: () => navigation.navigate('EditProfile') },
-        { label: 'Payment Methods', icon: '💳', action: () => {} },
-        { label: 'Subscription Management', icon: '📋', action: () => {} },
+        { label: 'Payment Methods', icon: '💳', action: () => navigation.navigate('PaymentMethods') },
+        { label: 'Subscription Management', icon: '📋', action: () => navigation.navigate('SubscriptionManagement') },
       ],
     },
     {
       title: 'Preferences',
       items: [
-        { label: 'Notifications', icon: '🔔', action: () => {} },
-        { label: 'Settings', icon: '⚙️', action: () => {} },
+        { label: 'Notifications', icon: '🔔', action: () => navigation.navigate('Notifications') },
+        { label: 'Settings', icon: '⚙️', action: () => navigation.navigate('Settings') },
       ],
     },
     {
       title: 'Support',
       items: [
-        { label: 'Help Center', icon: '❓', action: () => {} },
-        { label: 'Privacy Policy', icon: '🔒', action: () => {} },
-        { label: 'Terms of Service', icon: '📄', action: () => {} },
+        { label: 'Help Center', icon: '❓', action: () => navigation.navigate('HelpCenter') },
+        { label: 'Privacy Policy', icon: '🔒', action: () => navigation.navigate('PrivacyPolicy') },
+        { label: 'Terms of Service', icon: '📄', action: () => navigation.navigate('TermsOfService') },
       ],
     },
   ];
@@ -95,6 +95,18 @@ export const ProfileScreen = () => {
         {/* Header */}
         <View style={[styles.header, { marginBottom: spacing.xl }]}>
           <Text
+            style={{
+              color: colors.neonCyan,
+              fontSize: 12,
+              fontFamily: typography.fontFamily.bodyBold,
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              marginBottom: spacing.xs,
+            }}
+          >
+            Identity and controls
+          </Text>
+          <Text
             style={[
               styles.title,
               {
@@ -106,6 +118,15 @@ export const ProfileScreen = () => {
             ]}
           >
             Profile
+          </Text>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: 14,
+              fontFamily: typography.fontFamily.body,
+            }}
+          >
+            Keep your business identity, billing paths, and support routes one tap away.
           </Text>
         </View>
 
@@ -212,6 +233,24 @@ export const ProfileScreen = () => {
               </Text>
             </View>
           )}
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md, justifyContent: 'center' }}>
+            {['Customer profile ready', 'Billing access', 'Support always visible'].map((pill) => (
+              <View
+                key={pill}
+                style={{
+                  backgroundColor: colors.black + '20',
+                  borderRadius: 999,
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.xs,
+                  borderWidth: 1,
+                  borderColor: colors.textSecondary + '25',
+                }}
+              >
+                <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Menu Sections */}

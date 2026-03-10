@@ -1,8 +1,13 @@
-import { Card } from '@fluentui/react-components'
-import { useNavigate } from 'react-router-dom'
+import { Button, Card } from '@fluentui/react-components'
 
-export default function CommandCentre() {
-  const navigate = useNavigate()
+interface CommandCentreProps {
+  onOpenDiscover: () => void
+  onOpenBilling: () => void
+  onOpenMyAgents: () => void
+  onOpenGoals: () => void
+}
+
+export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyAgents, onOpenGoals }: CommandCentreProps) {
 
   const stats = [
     { label: '2 Agents', sublabel: 'Active', value: '🤖' },
@@ -34,11 +39,14 @@ export default function CommandCentre() {
     }
   ]
 
+  const priorities = [
+    'Approve the SDR connection request so outbound work resumes.',
+    'Review today\'s spend trend before the next billing cycle closes.',
+    'Add one more growth goal for your content operator.',
+  ]
+
   return (
     <div className="dashboard-page">
-      <h1>Command Centre</h1>
-
-      {/* Stats Section */}
       <div className="dashboard-stats">
         {stats.map((stat, idx) => (
           <Card key={idx} className="stat-card">
@@ -49,7 +57,51 @@ export default function CommandCentre() {
         ))}
       </div>
 
-      {/* Activity Feed */}
+      <div className="command-centre-grid">
+        <Card className="command-centre-panel">
+          <div className="section-header">
+            <h2>Today&#39;s Flight Plan</h2>
+            <span className="live-indicator">Top 3 priorities</span>
+          </div>
+          <div className="command-centre-checklist">
+            {priorities.map((item) => (
+              <div key={item} className="command-centre-checklist-item">
+                <span>•</span>
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+          <div className="command-centre-actions">
+            <Button appearance="primary" onClick={onOpenMyAgents}>Open My Agents</Button>
+            <Button appearance="secondary" onClick={onOpenBilling}>Review Spend</Button>
+          </div>
+        </Card>
+
+        <Card className="command-centre-panel command-centre-panel--accent">
+          <div className="section-header">
+            <h2>Business Pulse</h2>
+            <span className="live-indicator">Updated 2m ago</span>
+          </div>
+          <div className="command-centre-pulse-grid">
+            <div>
+              <div className="command-centre-pulse-value">98%</div>
+              <div className="command-centre-pulse-label">Goal adherence</div>
+            </div>
+            <div>
+              <div className="command-centre-pulse-value">₹6.4K</div>
+              <div className="command-centre-pulse-label">Spend this week</div>
+            </div>
+            <div>
+              <div className="command-centre-pulse-value">1</div>
+              <div className="command-centre-pulse-label">Blocked workflow</div>
+            </div>
+          </div>
+          <p className="command-centre-pulse-body">
+            Your strongest momentum is in content publishing. Sales outreach is waiting on one approval, so that is the highest leverage unblock.
+          </p>
+        </Card>
+      </div>
+
       <section className="activity-section">
         <div className="section-header">
           <h2>Agent Activity Feed</h2>
@@ -74,21 +126,20 @@ export default function CommandCentre() {
         </div>
       </section>
 
-      {/* Quick Actions */}
       <section className="quick-actions">
         <h2>Quick Actions</h2>
         <div className="action-grid">
-          <Card className="action-card">
+          <Card className="action-card" onClick={onOpenGoals}>
             <h3>🎯 Add New Goal</h3>
             <p>Configure goals for your agents</p>
           </Card>
-          <Card className="action-card" onClick={() => navigate('/discover')}>
+          <Card className="action-card" onClick={onOpenDiscover}>
             <h3>🤖 Hire Another Agent</h3>
-            <p>Browse marketplace</p>
+            <p>Browse the marketplace with outcomes first</p>
           </Card>
-          <Card className="action-card">
-            <h3>📦 View Deliverables</h3>
-            <p>See everything your agents have produced</p>
+          <Card className="action-card" onClick={onOpenBilling}>
+            <h3>💰 Review Spend</h3>
+            <p>Understand billing, receipts, and what changed</p>
           </Card>
         </div>
       </section>

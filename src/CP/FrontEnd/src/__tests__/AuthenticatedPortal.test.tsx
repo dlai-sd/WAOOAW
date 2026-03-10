@@ -31,7 +31,17 @@ vi.mock('../pages/authenticated/ProfileSettings', () => ({
   default: () => <div data-testid="page-profile-settings">Profile & Settings Page</div>,
 }))
 vi.mock('../pages/AgentDiscovery', () => ({
-  default: () => <div data-testid="page-discover">Discover Page</div>,
+  default: ({ onSelectAgent }: { onSelectAgent?: (agentId: string) => void }) => (
+    <div data-testid="page-discover">
+      Discover Page
+      <button onClick={() => onSelectAgent?.('AGT-42')} data-testid="discover-select-agent">
+        Open Agent
+      </button>
+    </div>
+  ),
+}))
+vi.mock('../pages/AgentDetail', () => ({
+  default: ({ agentIdProp }: { agentIdProp?: string }) => <div data-testid="page-agent-detail">Agent Detail {agentIdProp}</div>,
 }))
 
 const navigateMock = vi.fn()
@@ -124,5 +134,25 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     const badge = document.querySelector('.sidebar-badge')
     expect(badge).toBeTruthy()
     expect(badge?.textContent).toBe('1')
+  })
+
+  it('updates hero copy when billing is opened', () => {
+    renderPortal()
+    fireEvent.click(screen.getByText('Subscriptions & Billing'))
+
+    expect(screen.getByRole('heading', { name: 'Understand What You Are Paying For' })).toBeTruthy()
+    expect(screen.getByText('Subscription view')).toBeTruthy()
+    expect(screen.getByTestId('page-billing')).toBeTruthy()
+  })
+
+  it('keeps Discover highlighted while showing agent detail', () => {
+    renderPortal()
+
+    fireEvent.click(screen.getByText('Discover'))
+    fireEvent.click(screen.getByTestId('discover-select-agent'))
+
+    expect(screen.getByTestId('page-agent-detail')).toBeTruthy()
+    expect(screen.getByText('Agent Detail AGT-42')).toBeTruthy()
+    expect(screen.getByTestId('cp-nav-discover').className).toContain('active')
   })
 })

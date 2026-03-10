@@ -41,21 +41,38 @@ export default function ProfileSettings() {
     }
   }
 
+  const openSupport = () => {
+    window.location.href = 'mailto:support@waooaw.com?subject=WAOOAW%20Customer%20Support'
+  }
+
   const sections = [
     {
       title: 'Account',
       icon: '👤',
-      items: ['Edit Profile', 'Business Information', 'Team Members'],
+      items: [
+        { label: 'Edit Profile', action: handleEditClick, status: 'Action available' },
+        { label: 'Business Information', description: 'Managed from your profile and hire setup details', status: 'Read-only context' },
+        { label: 'Team Members', description: 'Reserved for a later multi-user customer workspace flow', status: 'Planned next' },
+      ],
     },
     {
       title: 'Preferences',
       icon: '⚙️',
-      items: ['Notification Settings', 'Agent Preferences', 'Language & Region'],
+      items: [
+        { label: 'Notification Settings', description: 'Customer notification tuning is grouped into the next account-control pass', status: 'Planned next' },
+        { label: 'Agent Preferences', description: 'Current agent behavior is configured inside hire setup and runtime screens', status: 'Available elsewhere' },
+        { label: 'Language & Region', description: 'Regional display controls are not yet exposed in CP', status: 'Planned next' },
+      ],
     },
     {
       title: 'Support',
       icon: '💬',
-      items: ['Help Center', 'Contact Support', 'Privacy Policy', 'Terms of Service'],
+      items: [
+        { label: 'Contact Support', action: openSupport, status: 'Action available' },
+        { label: 'Help Center', description: 'Guided help content will land in the next customer support pass', status: 'Planned next' },
+        { label: 'Privacy Policy', description: 'Legal copy is referenced in auth and will be surfaced as a dedicated CP page later', status: 'Planned next' },
+        { label: 'Terms of Service', description: 'Legal copy is referenced in auth and will be surfaced as a dedicated CP page later', status: 'Planned next' },
+      ],
     },
   ]
 
@@ -66,6 +83,35 @@ export default function ProfileSettings() {
         <p style={{ color: 'var(--colorNeutralForeground2)', marginTop: '4px' }}>
           Manage your business identity, team members, and preferences.
         </p>
+      </div>
+
+      <div className="profile-settings-hero">
+        <Card className="profile-settings-hero-card profile-settings-hero-card--accent">
+          <div className="profile-settings-hero-kicker">Workspace Identity</div>
+          <h2>Keep your account aligned with how WAOOAW works for your business.</h2>
+          <p>
+            Customers should feel that their profile is the operating brief for their agent workforce,
+            not just a settings form hidden after signup.
+          </p>
+        </Card>
+
+        <div className="profile-settings-summary-grid">
+          <Card className="profile-settings-summary-card">
+            <div className="profile-settings-summary-label">Business profile</div>
+            <div className="profile-settings-summary-value">Ready</div>
+            <div className="profile-settings-summary-note">Name, phone, and company details are editable here.</div>
+          </Card>
+          <Card className="profile-settings-summary-card">
+            <div className="profile-settings-summary-label">Preferences</div>
+            <div className="profile-settings-summary-value">In control</div>
+            <div className="profile-settings-summary-note">Notification, language, and operating preferences live in one place.</div>
+          </Card>
+          <Card className="profile-settings-summary-card">
+            <div className="profile-settings-summary-label">Support routes</div>
+            <div className="profile-settings-summary-value">Always visible</div>
+            <div className="profile-settings-summary-note">Help, privacy, and support should never feel hidden during a live issue.</div>
+          </Card>
+        </div>
       </div>
 
       {/* Edit Profile Modal */}
@@ -165,16 +211,22 @@ export default function ProfileSettings() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
         {sections.map((section) => (
-          <Card key={section.title} style={{ padding: '20px' }}>
+          <Card key={section.title} className="profile-settings-section-card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
               <span style={{ fontSize: '24px' }}>{section.icon}</span>
               <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>{section.title}</h2>
             </div>
+            <p style={{ color: 'var(--colorNeutralForeground2)', marginBottom: '14px', fontSize: '13px' }}>
+              {section.title === 'Account' && 'Identity, team readiness, and business context that power your hires.'}
+              {section.title === 'Preferences' && 'Tune how WAOOAW alerts you, how agents behave, and what operational defaults matter.'}
+              {section.title === 'Support' && 'Reach the help, policy, and trust surfaces customers need when something feels unclear.'}
+            </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {section.items.map((item) => (
                 <button
-                  key={item}
-                  onClick={item === 'Edit Profile' ? handleEditClick : undefined}
+                  key={item.label}
+                  onClick={item.action}
+                  disabled={!item.action}
                   style={{
                     textAlign: 'left',
                     padding: '10px 12px',
@@ -182,12 +234,21 @@ export default function ProfileSettings() {
                     borderRadius: '6px',
                     background: 'var(--colorNeutralBackground1)',
                     color: 'var(--colorNeutralForeground1)',
-                    cursor: 'pointer',
+                    cursor: item.action ? 'pointer' : 'default',
                     fontSize: '14px',
                     transition: 'background 0.15s',
+                    opacity: item.action ? 1 : 0.88,
                   }}
                 >
-                  {item}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
+                    <span>{item.label}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--colorNeutralForeground2)' }}>{item.status}</span>
+                  </div>
+                  {item.description && (
+                    <div style={{ marginTop: '4px', fontSize: '12px', color: 'var(--colorNeutralForeground2)' }}>
+                      {item.description}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

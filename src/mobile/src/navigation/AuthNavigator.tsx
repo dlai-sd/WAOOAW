@@ -54,12 +54,13 @@ export const AuthNavigator = () => {
           <SignUpScreen
             {...props}
             onSignInPress={() => props.navigation.navigate('SignIn')}
-            onRegistrationSuccess={(registrationId, otpId, channel, destinationMasked) => {
+            onRegistrationSuccess={(registrationId, otpId, channel, destinationMasked, pendingProfile) => {
               props.navigation.navigate('OTPVerification', {
                 registrationId,
                 otpId,
                 channel: channel as 'email' | 'phone',
                 destinationMasked,
+                pendingProfile,
               });
             }}
           />
@@ -78,6 +79,7 @@ export const AuthNavigator = () => {
             otpId={props.route.params.otpId}
             channel={props.route.params.channel}
             destinationMasked={props.route.params.destinationMasked}
+            pendingProfile={props.route.params.pendingProfile}
             onVerificationSuccess={() => {
               // Auth state will be handled by the service layer
               // Token is saved automatically by RegistrationService.verifyOTP

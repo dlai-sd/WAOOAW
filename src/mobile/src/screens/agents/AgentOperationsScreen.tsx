@@ -193,6 +193,27 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
           fontFamily: typography.fontFamily.body, fontSize: 13, marginTop: 2 }}>
           Agent Operations Hub
         </Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          {[
+            `${pendingApprovals.length} approvals`,
+            'Scheduler controls',
+            'Health + spend view',
+          ].map((pill) => (
+            <View
+              key={pill}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: colors.textSecondary + '25',
+                backgroundColor: colors.card,
+              }}
+            >
+              <Text style={{ color: colors.textPrimary, fontSize: 12 }}>{pill}</Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       {isLoading ? (
@@ -205,6 +226,25 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
           contentContainerStyle={{ padding: spacing.screenPadding?.horizontal ?? 16,
             paddingBottom: 40 }}
         >
+          <View
+            style={{
+              marginBottom: 14,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.textSecondary + '20',
+              backgroundColor: colors.card,
+              padding: 16,
+            }}
+          >
+            <Text style={{ color: colors.neonCyan, fontSize: 12, marginBottom: 6 }}>Next best action</Text>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontFamily: typography.fontFamily.bodyBold, marginBottom: 4 }}>
+              {pendingApprovals.length > 0 ? 'Clear pending approvals to keep work moving.' : 'Your agent is clear to run. Tune goals or schedule next.'}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.body }}>
+              Mobile should help you make the few decisions only you need to make, fast.
+            </Text>
+          </View>
+
           {SECTIONS.map((section) => (
             <View
               key={section.id}

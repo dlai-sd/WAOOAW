@@ -43,6 +43,13 @@ export interface OTPVerificationScreenProps {
    * Masked destination (e.g., "j***n@example.com")
    */
   destinationMasked?: string;
+
+  pendingProfile?: {
+    full_name: string;
+    email: string;
+    phone?: string;
+    business_name?: string;
+  };
   
   /**
    * Callback when verification is successful
@@ -60,6 +67,7 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   otpId: initialOtpId,
   channel,
   destinationMasked,
+  pendingProfile,
   onVerificationSuccess,
   onBack,
 }) => {
@@ -113,7 +121,10 @@ export const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
         const decoded = TokenManagerService.decodeToken(tokenResponse.access_token);
         const authUser = {
           customer_id: decoded.user_id,
-          email: decoded.email,
+          email: pendingProfile?.email || decoded.email,
+          full_name: pendingProfile?.full_name,
+          phone: pendingProfile?.phone,
+          business_name: pendingProfile?.business_name,
         };
         // Update Zustand store — triggers RootNavigator to show MainNavigator
         login(authUser);

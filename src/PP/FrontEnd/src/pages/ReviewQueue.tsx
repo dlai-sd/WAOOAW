@@ -30,6 +30,7 @@ export default function ReviewQueue() {
   const [customerId, setCustomerId] = useState('')
   const [agentId, setAgentId] = useState('')
   const [batches, setBatches] = useState<DraftBatch[]>([])
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [scheduledAtByPostId, setScheduledAtByPostId] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -40,6 +41,7 @@ export default function ReviewQueue() {
     try {
       const data = await gatewayApiClient.listMarketingDraftBatches({ customer_id: customerId, agent_id: agentId, limit: 20 })
       setBatches((data || []) as DraftBatch[])
+      setHasLoaded(true)
     } catch (e: any) {
       setError(e)
     } finally {
@@ -101,11 +103,30 @@ export default function ReviewQueue() {
         <Body1>Ops-assisted approvals for marketing draft batches</Body1>
       </div>
 
+      <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+          <div className="pp-dashboard-kicker">Approval desk</div>
+          <Text as="h2" size={700} weight="semibold">Help contributors move customer work, not just read draft rows.</Text>
+          <p className="pp-dashboard-body-copy">
+            The queue should make obvious what needs review, what is already approved, and what is still blocking publish or schedule.
+          </p>
+        </Card>
+        <Card className="pp-dashboard-panel">
+          <Text as="h3" size={600} weight="semibold">Best operator habit</Text>
+          <p className="pp-dashboard-body-copy">
+            Filter quickly, approve only what is safe, and leave the customer with a cleaner next state than when the ticket arrived.
+          </p>
+        </Card>
+      </div>
+
       {!!error && <ApiErrorPanel title="Review Queue error" error={error} />}
 
       <Card>
         <CardHeader header={<Text weight="semibold">Draft batches</Text>} />
         <div style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+          <Text size={200} style={{ width: '100%', opacity: 0.8 }}>
+            Narrow the queue by customer or agent so approvals feel operationally precise instead of noisy.
+          </Text>
           <Field label="Customer ID">
             <Input value={customerId} onChange={(_, data) => setCustomerId(data.value)} />
           </Field>
@@ -115,6 +136,15 @@ export default function ReviewQueue() {
           <Button appearance="primary" onClick={handleLoad} disabled={isBusy}>Load</Button>
         </div>
       </Card>
+
+      {hasLoaded && !isBusy && !error && batches.length === 0 && (
+        <Card style={{ marginTop: 16, padding: 20 }}>
+          <Text weight="semibold">No draft batches found</Text>
+          <Text size={300} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+            No matching customer or agent drafts are waiting right now. Adjust the filters or try again when a batch enters review.
+          </Text>
+        </Card>
+      )}
 
       {batches.map(batch => (
         <Card key={batch.batch_id} style={{ marginTop: 16 }}>

@@ -120,6 +120,18 @@ export const AgentDetailScreen = () => {
   const { agentId } = route.params;
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
 
+  const navigateToMainTab = React.useCallback(
+    (
+      tabName: 'HomeTab' | 'DiscoverTab' | 'MyAgentsTab' | 'ProfileTab',
+      screen: 'Home' | 'Discover' | 'HireWizard' | 'MyAgents' | 'Profile',
+      params?: Record<string, unknown>
+    ) => {
+      const parentNavigation = navigation.getParent() as any;
+      parentNavigation?.navigate(tabName, { screen, params });
+    },
+    [navigation]
+  );
+
   // Performance monitoring
   usePerformanceMonitoring('AgentDetail');
 
@@ -137,24 +149,23 @@ export const AgentDetailScreen = () => {
 
   // Handle start trial
   const handleStartTrial = React.useCallback(() => {
-    // Navigate to Hire Wizard (Story 2.6)
-    (navigation as any).navigate('HireWizard', { agentId: agent?.id });
-  }, [navigation, agent?.id]);
+    navigateToMainTab('DiscoverTab', 'HireWizard', { agentId: agent?.id ?? agentId });
+  }, [navigateToMainTab, agent?.id, agentId]);
 
   // Voice command handlers
   const handleVoiceNavigate = React.useCallback(
     (screen: string) => {
       if (screen === 'Home') {
-        navigation.navigate('Home' as never);
+        navigateToMainTab('HomeTab', 'Home');
       } else if (screen === 'Discover') {
-        navigation.goBack();
+        navigateToMainTab('DiscoverTab', 'Discover');
       } else if (screen === 'MyAgents') {
-        navigation.navigate('MyAgents' as never);
+        navigateToMainTab('MyAgentsTab', 'MyAgents');
       } else if (screen === 'Profile') {
-        navigation.navigate('Profile' as never);
+        navigateToMainTab('ProfileTab', 'Profile');
       }
     },
-    [navigation]
+    [navigateToMainTab]
   );
 
   const handleVoiceAction = React.useCallback(

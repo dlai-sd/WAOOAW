@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   Card,
   CardHeader,
@@ -42,6 +42,7 @@ export default function PolicyDenials() {
   const [limit, setLimit] = useState('100')
 
   const [selected, setSelected] = useState<PolicyDenialRecord | null>(null)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -57,6 +58,7 @@ export default function PolicyDenials() {
         agent_id: agentId.trim() || undefined,
         limit: Number(limit) || 100
       })) as PolicyDenialsResponse
+      setHasLoaded(true)
       setData(response)
       setSelected(null)
     } catch (e: any) {
@@ -64,6 +66,7 @@ export default function PolicyDenials() {
       setError(e)
       setData(null)
       setSelected(null)
+      setHasLoaded(true)
     } finally {
       setIsLoading(false)
     }
@@ -78,17 +81,27 @@ export default function PolicyDenials() {
     return 'Review details + correlation_id, then retry with corrected inputs/policy.'
   }
 
-  useEffect(() => {
-    const abortController = new AbortController()
-    void load(abortController.signal)
-    return () => abortController.abort()
-  }, [load])
-
   return (
     <div className="page-container">
       <div className="page-header">
         <Text as="h1" size={900} weight="semibold">Policy Denials</Text>
         <Body1>Audit log of Plant policy enforcement denials</Body1>
+      </div>
+
+      <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+          <div className="pp-dashboard-kicker">Governance signal</div>
+          <Text as="h2" size={700} weight="semibold">Explain why the platform said no.</Text>
+          <p className="pp-dashboard-body-copy">
+            Policy denials should help ops, infra, and governance contributors diagnose intent, policy, and input mistakes fast enough to unblock the right action.
+          </p>
+        </Card>
+        <Card className="pp-dashboard-panel">
+          <Text as="h3" size={600} weight="semibold">Useful denial UX</Text>
+          <p className="pp-dashboard-body-copy">
+            Show the denial, the likely fix, and the correlation path clearly enough that a helpdesk person can route or explain it without escalation roulette.
+          </p>
+        </Card>
       </div>
 
       <Card>
@@ -97,12 +110,15 @@ export default function PolicyDenials() {
           description={<Text size={200}>{isLoading ? 'Loading…' : data ? `${data.count} records` : '—'}</Text>}
           action={
             <Button appearance="subtle" size="small" onClick={() => void load()} disabled={isLoading}>
-              Refresh
+              {hasLoaded ? 'Refresh' : 'Load denials'}
             </Button>
           }
         />
 
         <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+          <Text size={200} style={{ gridColumn: '1 / -1', opacity: 0.8 }}>
+            Search by correlation, customer, or agent to reconstruct the denial storyline before recommending a retry.
+          </Text>
           <div>
             <Text size={200} style={{ display: 'block', marginBottom: 6, opacity: 0.85 }}>Correlation ID</Text>
             <Input value={correlationId} onChange={(_, d) => setCorrelationId(d.value)} placeholder="corr-..." />
@@ -122,6 +138,17 @@ export default function PolicyDenials() {
         </div>
 
         {error && <div style={{ padding: 16 }}><ApiErrorPanel title="Policy denials error" error={error} /></div>}
+
+        {!error && !isLoading && !hasLoaded && (
+          <div style={{ padding: 16 }}>
+            <Card className="pp-agent-setup-card">
+              <Text weight="semibold">Run a targeted denial search</Text>
+              <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+                Start with a correlation id, customer, or agent when possible so the first result set is operationally useful instead of noisy.
+              </Text>
+            </Card>
+          </div>
+        )}
 
         {!error && isLoading && (
           <div style={{ padding: 16 }}>
@@ -156,7 +183,7 @@ export default function PolicyDenials() {
               </TableRow>
             ))}
 
-            {!isLoading && !error && (data?.records || []).length === 0 && (
+            {!isLoading && !error && hasLoaded && (data?.records || []).length === 0 && (
               <TableRow>
                 <TableCell colSpan={6}>
                   <Text>No policy denials returned.</Text>
