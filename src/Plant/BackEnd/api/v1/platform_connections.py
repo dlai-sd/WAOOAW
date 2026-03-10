@@ -26,7 +26,7 @@ from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 from models.platform_connection import PlatformConnectionModel
 
-router = waooaw_router(prefix="/v1/hired-agents", tags=["platform-connections"])
+router = waooaw_router(prefix="/hired-agents", tags=["platform-connections"])
 
 logger = logging.getLogger(__name__)
 logger.addFilter(PiiMaskingFilter())

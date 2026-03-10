@@ -24,7 +24,7 @@ from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 from models.performance_stat import PerformanceStatModel
 
-router = waooaw_router(prefix="/v1/hired-agents", tags=["performance-stats"])
+router = waooaw_router(prefix="/hired-agents", tags=["performance-stats"])
 
 logger = logging.getLogger(__name__)
 logger.addFilter(PiiMaskingFilter())

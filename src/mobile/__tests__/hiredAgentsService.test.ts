@@ -6,10 +6,14 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { hiredAgentsService } from '../src/services/hiredAgents/hiredAgents.service';
 import apiClient from '../src/lib/apiClient';
+import cpApiClient from '../src/lib/cpApiClient';
 
 // @ts-ignore
 apiClient.get = jest.fn();
+// @ts-ignore
+cpApiClient.get = jest.fn();
 import type {
+  Deliverable,
   MyAgentInstanceSummary,
   HiredAgentInstance,
   TrialStatusRecord,
@@ -19,10 +23,13 @@ import type {
 
 // Mock apiClient
 jest.mock('../src/lib/apiClient');
+jest.mock('../src/lib/cpApiClient');
 
 describe('HiredAgentsService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (apiClient.get as any).mockReset();
+    (cpApiClient.get as any).mockReset();
   });
 
   describe('listMyAgents', () => {
@@ -51,11 +58,11 @@ describe('HiredAgentsService', () => {
         instances: mockSummary,
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockResponse });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockResponse });
 
       const result = await hiredAgentsService.listMyAgents();
 
-      expect(apiClient.get).toHaveBeenCalledWith('/cp/my-agents/summary');
+      expect(cpApiClient.get).toHaveBeenCalledWith('/cp/my-agents/summary');
       expect(result).toEqual(mockSummary);
     });
 
@@ -64,7 +71,7 @@ describe('HiredAgentsService', () => {
         instances: undefined as any,
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockResponse });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockResponse });
 
       const result = await hiredAgentsService.listMyAgents();
 
@@ -94,11 +101,11 @@ describe('HiredAgentsService', () => {
         updated_at: '2024-01-01T00:00:00Z',
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockHiredAgent });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockHiredAgent });
 
       const result = await hiredAgentsService.getHiredAgentBySubscription('SUB-123');
 
-      expect(apiClient.get).toHaveBeenCalledWith('/cp/hired-agents/by-subscription/SUB-123');
+      expect(cpApiClient.get).toHaveBeenCalledWith('/cp/hired-agents/by-subscription/SUB-123');
       expect(result).toEqual(mockHiredAgent);
     });
 
@@ -111,12 +118,51 @@ describe('HiredAgentsService', () => {
         updated_at: '2024-01-01T00:00:00Z',
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockHiredAgent });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockHiredAgent });
 
       await hiredAgentsService.getHiredAgentBySubscription('SUB/123');
 
       // Should encode the slash
-      expect(apiClient.get).toHaveBeenCalledWith('/cp/hired-agents/by-subscription/SUB%2F123');
+      expect(cpApiClient.get).toHaveBeenCalledWith('/cp/hired-agents/by-subscription/SUB%2F123');
+    });
+
+    it('should fetch hired agent by hired instance ID', async () => {
+      const mockHiredAgent: HiredAgentInstance = {
+        hired_instance_id: 'HIRE-123',
+        subscription_id: 'SUB-123',
+        agent_id: 'AGT-MKT-001',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+      };
+
+      (apiClient.get as any).mockResolvedValue({ data: mockHiredAgent });
+
+      const result = await hiredAgentsService.getHiredAgentById('HIRE-123');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/hired-agents/by-id/HIRE-123');
+      expect(result).toEqual(mockHiredAgent);
+    });
+
+    it('should fetch deliverables by hired instance ID from CP', async () => {
+      const mockDeliverables: Deliverable[] = [
+        {
+          deliverable_id: 'del-1',
+          hired_instance_id: 'HIRE-123',
+          agent_id: 'AGT-MKT-001',
+          title: 'Draft 1',
+          type: 'document',
+          review_status: 'pending_review',
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+        },
+      ];
+
+      (cpApiClient.get as any).mockResolvedValue({ data: { deliverables: mockDeliverables } });
+
+      const result = await hiredAgentsService.getDeliverablesByHiredAgent('HIRE-123');
+
+      expect(cpApiClient.get).toHaveBeenCalledWith('/cp/hired-agents/HIRE-123/deliverables');
+      expect(result).toEqual(mockDeliverables);
     });
   });
 
@@ -225,7 +271,7 @@ describe('HiredAgentsService', () => {
         instances: mockSummary,
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockResponse });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockResponse });
 
       const result = await hiredAgentsService.listActiveHiredAgents();
 
@@ -274,7 +320,7 @@ describe('HiredAgentsService', () => {
         instances: mockSummary,
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockResponse });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockResponse });
 
       const result = await hiredAgentsService.listAgentsInTrial();
 
@@ -315,7 +361,7 @@ describe('HiredAgentsService', () => {
         instances: mockSummary,
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockResponse });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockResponse });
 
       const result = await hiredAgentsService.listAgentsNeedingSetup();
 
@@ -342,7 +388,7 @@ describe('HiredAgentsService', () => {
         instances: mockSummary,
       };
 
-      (apiClient.get as any).mockResolvedValue({ data: mockResponse });
+      (cpApiClient.get as any).mockResolvedValue({ data: mockResponse });
 
       const result = await hiredAgentsService.listAgentsNeedingSetup();
 

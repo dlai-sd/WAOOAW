@@ -69,6 +69,28 @@ class UserStore:
         if alias_id and alias_id not in self._users:
             self._users[alias_id] = user
 
+    def normalize_user_id(self, user: User, canonical_id: str) -> User:
+        """Make *canonical_id* the user's actual id while preserving old lookups."""
+        if not canonical_id or user.id == canonical_id:
+            self.alias_user_id(user, canonical_id)
+            return user
+
+        updated = user.model_copy(update={"id": canonical_id})
+
+        for lookup_id, existing in list(self._users.items()):
+            if existing is user:
+                self._users[lookup_id] = updated
+
+        self._users[canonical_id] = updated
+
+        email_key = (updated.email or "").strip()
+        if email_key:
+            self._email_index[email_key] = canonical_id
+
+        provider_key = f"{updated.provider}:{updated.provider_id}"
+        self._provider_index[provider_key] = canonical_id
+        return updated
+
     def update_last_login(self, user_id: str):
         """Update user's last login timestamp"""
         user = self._users.get(user_id)

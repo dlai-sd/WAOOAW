@@ -114,3 +114,82 @@ def test_deliverables_generated_reviewed_and_executed(test_client, monkeypatch):
     assert executed.status_code == 200
     assert executed.json()["execution_status"] == "executed"
     assert executed.json()["executed_at"] is not None
+
+
+@pytest.mark.unit
+def test_list_deliverables_supports_status_filter(test_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+
+    customer_id = "cust-filter-1"
+    checkout = test_client.post(
+        "/api/v1/payments/coupon/checkout",
+        json={
+            "coupon_code": "WAOOAW100",
+            "agent_id": "AGT-TRD-DELTA-001",
+            "duration": "monthly",
+            "customer_id": customer_id,
+        },
+    )
+    subscription_id = checkout.json()["subscription_id"]
+
+    draft = test_client.put(
+        "/api/v1/hired-agents/draft",
+        json={
+            "subscription_id": subscription_id,
+            "agent_id": "AGT-TRD-DELTA-001",
+            "agent_type_id": "trading.share_trader.v1",
+            "customer_id": customer_id,
+            "nickname": "Trader",
+            "theme": "dark",
+            "config": {
+                "timezone": "Asia/Kolkata",
+                "exchange_provider": "delta_exchange_india",
+                "exchange_credential_ref": "EXCH-test",
+                "allowed_coins": ["BTC"],
+                "default_coin": "BTC",
+                "interval_seconds": 60,
+                "risk_limits": {"max_units_per_order": 2},
+            },
+        },
+    )
+    hired_instance_id = draft.json()["hired_instance_id"]
+
+    goal = test_client.put(
+        f"/api/v1/hired-agents/{hired_instance_id}/goals",
+        json={
+            "customer_id": customer_id,
+            "goal_template_id": "trading.trade_intent_draft.v1",
+            "frequency": "on_demand",
+            "settings": {"coin": "BTC", "side": "buy", "units": 1},
+        },
+    )
+    assert goal.status_code == 200
+
+    listed = test_client.get(
+        f"/api/v1/hired-agents/{hired_instance_id}/deliverables",
+        params={"customer_id": customer_id},
+    )
+    deliverable_id = listed.json()["deliverables"][0]["deliverable_id"]
+
+    reviewed = test_client.post(
+        f"/api/v1/deliverables/{deliverable_id}/review",
+        json={"customer_id": customer_id, "decision": "approved", "notes": "ok"},
+    )
+    assert reviewed.status_code == 200
+
+    approved_only = test_client.get(
+        f"/api/v1/hired-agents/{hired_instance_id}/deliverables",
+        params={"customer_id": customer_id, "status": "approved"},
+    )
+    assert approved_only.status_code == 200
+    approved_items = approved_only.json()["deliverables"]
+    assert len(approved_items) == 1
+    assert approved_items[0]["review_status"] == "approved"
+
+    pending_only = test_client.get(
+        f"/api/v1/hired-agents/{hired_instance_id}/deliverables",
+        params={"customer_id": customer_id, "status": "pending_review"},
+    )
+    assert pending_only.status_code == 200
+    assert pending_only.json()["deliverables"] == []

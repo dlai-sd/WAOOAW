@@ -34,7 +34,7 @@ def test_import_performance_stats_router():
 
 def test_router_prefix():
     from api.v1.performance_stats import router
-    assert router.prefix == "/v1/hired-agents"
+    assert router.prefix == "/hired-agents"
 
 
 def test_router_tags():

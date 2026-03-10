@@ -463,6 +463,7 @@ async def list_deliverables(
     hired_instance_id: str,
     customer_id: str | None = None,
     as_of: datetime | None = None,
+    status: DeliverableReviewStatus | None = None,
 ) -> DeliverablesListResponse:
     record = hired_agents_simple._by_id.get(hired_instance_id)
     if not record:
@@ -478,6 +479,7 @@ async def list_deliverables(
         DeliverableResponse(**d.model_dump())
         for d in instance_map.values()
         if d.hired_instance_id == hired_instance_id
+        and (status is None or d.review_status == status)
     ]
     deliverables.sort(key=lambda d: (d.created_at, d.deliverable_id))
     return DeliverablesListResponse(hired_instance_id=hired_instance_id, deliverables=deliverables)
