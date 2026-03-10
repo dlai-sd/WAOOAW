@@ -60,7 +60,7 @@ export const RootNavigator = () => {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} testID={isAuthenticated ? 'mobile-main-root' : 'mobile-auth-root'}>
       <NavigationContainer
         linking={linking}
         theme={{

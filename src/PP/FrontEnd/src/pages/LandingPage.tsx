@@ -3,7 +3,7 @@ import { Bot24Regular, ShieldTask24Regular, Certificate24Regular } from '@fluent
 
 export default function LandingPage() {
   return (
-    <div className="landing-page">
+    <div className="landing-page" data-testid="pp-landing-page">
       <div className="landing-hero">
         <div className="hero-content">
           <Text as="h1" size={1000} weight="bold" className="hero-title">

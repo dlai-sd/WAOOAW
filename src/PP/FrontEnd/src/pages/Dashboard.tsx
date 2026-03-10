@@ -16,7 +16,7 @@ export const Dashboard: React.FC = () => {
   }, [])
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 24 }} data-testid="pp-dashboard-page">
       <Text as="h1" size={900} weight="semibold" style={{ marginBottom: 24 }}>
         Dashboard
       </Text>

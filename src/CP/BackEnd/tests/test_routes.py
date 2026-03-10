@@ -47,6 +47,65 @@ def test_refresh_restore_normalizes_user_id(client: TestClient):
     assert me_response.json()["id"] == "canonical-user-id"
 
 
+def test_e2e_session_disabled_by_default(client: TestClient, monkeypatch):
+    """E2E bootstrap route must stay dark unless explicitly enabled."""
+    monkeypatch.setattr("api.auth.routes.settings.ENABLE_E2E_HOOKS", False, raising=False)
+
+    response = client.post(
+        "/api/auth/e2e/session",
+        headers={"X-E2E-Secret": "wrong"},
+        json={"email": "e2e.cp@waooaw.com"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_e2e_session_requires_shared_secret(client: TestClient, monkeypatch):
+    """E2E bootstrap route should reject requests without the configured secret."""
+    monkeypatch.setattr("api.auth.routes.settings.ENABLE_E2E_HOOKS", True, raising=False)
+    monkeypatch.setattr("api.auth.routes.settings.E2E_SHARED_SECRET", "cp-e2e-secret", raising=False)
+
+    response = client.post(
+        "/api/auth/e2e/session",
+        headers={"X-E2E-Secret": "wrong"},
+        json={"email": "e2e.cp@waooaw.com"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_e2e_session_mints_refreshable_session(client: TestClient, monkeypatch):
+    """E2E bootstrap must produce a deterministic user id and a working refresh flow."""
+    monkeypatch.setattr("api.auth.routes.settings.ENABLE_E2E_HOOKS", True, raising=False)
+    monkeypatch.setattr("api.auth.routes.settings.E2E_SHARED_SECRET", "cp-e2e-secret", raising=False)
+
+    response = client.post(
+        "/api/auth/e2e/session",
+        headers={"X-E2E-Secret": "cp-e2e-secret"},
+        json={
+            "email": "smoke@waooaw.com",
+            "name": "Smoke User",
+            "user_id": "cp-e2e-user",
+        },
+    )
+
+    assert response.status_code == 200
+    tokens = response.json()
+
+    me_response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert me_response.status_code == 200
+    assert me_response.json()["id"] == "cp-e2e-user"
+
+    refresh_response = client.post(
+        "/api/auth/refresh",
+        headers={"Authorization": f"Bearer {tokens['refresh_token']}"},
+    )
+    assert refresh_response.status_code == 200
+
+
 @patch("api.auth.routes._lookup_plant_customer_id")
 @patch("api.auth.routes.verify_google_token")
 def test_google_verify_normalizes_user_id_to_plant_uuid(mock_verify, mock_lookup_plant_customer_id, client: TestClient):

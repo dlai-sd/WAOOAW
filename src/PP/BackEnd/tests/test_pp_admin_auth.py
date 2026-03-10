@@ -111,6 +111,58 @@ async def test_dev_token_disabled_in_prod(client, monkeypatch):
 
 
 @pytest.mark.auth
+async def test_e2e_admin_token_disabled_by_default(client, monkeypatch):
+    monkeypatch.setattr(settings, "ENABLE_E2E_HOOKS", False, raising=False)
+    resp = await client.post(
+        "/api/auth/e2e/admin-token",
+        headers={"X-E2E-Secret": "wrong"},
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.auth
+async def test_e2e_admin_token_requires_secret(client, monkeypatch):
+    monkeypatch.setattr(settings, "ENABLE_E2E_HOOKS", True, raising=False)
+    monkeypatch.setattr(settings, "E2E_SHARED_SECRET", "pp-e2e-secret", raising=False)
+    resp = await client.post(
+        "/api/auth/e2e/admin-token",
+        headers={"X-E2E-Secret": "wrong"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.auth
+async def test_e2e_admin_token_mints_admin_jwt(client, monkeypatch):
+    monkeypatch.setattr(settings, "ENABLE_E2E_HOOKS", True, raising=False)
+    monkeypatch.setattr(settings, "E2E_SHARED_SECRET", "pp-e2e-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_ALGORITHM", "HS256", raising=False)
+    monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
+
+    resp = await client.post(
+        "/api/auth/e2e/admin-token",
+        headers={"X-E2E-Secret": "pp-e2e-secret"},
+        json={
+            "email": "smoke-admin@waooaw.com",
+            "user_id": "pp-e2e-admin",
+            "roles": ["admin"],
+        },
+    )
+    assert resp.status_code == 200
+
+    body = resp.json()
+    claims = jwt.decode(
+        body["access_token"],
+        "test-secret",
+        algorithms=["HS256"],
+        issuer="waooaw.com",
+        options={"require": ["exp", "iat", "iss", "sub"]},
+    )
+    assert claims["sub"] == "pp-e2e-admin"
+    assert "admin" in (claims.get("roles") or [])
+
+
+@pytest.mark.auth
 async def test_db_updates_token_disabled_when_feature_off(client, monkeypatch):
     monkeypatch.setattr(settings, "ENVIRONMENT", "development", raising=False)
     monkeypatch.setattr(settings, "ENABLE_DB_UPDATES", False, raising=False)

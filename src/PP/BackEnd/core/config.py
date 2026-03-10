@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     ENABLE_AGENT_SEEDING: bool = False
     ENABLE_DB_UPDATES: bool = False
     ENABLE_DEV_TOKEN: bool = False         # Enable /auth/dev-token (development only)
+    ENABLE_E2E_HOOKS: bool = False         # Enable secret-guarded /auth/e2e/* hooks
+    E2E_SHARED_SECRET: str = ""           # Runtime-injected shared secret for E2E hooks
     ENABLE_METERING_DEBUG: bool = False    # Enable /metering/debug endpoints (development only)
     DEBUG_VERBOSE: bool = False            # Enable verbose debug logging (development only)
 

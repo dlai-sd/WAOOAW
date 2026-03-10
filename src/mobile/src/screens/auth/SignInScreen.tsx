@@ -176,6 +176,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.black }]}
       edges={["top", "bottom", "left", "right"]}
+      testID="mobile-signin-screen"
     >
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
@@ -237,6 +238,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                 onPress={handleGoogleSignIn}
                 loading={isLoading}
                 disabled={isLoading}
+                testID="mobile-google-signin-button"
               />
 
               {/* Apple Sign-In (iOS only) */}
@@ -282,6 +284,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                     }
                   }}
                   disabled={isLoading}
+                  testID="mobile-demo-signin-button"
                 >
                   <Text
                     style={[
@@ -339,6 +342,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                 accessibilityLabel="Sign up"
                 accessibilityRole="button"
                 accessibilityState={{ disabled: isLoading }}
+                testID="mobile-signup-link"
               >
                 <Text
                   style={[

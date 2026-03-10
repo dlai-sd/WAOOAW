@@ -44,7 +44,7 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
   return (
     <>
       <Header theme={theme} toggleTheme={toggleTheme} />
-      <main className="auth-page">
+      <main className="auth-page" data-testid="cp-signin-page">
         <div className="auth-center">
           <div className="auth-unified-card">
 
@@ -54,6 +54,7 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
               <Button
                 appearance="subtle"
                 aria-label="Close"
+                data-testid="cp-signin-close"
                 icon={<Dismiss24Regular />}
                 onClick={() => navigate('/', { replace: true })}
               />

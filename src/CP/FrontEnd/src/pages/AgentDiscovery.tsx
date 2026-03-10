@@ -85,7 +85,7 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
   const filteredAgents = agents
 
   return (
-    <div className="discover-page">
+    <div className="discover-page" data-testid="cp-discover-page">
       {/* Header */}
       <div className="discover-header">
         <h1 className="discover-title">
@@ -105,6 +105,7 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
             </label>
             <Input
               placeholder="Search by name or description..."
+              data-testid="cp-discover-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -119,6 +120,7 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
             </label>
             <Select
               value={industryFilter}
+              data-testid="cp-discover-industry-filter"
               onChange={(e, data) => setIndustryFilter(data.value as Industry | '')}
               className="discover-control"
             >
@@ -138,6 +140,7 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
             </label>
             <Select
               value={statusFilter}
+              data-testid="cp-discover-status-filter"
               onChange={(e, data) => setStatusFilter(data.value as AgentStatus | '')}
               className="discover-control"
             >
@@ -152,6 +155,7 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
             icon={<Search20Regular />}
             onClick={handleSearch}
             className="discover-action"
+            data-testid="cp-discover-search-button"
           >
             Search
           </Button>
