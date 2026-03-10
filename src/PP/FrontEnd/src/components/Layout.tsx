@@ -40,7 +40,7 @@ const navItems: NavItem[] = [
   { path: '/agents', label: 'Agent Management', icon: <Bot24Regular /> },
   { path: '/agent-setup', label: 'Agent Setup', icon: <Bot24Regular /> },
   { path: '/agent-type-setup', label: 'Agent Type Setup', icon: <Certificate24Regular /> },
-  { path: '/governor', label: 'Reference Agents', icon: <Beaker24Regular /> },
+  { path: '/governor', label: 'Governor Console', icon: <Beaker24Regular /> },
   { path: '/genesis', label: 'Genesis', icon: <Certificate24Regular /> },
   { type: 'section', label: 'Compliance' },
   { path: '/approvals-queue', label: 'Approvals Queue', icon: <DocumentCheckmark24Regular /> },

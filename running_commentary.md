@@ -38,7 +38,7 @@ The work should continue in small chunks, each ending in a checkpoint commit and
 | Chunk | Goal | Status | Notes |
 |---|---|---|---|
 | 1 | Structured QA pass on CP user journeys | complete | chunks 1A and 1B validated and checkpointed |
-| 2 | Structured QA pass on PP contributor journeys | planned | landing, dashboard, agent setup, hired agents ops, review queue, policy denials, audit |
+| 2 | Structured QA pass on PP contributor journeys | in progress | first validated PP slice complete |
 | 3 | Structured QA pass on mobile journeys | planned | sign in, sign up, today, ops, profile, approvals |
 | 4 | Fix defects from QA pass | planned | focus on layout, interaction, empty/loading/error states |
 | 5 | Add targeted frontend test coverage for new flows | planned | CP shell navigation, PP shell/navigation, mobile home/ops/profile |
@@ -78,6 +78,22 @@ Files in Chunk 1B:
 - `src/CP/FrontEnd/src/pages/authenticated/UsageBilling.tsx`
 - `src/CP/FrontEnd/src/pages/authenticated/ProfileSettings.tsx`
 - `src/CP/FrontEnd/src/styles/globals.css`
+
+### Chunk 2A — PP QA sub-checkpoint
+
+Validated and ready on branch before moving deeper into PP ops and governance pages.
+
+| Area | Result |
+|---|---|
+| Sidebar navigation accuracy | fixed misleading `/governor` label so contributors now see `Governor Console` instead of the wrong `Reference Agents` wording |
+| Agent setup reset behavior | fixed reset flow so it clears stale validation and success state instead of leaving misleading saved UI on screen |
+| Review queue empty state | fixed blank-result behavior by showing a clear no-batches-found state after load |
+| PP validation | `npm run build` + `npx vitest run` exited `0` after these fixes |
+
+Files in Chunk 2A:
+- `src/PP/FrontEnd/src/components/Layout.tsx`
+- `src/PP/FrontEnd/src/pages/AgentTypeSetupScreen.tsx`
+- `src/PP/FrontEnd/src/pages/ReviewQueue.tsx`
 
 ---
 

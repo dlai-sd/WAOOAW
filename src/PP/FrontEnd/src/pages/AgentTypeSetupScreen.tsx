@@ -86,6 +86,12 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
+  function handleReset() {
+    setForm({ ...DEFAULT_FORM, hooks: { ...DEFAULT_HOOKS } })
+    setValidationErrors({})
+    setSubmitted(false)
+  }
+
   async function handleSubmit() {
     const errors = validate(form)
     setValidationErrors(errors)
@@ -402,7 +408,7 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
         >
           {isSubmitting ? 'Saving…' : agentSetupId ? 'Update' : 'Create'}
         </Button>
-        <Button appearance="secondary" onClick={() => setForm({ ...DEFAULT_FORM, hooks: { ...DEFAULT_HOOKS } })}>
+        <Button appearance="secondary" onClick={handleReset}>
           Reset
         </Button>
       </div>

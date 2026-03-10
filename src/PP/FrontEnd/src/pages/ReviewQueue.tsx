@@ -30,6 +30,7 @@ export default function ReviewQueue() {
   const [customerId, setCustomerId] = useState('')
   const [agentId, setAgentId] = useState('')
   const [batches, setBatches] = useState<DraftBatch[]>([])
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [scheduledAtByPostId, setScheduledAtByPostId] = useState<Record<string, string>>({})
   const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
@@ -40,6 +41,7 @@ export default function ReviewQueue() {
     try {
       const data = await gatewayApiClient.listMarketingDraftBatches({ customer_id: customerId, agent_id: agentId, limit: 20 })
       setBatches((data || []) as DraftBatch[])
+      setHasLoaded(true)
     } catch (e: any) {
       setError(e)
     } finally {
@@ -134,6 +136,15 @@ export default function ReviewQueue() {
           <Button appearance="primary" onClick={handleLoad} disabled={isBusy}>Load</Button>
         </div>
       </Card>
+
+      {hasLoaded && !isBusy && !error && batches.length === 0 && (
+        <Card style={{ marginTop: 16, padding: 20 }}>
+          <Text weight="semibold">No draft batches found</Text>
+          <Text size={300} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+            No matching customer or agent drafts are waiting right now. Adjust the filters or try again when a batch enters review.
+          </Text>
+        </Card>
+      )}
 
       {batches.map(batch => (
         <Card key={batch.batch_id} style={{ marginTop: 16 }}>
