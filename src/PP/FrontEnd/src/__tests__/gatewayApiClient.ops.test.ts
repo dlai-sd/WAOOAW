@@ -43,6 +43,16 @@ test('gatewayApiClient has listOpsHiredAgentDeliverables method', async () => {
   expect(typeof gatewayApiClient.listOpsHiredAgentDeliverables).toBe('function')
 })
 
+test('gatewayApiClient has listOpsHiredAgentSkills method', async () => {
+  const { gatewayApiClient } = await import('../services/gatewayApiClient')
+  expect(typeof gatewayApiClient.listOpsHiredAgentSkills).toBe('function')
+})
+
+test('gatewayApiClient has listOpsPlatformConnections method', async () => {
+  const { gatewayApiClient } = await import('../services/gatewayApiClient')
+  expect(typeof gatewayApiClient.listOpsPlatformConnections).toBe('function')
+})
+
 test('listOpsSubscriptions builds URL with /pp/ops/subscriptions and customer_id param', async () => {
   const { gatewayApiClient } = await import('../services/gatewayApiClient')
   fetchMock.mockResolvedValueOnce(
@@ -85,4 +95,32 @@ test('listOpsHiredAgentDeliverables builds URL with /pp/ops/hired-agents/{id}/de
   expect(fetchMock).toHaveBeenCalledTimes(1)
   const calledUrl: string = fetchMock.mock.calls[0][0] as string
   expect(calledUrl).toContain('/pp/ops/hired-agents/inst-1/deliverables')
+})
+
+test('listOpsHiredAgentSkills builds URL with /pp/ops/hired-agents/{id}/skills', async () => {
+  const { gatewayApiClient } = await import('../services/gatewayApiClient')
+  fetchMock.mockResolvedValueOnce(
+    new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  )
+  await gatewayApiClient.listOpsHiredAgentSkills('inst-1')
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const calledUrl: string = fetchMock.mock.calls[0][0] as string
+  expect(calledUrl).toContain('/pp/ops/hired-agents/inst-1/skills')
+})
+
+test('listOpsPlatformConnections builds URL with /pp/ops/hired-agents/{id}/platform-connections', async () => {
+  const { gatewayApiClient } = await import('../services/gatewayApiClient')
+  fetchMock.mockResolvedValueOnce(
+    new Response(JSON.stringify([]), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
+  )
+  await gatewayApiClient.listOpsPlatformConnections('inst-1')
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const calledUrl: string = fetchMock.mock.calls[0][0] as string
+  expect(calledUrl).toContain('/pp/ops/hired-agents/inst-1/platform-connections')
 })

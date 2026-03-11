@@ -276,7 +276,7 @@ router = waooaw_router(prefix="/reference-agents", tags=["reference-agents"])
 **Validation**
 
 ```bash
-cd src/Plant/BackEnd && pytest tests -k "reference_agents or content_models" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm plant-backend-test --no-cov tests -k "reference_agents or content_models" -x -v
 ```
 
 #### I1-S2 — Persist the Theme Discovery brief and draft workflow as first-class runtime state
@@ -337,7 +337,7 @@ async def get_campaign(
 **Validation**
 
 ```bash
-cd src/Plant/BackEnd && pytest tests -k "campaign or marketing_drafts" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm plant-backend-test --no-cov tests -k "campaign or marketing_drafts" -x -v
 ```
 
 ### E2 — Approval gate and customer proxy layer exist
@@ -392,7 +392,7 @@ router = waooaw_router(prefix="/platform-connections", tags=["platform-connectio
 **Validation**
 
 ```bash
-cd src/Plant/BackEnd && pytest tests -k "platform_connection or publisher_engine or marketing_scheduler" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm plant-backend-test --no-cov tests -k "platform_connection or publisher_engine or marketing_scheduler" -x -v
 ```
 
 #### I1-S4 — Expose thin CP proxy routes for the new digital marketing runtime
@@ -451,7 +451,7 @@ async def approve_campaign_item(
 **Validation**
 
 ```bash
-cd src/CP/BackEnd && pytest tests -k "campaigns or marketing_review or platform_credentials" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm cp-backend-test --no-cov tests -k "campaigns or marketing_review or platform_credentials" -x -v
 ```
 
 ## Iteration 2 — Customer Workflow On CP And Mobile
@@ -650,7 +650,7 @@ cd src/mobile && npm run typecheck && npm test -- --runTestsByPath __tests__/MyA
 
 | Story | Title | Surface | Status | Dependency |
 |---|---|---|---|---|
-| I3-S1 | Build PP oversight for briefs, approvals, and YouTube publish state | PP FrontEnd and PP BackEnd | Planned | Iterations 1 and 2 |
+| I3-S1 | Build PP oversight for briefs, approvals, and YouTube publish state | PP FrontEnd and PP BackEnd | Completed | Iterations 1 and 2 |
 | I3-S2 | Build PP diagnostics for blocked publish, credentials, and scheduler traces | PP FrontEnd and PP BackEnd | Planned | I3-S1 |
 | I3-S3 | Add audit, metrics, and run-history alignment for the agent lifecycle | Plant, CP, PP, mobile | Planned | I3-S1 |
 | I3-S4 | Add regression coverage and release-closeout for the first sellable agent | cross-surface | Planned | I3-S2 and I3-S3 |
@@ -703,7 +703,7 @@ router = waooaw_router(prefix="/ops/hired-agents", tags=["ops-hired-agents"])
 **Validation**
 
 ```bash
-cd src/PP/BackEnd && pytest tests -k "ops_hired_agents" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm pp-backend-test --no-cov tests -k "ops_hired_agents" -x -v
 cd /workspaces/WAOOAW/src/PP/FrontEnd && npm run build && npx vitest run src/__tests__/HiredAgentsOps.test.tsx src/pages/ReviewQueue.test.tsx
 ```
 
@@ -745,7 +745,7 @@ PP can diagnose why a YouTube publish did not happen and whether the blocker was
 **Validation**
 
 ```bash
-cd src/PP/BackEnd && pytest tests -k "approval_routes or ops_diagnostics" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm pp-backend-test --no-cov tests -k "approval_routes or ops_diagnostics" -x -v
 cd /workspaces/WAOOAW/src/PP/FrontEnd && npm run build && npx vitest run src/__tests__/SchedulerDiagnosticsPanel.test.tsx src/__tests__/HookTracePanel.test.tsx
 ```
 
@@ -789,8 +789,8 @@ The Digital Marketing Agent exposes a complete audit and progress spine for Them
 **Validation**
 
 ```bash
-cd src/Plant/BackEnd && pytest tests -k "flow_runs or audit or metrics" -x -v
-cd /workspaces/WAOOAW/src/CP/BackEnd && pytest tests -k "cp_flow_runs" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm plant-backend-test --no-cov tests -k "flow_runs or audit or metrics" -x -v
+docker compose -f /workspaces/WAOOAW/docker-compose.test.yml run --rm cp-backend-test --no-cov tests -k "cp_flow_runs" -x -v
 ```
 
 #### I3-S4 — Add regression coverage and release-closeout for the first sellable agent

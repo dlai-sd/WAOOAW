@@ -11,8 +11,10 @@ const mockGatewayApiClient = vi.hoisted(() => ({
   getOpsHiredAgent: vi.fn(async () => ({})),
   listOpsHiredAgentGoals: vi.fn(async () => ({ goals: [] })),
   listOpsHiredAgentDeliverables: vi.fn(async () => ({ deliverables: [] })),
-  listOpsApprovals: vi.fn(async () => ({ approvals: [] })),
-  listOpsPolicyDenials: vi.fn(async () => ({ records: [] })),
+  listApprovals: vi.fn(async () => ({ approvals: [] })),
+  listPolicyDenials: vi.fn(async () => ({ records: [] })),
+  listOpsHiredAgentSkills: vi.fn(async () => ([])),
+  listOpsPlatformConnections: vi.fn(async () => ([])),
 }))
 
 vi.mock('../services/gatewayApiClient', () => ({
@@ -75,4 +77,86 @@ test('E9-S1-T2: Lookup button shows error message when email not found', async (
   await waitFor(() => {
     expect(screen.getByText('Customer not found for this email address.')).toBeInTheDocument()
   })
+})
+
+test('I3-S1-T1: Hired agent ops shows digital marketing brief and truthful publish state', async () => {
+  mockGatewayApiClient.listOpsSubscriptions.mockResolvedValueOnce([
+    { subscription_id: 'SUB-1', agent_id: 'AGT-MKT-DMA-001', status: 'active', duration: 'monthly' }
+  ])
+  mockGatewayApiClient.listOpsHiredAgents.mockResolvedValueOnce([
+    {
+      hired_instance_id: 'HIRE-1',
+      subscription_id: 'SUB-1',
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      configured: true,
+      goals_completed: true,
+      trial_status: 'active',
+      config: { timezone: 'Asia/Kolkata' }
+    }
+  ])
+  mockGatewayApiClient.listOpsHiredAgentGoals.mockResolvedValueOnce({ hired_instance_id: 'HIRE-1', goals: [] })
+  mockGatewayApiClient.listOpsHiredAgentDeliverables.mockResolvedValueOnce({
+    hired_instance_id: 'HIRE-1',
+    deliverables: [
+      {
+        deliverable_id: 'DEL-1',
+        review_status: 'approved',
+        execution_status: 'scheduled',
+        approval_id: 'APR-9',
+        created_at: '2026-03-11T10:00:00Z',
+        payload: {
+          destination: { destination_type: 'youtube', metadata: { visibility: 'private' } },
+          publish_status: 'not_published'
+        }
+      }
+    ]
+  })
+  mockGatewayApiClient.listApprovals.mockResolvedValueOnce({ approvals: [] })
+  mockGatewayApiClient.listPolicyDenials.mockResolvedValueOnce({ records: [] })
+  mockGatewayApiClient.listOpsHiredAgentSkills.mockResolvedValueOnce([
+    {
+      skill_id: 'skill-theme-discovery',
+      display_name: 'Theme Discovery',
+      goal_schema: {
+        fields: [
+          { key: 'business_name', label: 'Business name', required: true },
+          { key: 'audience', label: 'Audience', required: true }
+        ]
+      },
+      goal_config: {
+        business_name: 'WAOOAW Studio',
+        audience: 'Founders launching YouTube content'
+      }
+    }
+  ])
+  mockGatewayApiClient.listOpsPlatformConnections.mockResolvedValueOnce([])
+
+  const user = userEvent.setup()
+
+  render(
+    <MemoryRouter initialEntries={['/hired-agents']}>
+      <Routes>
+        <Route path="/hired-agents" element={<HiredAgentsOps />} />
+      </Routes>
+    </MemoryRouter>
+  )
+
+  await user.type(screen.getByRole('textbox', { name: /customer id/i }), 'CUST-9')
+  await user.click(screen.getByRole('button', { name: 'Load' }))
+
+  await waitFor(() => {
+    expect(screen.getByText('HIRE-1')).toBeInTheDocument()
+  })
+
+  await user.click(screen.getByText('HIRE-1'))
+
+  await waitFor(() => {
+    expect(screen.getByTestId('pp-dma-brief-summary-card')).toBeInTheDocument()
+  })
+
+  expect(screen.getByText('WAOOAW Studio')).toBeInTheDocument()
+  expect(screen.getByTestId('pp-dma-publish-readiness')).toHaveTextContent('Blocked by channel connection')
+  expect(screen.getByTestId('pp-dma-channel-status')).toHaveTextContent('Youtube not connected')
+  expect(screen.getByTestId('pp-dma-block-owner')).toHaveTextContent('Platform action required')
 })

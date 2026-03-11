@@ -128,6 +128,34 @@ async def test_list_hired_agent_deliverables_returns_200(app, client):
 
 
 @pytest.mark.unit
+async def test_list_hired_agent_skills_returns_200(app, client):
+    from clients.plant_client import get_plant_client
+
+    plant = _make_plant(200, [{"skill_id": "skill-1", "display_name": "Theme Discovery"}])
+    app.dependency_overrides[get_plant_client] = lambda: plant
+    try:
+        resp = await client.get("/api/pp/ops/hired-agents/inst-1/skills")
+        assert resp.status_code == 200
+        assert resp.json()[0]["skill_id"] == "skill-1"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+async def test_list_hired_agent_platform_connections_returns_200(app, client):
+    from clients.plant_client import get_plant_client
+
+    plant = _make_plant(200, [{"platform_key": "youtube", "status": "connected"}])
+    app.dependency_overrides[get_plant_client] = lambda: plant
+    try:
+        resp = await client.get("/api/pp/ops/hired-agents/inst-1/platform-connections")
+        assert resp.status_code == 200
+        assert resp.json()[0]["platform_key"] == "youtube"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
 async def test_list_hired_agent_goals_returns_200(app, client):
     from clients.plant_client import get_plant_client
 

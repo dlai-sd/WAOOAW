@@ -148,6 +148,76 @@ async def list_hired_agent_deliverables(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.get("/{hired_instance_id}/skills", response_model=list)
+async def list_hired_agent_skills(
+    hired_instance_id: str,
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    """List runtime skills for a hired agent instance (cached)."""
+    plant_path = f"/api/v1/hired-agents/{hired_instance_id}/skills"
+
+    cached = await cache_get("hired_skills", plant_path)
+    if cached is not None:
+        return cached
+
+    try:
+        resp = await client._request(
+            method="GET",
+            path=plant_path,
+            headers={"Authorization": auth_header} if auth_header else None,
+        )
+        if resp.status_code == 200:
+            body = resp.json()
+            await cache_set("hired_skills", plant_path, body)
+            await audit.log(
+                "pp_ops",
+                "hired_agent_skills_listed",
+                "success",
+                metadata={"hired_instance_id": hired_instance_id},
+            )
+            return body
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/{hired_instance_id}/platform-connections", response_model=list)
+async def list_hired_agent_platform_connections(
+    hired_instance_id: str,
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    client: PlantAPIClient = Depends(get_plant_client),
+    audit: AuditLogger = Depends(get_audit_logger),
+):
+    """List platform connections for a hired agent instance (cached)."""
+    plant_path = f"/api/v1/hired-agents/{hired_instance_id}/platform-connections"
+
+    cached = await cache_get("hired_platform_connections", plant_path)
+    if cached is not None:
+        return cached
+
+    try:
+        resp = await client._request(
+            method="GET",
+            path=plant_path,
+            headers={"Authorization": auth_header} if auth_header else None,
+        )
+        if resp.status_code == 200:
+            body = resp.json()
+            await cache_set("hired_platform_connections", plant_path, body)
+            await audit.log(
+                "pp_ops",
+                "hired_agent_platform_connections_listed",
+                "success",
+                metadata={"hired_instance_id": hired_instance_id},
+            )
+            return body
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @router.get("/{hired_agent_id}/construct-health", response_model=dict)
 async def get_construct_health(
     hired_agent_id: str,

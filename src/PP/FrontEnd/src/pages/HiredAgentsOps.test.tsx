@@ -53,6 +53,8 @@ const mocks = vi.hoisted(() => {
         }
       ]
     })),
+    listOpsHiredAgentSkills: vi.fn(async () => ([])),
+    listOpsPlatformConnections: vi.fn(async () => ([])),
     listApprovals: vi.fn(async () => ({
       count: 1,
       approvals: [
@@ -96,6 +98,8 @@ vi.mock('../services/gatewayApiClient', () => {
         listOpsHiredAgents: mocks.listOpsHiredAgents,
         listOpsHiredAgentGoals: mocks.listOpsHiredAgentGoals,
         listOpsHiredAgentDeliverables: mocks.listOpsHiredAgentDeliverables,
+        listOpsHiredAgentSkills: mocks.listOpsHiredAgentSkills,
+        listOpsPlatformConnections: mocks.listOpsPlatformConnections,
         listApprovals: mocks.listApprovals,
         listPolicyDenials: mocks.listPolicyDenials
       }
@@ -144,6 +148,77 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
   expect(screen.getByText('APR-1')).toBeInTheDocument()
   expect(screen.getByText('Policy Denials')).toBeInTheDocument()
   expect(screen.getByText('approval_required')).toBeInTheDocument()
+})
+
+test('HiredAgentsOps surfaces DMA publish state without pretending approval implies publish', async () => {
+  mocks.listOpsSubscriptions.mockResolvedValueOnce([
+    { subscription_id: 'SUB-9', agent_id: 'AGT-MKT-DMA-001', status: 'active', duration: 'monthly' }
+  ])
+  mocks.listOpsHiredAgents.mockResolvedValueOnce([
+    {
+      hired_instance_id: 'HIRE-9',
+      subscription_id: 'SUB-9',
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      configured: true,
+      goals_completed: true,
+      trial_status: 'active',
+      config: { timezone: 'Asia/Kolkata' }
+    }
+  ])
+  mocks.listOpsHiredAgentGoals.mockResolvedValueOnce({ hired_instance_id: 'HIRE-9', goals: [] })
+  mocks.listOpsHiredAgentDeliverables.mockResolvedValueOnce({
+    hired_instance_id: 'HIRE-9',
+    deliverables: [
+      {
+        deliverable_id: 'DEL-9',
+        review_status: 'approved',
+        execution_status: 'scheduled',
+        approval_id: 'APR-9',
+        created_at: '2026-03-11T10:00:00Z',
+        payload: {
+          destination: { destination_type: 'youtube', metadata: { visibility: 'private' } },
+          publish_status: 'not_published'
+        }
+      }
+    ]
+  })
+  mocks.listOpsHiredAgentSkills.mockResolvedValueOnce([
+    {
+      skill_id: 'skill-theme-discovery',
+      display_name: 'Theme Discovery',
+      goal_schema: { fields: [{ key: 'business_name', label: 'Business name', required: true }] },
+      goal_config: { business_name: 'WAOOAW Studio' }
+    }
+  ])
+  mocks.listOpsPlatformConnections.mockResolvedValueOnce([])
+  mocks.listApprovals.mockResolvedValueOnce({ count: 0, approvals: [] })
+  mocks.listPolicyDenials.mockResolvedValueOnce({ count: 0, records: [] })
+
+  const user = userEvent.setup()
+  render(
+    <MemoryRouter initialEntries={['/hired-agents']}>
+      <Routes>
+        <Route path="/hired-agents" element={React.createElement(HiredAgentsOps as any) as any} />
+      </Routes>
+    </MemoryRouter>
+  )
+
+  await user.type(screen.getByLabelText('Customer ID'), 'CUST-9')
+  await user.click(screen.getByRole('button', { name: 'Load' }))
+
+  await waitFor(() => {
+    expect(screen.getByText('HIRE-9')).toBeInTheDocument()
+  })
+
+  await user.click(screen.getByText('HIRE-9'))
+
+  await waitFor(() => {
+    expect(screen.getByTestId('pp-dma-publish-readiness')).toHaveTextContent('Blocked by channel connection')
+  })
+
+  expect(screen.getByText('WAOOAW Studio')).toBeInTheDocument()
+  expect(screen.getByTestId('pp-dma-channel-status')).toHaveTextContent('Youtube not connected')
 })
 
 test('HiredAgentsOps preserves handoff context and links to the next operator surface', async () => {

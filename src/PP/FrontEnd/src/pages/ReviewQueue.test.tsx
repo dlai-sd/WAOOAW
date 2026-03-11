@@ -44,6 +44,22 @@ const mocks = vi.hoisted(() => {
     })),
     approveMarketingDraftPost: vi.fn(async () => ({ post_id: 'POST-1', review_status: 'approved', approval_id: 'APR-123' })),
     rejectMarketingDraftPost: vi.fn(async () => ({ post_id: 'POST-1', review_status: 'rejected' })),
+    listOpsHiredAgentDeliverables: vi.fn(async () => ({
+      deliverables: [
+        {
+          deliverable_id: 'DEL-1',
+          approval_id: 'APR-123',
+          review_status: 'approved',
+          execution_status: 'scheduled',
+          created_at: '2026-03-10T12:00:00Z',
+          payload: {
+            destination: { destination_type: 'youtube', metadata: { visibility: 'private' } },
+            publish_status: 'not_published'
+          }
+        }
+      ]
+    })),
+    listOpsPlatformConnections: vi.fn(async () => ([])),
   }
 })
 
@@ -55,7 +71,9 @@ vi.mock('../services/gatewayApiClient', () => {
         ...(actual.gatewayApiClient || {}),
         listReviewQueueApprovals: mocks.listReviewQueueApprovals,
         approveMarketingDraftPost: mocks.approveMarketingDraftPost,
-        rejectMarketingDraftPost: mocks.rejectMarketingDraftPost
+        rejectMarketingDraftPost: mocks.rejectMarketingDraftPost,
+        listOpsHiredAgentDeliverables: mocks.listOpsHiredAgentDeliverables,
+        listOpsPlatformConnections: mocks.listOpsPlatformConnections,
       }
     }
   })
@@ -81,6 +99,10 @@ test('ReviewQueue loads enriched approvals and can approve or deny a selected it
 
   expect(screen.getByText('Decision workspace')).toBeInTheDocument()
   expect(screen.getByText('Healthcare Content Agent')).toBeInTheDocument()
+  await waitFor(() => {
+    expect(screen.getByTestId('pp-review-queue-publish-readiness')).toHaveTextContent('Blocked by channel connection')
+  })
+  expect(screen.getByTestId('pp-review-queue-channel-status')).toHaveTextContent('Youtube not connected')
 
   fireEvent.click(screen.getByRole('button', { name: 'Approve and remove' }))
 
@@ -158,6 +180,10 @@ test('ReviewQueue preserves operator context for the next PP surface', async () 
   })
 
   expect(screen.getByText('Operator handoff context')).toBeInTheDocument()
+
+  await waitFor(() => {
+    expect(screen.getByTestId('pp-review-queue-block-owner')).toHaveTextContent('Platform action required')
+  })
 
   await user.click(screen.getByRole('button', { name: 'Open runtime context' }))
 
