@@ -83,7 +83,7 @@ export default function ProfileSettings() {
   }
 
   const openSupport = () => {
-    window.location.href = 'mailto:support@waooaw.com?subject=WAOOAW%20Customer%20Support'
+    window.location.href = 'mailto:customersupport@dlaisd.com?subject=WAOOAW%20Customer%20Support'
   }
 
   const profileCompletion = useMemo(() => {
