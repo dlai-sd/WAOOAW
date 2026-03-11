@@ -11,7 +11,6 @@ module.exports = {
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
         },
-        isolatedModules: true,
         diagnostics: false,
       },
     ],
