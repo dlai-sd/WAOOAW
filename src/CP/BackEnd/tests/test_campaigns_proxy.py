@@ -252,6 +252,31 @@ def test_patch_theme_item_proxies_to_plant(client, auth_headers, monkeypatch):
     assert resp.status_code == 200
 
 
+@pytest.mark.unit
+def test_get_upload_eligibility_proxies_campaign_runtime_state(client, auth_headers, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
+
+    campaign_data = {
+        "campaign_id": "test-campaign-id",
+        "workflow_state": "approved_for_upload",
+        "approval_state": {"pending_review_count": 0, "approved_count": 3, "rejected_count": 0},
+        "brief_summary": {"summary_text": "Summary"},
+        "draft_deliverables": [{"deliverable_id": "post-1"}],
+    }
+    mock_client = _mock_plant_client(200, campaign_data)
+
+    with patch("api.campaigns.httpx.AsyncClient", return_value=mock_client):
+        resp = client.get(
+            "/api/cp/campaigns/test-campaign-id/upload-eligibility",
+            headers=auth_headers,
+        )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["workflow_state"] == "approved_for_upload"
+    assert body["approval_state"]["approved_count"] == 3
+
+
 # ─── Router is registered in main.py ─────────────────────────────────────────
 
 @pytest.mark.unit

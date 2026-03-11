@@ -225,7 +225,7 @@ EXECUTION ORDER:
 | I1-S1 | Register the Digital Marketing Agent and its three visible skills | Plant BackEnd | Completed | none |
 | I1-S2 | Persist the Theme Discovery brief and draft workflow as first-class runtime state | Plant BackEnd | Completed | I1-S1 |
 | I1-S3 | Enforce approval-gated YouTube publish eligibility and credential execution | Plant BackEnd | Completed | I1-S2 |
-| I1-S4 | Expose thin CP proxy routes for the new digital marketing runtime | CP BackEnd | Planned | I1-S2 and I1-S3 |
+| I1-S4 | Expose thin CP proxy routes for the new digital marketing runtime | CP BackEnd | Completed | I1-S2 and I1-S3 |
 
 ### E1 — Customer-visible digital marketing runtime exists
 
