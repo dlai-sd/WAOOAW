@@ -151,6 +151,22 @@ const mockHiredAgentEnding: MyAgentInstanceSummary = {
   cancel_at_period_end: true,
 };
 
+const mockDigitalMarketingAgent: MyAgentInstanceSummary = {
+  subscription_id: 'sub_dma_321',
+  agent_id: 'AGT-MKT-DMA-001',
+  agent_type_id: 'marketing.digital_marketing.v1',
+  duration: 'monthly',
+  status: 'active',
+  trial_status: 'converted',
+  nickname: 'YouTube Growth Agent',
+  hired_instance_id: 'hire_dma_321',
+  current_period_start: '2024-01-01T00:00:00Z',
+  current_period_end: '2024-02-01T00:00:00Z',
+  cancel_at_period_end: false,
+  configured: true,
+  goals_completed: false,
+};
+
 describe('MyAgentsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -582,6 +598,37 @@ describe('MyAgentsScreen', () => {
       await waitFor(() => {
         expect(mockNavigate).toHaveBeenCalledWith('AgentOperations', {
           hiredAgentId: 'hire_456',
+        });
+      });
+    });
+
+    it('routes digital marketing hires back to Theme Discovery when goals are incomplete', async () => {
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [mockDigitalMarketingAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByTestId } = renderScreen();
+
+      fireEvent.press(getByText('Hired (1)'));
+
+      await waitFor(() => getByTestId('agent-card-sub_dma_321'));
+      expect(getByText('Tap to resume Theme Discovery →')).toBeTruthy();
+
+      fireEvent.press(getByTestId('agent-card-sub_dma_321'));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('AgentOperations', {
+          hiredAgentId: 'hire_dma_321',
+          focusSection: 'goals',
         });
       });
     });

@@ -39,6 +39,15 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
   { key: 'recent', label: 'Recently active' },
 ];
 
+const DIGITAL_MARKETING_AGENT_ID = 'AGT-MKT-DMA-001';
+
+function isDigitalMarketingAgent(agent: MyAgentInstanceSummary): boolean {
+  return (
+    String(agent.agent_id || '').trim().toUpperCase() === DIGITAL_MARKETING_AGENT_ID ||
+    String(agent.agent_type_id || '').trim() === 'marketing.digital_marketing.v1'
+  );
+}
+
 function getAttentionReasons(agent: MyAgentInstanceSummary): string[] {
   const reasons: string[] = []
 
@@ -149,8 +158,10 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
         trialId: agent.subscription_id,
       });
     } else if (agent.hired_instance_id) {
+      const resumeThemeDiscovery = isDigitalMarketingAgent(agent) && agent.goals_completed === false;
       navigation.navigate('AgentOperations', {
         hiredAgentId: agent.hired_instance_id,
+        ...(resumeThemeDiscovery ? { focusSection: 'goals' as const } : {}),
       });
     } else {
       // Fallback when runtime instance data has not been hydrated yet
@@ -662,6 +673,7 @@ const HiredAgentCard = ({
   };
 
   const badge = getStatusBadge();
+  const resumeThemeDiscovery = isDigitalMarketingAgent(agent) && agent.hired_instance_id && agent.goals_completed === false;
 
   // Format trial dates
   const formatDate = (dateString: string) => {
@@ -869,7 +881,9 @@ const HiredAgentCard = ({
           },
         ]}
       >
-        Tap to view {agent.trial_status === 'active' ? 'trial dashboard' : agent.hired_instance_id ? 'operations' : 'agent details'} →
+        {resumeThemeDiscovery
+          ? 'Tap to resume Theme Discovery →'
+          : `Tap to view ${agent.trial_status === 'active' ? 'trial dashboard' : agent.hired_instance_id ? 'operations' : 'agent details'} →`}
       </Text>
     </TouchableOpacity>
   );
