@@ -50,6 +50,8 @@ describe('resolveNavigationTarget', () => {
     ['approval_required', 'approvals'],
     ['deliverable_approved', 'recent'],
     ['deliverable_rejected', 'activity'],
+    ['publish_ready', 'recent'],
+    ['publish_blocked', 'health'],
     ['credential_expiring', 'health'],
     ['agent_paused', 'scheduler'],
     ['trial_ending', 'spend'],

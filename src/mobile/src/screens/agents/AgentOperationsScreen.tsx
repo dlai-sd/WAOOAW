@@ -19,6 +19,7 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgentById } from '@/hooks/useHiredAgents';
 import { useApprovalQueue } from '@/hooks/useApprovalQueue';
+import { ContentDraftApprovalCard } from '@/components/ContentDraftApprovalCard';
 import cpApiClient from '@/lib/cpApiClient';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
 import { DigitalMarketingBriefStepCard } from '@/components/DigitalMarketingBriefStepCard';
@@ -544,28 +545,12 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
                       </Text>
                     ) : (
                       pendingApprovals.map((item) => (
-                        <View key={item.id} style={styles.approvalItem}>
-                          <Text style={{ color: colors.textPrimary, fontSize: 14,
-                            fontFamily: typography.fontFamily.body }}>
-                            {item.title || item.type}
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                            <TouchableOpacity
-                              style={[styles.actionBtn, { backgroundColor: '#10b98122' }]}
-                              onPress={() => approve(item.id)}
-                              accessibilityLabel="Approve"
-                            >
-                              <Text style={{ color: '#10b981', fontSize: 13 }}>Approve</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.actionBtn, { backgroundColor: '#ef444422' }]}
-                              onPress={() => reject(item.id)}
-                              accessibilityLabel="Reject"
-                            >
-                              <Text style={{ color: '#ef4444', fontSize: 13 }}>Reject</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
+                        <ContentDraftApprovalCard
+                          key={item.id}
+                          deliverable={item}
+                          onApprove={approve}
+                          onReject={reject}
+                        />
                       ))
                     )}
                   </View>

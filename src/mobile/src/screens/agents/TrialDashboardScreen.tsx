@@ -676,12 +676,14 @@ export const TrialDashboardScreen = ({ navigation, route }: Props) => {
                               fontFamily: typography.fontFamily.body,
                             }}
                           >
-                            {new Date(deliverable.created_at).toLocaleDateString('en-IN', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
+                            {deliverable.created_at
+                              ? new Date(deliverable.created_at).toLocaleDateString('en-IN', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : 'Pending timestamp'}
                           </Text>
 
                           {/* Status Badge */}

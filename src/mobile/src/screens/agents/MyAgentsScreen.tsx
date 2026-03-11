@@ -24,6 +24,13 @@ import { ErrorView } from '@/components/ErrorView';
 import { VoiceControl } from '@/components/voice/VoiceControl';
 import { VoiceHelpModal } from '@/components/voice/VoiceHelpModal';
 import { usePerformanceMonitoring } from '@/hooks/usePerformanceMonitoring';
+import {
+  getDeliverablePublishReadiness,
+  getPlatformConnectionSummary,
+  hiredAgentsService,
+  type DeliverablePublishReadiness,
+  type PlatformConnectionSummary,
+} from '@/services/hiredAgents/hiredAgents.service';
 import type { MyAgentInstanceSummary } from '@/types/hiredAgents.types';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
 
@@ -86,6 +93,16 @@ function sortAgents(agents: MyAgentInstanceSummary[], sort: SortOption): MyAgent
     return [...agents].sort((a, b) => a.agent_id.localeCompare(b.agent_id));
   }
   return agents; // 'recent' = existing order
+}
+
+function statusToneColor(
+  tone: DeliverablePublishReadiness['tone'] | PlatformConnectionSummary['tone'],
+  colors: ReturnType<typeof useTheme>['colors']
+): string {
+  if (tone === 'success') return colors.success;
+  if (tone === 'warning') return colors.warning;
+  if (tone === 'danger') return '#ef4444';
+  return colors.neonCyan;
 }
 
 export const MyAgentsScreen = ({ navigation }: Props) => {
@@ -856,6 +873,10 @@ const HiredAgentCard = ({
         </View>
       </View>
 
+      {isDigitalMarketingAgent(agent) && agent.hired_instance_id ? (
+        <DigitalMarketingRuntimeStatus hiredAgentId={agent.hired_instance_id} />
+      ) : null}
+
       {/* CTA hint */}
       {attentionReasons.length > 0 && (
         <Text
@@ -886,6 +907,127 @@ const HiredAgentCard = ({
           : `Tap to view ${agent.trial_status === 'active' ? 'trial dashboard' : agent.hired_instance_id ? 'operations' : 'agent details'} →`}
       </Text>
     </TouchableOpacity>
+  );
+};
+
+const DigitalMarketingRuntimeStatus = ({ hiredAgentId }: { hiredAgentId: string }) => {
+  const { colors, spacing, typography } = useTheme();
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [channelSummary, setChannelSummary] = React.useState<PlatformConnectionSummary | null>(null);
+  const [publishReadiness, setPublishReadiness] = React.useState<DeliverablePublishReadiness | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadRuntimeStatus = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [deliverables, connections] = await Promise.all([
+          hiredAgentsService.getDeliverablesByHiredAgent(hiredAgentId),
+          hiredAgentsService.listPlatformConnections(hiredAgentId),
+        ]);
+
+        if (cancelled) return;
+
+        const nextChannelSummary = getPlatformConnectionSummary(connections, 'youtube');
+        setChannelSummary(nextChannelSummary);
+
+        const latestDeliverable = [...deliverables].sort((a, b) => {
+          const aTime = new Date(String(a.updated_at || a.created_at || 0)).getTime();
+          const bTime = new Date(String(b.updated_at || b.created_at || 0)).getTime();
+          return bTime - aTime;
+        })[0];
+
+        if (!latestDeliverable) {
+          setPublishReadiness(null);
+          return;
+        }
+
+        setPublishReadiness(
+          getDeliverablePublishReadiness(latestDeliverable, {
+            hasPlatformConnection: nextChannelSummary.isReady,
+            platformLabel: 'YouTube',
+          })
+        );
+      } catch (loadError: any) {
+        if (!cancelled) {
+          setError(loadError?.message || 'Failed to load runtime status');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadRuntimeStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [hiredAgentId]);
+
+  if (loading) {
+    return (
+      <View style={[styles.runtimeStatusCard, { borderColor: colors.border, marginTop: spacing.md }]}> 
+        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body }}>
+          Loading YouTube publish status...
+        </Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.runtimeStatusCard, { borderColor: colors.border, marginTop: spacing.md }]}> 
+        <Text style={{ color: '#ef4444', fontSize: 12, fontFamily: typography.fontFamily.bodyBold, marginBottom: 4 }}>
+          Runtime status unavailable
+        </Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body }}>
+          {error}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.runtimeStatusCard, { borderColor: colors.border, marginTop: spacing.md }]}> 
+      <Text style={{ color: colors.neonCyan, fontSize: 11, fontFamily: typography.fontFamily.bodyBold, marginBottom: 6 }}>
+        Digital Marketing runtime
+      </Text>
+      {channelSummary ? (
+        <Text
+          style={{
+            color: statusToneColor(channelSummary.tone, colors),
+            fontSize: 12,
+            fontFamily: typography.fontFamily.bodyBold,
+            marginBottom: 4,
+          }}
+        >
+          Channel: {channelSummary.label}
+        </Text>
+      ) : null}
+      {publishReadiness ? (
+        <>
+          <Text
+            style={{
+              color: statusToneColor(publishReadiness.tone, colors),
+              fontSize: 12,
+              fontFamily: typography.fontFamily.bodyBold,
+              marginBottom: 4,
+            }}
+          >
+            Publish readiness: {publishReadiness.label}
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, lineHeight: 18 }}>
+            {publishReadiness.message}
+          </Text>
+        </>
+      ) : (
+        <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, lineHeight: 18 }}>
+          Theme Discovery is saved. The agent is waiting to produce the first channel-ready draft.
+        </Text>
+      )}
+    </View>
   );
 };
 
@@ -932,4 +1074,9 @@ const styles = StyleSheet.create({
   ctaHint: {},
   sortBar: { flexDirection: 'row', flexWrap: 'wrap' },
   sortChip: {},
+  runtimeStatusCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
 });

@@ -16,6 +16,9 @@ import { MyAgentsScreen } from '@/screens/agents/MyAgentsScreen';
 import * as useHiredAgentsModule from '@/hooks/useHiredAgents';
 import type { MyAgentInstanceSummary } from '@/types/hiredAgents.types';
 
+const mockGetDeliverablesByHiredAgent = jest.fn();
+const mockListPlatformConnections = jest.fn();
+
 // Mock NavigationContainer
 jest.mock('@react-navigation/native', () => ({
   ...jest.requireActual('@react-navigation/native'),
@@ -24,6 +27,17 @@ jest.mock('@react-navigation/native', () => ({
 
 // Mock hooks
 jest.mock('@/hooks/useHiredAgents');
+jest.mock('@/services/hiredAgents/hiredAgents.service', () => {
+  const actual = jest.requireActual('@/services/hiredAgents/hiredAgents.service');
+  return {
+    ...actual,
+    hiredAgentsService: {
+      ...actual.hiredAgentsService,
+      getDeliverablesByHiredAgent: (...args: unknown[]) => mockGetDeliverablesByHiredAgent(...args),
+      listPlatformConnections: (...args: unknown[]) => mockListPlatformConnections(...args),
+    },
+  };
+});
 
 // Mock useTheme
 jest.mock('@/hooks/useTheme', () => ({
@@ -172,6 +186,8 @@ describe('MyAgentsScreen', () => {
     jest.clearAllMocks();
     mockNavigate.mockClear();
     mockParentNavigate.mockClear();
+    mockGetDeliverablesByHiredAgent.mockResolvedValue([]);
+    mockListPlatformConnections.mockResolvedValue([]);
   });
 
   const renderScreen = () => {
@@ -630,6 +646,50 @@ describe('MyAgentsScreen', () => {
           hiredAgentId: 'hire_dma_321',
           focusSection: 'goals',
         });
+      });
+    });
+
+    it('shows truthful digital marketing publish progress on hired agent cards', async () => {
+      mockGetDeliverablesByHiredAgent.mockResolvedValueOnce([
+        {
+          deliverable_id: 'DEL-1',
+          hired_instance_id: 'hire_dma_321',
+          agent_id: 'AGT-MKT-DMA-001',
+          title: 'YouTube explainer draft',
+          type: 'document',
+          review_status: 'approved',
+          execution_status: 'not_executed',
+          payload: {
+            destination: {
+              destination_type: 'youtube',
+              metadata: { visibility: 'private' },
+            },
+          },
+          created_at: '2026-03-11T08:00:00Z',
+          updated_at: '2026-03-11T08:30:00Z',
+        },
+      ]);
+      mockListPlatformConnections.mockResolvedValueOnce([]);
+
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [{ ...mockDigitalMarketingAgent, goals_completed: true }],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText } = renderScreen();
+      fireEvent.press(getByText('Hired (1)'));
+
+      await waitFor(() => {
+        expect(getByText('Publish readiness: Blocked by missing channel connection')).toBeTruthy();
+        expect(getByText('Channel: Youtube not connected')).toBeTruthy();
       });
     });
   });
