@@ -27,6 +27,7 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
     assert store.update_post(
         post_id,
         review_status="approved",
+        approval_id="APR-123",
         execution_status="scheduled",
         scheduled_at=datetime.utcnow() - timedelta(seconds=1),
     )
