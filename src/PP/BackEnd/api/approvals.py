@@ -2,6 +2,10 @@
 
 Phase 1: admin-only routes to mint approvals that can be used as `approval_id`
 when invoking approval-gated actions in Plant (e.g. trading).
+
+MVP review-queue support adds a thin enrichment route that combines PP approval
+records with Plant hired-agent and marketing draft context so PP operators can
+render actionable review cards without reconstructive fetches in the UI.
 """
 
 from __future__ import annotations
@@ -11,7 +15,9 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from api.deps import get_authorization_header
 from api.security import require_admin
+from clients.plant_client import PlantAPIClient, PlantAPIError, get_plant_client
 from services.approvals import ApprovalRecord, FileApprovalStore, get_approval_store
 
 
@@ -108,6 +114,148 @@ class ApprovalListResponse(BaseModel):
     approvals: List[Dict[str, Any]]
 
 
+class DeliverablePreviewResponse(BaseModel):
+    batch_id: Optional[str] = None
+    post_id: Optional[str] = None
+    brand_name: Optional[str] = None
+    theme: Optional[str] = None
+    channel: Optional[str] = None
+    text_preview: Optional[str] = None
+
+
+class ReviewQueueApprovalResponse(BaseModel):
+    approval_id: str
+    customer_id: str
+    customer_label: str
+    agent_id: str
+    agent_label: str
+    action: str
+    requested_by: str
+    correlation_id: Optional[str] = None
+    purpose: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: str
+    expires_at: Optional[str] = None
+    hired_instance_id: Optional[str] = None
+    review_state: str
+    deliverable_preview: DeliverablePreviewResponse = Field(default_factory=DeliverablePreviewResponse)
+
+
+class ReviewQueueApprovalListResponse(BaseModel):
+    count: int
+    approvals: List[ReviewQueueApprovalResponse]
+
+
+def _truncate_preview(text: Any, limit: int = 140) -> Optional[str]:
+    value = str(text or '').strip()
+    if not value:
+        return None
+    if len(value) <= limit:
+        return value
+    return f"{value[: limit - 1].rstrip()}…"
+
+
+async def _fetch_hired_agents_by_customer(
+    *,
+    customer_id: str,
+    auth_header: Optional[str],
+    client: PlantAPIClient,
+) -> List[Dict[str, Any]]:
+    response = await client._request(
+        method="GET",
+        path=f"/api/v1/hired-agents/by-customer/{customer_id}",
+        headers={"Authorization": auth_header} if auth_header else None,
+    )
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    body = response.json()
+    if isinstance(body, dict):
+        return list(body.get("instances") or [])
+    if isinstance(body, list):
+        return body
+    return []
+
+
+async def _fetch_draft_batches(
+    *,
+    customer_id: str,
+    agent_id: Optional[str],
+    auth_header: Optional[str],
+    client: PlantAPIClient,
+    limit: int,
+) -> List[Dict[str, Any]]:
+    params: Dict[str, Any] = {
+        "customer_id": customer_id,
+        "status": "pending_review",
+        "limit": limit,
+    }
+    if agent_id:
+        params["agent_id"] = agent_id
+
+    response = await client._request(
+        method="GET",
+        path="/api/v1/marketing/draft-batches",
+        params=params,
+        headers={"Authorization": auth_header} if auth_header else None,
+    )
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
+    body = response.json()
+    return body if isinstance(body, list) else []
+
+
+def _match_hired_instance(agent_id: str, hired_agents: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    for instance in hired_agents:
+        if str(instance.get("agent_id") or "") == agent_id:
+            return instance
+    return None
+
+
+def _match_draft_batch(agent_id: str, draft_batches: List[Dict[str, Any]]) -> Dict[str, Any] | None:
+    for batch in draft_batches:
+        if str(batch.get("agent_id") or "") == agent_id:
+            return batch
+    return None
+
+
+def _to_review_queue_response(
+    approval: ApprovalRecord,
+    *,
+    hired_instance: Optional[Dict[str, Any]],
+    draft_batch: Optional[Dict[str, Any]],
+) -> ReviewQueueApprovalResponse:
+    posts = list(draft_batch.get("posts") or []) if draft_batch else []
+    first_post = posts[0] if posts else {}
+    review_state = str(first_post.get("review_status") or draft_batch.get("status") or "context_unavailable")
+
+    return ReviewQueueApprovalResponse(
+        approval_id=approval.approval_id,
+        customer_id=approval.customer_id,
+        customer_label=approval.customer_id,
+        agent_id=approval.agent_id,
+        agent_label=str((hired_instance or {}).get("nickname") or approval.agent_id),
+        action=approval.action,
+        requested_by=approval.requested_by,
+        correlation_id=approval.correlation_id,
+        purpose=approval.purpose,
+        notes=approval.notes,
+        created_at=approval.created_at.isoformat(),
+        expires_at=approval.expires_at.isoformat() if approval.expires_at else None,
+        hired_instance_id=(hired_instance or {}).get("hired_instance_id"),
+        review_state=review_state,
+        deliverable_preview=DeliverablePreviewResponse(
+            batch_id=(draft_batch or {}).get("batch_id"),
+            post_id=first_post.get("post_id"),
+            brand_name=(draft_batch or {}).get("brand_name"),
+            theme=(draft_batch or {}).get("theme"),
+            channel=first_post.get("channel"),
+            text_preview=_truncate_preview(first_post.get("text")),
+        ),
+    )
+
+
 @router.get("", response_model=ApprovalListResponse)
 async def list_approvals(
     customer_id: Optional[str] = None,
@@ -120,6 +268,65 @@ async def list_approvals(
 ) -> ApprovalListResponse:
     rows = store.list(customer_id=customer_id, agent_id=agent_id, action=action, correlation_id=correlation_id, limit=limit)
     return ApprovalListResponse(count=len(rows), approvals=[_to_response(r).model_dump(mode="json") for r in rows])
+
+
+@router.get("/review-queue", response_model=ReviewQueueApprovalListResponse)
+async def list_review_queue_approvals(
+    request: Request,
+    customer_id: Optional[str] = None,
+    agent_id: Optional[str] = None,
+    action: Optional[str] = None,
+    correlation_id: Optional[str] = None,
+    limit: int = 20,
+    _claims: Dict[str, Any] = Depends(require_admin),
+    auth_header: Optional[str] = Depends(get_authorization_header),
+    store: FileApprovalStore = Depends(get_approval_store),
+    client: PlantAPIClient = Depends(get_plant_client),
+) -> ReviewQueueApprovalListResponse:
+    rows = store.list(
+        customer_id=customer_id,
+        agent_id=agent_id,
+        action=action,
+        correlation_id=correlation_id,
+        limit=limit,
+    )
+
+    if not rows:
+        return ReviewQueueApprovalListResponse(count=0, approvals=[])
+
+    hired_agents_by_customer: Dict[str, List[Dict[str, Any]]] = {}
+    draft_batches_by_context: Dict[tuple[str, str], List[Dict[str, Any]]] = {}
+
+    try:
+        for row in rows:
+            if row.customer_id not in hired_agents_by_customer:
+                hired_agents_by_customer[row.customer_id] = await _fetch_hired_agents_by_customer(
+                    customer_id=row.customer_id,
+                    auth_header=auth_header,
+                    client=client,
+                )
+
+            context_key = (row.customer_id, row.agent_id)
+            if context_key not in draft_batches_by_context:
+                draft_batches_by_context[context_key] = await _fetch_draft_batches(
+                    customer_id=row.customer_id,
+                    agent_id=row.agent_id,
+                    auth_header=auth_header,
+                    client=client,
+                    limit=limit,
+                )
+    except PlantAPIError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    approvals = [
+        _to_review_queue_response(
+            row,
+            hired_instance=_match_hired_instance(row.agent_id, hired_agents_by_customer.get(row.customer_id, [])),
+            draft_batch=_match_draft_batch(row.agent_id, draft_batches_by_context.get((row.customer_id, row.agent_id), [])),
+        )
+        for row in rows
+    ]
+    return ReviewQueueApprovalListResponse(count=len(approvals), approvals=approvals)
 
 
 @router.get("/{approval_id}", response_model=ApprovalResponse)

@@ -1,3 +1,310 @@
+# Running Commentary — 2026-03-10
+
+> **Purpose:** Track the UI/UX revamp follow-through on CP, PP, and mobile so connection issues do not lose the plan or checkpoint state.
+> **Branch:** `feat/ui-ux-revamp`
+> **Fallback checkpoint:** `9237c55` (`fix(frontend): wire command centre fallback nav props`)
+
+---
+
+## Current State
+
+The UI/UX revamp is implemented and pushed on `feat/ui-ux-revamp`.
+
+### Completed baseline
+
+| Area | Status | Notes |
+|---|---|---|
+| CP customer shell + discovery + command centre + spend/profile | ✅ Complete | visual hierarchy and customer operating surface upgraded |
+| CP auth + hire setup | ✅ Complete | sign in, sign up, and hire wizard upgraded |
+| PP shell + dashboard + contributor/ops pages | ✅ Complete | landing, dashboard, setup, ops, review, governance surfaces upgraded |
+| Mobile customer surfaces | ✅ Complete | home, my agents, ops, profile, sign in, sign up upgraded |
+| Node toolchain in container | ✅ Complete | `node v18.20.4`, `npm 9.2.0` on PATH |
+| Disk cleanup | ✅ Complete | Docker prune recovered space from ~1.5G free to ~11G free |
+| Validation checkpoint | ✅ Complete | CP build/test, PP build/test, mobile typecheck/test command path exited `0` |
+
+### Current branch checkpoints
+
+| Commit | Meaning |
+|---|---|
+| `2ddd8be` | main UI/UX revamp across CP, PP, and mobile |
+| `9237c55` | final CP fallback prop wiring fix after validation |
+
+---
+
+## Next Sequence
+
+The work should continue in small chunks, each ending in a checkpoint commit and push.
+
+| Chunk | Goal | Status | Notes |
+|---|---|---|---|
+| 1 | Structured QA pass on CP user journeys | complete | chunks 1A and 1B validated and checkpointed |
+| 2 | Structured QA pass on PP contributor journeys | complete | chunks 2A and 2B validated and checkpointed |
+| 3 | Structured QA pass on mobile journeys | complete | chunks 3A and 3B validated and checkpointed |
+| 4 | Fix defects from QA pass | complete | mobile residuals and PP usage-events first-load honesty fixed and checkpointed |
+| 5 | Add targeted frontend test coverage for new flows | complete | CP portal routing, PP hook trace stability, and mobile ops routing coverage added and validated |
+| 6 | Final smoke + PR prep | complete | focused smoke validation green, worktree clean, residual warnings recorded |
+
+### Chunk 1A — CP QA sub-checkpoint
+
+Validated and ready on branch before moving to the next CP slice.
+
+| Area | Result |
+|---|---|
+| Discovery -> detail navigation | fixed so discovery uses the provided selection callback instead of bypassing the portal flow |
+| Command Centre quick action | fixed dead `Add New Goal` action by wiring it to the goals page |
+| Payment confirmation -> setup | upgraded `HireReceipt` so the user continues into setup instead of landing in a thin utility dead end |
+| CP validation | `npm run build` + `npm run test:run` exited `0` after these fixes |
+
+Files in Chunk 1A:
+- `src/CP/FrontEnd/src/pages/AgentDiscovery.tsx`
+- `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`
+- `src/CP/FrontEnd/src/pages/HireReceipt.tsx`
+- `src/CP/FrontEnd/src/pages/authenticated/CommandCentre.tsx`
+- `src/CP/FrontEnd/src/styles/globals.css`
+
+### Chunk 1B — CP QA sub-checkpoint
+
+Validated and ready on branch after the second CP journey slice.
+
+| Area | Result |
+|---|---|
+| Hire setup review | fixed so the final step now shows a real summary of what the customer configured before activation |
+| Billing clarity | fixed so active subscriptions are visible, not just aggregate invoice and receipt totals |
+| Profile honesty | fixed misleading dead buttons by making only real actions clickable and labeling the rest truthfully |
+| CP validation | `npm run build` + `npm run test:run` exited `0` after these fixes |
+
+Files in Chunk 1B:
+- `src/CP/FrontEnd/src/pages/HireSetupWizard.tsx`
+- `src/CP/FrontEnd/src/pages/authenticated/UsageBilling.tsx`
+- `src/CP/FrontEnd/src/pages/authenticated/ProfileSettings.tsx`
+- `src/CP/FrontEnd/src/styles/globals.css`
+
+### Chunk 2A — PP QA sub-checkpoint
+
+Validated and ready on branch before moving deeper into PP ops and governance pages.
+
+| Area | Result |
+|---|---|
+| Sidebar navigation accuracy | fixed misleading `/governor` label so contributors now see `Governor Console` instead of the wrong `Reference Agents` wording |
+| Agent setup reset behavior | fixed reset flow so it clears stale validation and success state instead of leaving misleading saved UI on screen |
+| Review queue empty state | fixed blank-result behavior by showing a clear no-batches-found state after load |
+| PP validation | `npm run build` + `npx vitest run` exited `0` after these fixes |
+
+Files in Chunk 2A:
+- `src/PP/FrontEnd/src/components/Layout.tsx`
+- `src/PP/FrontEnd/src/pages/AgentTypeSetupScreen.tsx`
+- `src/PP/FrontEnd/src/pages/ReviewQueue.tsx`
+
+### Chunk 2B — PP QA sub-checkpoint
+
+Validated and ready on branch after the PP ops/governance slice.
+
+| Area | Result |
+|---|---|
+| Hired agent runtime guidance | added a clear pre-selection state plus a compact selected-instance summary so ops can orient before drilling into tabs |
+| Policy denials workflow | changed denials from eager auto-load to a deliberate search action with a better first-load guidance state and more truthful empty state |
+| Audit console guidance | added a pre-run explanation card so contributors know when to run a broad audit versus a scoped investigation |
+| PP validation | `npm run build` exited `0`; targeted `vitest` coverage for layout, hired-agent ops, review queue, and policy denials exited `0` |
+
+Files in Chunk 2B:
+- `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx`
+- `src/PP/FrontEnd/src/pages/PolicyDenials.tsx`
+- `src/PP/FrontEnd/src/pages/AuditConsole.tsx`
+- `src/PP/FrontEnd/src/pages/PolicyDenials.test.tsx`
+- `src/PP/FrontEnd/src/__tests__/Layout.test.tsx`
+- `src/PP/FrontEnd/src/__tests__/HiredAgentsOps.test.tsx`
+
+### Chunk 3A — Mobile QA sub-checkpoint
+
+Validated and ready on branch after the first mobile journey slice.
+
+| Area | Result |
+|---|---|
+| Cross-tab navigation reliability | fixed Today, Discover, and Ops flows to jump through the tab navigator instead of trying stack-local route names that could miss the intended tab |
+| Home action honesty | changed the second Today quick action so it truthfully opens Ops instead of claiming to start a trial while sending users elsewhere |
+| Ops list routing | fixed hired-agent rows so active hires open the operations hub by default, while trials still open the trial dashboard |
+| Small-screen fit | wrapped profile and ops pill rows so the mobile shell stays readable on narrow devices |
+| Mobile validation | `npm run typecheck` exited `0`; targeted `jest` coverage for navigation config exited `0`; full mobile Jest remains noisy from an unrelated localhost push-token registration side effect |
+
+Files in Chunk 3A:
+- `src/mobile/src/screens/home/HomeScreen.tsx`
+- `src/mobile/src/screens/agents/MyAgentsScreen.tsx`
+- `src/mobile/src/screens/discover/DiscoverScreen.tsx`
+- `src/mobile/src/screens/discover/AgentDetailScreen.tsx`
+- `src/mobile/src/screens/profile/ProfileScreen.tsx`
+
+### Chunk 3B — Mobile QA sub-checkpoint
+
+Validated and ready on branch after the remaining auth, profile, and approval-flow slice.
+
+| Area | Result |
+|---|---|
+| Signup -> profile continuity | carried signup identity data through OTP verification so the post-verification mobile shell has the customer name, phone, and business context immediately |
+| Settings honesty | replaced the inert notifications toggle in settings with a real manage-notifications route |
+| Approval-entry clarity | improved the notifications surface so approval and health alerts clearly explain that they route into the ops hub, and fixed that route to switch tabs correctly |
+| Mobile validation | `npm run typecheck` exited `0`; targeted `jest` coverage for navigation config exited `0` |
+
+Files in Chunk 3B:
+- `src/mobile/src/navigation/types.ts`
+- `src/mobile/src/navigation/AuthNavigator.tsx`
+- `src/mobile/src/screens/auth/SignUpScreen.tsx`
+- `src/mobile/src/screens/auth/OTPVerificationScreen.tsx`
+- `src/mobile/src/screens/profile/SettingsScreen.tsx`
+- `src/mobile/src/screens/profile/NotificationsScreen.tsx`
+
+### Iteration 1 Status
+
+Journey QA is now complete across CP, PP, and mobile. The next phase is the consolidated defect pass so remaining rough edges can be fixed across products instead of one surface at a time.
+
+### Iteration 2 — Defect Fixes
+
+#### Chunk 4A — Mobile residual defect fixes
+
+Validated and ready on branch after the first defect-fix slice.
+
+| Area | Result |
+|---|---|
+| Push-token test noise | guarded mobile push-token registration in test mode so Jest runs stop firing localhost requests as a login side effect |
+| My Agents landing behavior | switched the ops landing tab automatically to hired agents when a customer has no trials but does have active hires |
+| Settings sign-out safety | added logout confirmation in settings so the mobile account journey is consistent with profile sign-out behavior |
+| Validation | `npm run typecheck` exited `0`; targeted navigation Jest coverage still exited `0` |
+
+Files in Chunk 4A:
+- `src/mobile/src/services/notifications/pushNotifications.service.ts`
+- `src/mobile/src/screens/agents/MyAgentsScreen.tsx`
+- `src/mobile/src/screens/profile/SettingsScreen.tsx`
+
+#### Chunk 4B — PP usage-events first-load honesty
+
+Validated and ready on branch after the second defect-fix slice.
+
+| Area | Result |
+|---|---|
+| Usage events first paint | removed the fake default customer load so contributors now choose scope deliberately instead of landing on placeholder data |
+| Aggregate honesty | changed usage aggregates to a deliberate load flow with guidance before the first query and truthful empty states after load |
+| Validation | `npm run build` exited `0`; targeted `vitest` coverage for usage events exited `0` |
+
+Files in Chunk 4B:
+- `src/PP/FrontEnd/src/pages/CustomerManagement.tsx`
+- `src/PP/FrontEnd/src/pages/CustomerManagement.test.tsx`
+
+### Iteration 2 Status
+
+The consolidated defect pass is complete. The next phase is targeted frontend test hardening around the revised shells, routing, and first-load states.
+
+### Iteration 3 — Frontend Test Hardening
+
+#### Chunk 5A — CP portal + mobile ops coverage
+
+Validated and ready on branch after the first test-hardening slice.
+
+| Area | Result |
+|---|---|
+| CP portal shell | added coverage for billing hero copy and discover-to-agent-detail sidebar state in the authenticated portal |
+| Mobile ops routing | added coverage for auto-switching to hired agents when trials are empty and routing hires into the operations hub |
+| Validation | focused CP `vitest` and mobile `jest` targets exited `0` |
+
+Files in Chunk 5A:
+- `src/CP/FrontEnd/src/__tests__/AuthenticatedPortal.test.tsx`
+- `src/mobile/src/screens/agents/__tests__/MyAgentsScreen.test.tsx`
+
+#### Chunk 5B — PP hook-trace test stabilization
+
+Validated and ready on branch after the second test-hardening slice.
+
+| Area | Result |
+|---|---|
+| PP hook trace assertions | stabilized tests against duplicate option labels and header-row counts so the focused hook-trace suite reflects the actual contributor UI |
+| Validation | focused PP `vitest` for `HookTracePanel` exited `0` |
+
+Files in Chunk 5B:
+- `src/PP/FrontEnd/src/__tests__/HookTracePanel.test.tsx`
+
+### Iteration 3 Status
+
+Focused frontend test hardening is complete. The final phase is smoke validation and PR-prep context so the branch can be handed off cleanly.
+
+### Iteration 4 — Final Smoke + PR Prep
+
+Validated and ready on branch after the final smoke pass.
+
+| Area | Result |
+|---|---|
+| Worktree state | `git status --short` returned clean |
+| CP smoke | `npm run build` and focused `vitest` for `AuthenticatedPortal` exited `0` |
+| PP smoke | `npm run build` and focused `vitest` for layout, hired-agent ops, review queue, hook trace, policy denials, and usage events exited `0` |
+| Mobile smoke | `npm run typecheck` and focused `jest` for navigation plus `MyAgentsScreen` exited `0` |
+| Residual warnings | Vite still warns about large frontend chunks in CP and PP builds; mobile Jest still emits upstream `react-test-renderer` deprecation noise; `ts-jest` warns to move `isolatedModules` into `tsconfig.json` |
+
+### Iteration 4 Status
+
+All four iterations are complete on `feat/ui-ux-revamp`. The branch is clean, checkpointed, and ready for PR handoff with residual warnings documented above.
+
+---
+
+## Iteration Guidance
+
+### Iteration 1 — Journey QA
+
+Do a real walkthrough of the revamped product surfaces and log defects by severity.
+
+- CP customer journey:
+  - sign in
+  - sign up
+  - discover
+  - hire setup
+  - command centre
+  - billing
+  - profile
+- PP contributor journey:
+  - landing
+  - dashboard
+  - agent type setup
+  - hired agents ops
+  - review queue
+  - policy denials
+  - audit console
+- Mobile customer journey:
+  - sign in
+  - sign up
+  - Today tab
+  - Ops tab
+  - profile
+  - approvals flow
+
+### Iteration 2 — Defect Fixes
+
+Address the specific issues found in Iteration 1.
+
+Priorities:
+- responsive breakpoints
+- spacing and hierarchy regressions
+- empty/loading/error states
+- language consistency across CP, PP, and mobile
+- navigation rough edges
+
+### Iteration 3 — Frontend Test Hardening
+
+Add focused tests to protect the revamp.
+
+Priority targets:
+- CP portal navigation and command-centre routing
+- CP hire/setup flow shell states
+- PP dashboard and contributor-page render coverage
+- mobile home, profile, and agent operations states
+
+---
+
+## Hygiene Rules For This Branch
+
+- Keep working in small chunks.
+- After each chunk, commit and push immediately.
+- Prefer checkpoint-style commit messages when a chunk is finished.
+- Do not start the next chunk before the previous one is validated.
+- If the session drops, resume from this file first, then `git log --oneline -5`.
+
+---
+
 # Running Commentary — 2026-03-05
 
 > **Purpose:** Fix 3 UI/payment defects: coupon checkout error (D2), sign-out landing page redirect (D3), sign-in screen dividers + 6-digit OTP (D4).

@@ -73,6 +73,7 @@ export default function SignUp({ theme, toggleTheme }: SignUpProps) {
   }, [location.search])
 
   const step = STEP_CONTENT[regStep]
+  const registrationMilestones = ['Create account', 'Describe business', 'Launch first agent trial']
 
   return (
     <>
@@ -99,14 +100,30 @@ export default function SignUp({ theme, toggleTheme }: SignUpProps) {
               <section className="auth-left-panel" aria-label="Why create an account">
                 <div className="auth-left-step" key={regStep}>
                   <div className="auth-left-illustration">{step.illustration}</div>
+                  <div className="auth-side-kicker">Start Your Workforce</div>
                   <h2 className="auth-left-heading">{step.heading}</h2>
                   <p className="auth-left-tagline">{step.tagline}</p>
+                  <div className="auth-milestone-list">
+                    {registrationMilestones.map((milestone, index) => (
+                      <div key={milestone} className={`auth-milestone-item ${regStep === index + 1 ? 'active' : ''}`}>
+                        <span className="auth-milestone-index">0{index + 1}</span>
+                        <span>{milestone}</span>
+                      </div>
+                    ))}
+                  </div>
                   <ul className="auth-left-bullets">
                     {step.bullets.map((b) => (
                       <li key={b}>{b}</li>
                     ))}
                   </ul>
                   <p className="auth-left-footnote">{step.footnote}</p>
+                  <div className="auth-confidence-card">
+                    <div className="auth-confidence-title">Why this matters</div>
+                    <p className="auth-confidence-body">
+                      Signup should explain the value ladder: try first, keep the work, then decide whether this agent
+                      deserves a bigger role in the business.
+                    </p>
+                  </div>
                 </div>
               </section>
 

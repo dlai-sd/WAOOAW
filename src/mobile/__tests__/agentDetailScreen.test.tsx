@@ -67,9 +67,15 @@ jest.mock('@/hooks/useTheme', () => ({
 
 // Mock navigation
 const mockNavigate = jest.fn();
+const mockParentNavigate = jest.fn();
+const mockGoBack = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: mockNavigate,
+    getParent: () => ({
+      navigate: mockParentNavigate,
+    }),
+    goBack: mockGoBack,
   }),
   useRoute: () => ({
     params: { agentId: 'agent-123' },
@@ -447,7 +453,7 @@ describe('AgentDetailScreen Component', () => {
     expect(queryByText('Start 7-Day Free Trial')).toBeNull();
   });
 
-  it('should handle CTA button press', () => {
+  it('should route CTA button press through the discover tab hire wizard', async () => {
     (useAgentDetail as jest.Mock).mockReturnValue({
       data: mockAgent,
       isLoading: false,
@@ -463,8 +469,12 @@ describe('AgentDetailScreen Component', () => {
     const ctaButton = getByText('Start 7-Day Free Trial');
     fireEvent.press(ctaButton);
 
-    // Should log to console (Hire Wizard navigation in Story 2.6)
-    expect(true).toBe(true); // Placeholder assertion
+    await waitFor(() => {
+      expect(mockParentNavigate).toHaveBeenCalledWith('DiscoverTab', {
+        screen: 'HireWizard',
+        params: { agentId: 'agent-123' },
+      });
+    });
   });
 
   it('should call refetch on retry button press', () => {

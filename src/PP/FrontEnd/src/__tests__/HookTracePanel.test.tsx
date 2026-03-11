@@ -44,9 +44,9 @@ test('HookTracePanel renders table with hook events', async () => {
     expect(screen.getByText('pre_pump')).toBeInTheDocument()
   })
 
-  expect(screen.getByText('proceed')).toBeInTheDocument()
-  expect(screen.getByText('post_processor')).toBeInTheDocument()
-  expect(screen.getByText('halt')).toBeInTheDocument()
+  expect(screen.getAllByText('proceed').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText('post_processor').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getAllByText('halt').length).toBeGreaterThanOrEqual(1)
 })
 
 test('HookTracePanel renders up to 50 rows', async () => {
@@ -65,8 +65,8 @@ test('HookTracePanel renders up to 50 rows', async () => {
   render(<HookTracePanel hiredAgentId="HIRE-1" />)
 
   await waitFor(() => {
-    const rows = screen.getAllByText('pre_pump')
-    expect(rows.length).toBe(50)
+    const rows = screen.getAllByRole('row')
+    expect(rows.length - 1).toBe(50)
   })
 })
 
@@ -109,7 +109,7 @@ test('HookTracePanel halt rows have red tint background', async () => {
   render(<HookTracePanel hiredAgentId="HIRE-1" />)
 
   await waitFor(() => {
-    expect(screen.getByText('halt')).toBeInTheDocument()
+    expect(screen.getAllByText('halt').length).toBeGreaterThanOrEqual(1)
   })
 
   // The halt row text should be visible

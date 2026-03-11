@@ -20,7 +20,7 @@ function sanitizeNextPath(raw: string | null): string | null {
 const LEFT_PANEL = {
   illustration: '',
   heading: 'Welcome back.',
-  tagline: 'Your AI workforce is ready.',
+  tagline: 'Your AI workforce is ready to run.',
   bullets: [
     '✅ 7-day free trial — no credit card needed',
     '✅ Keep all deliverables, even if you cancel',
@@ -29,6 +29,12 @@ const LEFT_PANEL = {
   ],
   footnote: 'Join hundreds of businesses already saving hours every week.',
 }
+
+const SIGNIN_PROOF = [
+  { value: '19+', label: 'Specialised agents' },
+  { value: '1', label: 'Unified customer OS' },
+  { value: '24/7', label: 'Always-on workforce' },
+]
 
 export default function SignIn({ theme, toggleTheme }: SignInProps) {
   const location = useLocation()
@@ -67,14 +73,30 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
               <section className="auth-left-panel" aria-label="Why use WAOOAW">
                 <div className="auth-left-step">
                   <div className="auth-left-illustration">{p.illustration}</div>
+                  <div className="auth-side-kicker">Customer Command Centre</div>
                   <h2 className="auth-left-heading">{p.heading}</h2>
                   <p className="auth-left-tagline">{p.tagline}</p>
+                  <div className="auth-proof-grid">
+                    {SIGNIN_PROOF.map((item) => (
+                      <div key={item.label} className="auth-proof-card">
+                        <div className="auth-proof-value">{item.value}</div>
+                        <div className="auth-proof-label">{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
                   <ul className="auth-left-bullets">
                     {p.bullets.map((b) => (
                       <li key={b}>{b}</li>
                     ))}
                   </ul>
                   <p className="auth-left-footnote">{p.footnote}</p>
+                  <div className="auth-confidence-card">
+                    <div className="auth-confidence-title">What customers should feel here</div>
+                    <p className="auth-confidence-body">
+                      Clear entry, low friction, and immediate confidence that WAOOAW will help them hire, approve,
+                      monitor spend, and operate agents without getting lost.
+                    </p>
+                  </div>
                 </div>
               </section>
 

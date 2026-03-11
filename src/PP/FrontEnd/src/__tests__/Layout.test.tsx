@@ -29,11 +29,9 @@ test('E7-S1-T1: Nav shows "Usage Events" for /customers route', () => {
   expect(screen.getByText('Usage Events')).toBeInTheDocument()
 })
 
-test('E7-S1-T2: Nav shows "Reference Agents" for /governor route', () => {
+test('E7-S1-T2: Nav shows "Governor Console" for /governor route', () => {
   renderLayout()
-  // There are two "Reference Agents" entries: the /governor and /reference-agents items
-  const items = screen.getAllByText('Reference Agents')
-  expect(items.length).toBeGreaterThanOrEqual(1)
+  expect(screen.getByText('Governor Console')).toBeInTheDocument()
 })
 
 test('E7-S1: "Customers" label is not present in nav (renamed to Usage Events)', () => {
@@ -43,7 +41,7 @@ test('E7-S1: "Customers" label is not present in nav (renamed to Usage Events)',
   expect(navLinks).toHaveLength(0)
 })
 
-test('E7-S1: "Governor" label is not present in nav (renamed to Reference Agents)', () => {
+test('E7-S1: "Governor" label is not present in nav (renamed to Governor Console)', () => {
   renderLayout()
   const navLinks = screen.queryAllByRole('link', { name: /^Governor$/ })
   expect(navLinks).toHaveLength(0)

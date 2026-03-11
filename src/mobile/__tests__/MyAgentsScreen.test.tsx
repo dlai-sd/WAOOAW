@@ -90,6 +90,7 @@ jest.mock('@/components/ErrorView', () => {
 
 // Mock navigation
 const mockNavigate = jest.fn();
+const mockParentNavigate = jest.fn();
 const mockNavigation = {
   navigate: mockNavigate,
   goBack: jest.fn(),
@@ -99,7 +100,9 @@ const mockNavigation = {
   canGoBack: jest.fn(() => true),
   dispatch: jest.fn(),
   isFocused: jest.fn(() => true),
-  getParent: jest.fn(),
+  getParent: jest.fn(() => ({
+    navigate: mockParentNavigate,
+  })),
   getState: jest.fn(),
   reset: jest.fn(),
   setParams: jest.fn(),
@@ -152,6 +155,7 @@ describe('MyAgentsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockNavigate.mockClear();
+    mockParentNavigate.mockClear();
   });
 
   const renderScreen = () => {
@@ -299,7 +303,9 @@ describe('MyAgentsScreen', () => {
       fireEvent.press(ctaButton);
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('Discover');
+        expect(mockParentNavigate).toHaveBeenCalledWith('DiscoverTab', {
+          screen: 'Discover',
+        });
       });
     });
 
@@ -574,8 +580,8 @@ describe('MyAgentsScreen', () => {
       fireEvent.press(agentCard);
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('AgentDetail', {
-          agentId: 'seo_specialist',
+        expect(mockNavigate).toHaveBeenCalledWith('AgentOperations', {
+          hiredAgentId: 'hire_456',
         });
       });
     });

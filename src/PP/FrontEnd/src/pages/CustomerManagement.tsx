@@ -52,10 +52,12 @@ type UsageEventsAggregateResponse = {
 }
 
 export default function CustomerManagement() {
-  const [customerId, setCustomerId] = useState('CUST-1')
+  const [customerId, setCustomerId] = useState('')
   const [agentId, setAgentId] = useState('')
   const [limit, setLimit] = useState('100')
   const [aggregateBucket, setAggregateBucket] = useState<'day' | 'month'>('day')
+  const [hasLoadedUsage, setHasLoadedUsage] = useState(false)
+  const [hasLoadedAggregates, setHasLoadedAggregates] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [data, setData] = useState<UsageEventsListResponse | null>(null)
@@ -72,11 +74,13 @@ export default function CustomerManagement() {
         agent_id: agentId.trim() || undefined,
         limit: Number(limit) || 100
       })) as UsageEventsListResponse
+      setHasLoadedUsage(true)
       setData(response)
     } catch (e: any) {
       if (e?.name === 'AbortError' || signal?.aborted) return
       setError(e)
       setData(null)
+      setHasLoadedUsage(true)
     } finally {
       setIsLoading(false)
     }
@@ -90,22 +94,24 @@ export default function CustomerManagement() {
         customer_id: customerId.trim() || undefined,
         agent_id: agentId.trim() || undefined
       })) as UsageEventsAggregateResponse
+      setHasLoadedAggregates(true)
       setAggregateData(response)
     } catch (e: any) {
       if (e?.name === 'AbortError' || signal?.aborted) return
       setAggregateError(e)
       setAggregateData(null)
+      setHasLoadedAggregates(true)
     } finally {
       setIsAggregateLoading(false)
     }
   }, [aggregateBucket, customerId, agentId])
 
   useEffect(() => {
+    if (!hasLoadedAggregates) return
     const abortController = new AbortController()
-    void loadUsage(abortController.signal)
     void loadAggregates(abortController.signal)
     return () => abortController.abort()
-  }, [loadUsage, loadAggregates])
+  }, [aggregateBucket, hasLoadedAggregates, loadAggregates])
 
   return (
     <div className="page-container">
@@ -120,7 +126,7 @@ export default function CustomerManagement() {
           description={<Text size={200}>{isLoading ? 'Loading…' : data ? `${data.count} events` : '—'}</Text>}
           action={
             <Button appearance="subtle" size="small" onClick={() => void loadUsage()} disabled={isLoading}>
-              Refresh
+              {hasLoadedUsage ? 'Refresh' : 'Load usage'}
             </Button>
           }
         />
@@ -139,6 +145,19 @@ export default function CustomerManagement() {
             <Input value={limit} onChange={(_, d) => setLimit(d.value)} placeholder="100" />
           </div>
         </div>
+
+        {!error && !isLoading && !hasLoadedUsage && (
+          <div style={{ padding: 16 }}>
+            <Card>
+              <div style={{ padding: 16 }}>
+                <Text weight="semibold">Start with a customer or agent filter</Text>
+                <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+                  Usage review is more useful when contributors intentionally load a customer or agent scope instead of landing on placeholder data.
+                </Text>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {error && <div style={{ padding: 16 }}><ApiErrorPanel title="Usage events error" error={error} /></div>}
 
@@ -173,7 +192,7 @@ export default function CustomerManagement() {
               </TableRow>
             ))}
 
-            {!isLoading && !error && (data?.events || []).length === 0 && (
+            {!isLoading && !error && hasLoadedUsage && (data?.events || []).length === 0 && (
               <TableRow>
                 <TableCell colSpan={7}>
                   <Text>No usage events returned.</Text>
@@ -206,11 +225,24 @@ export default function CustomerManagement() {
                 Month
               </Button>
               <Button appearance="subtle" size="small" onClick={() => void loadAggregates()} disabled={isAggregateLoading}>
-                Refresh
+                {hasLoadedAggregates ? 'Refresh' : 'Load aggregates'}
               </Button>
             </div>
           }
         />
+
+        {!aggregateError && !isAggregateLoading && !hasLoadedAggregates && (
+          <div style={{ padding: 16 }}>
+            <Card>
+              <div style={{ padding: 16 }}>
+                <Text weight="semibold">Load aggregates after choosing the scope</Text>
+                <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
+                  Pick the customer, optional agent, and bucket size first so the aggregate view answers a real operational question.
+                </Text>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {aggregateError && <div style={{ padding: 16 }}><ApiErrorPanel title="Usage aggregates error" error={aggregateError} /></div>}
 
@@ -241,7 +273,7 @@ export default function CustomerManagement() {
               </TableRow>
             ))}
 
-            {!isAggregateLoading && !aggregateError && (aggregateData?.rows || []).length === 0 && (
+            {!isAggregateLoading && !aggregateError && hasLoadedAggregates && (aggregateData?.rows || []).length === 0 && (
               <TableRow>
                 <TableCell colSpan={5}>
                   <Text>No aggregate rows returned.</Text>

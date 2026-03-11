@@ -349,6 +349,9 @@ export const gatewayApiClient = {
   listApprovals: (query?: { customer_id?: string; agent_id?: string; action?: string; correlation_id?: string; limit?: number }) =>
     gatewayRequestJson<{ count: number; approvals: any[] }>(withQuery('/pp/approvals', query)),
 
+  listReviewQueueApprovals: (query?: { customer_id?: string; agent_id?: string; action?: string; correlation_id?: string; limit?: number }) =>
+    gatewayRequestJson<{ count: number; approvals: any[] }>(withQuery('/pp/approvals/review-queue', query)),
+
   // Ops subscription routes (dedicated PP proxy — not catch-all)
   listOpsSubscriptions: (query?: {
     customer_id?: string
@@ -478,6 +481,14 @@ export const gatewayApiClient = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload || {})
+      }
+    ),
+
+  rejectMarketingDraftPost: (postId: string) =>
+    gatewayRequestJson<{ post_id: string; review_status: string }>(
+      `/v1/marketing/draft-posts/${encodeURIComponent(postId)}/reject`,
+      {
+        method: 'POST',
       }
     ),
 

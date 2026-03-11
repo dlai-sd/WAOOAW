@@ -25,6 +25,8 @@ import apiClient from '../../lib/apiClient';
  * Safe to call from sign-in flows — never throws.
  */
 export const registerPushToken = async (): Promise<void> => {
+  if (process.env.NODE_ENV === 'test') return;
+
   // expo-notifications is unsupported on web
   if (Platform.OS === 'web') return;
 

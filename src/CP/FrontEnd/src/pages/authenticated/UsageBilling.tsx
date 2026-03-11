@@ -75,16 +75,109 @@ export default function UsageBilling() {
     }
   }
 
+  const activeSubscriptions = subscriptions.filter((subscription) => (subscription.status || '').toLowerCase() === 'active')
+  const totalBilled = invoices.reduce((sum, invoice) => sum + (typeof invoice.total_amount === 'number' ? invoice.total_amount : 0), 0)
+  const totalReceipted = receipts.reduce((sum, receipt) => sum + (typeof receipt.total_amount === 'number' ? receipt.total_amount : 0), 0)
+
+  const summaryCards = [
+    {
+      label: 'Active subscriptions',
+      value: loading ? 'Loading…' : String(activeSubscriptions.length),
+      note: loading
+        ? 'Connecting to live subscription records'
+        : activeSubscriptions.length
+          ? 'Live agent contracts currently billing'
+          : 'No active subscriptions yet. Your billing timeline starts after the first live hire.',
+    },
+    {
+      label: 'Invoices to date',
+      value: loading ? 'Loading…' : invoices.length ? `₹${totalBilled}` : 'None yet',
+      note: loading
+        ? 'Waiting for invoice history'
+        : invoices.length
+          ? `Across ${invoices.length} invoice records`
+          : 'Invoices appear only after a chargeable billing event completes.',
+    },
+    {
+      label: 'Receipts available',
+      value: loading ? 'Loading…' : receipts.length ? `₹${totalReceipted}` : 'None yet',
+      note: loading
+        ? 'Waiting for receipt history'
+        : receipts.length
+          ? `Across ${receipts.length} receipt records`
+          : 'Receipts appear after successful payment capture.',
+    },
+  ]
+
   return (
     <div className="usage-billing-page">
       <div className="page-header">
         <h1>Usage & Billing</h1>
         <div className="plan-info">
-          <div>Next Billing Date: <strong>{nextBillingDate ? formatDate(nextBillingDate) : '—'}</strong></div>
+          <div>
+            Billing status:{' '}
+            <strong>
+              {loading
+                ? 'Loading live billing state'
+                : nextBillingDate
+                  ? `Next billing ${formatDate(nextBillingDate)}`
+                  : 'No active billing cycle yet'}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="usage-billing-overview">
+        <Card className="usage-billing-overview-card usage-billing-overview-card--accent">
+          <div className="usage-billing-overview-kicker">Spend Confidence</div>
+          <h2>Track what changed before billing surprises you.</h2>
+          <p>
+            WAOOAW should make cost legible: what is active, what has already been billed,
+            and which receipts prove the work you approved or purchased.
+          </p>
+        </Card>
+
+        <div className="usage-billing-summary-grid">
+          {summaryCards.map((card) => (
+            <Card key={card.label} className="usage-billing-summary-card">
+              <div className="usage-billing-summary-label">{card.label}</div>
+              <div className="usage-billing-summary-value">{card.value}</div>
+              <div className="usage-billing-summary-note">{card.note}</div>
+            </Card>
+          ))}
         </div>
       </div>
 
       <Card className="plan-comparison-card" style={{ padding: '1.25rem' }}>
+        <h2>Live subscriptions</h2>
+        {loading ? (
+          <div style={{ padding: '0.5rem 0' }}>Loading…</div>
+        ) : activeSubscriptions.length ? (
+          <div style={{ display: 'grid', gap: '0.75rem', paddingTop: '0.5rem', marginBottom: '1rem' }}>
+            {activeSubscriptions
+              .slice()
+              .sort((a, b) => String(a.current_period_end || '').localeCompare(String(b.current_period_end || '')))
+              .map((subscription) => (
+                <Card key={subscription.subscription_id} style={{ padding: '0.9rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{subscription.agent_id || subscription.subscription_id}</div>
+                      <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>
+                        Status: {subscription.status || 'active'} · Duration: {subscription.duration || '—'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.82rem', opacity: 0.8 }}>Next billing</div>
+                      <div style={{ fontWeight: 700 }}>{subscription.current_period_end ? formatDate(subscription.current_period_end) : '—'}</div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+          </div>
+        ) : (
+          <div style={{ padding: '0.5rem 0 1rem' }}>No active subscriptions yet. Hire an agent and activate the trial before billing can become live here.</div>
+        )}
+
         <h2>Invoices</h2>
         {loading ? (
           <div style={{ padding: '0.5rem 0' }}>Loading…</div>
@@ -119,7 +212,7 @@ export default function UsageBilling() {
               ))}
           </div>
         ) : (
-          <div style={{ padding: '0.5rem 0' }}>No invoices yet.</div>
+          <div style={{ padding: '0.5rem 0' }}>No invoices yet. WAOOAW will only show invoice records after an actual chargeable event occurs.</div>
         )}
 
         {error && <div style={{ paddingTop: '0.75rem', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div>}
@@ -160,10 +253,28 @@ export default function UsageBilling() {
               ))}
           </div>
         ) : (
-          <div style={{ padding: '0.5rem 0' }}>No receipts yet.</div>
+          <div style={{ padding: '0.5rem 0' }}>No receipts yet. Receipt proof appears only after payment succeeds.</div>
         )}
 
         {error && <div style={{ paddingTop: '0.75rem', color: 'var(--colorPaletteRedForeground1)' }}>{error}</div>}
+      </Card>
+
+      <Card className="usage-billing-confidence-card">
+        <div className="usage-billing-confidence-title">What a confident customer should always know</div>
+        <div className="usage-billing-confidence-grid">
+          <div>
+            <strong>What is live</strong>
+            <p>Which subscriptions are actually active right now, not what the shell assumes should exist.</p>
+          </div>
+          <div>
+            <strong>What was charged</strong>
+            <p>Invoices should only appear when a real billing event completed, and every record should map back to a subscription.</p>
+          </div>
+          <div>
+            <strong>What proves payment</strong>
+            <p>Receipts should be one click away whenever finance or compliance asks for evidence of payment.</p>
+          </div>
+        </div>
       </Card>
     </div>
   )

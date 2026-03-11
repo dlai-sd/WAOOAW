@@ -4,14 +4,14 @@
  * App preferences: notifications toggle, privacy policy, terms, sign-out.
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
+  Alert,
   View,
   Text,
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Switch,
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuthStore } from '../../store/authStore';
@@ -22,14 +22,30 @@ type Props = ProfileStackScreenProps<'Settings'>;
 export const SettingsScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
   const logout = useAuthStore((state) => state.logout);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const handleSignOut = async () => {
-    try {
-      await logout();
-    } catch {
-      // logout cleans up state regardless
-    }
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch {
+              // logout cleans up state regardless
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const rowStyle = {
@@ -97,15 +113,18 @@ export const SettingsScreen = ({ navigation }: Props) => {
       <ScrollView>
         {/* Preferences */}
         <Text style={sectionHeaderStyle}>Preferences</Text>
-        <View style={rowStyle}>
-          <Text style={labelStyle}>🔔  Notifications</Text>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{ false: colors.border, true: colors.neonCyan }}
-            thumbColor={notificationsEnabled ? colors.black : colors.textSecondary}
-          />
-        </View>
+        <TouchableOpacity
+          style={rowStyle}
+          onPress={() => navigation.navigate('Notifications')}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={labelStyle}>🔔  Manage Notifications</Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 12, marginTop: 2 }}>
+              Push permissions, alert types, and approval routing previews
+            </Text>
+          </View>
+          <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
+        </TouchableOpacity>
 
         {/* Legal */}
         <Text style={sectionHeaderStyle}>Legal</Text>

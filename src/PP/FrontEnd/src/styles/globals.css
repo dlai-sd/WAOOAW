@@ -131,6 +131,20 @@ body {
   height: 100%;
 }
 
+.pp-public-chip,
+.pp-shell-chip {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pp-public-chip {
+  color: var(--colorBrandForeground1);
+}
+
 .landing-page {
   max-width: 1400px;
   margin: 0 auto;
@@ -168,6 +182,31 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 32px;
+}
+
+.pp-landing-proof-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.pp-landing-proof-pill {
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.pp-landing-role-grid,
+.pp-dashboard-grid,
+.pp-dashboard-role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
 }
 
 .feature-card {
@@ -221,6 +260,40 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.sidebar-workspace-card {
+  margin: 0 8px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: linear-gradient(160deg, rgba(0, 242, 254, 0.12), rgba(102, 126, 234, 0.08));
+}
+
+.sidebar-workspace-label,
+.pp-shell-eyebrow,
+.pp-dashboard-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #00f2fe;
+}
+
+.sidebar-workspace-title {
+  margin-top: 0.45rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.sidebar-workspace-body,
+.pp-shell-description,
+.pp-dashboard-body-copy,
+.pp-dashboard-role-grid p,
+.pp-dashboard-priority-item {
+  color: var(--colorNeutralForeground2);
+  line-height: 1.55;
 }
 
 .sidebar-logo-image {
@@ -279,6 +352,39 @@ body {
   padding: 32px;
 }
 
+.pp-shell-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 24px;
+  padding: 24px 28px;
+  border-radius: 24px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background:
+    radial-gradient(circle at top left, rgba(0, 242, 254, 0.18), transparent 35%),
+    linear-gradient(160deg, var(--colorNeutralBackground2), rgba(24, 24, 27, 0.92));
+}
+
+.pp-shell-title {
+  margin: 0.4rem 0 0.7rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2rem, 2.8vw, 2.7rem);
+}
+
+.pp-shell-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.pp-shell-chip--success {
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.12);
+}
+
 /* Page styles */
 .page-container {
   max-width: 1400px;
@@ -306,4 +412,73 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.pp-dashboard-panel {
+  padding: 22px;
+  border-radius: 22px;
+}
+
+.pp-dashboard-panel--accent {
+  background:
+    radial-gradient(circle at top right, rgba(240, 147, 251, 0.16), transparent 35%),
+    linear-gradient(160deg, var(--colorNeutralBackground2), var(--colorNeutralBackground3));
+}
+
+.pp-dashboard-priority-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.pp-agent-setup-hero,
+.pp-agent-setup-footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.pp-agent-setup-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pp-agent-setup-card {
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.pp-agent-setup-card--accent {
+  background:
+    radial-gradient(circle at top right, rgba(0, 242, 254, 0.16), transparent 35%),
+    linear-gradient(160deg, var(--colorNeutralBackground2), var(--colorNeutralBackground3));
+}
+
+.pp-agent-setup-metric {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.pp-agent-setup-label {
+  color: var(--colorNeutralForeground2);
+  margin-top: 6px;
+}
+
+@media (max-width: 980px) {
+  .pp-shell-hero,
+  .pp-agent-setup-hero,
+  .pp-agent-setup-footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pp-shell-chip-row {
+    justify-content: flex-start;
+  }
+
+  .pp-agent-setup-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }

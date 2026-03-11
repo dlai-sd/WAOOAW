@@ -86,6 +86,12 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
+  function handleReset() {
+    setForm({ ...DEFAULT_FORM, hooks: { ...DEFAULT_HOOKS } })
+    setValidationErrors({})
+    setSubmitted(false)
+  }
+
   async function handleSubmit() {
     const errors = validate(form)
     setValidationErrors(errors)
@@ -110,6 +116,31 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
         <Body1>Configure agent identity, construct bindings, policy and hooks</Body1>
       </div>
 
+      <div className="pp-agent-setup-hero">
+        <Card className="pp-agent-setup-card pp-agent-setup-card--accent">
+          <div className="pp-dashboard-kicker">Author safely</div>
+          <Text as="h2" size={700} weight="semibold">Design hireable supply with stronger runtime discipline.</Text>
+          <p className="pp-dashboard-body-copy">
+            This surface should help tech staff and ops contributors understand what will be published, what approvals will
+            exist later, and what construct gaps still block a clean release.
+          </p>
+        </Card>
+        <div className="pp-agent-setup-summary-grid">
+          <Card className="pp-agent-setup-card">
+            <div className="pp-agent-setup-metric">4</div>
+            <div className="pp-agent-setup-label">Authoring sections</div>
+          </Card>
+          <Card className="pp-agent-setup-card">
+            <div className="pp-agent-setup-metric">1</div>
+            <div className="pp-agent-setup-label">Publish story to understand</div>
+          </Card>
+          <Card className="pp-agent-setup-card">
+            <div className="pp-agent-setup-metric">0</div>
+            <div className="pp-agent-setup-label">Guesswork desired</div>
+          </Card>
+        </div>
+      </div>
+
       {!!error && <ApiErrorPanel title="Agent type setup error" error={error} />}
 
       {submitted && savedAt && (
@@ -132,6 +163,7 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
       <Card style={{ marginBottom: 16 }}>
         <CardHeader header={<Text weight="semibold">1. Identity</Text>} />
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600 }}>
+          <Text size={200} style={{ opacity: 0.8 }}>Name the construct so marketplace, support, and ops teams can immediately understand what this agent is for.</Text>
           <Field
             label="Agent type"
             required
@@ -199,6 +231,7 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
           </div>
         )}
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600 }}>
+          <Text size={200} style={{ opacity: 0.8 }}>These bindings decide what the runtime can do. The UX should help contributors spot incomplete definitions early.</Text>
           <Field
             label="Processor class"
             required
@@ -287,6 +320,7 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
       <Card style={{ marginBottom: 16 }}>
         <CardHeader header={<Text weight="semibold">3. Constraint Policy</Text>} />
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600 }}>
+          <Text size={200} style={{ opacity: 0.8 }}>Policy is part of the product. This is where a contributor decides whether the customer later sees approvals, limits, and safe defaults.</Text>
           <div>
             <Text size={200} style={{ display: 'block', marginBottom: 8, opacity: 0.85 }}>
               Approval mode
@@ -343,6 +377,7 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
       <Card style={{ marginBottom: 16 }}>
         <CardHeader header={<Text weight="semibold">4. Hook Checklist</Text>} />
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <Text size={200} style={{ opacity: 0.8 }}>Hooks are not implementation trivia. They are what make auditability, safety, and lifecycle control visible and dependable.</Text>
           {HOOK_LIST.map(hook => (
             <div key={hook.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <Checkbox
@@ -373,9 +408,20 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
         >
           {isSubmitting ? 'Saving…' : agentSetupId ? 'Update' : 'Create'}
         </Button>
-        <Button appearance="secondary" onClick={() => setForm({ ...DEFAULT_FORM, hooks: { ...DEFAULT_HOOKS } })}>
+        <Button appearance="secondary" onClick={handleReset}>
           Reset
         </Button>
+      </div>
+
+      <div className="pp-agent-setup-footer-grid">
+        <Card className="pp-agent-setup-card">
+          <Text weight="semibold">Best contributor outcome</Text>
+          <Text size={200}>A new agent type can be read, validated, simulated, and published without hidden assumptions.</Text>
+        </Card>
+        <Card className="pp-agent-setup-card">
+          <Text weight="semibold">Best customer outcome</Text>
+          <Text size={200}>The customer later hires a clear, trustworthy, well-governed agent type rather than a mystery bundle of settings.</Text>
+        </Card>
       </div>
     </div>
   )

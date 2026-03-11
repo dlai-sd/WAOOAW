@@ -156,7 +156,8 @@ export const MainNavigator = () => {
         name="HomeTab"
         component={HomeNavigator}
         options={{
-          title: "Home",
+          title: "Today",
+          tabBarButtonTestID: 'mobile-home-tab',
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
@@ -180,6 +181,7 @@ export const MainNavigator = () => {
         component={DiscoverNavigator}
         options={{
           title: "Discover",
+          tabBarButtonTestID: 'mobile-discover-tab',
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
@@ -202,7 +204,8 @@ export const MainNavigator = () => {
         name="MyAgentsTab"
         component={MyAgentsNavigator}
         options={{
-          title: "My Agents",
+          title: "Ops",
+          tabBarButtonTestID: 'mobile-my-agents-tab',
           tabBarIcon: ({ color, size }) => (
             <View
               style={{
@@ -226,6 +229,7 @@ export const MainNavigator = () => {
         component={ProfileNavigator}
         options={{
           title: "Profile",
+          tabBarButtonTestID: 'mobile-profile-tab',
           tabBarIcon: ({ color, size }) => (
             <View
               style={{

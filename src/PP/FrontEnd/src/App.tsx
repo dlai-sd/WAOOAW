@@ -103,6 +103,7 @@ function AppShell() {
                   <img src={waooawLogo} alt="WAOOAW Logo" className="logo-image" />
                 </div>
                 <div className="header-actions">
+                  <div className="pp-public-chip">For platform contributors</div>
                   <Button 
                     appearance="subtle" 
                     icon={theme === 'light' ? <WeatherMoon24Regular /> : <WeatherSunny24Regular />}
@@ -125,6 +126,9 @@ function AppShell() {
               <DialogBody data-testid="pp-login-dialog">
                 <DialogTitle>Sign in to Platform Portal</DialogTitle>
                 <DialogContent>
+                  <Text size={300} style={{ display: 'block', marginTop: '8px', opacity: 0.85 }}>
+                    Designed for WAOOAW tech staff, ops, infra, helpdesk, and governance contributors.
+                  </Text>
                   <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     {config.googleClientId ? (
                       <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} />

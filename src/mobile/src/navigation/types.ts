@@ -32,6 +32,12 @@ export type AuthStackParamList = {
     otpId: string;
     channel?: 'email' | 'phone';
     destinationMasked: string;
+    pendingProfile?: {
+      full_name: string;
+      email: string;
+      phone?: string;
+      business_name?: string;
+    };
   };
 };
 
@@ -94,8 +100,21 @@ export type MyAgentsStackParamList = {
   TrialDashboard: { trialId: string };
   ActiveTrialsList: undefined;
   HiredAgentsList: undefined;
-  AgentOperations: { hiredAgentId: string; focusSection?: string };
+  AgentOperations: {
+    hiredAgentId: string;
+    focusSection?: AgentOperationsFocusSection;
+  };
 };
+
+export type AgentOperationsFocusSection =
+  | 'activity'
+  | 'approvals'
+  | 'scheduler'
+  | 'health'
+  | 'goals'
+  | 'spend'
+  | 'recent'
+  | 'history';
 
 export type MyAgentsStackScreenProps<T extends keyof MyAgentsStackParamList> =
   NativeStackScreenProps<MyAgentsStackParamList, T>;
@@ -208,7 +227,7 @@ export const linking: any = {
               TrialDashboard: 'my-agents/trial/:trialId',
               ActiveTrialsList: 'trials/active',
               HiredAgentsList: 'agents/hired',
-              AgentOperations: 'my-agents/operations/:hiredAgentId',
+              AgentOperations: 'my-agents/operations/:hiredAgentId/:focusSection?',
             },
           },
           ProfileTab: {
