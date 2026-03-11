@@ -1,16 +1,34 @@
 from __future__ import annotations
 
+from datetime import datetime, UTC
+
 import httpx
 import pytest
 
 
-@pytest.mark.unit
-def test_cp_hired_agents_get_by_subscription_injects_customer_id(client, auth_headers, monkeypatch):
-    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+def _override_current_user():
+    from api.auth.dependencies import get_current_user
+    from main import app
+    from models.user import User
 
-    me = client.get("/api/auth/me", headers=auth_headers)
-    assert me.status_code == 200
-    user_id = me.json()["id"]
+    async def _fake_current_user() -> User:
+        return User(
+            id="cp-test-user",
+            email="test@example.com",
+            name="Test User",
+            provider="google",
+            provider_id="google-test-user",
+            created_at=datetime.now(UTC),
+        )
+
+    app.dependency_overrides[get_current_user] = _fake_current_user
+    return {"Authorization": "Bearer test-access-token"}, "cp-test-user"
+
+
+@pytest.mark.unit
+def test_cp_hired_agents_get_by_subscription_injects_customer_id(client, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+    auth_headers, user_id = _override_current_user()
 
     from api import hired_agents_proxy as api
 
@@ -40,11 +58,45 @@ def test_cp_hired_agents_get_by_subscription_injects_customer_id(client, auth_he
 
 
 @pytest.mark.unit
-def test_cp_hired_agents_returns_503_when_plant_url_missing(client, auth_headers, monkeypatch):
+def test_cp_hired_agents_returns_503_when_plant_url_missing(client, monkeypatch):
     monkeypatch.delenv("PLANT_GATEWAY_URL", raising=False)
+    auth_headers, _ = _override_current_user()
 
     resp = client.get("/api/cp/hired-agents/by-subscription/SUB-1", headers=auth_headers)
     assert resp.status_code == 503
+
+
+@pytest.mark.unit
+def test_cp_hired_agents_get_by_subscription_maps_plant_401_to_404(client, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+    auth_headers, _ = _override_current_user()
+
+    from api import hired_agents_proxy as api
+
+    async def _fake_get_json(*, url: str, authorization: str | None, correlation_id: str | None):
+        raise api.HTTPException(status_code=401, detail="Plant call failed (401)")
+
+    monkeypatch.setattr(api, "_plant_get_json", _fake_get_json)
+
+    resp = client.get("/api/cp/hired-agents/by-subscription/SUB-401", headers=auth_headers)
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Hired agent not found"
+
+
+@pytest.mark.unit
+def test_cp_hired_agents_get_by_subscription_preserves_other_4xx(client, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-gateway")
+    auth_headers, _ = _override_current_user()
+
+    from api import hired_agents_proxy as api
+
+    async def _fake_get_json(*, url: str, authorization: str | None, correlation_id: str | None):
+        raise api.HTTPException(status_code=422, detail="Plant call failed (422)")
+
+    monkeypatch.setattr(api, "_plant_get_json", _fake_get_json)
+
+    resp = client.get("/api/cp/hired-agents/by-subscription/SUB-422", headers=auth_headers)
+    assert resp.status_code == 422
 
 
 @pytest.mark.unit

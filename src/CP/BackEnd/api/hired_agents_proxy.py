@@ -223,11 +223,17 @@ async def get_by_subscription(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
-    data = await _plant_get_json(
-        url=f"{base}/api/v1/hired-agents/by-subscription/{subscription_id}?customer_id={current_user.id}",
-        authorization=authorization,
-        correlation_id=correlation_id,
-    )
+    try:
+        data = await _plant_get_json(
+            url=f"{base}/api/v1/hired-agents/by-subscription/{subscription_id}?customer_id={current_user.id}",
+            authorization=authorization,
+            correlation_id=correlation_id,
+        )
+    except HTTPException as exc:
+        if exc.status_code in {401, 403, 404, 410}:
+            raise HTTPException(status_code=404, detail="Hired agent not found")
+        raise
+
     return HiredAgentInstanceResponse(**data)
 
 @router.put("/draft", response_model=HiredAgentInstanceResponse)
