@@ -93,3 +93,20 @@ def test_reference_agent_tutor_has_bindings():
     from agent_mold.reference_agents import tutor_agent
     assert tutor_agent.bindings is not None
     tutor_agent.bindings.validate()
+
+
+def test_digital_marketing_agent_contract_exposes_visible_skills_and_youtube_destination():
+    from agent_mold.reference_agents import digital_marketing_agent
+
+    skill_dimension = digital_marketing_agent.spec.dimensions[digital_marketing_agent.spec.dimensions.keys().__iter__().__next__()]
+    assert skill_dimension is not None
+
+    skill_config = digital_marketing_agent.spec.dimensions[
+        next(name for name in digital_marketing_agent.spec.dimensions.keys() if name.value == "skill")
+    ].config
+    assert skill_config["visible_skills"] == [
+        "Theme Discovery",
+        "Content Creation",
+        "Content Publishing",
+    ]
+    assert skill_config["supported_live_destinations"] == ["youtube"]
