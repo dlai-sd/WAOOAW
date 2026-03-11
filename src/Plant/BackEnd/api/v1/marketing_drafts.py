@@ -61,6 +61,9 @@ class CreateDraftBatchRequest(BaseModel):
     audience: Optional[str] = None
     tone: Optional[str] = None
     language: Optional[str] = None
+    youtube_credential_ref: Optional[str] = None
+    youtube_visibility: str = "private"
+    public_release_requested: bool = False
 
     channels: Optional[List[ChannelName]] = None
 
@@ -128,6 +131,9 @@ async def create_draft_batch(
             channel=v.channel,
             text=v.text,
             hashtags=v.hashtags,
+            credential_ref=body.youtube_credential_ref if v.channel == ChannelName.YOUTUBE else None,
+            visibility=body.youtube_visibility if v.channel == ChannelName.YOUTUBE else "private",
+            public_release_requested=body.public_release_requested if v.channel == ChannelName.YOUTUBE else False,
         )
         for v in result.output.variants
     ]

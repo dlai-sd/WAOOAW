@@ -70,6 +70,25 @@ def _to_response(conn: PlatformConnectionModel) -> ConnectionResponse:
     )
 
 
+async def get_connected_platform_connection(
+    db: AsyncSession,
+    *,
+    hired_instance_id: str,
+    skill_id: str,
+    platform_key: str,
+) -> PlatformConnectionModel | None:
+    """Return a connected platform connection for publish eligibility checks."""
+
+    result = await db.execute(
+        select(PlatformConnectionModel)
+        .where(PlatformConnectionModel.hired_instance_id == hired_instance_id)
+        .where(PlatformConnectionModel.skill_id == skill_id)
+        .where(PlatformConnectionModel.platform_key == platform_key)
+        .where(PlatformConnectionModel.status == "connected")
+    )
+    return result.scalars().first()
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get(

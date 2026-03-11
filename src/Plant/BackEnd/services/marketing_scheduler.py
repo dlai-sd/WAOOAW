@@ -47,6 +47,13 @@ def run_due_posts_once(
             post.attempts += 1
 
             try:
+                if post.channel.value == "youtube" and not post.approval_id:
+                    raise RuntimeError("approval_required_for_youtube_publish")
+                if post.channel.value == "youtube" and not post.credential_ref:
+                    raise RuntimeError("credential_ref_required_for_youtube_publish")
+                if post.channel.value == "youtube" and post.visibility == "public" and not post.public_release_requested:
+                    raise RuntimeError("public_release_requires_explicit_customer_action")
+
                 # Deterministic placeholder for provider execution.
                 # For unit tests we can inject a transient failure by channel.
                 if fail_channel and post.channel.value == fail_channel:

@@ -136,6 +136,54 @@ def test_default_registry_includes_x_and_twitter_aliases():
 
 
 @pytest.mark.unit
+def test_default_registry_includes_youtube():
+    assert default_registry.is_registered("youtube") is True
+
+
+@pytest.mark.unit
+def test_youtube_publish_requires_approval_and_credential_ref():
+    post = _make_post("youtube")
+    engine = PublisherEngine(build_default_registry())
+
+    missing_approval = engine.publish(PublishInput(post=post, credential_ref="secret-ref"))
+    assert missing_approval.success is False
+    assert missing_approval.error == "approval_required_for_youtube_publish"
+
+    missing_credential = engine.publish(PublishInput(post=post, approval_id="APR-1"))
+    assert missing_credential.success is False
+    assert missing_credential.error == "credential_ref_required_for_youtube_publish"
+
+
+@pytest.mark.unit
+def test_youtube_public_release_requires_explicit_customer_action():
+    post = _make_post("youtube")
+    engine = PublisherEngine(build_default_registry())
+
+    denied = engine.publish(
+        PublishInput(
+            post=post,
+            approval_id="APR-1",
+            credential_ref="secret-ref",
+            visibility="public",
+            public_release_requested=False,
+        )
+    )
+    assert denied.success is False
+    assert denied.error == "public_release_requires_explicit_customer_action"
+
+    allowed = engine.publish(
+        PublishInput(
+            post=post,
+            approval_id="APR-1",
+            credential_ref="secret-ref",
+            visibility="public",
+            public_release_requested=True,
+        )
+    )
+    assert allowed.success is True
+
+
+@pytest.mark.unit
 def test_build_default_registry_returns_fresh_registry():
     """build_default_registry() returns a new independent DestinationRegistry."""
     r1 = build_default_registry()

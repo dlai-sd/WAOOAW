@@ -30,7 +30,10 @@ class DraftPostRecord(BaseModel):
 
     review_status: DraftReviewStatus = "pending_review"
     approval_id: Optional[str] = None
+    credential_ref: Optional[str] = None
     execution_status: DraftExecutionStatus = "not_scheduled"
+    visibility: str = "private"
+    public_release_requested: bool = False
 
     scheduled_at: Optional[datetime] = None
 
@@ -101,7 +104,10 @@ class FileDraftBatchStore:
         *,
         review_status: DraftReviewStatus | object = _UNSET,
         approval_id: str | None | object = _UNSET,
+        credential_ref: str | None | object = _UNSET,
         execution_status: DraftExecutionStatus | object = _UNSET,
+        visibility: str | object = _UNSET,
+        public_release_requested: bool | object = _UNSET,
         scheduled_at: datetime | None | object = _UNSET,
         attempts: int | object = _UNSET,
         last_error: str | None | object = _UNSET,
@@ -117,8 +123,14 @@ class FileDraftBatchStore:
                     post.review_status = review_status
                 if approval_id is not _UNSET:
                     post.approval_id = approval_id
+                if credential_ref is not _UNSET:
+                    post.credential_ref = credential_ref
                 if execution_status is not _UNSET:
                     post.execution_status = execution_status
+                if visibility is not _UNSET:
+                    post.visibility = visibility
+                if public_release_requested is not _UNSET:
+                    post.public_release_requested = public_release_requested
                 if scheduled_at is not _UNSET:
                     post.scheduled_at = scheduled_at
                 if attempts is not _UNSET:

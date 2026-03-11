@@ -16,6 +16,7 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
             "customer_id": "CUST-001",
             "theme": "Clinic hours update",
             "brand_name": "Care Clinic",
+            "youtube_credential_ref": "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest",
         },
     )
     assert create.status_code == 200
@@ -60,3 +61,49 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
     # Re-run should be idempotent (post is no longer 'scheduled')
     executed_again = run_due_posts_once(store, usage_events=events)
     assert executed_again == 0
+
+
+def test_scheduler_rejects_youtube_without_approval_or_credential_ref(test_client, tmp_path, monkeypatch):
+    store_path = tmp_path / "draft_batches.jsonl"
+    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "customer_id": "CUST-001",
+            "theme": "Clinic hours update",
+            "brand_name": "Care Clinic",
+        },
+    )
+    assert create.status_code == 200
+    post_id = create.json()["posts"][0]["post_id"]
+
+    store = FileDraftBatchStore(str(store_path))
+    assert store.update_post(
+        post_id,
+        review_status="approved",
+        execution_status="scheduled",
+        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
+    )
+
+    executed = run_due_posts_once(store)
+    assert executed == 1
+
+    _batch, post = store.find_post(post_id)  # type: ignore[assignment]
+    assert post.execution_status == "failed"
+    assert post.last_error == "approval_required_for_youtube_publish"
+
+    assert store.update_post(
+        post_id,
+        approval_id="APR-123",
+        execution_status="scheduled",
+        last_error=None,
+    )
+
+    executed_again = run_due_posts_once(store)
+    assert executed_again == 1
+
+    _batch, post = store.find_post(post_id)  # type: ignore[assignment]
+    assert post.execution_status == "failed"
+    assert post.last_error == "credential_ref_required_for_youtube_publish"

@@ -303,6 +303,9 @@ class PublishInput(BaseModel):
     post: ContentPost
     credential_ref: Optional[str] = Field(None,
         description="Secret Manager key for platform OAuth token, if required")
+    approval_id: Optional[str] = Field(None, description="Customer approval reference for the exact deliverable")
+    visibility: str = Field("private", description="Requested destination visibility, e.g. private/unlisted/public")
+    public_release_requested: bool = Field(False, description="Explicit customer action allowing a move to public visibility")
 
 
 class PublishReceipt(BaseModel):

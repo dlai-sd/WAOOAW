@@ -173,6 +173,17 @@ def _build_draft_deliverables(posts: list[ContentPost]) -> list[DraftDeliverable
     ]
 
 
+def _build_publish_input(post: ContentPost) -> PublishInput:
+    metadata = post.destination.metadata or {}
+    return PublishInput(
+        post=post,
+        credential_ref=metadata.get("credential_ref"),
+        approval_id=metadata.get("approval_id"),
+        visibility=str(metadata.get("visibility") or "private"),
+        public_release_requested=bool(metadata.get("public_release_requested", False)),
+    )
+
+
 def _build_approval_state(posts: list[ContentPost]) -> CampaignApprovalState:
     pending = sum(1 for post in posts if post.review_status == ReviewStatus.PENDING_REVIEW)
     approved = sum(1 for post in posts if post.review_status == ReviewStatus.APPROVED)
@@ -776,7 +787,7 @@ async def publish_post(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Post is already published.",
             )
-        inp = PublishInput(post=post)
+        inp = _build_publish_input(post)
         receipt = default_engine.publish(inp)
         receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
         publish_status_str = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
@@ -811,7 +822,7 @@ async def publish_post(
             detail="Post is already published.",
         )
 
-    inp = PublishInput(post=post)
+    inp = _build_publish_input(post)
     receipt = default_engine.publish(inp)
 
     now = datetime.now(timezone.utc)
@@ -865,7 +876,7 @@ async def publish_due(
         receipts: list[PublishReceipt] = []
         for orm_post in eligible_orm:
             post = _orm_post_to_pydantic(orm_post)
-            inp = PublishInput(post=post)
+            inp = _build_publish_input(post)
             receipt = default_engine.publish(inp)
             receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
             pub_status = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
@@ -895,7 +906,7 @@ async def publish_due(
 
     receipts: list[PublishReceipt] = []
     for post in eligible:
-        inp = PublishInput(post=post)
+        inp = _build_publish_input(post)
         receipt = default_engine.publish(inp)
         if receipt.success:
             post.publish_status = PublishStatus.PUBLISHED
