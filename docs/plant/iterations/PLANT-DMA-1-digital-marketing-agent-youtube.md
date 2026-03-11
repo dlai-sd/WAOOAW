@@ -651,7 +651,7 @@ cd src/mobile && npm run typecheck && npm test -- --runTestsByPath __tests__/MyA
 | Story | Title | Surface | Status | Dependency |
 |---|---|---|---|---|
 | I3-S1 | Build PP oversight for briefs, approvals, and YouTube publish state | PP FrontEnd and PP BackEnd | Completed | Iterations 1 and 2 |
-| I3-S2 | Build PP diagnostics for blocked publish, credentials, and scheduler traces | PP FrontEnd and PP BackEnd | Planned | I3-S1 |
+| I3-S2 | Build PP diagnostics for blocked publish, credentials, and scheduler traces | PP FrontEnd and PP BackEnd | Completed | I3-S1 |
 | I3-S3 | Add audit, metrics, and run-history alignment for the agent lifecycle | Plant, CP, PP, mobile | Planned | I3-S1 |
 | I3-S4 | Add regression coverage and release-closeout for the first sellable agent | cross-surface | Planned | I3-S2 and I3-S3 |
 

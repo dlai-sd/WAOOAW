@@ -123,6 +123,16 @@ class DeliverablePreviewResponse(BaseModel):
     text_preview: Optional[str] = None
 
 
+class PublishDiagnosticsResponse(BaseModel):
+    publish_block: str
+    publish_reason: str
+    credential_state: str
+    approval_lineage: str
+    youtube_visibility: Optional[str] = None
+    public_release_requested: bool = False
+    last_error: Optional[str] = None
+
+
 class ReviewQueueApprovalResponse(BaseModel):
     approval_id: str
     customer_id: str
@@ -139,6 +149,7 @@ class ReviewQueueApprovalResponse(BaseModel):
     hired_instance_id: Optional[str] = None
     review_state: str
     deliverable_preview: DeliverablePreviewResponse = Field(default_factory=DeliverablePreviewResponse)
+    publish_diagnostics: PublishDiagnosticsResponse
 
 
 class ReviewQueueApprovalListResponse(BaseModel):
@@ -153,6 +164,117 @@ def _truncate_preview(text: Any, limit: int = 140) -> Optional[str]:
     if len(value) <= limit:
         return value
     return f"{value[: limit - 1].rstrip()}…"
+
+
+def _normalize_publish_reason(reason: Optional[str]) -> str:
+    value = str(reason or "").strip().lower()
+    if value == "approval_required_for_youtube_publish":
+        return "The scheduler refused to publish because the exact deliverable has no approval id."
+    if value == "credential_ref_required_for_youtube_publish":
+        return "The draft is approved, but the YouTube credential reference is still missing."
+    if value == "public_release_requires_explicit_customer_action":
+        return "Upload can stay non-public, but public release still needs explicit customer action."
+    if value:
+        return f"The latest scheduler or publish attempt failed with: {value}."
+    return "No publish blocker has been recorded yet."
+
+
+def _derive_publish_diagnostics(draft_batch: Optional[Dict[str, Any]]) -> PublishDiagnosticsResponse:
+    posts = list(draft_batch.get("posts") or []) if draft_batch else []
+    first_post = posts[0] if posts else {}
+
+    review_status = str(first_post.get("review_status") or draft_batch.get("status") or "pending_review").strip().lower()
+    execution_status = str(first_post.get("execution_status") or "not_scheduled").strip().lower()
+    channel = str(first_post.get("channel") or draft_batch.get("channel") or "").strip().lower()
+    approval_id = str(first_post.get("approval_id") or "").strip() or None
+    credential_ref = str(
+        first_post.get("credential_ref")
+        or draft_batch.get("youtube_credential_ref")
+        or draft_batch.get("credential_ref")
+        or ""
+    ).strip() or None
+    visibility = str(first_post.get("visibility") or draft_batch.get("youtube_visibility") or "private").strip().lower() or "private"
+    public_release_requested = bool(
+        first_post.get("public_release_requested")
+        or draft_batch.get("public_release_requested")
+    )
+    last_error = str(first_post.get("last_error") or draft_batch.get("last_error") or "").strip() or None
+    post_id = str(first_post.get("post_id") or "").strip() or None
+
+    if approval_id and post_id:
+        approval_lineage = f"Approval {approval_id} is currently attached to post {post_id}."
+    elif approval_id:
+        approval_lineage = f"Approval {approval_id} exists, but the exact post id was not returned."
+    else:
+        approval_lineage = "No approval id is attached to the exact deliverable yet."
+
+    if review_status == "rejected":
+        return PublishDiagnosticsResponse(
+            publish_block="customer_rejection",
+            publish_reason="The customer rejected this draft, so a revised deliverable must be approved before anything can publish.",
+            credential_state="not_applicable_until_reapproved",
+            approval_lineage=approval_lineage,
+            youtube_visibility=visibility if channel == "youtube" else None,
+            public_release_requested=public_release_requested,
+            last_error=last_error,
+        )
+
+    if not approval_id:
+        return PublishDiagnosticsResponse(
+            publish_block="approval_missing",
+            publish_reason="The draft is still blocked on exact customer approval before publish can proceed.",
+            credential_state="pending_after_approval",
+            approval_lineage=approval_lineage,
+            youtube_visibility=visibility if channel == "youtube" else None,
+            public_release_requested=public_release_requested,
+            last_error=last_error,
+        )
+
+    if channel == "youtube" and not credential_ref:
+        return PublishDiagnosticsResponse(
+            publish_block="credential_missing",
+            publish_reason=_normalize_publish_reason(last_error or "credential_ref_required_for_youtube_publish"),
+            credential_state="missing_youtube_credential_ref",
+            approval_lineage=approval_lineage,
+            youtube_visibility=visibility,
+            public_release_requested=public_release_requested,
+            last_error=last_error,
+        )
+
+    if last_error == "public_release_requires_explicit_customer_action" or (
+        execution_status == "executed" and channel == "youtube" and visibility != "public"
+    ):
+        return PublishDiagnosticsResponse(
+            publish_block="awaiting_public_release",
+            publish_reason=_normalize_publish_reason(last_error or "public_release_requires_explicit_customer_action"),
+            credential_state="credential_present",
+            approval_lineage=approval_lineage,
+            youtube_visibility=visibility if channel == "youtube" else None,
+            public_release_requested=public_release_requested,
+            last_error=last_error,
+        )
+
+    if last_error:
+        block = "scheduler_denial" if "policy" in last_error.lower() or "denied" in last_error.lower() else "publish_failed"
+        return PublishDiagnosticsResponse(
+            publish_block=block,
+            publish_reason=_normalize_publish_reason(last_error),
+            credential_state="credential_present" if credential_ref else "unknown",
+            approval_lineage=approval_lineage,
+            youtube_visibility=visibility if channel == "youtube" else None,
+            public_release_requested=public_release_requested,
+            last_error=last_error,
+        )
+
+    return PublishDiagnosticsResponse(
+        publish_block="ready_or_inflight",
+        publish_reason="Approval lineage and credentials are present. PP should inspect scheduler and hook diagnostics for the next runtime step.",
+        credential_state="credential_present" if credential_ref else "unknown",
+        approval_lineage=approval_lineage,
+        youtube_visibility=visibility if channel == "youtube" else None,
+        public_release_requested=public_release_requested,
+        last_error=last_error,
+    )
 
 
 async def _fetch_hired_agents_by_customer(
@@ -253,6 +375,7 @@ def _to_review_queue_response(
             channel=first_post.get("channel"),
             text_preview=_truncate_preview(first_post.get("text")),
         ),
+        publish_diagnostics=_derive_publish_diagnostics(draft_batch),
     )
 
 

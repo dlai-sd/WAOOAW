@@ -14,13 +14,19 @@ export interface SchedulerDiagnosticsResponse {
   hired_agent_id: string
   cron_expression: string
   next_run?: string | null
+  next_run_at?: string | null
   last_run?: string | null
+  last_run_at?: string | null
   lag_seconds?: number | null
   dlq_depth: number
   dlq_entries?: DlqEntry[]
   tasks_used_today?: number | null
   trial_task_limit?: number | null
   is_paused?: boolean
+  pause_state?: string | null
+  latest_failure_reason?: string | null
+  latest_approval_id?: string | null
+  latest_deliverable_id?: string | null
 }
 
 export function useSchedulerDiagnostics(hiredAgentId: string) {

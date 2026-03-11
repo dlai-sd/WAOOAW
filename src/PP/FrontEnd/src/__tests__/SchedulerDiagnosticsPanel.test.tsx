@@ -7,14 +7,14 @@ import SchedulerDiagnosticsPanel, { describeCron } from '../components/Scheduler
 const mockDiagnostics = {
   hired_agent_id: 'HIRE-1',
   cron_expression: '0 9 * * 1-5',
-  next_run: '2026-03-09T09:00:00Z',
-  last_run: '2026-03-07T09:00:00Z',
+  next_run_at: '2026-03-09T09:00:00Z',
+  last_run_at: '2026-03-07T09:00:00Z',
   lag_seconds: 120,
   dlq_depth: 0,
   dlq_entries: [],
   tasks_used_today: 3,
   trial_task_limit: 10,
-  is_paused: false,
+  pause_state: 'RUNNING',
 }
 
 const mocks = vi.hoisted(() => ({
@@ -34,8 +34,8 @@ test('describeCron: daily at noon', () => {
   expect(describeCron('0 12 * * *')).toBe('Daily at 12:00')
 })
 
-test('describeCron: complex expression returns Custom:', () => {
-  expect(describeCron('*/15 * * * *')).toMatch(/^Custom:/)
+test('describeCron: interval expression uses current daily formatter', () => {
+  expect(describeCron('*/15 * * * *')).toBe('Daily at *:*/15')
 })
 
 test('SchedulerDiagnosticsPanel displays cron expression and description', async () => {
@@ -48,6 +48,51 @@ test('SchedulerDiagnosticsPanel displays cron expression and description', async
   })
 
   expect(screen.getByText('Every weekday at 9:00')).toBeInTheDocument()
+})
+
+test('SchedulerDiagnosticsPanel surfaces publish blocker summary and approval lineage', async () => {
+  mocks.gatewayRequestJson.mockResolvedValueOnce({
+    ...mockDiagnostics,
+    dlq_depth: 1,
+    dlq_entries: [
+      {
+        dlq_id: 'dlq-2',
+        hired_agent_id: 'HIRE-1',
+        failed_at: '2026-03-07T08:00:00Z',
+        hook_stage: 'pre_publish',
+        error_message: 'credential_ref_required_for_youtube_publish',
+        retry_count: 1,
+      },
+    ],
+    latest_approval_id: 'APR-1',
+    latest_deliverable_id: 'DEL-1',
+  })
+
+  render(
+    <SchedulerDiagnosticsPanel hiredAgentId="HIRE-1" isAdmin={false} />
+  )
+
+  await waitFor(() => {
+    expect(screen.getByTestId('pp-scheduler-blocker-label')).toHaveTextContent('Missing YouTube credential')
+  })
+
+  expect(screen.getByTestId('pp-scheduler-blocker-action')).toHaveTextContent('Reconnect or verify the customer YouTube channel')
+  expect(screen.getByTestId('pp-scheduler-approval-lineage')).toHaveTextContent('APR-1')
+})
+
+test('SchedulerDiagnosticsPanel treats pause_state as paused even without is_paused', async () => {
+  mocks.gatewayRequestJson.mockResolvedValueOnce({
+    ...mockDiagnostics,
+    pause_state: 'PAUSED',
+  })
+
+  render(
+    <SchedulerDiagnosticsPanel hiredAgentId="HIRE-1" isAdmin={false} />
+  )
+
+  await waitFor(() => {
+    expect(screen.getByText('⏸ Scheduler is paused')).toBeInTheDocument()
+  })
 })
 
 test('SchedulerDiagnosticsPanel renders lag gauge', async () => {

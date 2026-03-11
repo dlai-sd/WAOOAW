@@ -33,6 +33,12 @@ const STAGES = [
 
 const RESULTS = ['All', 'proceed', 'halt']
 
+type HookSignal = {
+  label: string
+  message: string
+  approvalId: string | null
+}
+
 function stageColor(stage: string): string {
   if (stage === 'pre_pump' || stage === 'post_pump') return '#00f2fe'
   if (stage === 'pre_processor' || stage === 'post_processor') return '#667eea'
@@ -41,10 +47,55 @@ function stageColor(stage: string): string {
   return 'rgba(255,255,255,0.6)'
 }
 
+function extractApprovalId(payloadSummary: string): string | null {
+  const match = String(payloadSummary || '').match(/APR-[A-Za-z0-9-]+/)
+  return match ? match[0] : null
+}
+
+function classifyHookSignal(entry: { reason?: string; result?: string; payload_summary?: string }): HookSignal {
+  const reason = String(entry.reason || '').trim().toLowerCase()
+  const approvalId = extractApprovalId(String(entry.payload_summary || ''))
+  if (reason === 'approval_required_for_youtube_publish') {
+    return {
+      label: 'Approval gate halted publish',
+      message: 'PRE_PUBLISH halted because the exact deliverable still lacks approval.',
+      approvalId,
+    }
+  }
+  if (reason === 'credential_ref_required_for_youtube_publish') {
+    return {
+      label: 'Credential reference missing',
+      message: 'The publish path halted after approval because no YouTube credential reference was available.',
+      approvalId,
+    }
+  }
+  if (reason === 'public_release_requires_explicit_customer_action') {
+    return {
+      label: 'Awaiting public release',
+      message: 'The content can remain non-public, but public release still needs explicit customer action.',
+      approvalId,
+    }
+  }
+  if (String(entry.result || '').trim().toLowerCase() === 'halt') {
+    return {
+      label: 'Hook halted execution',
+      message: reason || 'A hook blocked this runtime step before publish completed.',
+      approvalId,
+    }
+  }
+  return {
+    label: 'Latest hook state',
+    message: reason || 'No blocking hook state is present in the latest event.',
+    approvalId,
+  }
+}
+
 export default function HookTracePanel({ hiredAgentId }: HookTracePanelProps) {
   const [stageFilter, setStageFilter] = useState('All')
   const [resultFilter, setResultFilter] = useState('All')
   const { data, isLoading, error, refetch } = useHookTrace(hiredAgentId)
+  const latestBlockingEvent = data.find((entry) => String(entry.result || '').trim().toLowerCase() !== 'proceed') || null
+  const latestSignal = latestBlockingEvent ? classifyHookSignal(latestBlockingEvent) : null
 
   useEffect(() => {
     void refetch({
@@ -105,6 +156,20 @@ export default function HookTracePanel({ hiredAgentId }: HookTracePanelProps) {
             </select>
           </div>
         </div>
+
+        {latestSignal && (
+          <div style={{ padding: '0 16px 16px' }}>
+            <Card appearance="outline" data-testid="pp-hook-trace-signal-card">
+              <div style={{ padding: 12, display: 'grid', gap: 6 }}>
+                <Text weight="semibold" data-testid="pp-hook-trace-signal-label">{latestSignal.label}</Text>
+                <Text data-testid="pp-hook-trace-signal-message">{latestSignal.message}</Text>
+                <Text size={200} data-testid="pp-hook-trace-approval-lineage">
+                  Approval lineage: {latestSignal.approvalId || 'No approval id visible in the latest hook payload.'}
+                </Text>
+              </div>
+            </Card>
+          </div>
+        )}
       </Card>
 
       {isLoading && (
@@ -121,6 +186,7 @@ export default function HookTracePanel({ hiredAgentId }: HookTracePanelProps) {
             <TableRow>
               <TableHeaderCell>Emitted at</TableHeaderCell>
               <TableHeaderCell>Stage</TableHeaderCell>
+                <TableHeaderCell>Hook class</TableHeaderCell>
               <TableHeaderCell>Result</TableHeaderCell>
               <TableHeaderCell>Reason</TableHeaderCell>
               <TableHeaderCell>Payload summary</TableHeaderCell>
@@ -155,6 +221,7 @@ export default function HookTracePanel({ hiredAgentId }: HookTracePanelProps) {
                     {entry.stage}
                   </span>
                 </TableCell>
+                <TableCell>{entry.hook_class || '—'}</TableCell>
                 <TableCell>{entry.result}</TableCell>
                 <TableCell>{entry.reason}</TableCell>
                 <TableCell>
@@ -166,7 +233,7 @@ export default function HookTracePanel({ hiredAgentId }: HookTracePanelProps) {
             ))}
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={6}>
                   <Text>No hook events found.</Text>
                 </TableCell>
               </TableRow>
