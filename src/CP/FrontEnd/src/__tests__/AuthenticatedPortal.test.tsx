@@ -28,25 +28,57 @@ vi.mock('../services/myAgentsSummary.service', () => ({
   }),
 }))
 
-vi.mock('../services/hiredAgentDeliverables.service', () => ({
-  listHiredAgentDeliverables: vi.fn().mockResolvedValue({
-    hired_instance_id: 'HIRED-1',
-    deliverables: [
+vi.mock('../services/hiredAgentDeliverables.service', async () => {
+  const actual = await vi.importActual<any>('../services/hiredAgentDeliverables.service')
+  return {
+    ...actual,
+    listHiredAgentDeliverables: vi.fn().mockResolvedValue({
+      hired_instance_id: 'HIRED-1',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-1',
+          hired_instance_id: 'HIRED-1',
+          goal_instance_id: 'GOAL-1',
+          goal_template_id: 'TPL-1',
+          title: 'YouTube thought leadership draft',
+          payload: {
+            summary: 'Awaiting your approval before the agent publishes it.',
+            destination: {
+              destination_type: 'youtube',
+              metadata: {
+                visibility: 'private',
+              },
+            },
+          },
+          review_status: 'pending_review',
+          execution_status: 'not_executed',
+          created_at: '2026-03-10T12:00:00Z',
+          updated_at: '2026-03-10T12:15:00Z',
+        },
+      ],
+    }),
+  }
+})
+
+vi.mock('../services/platformConnections.service', async () => {
+  const actual = await vi.importActual<any>('../services/platformConnections.service')
+  return {
+    ...actual,
+    listPlatformConnections: vi.fn().mockResolvedValue([
       {
-        deliverable_id: 'DEL-1',
+        id: 'CONN-1',
         hired_instance_id: 'HIRED-1',
-        goal_instance_id: 'GOAL-1',
-        goal_template_id: 'TPL-1',
-        title: 'LinkedIn thought leadership draft',
-        payload: { summary: 'Awaiting your approval before the agent publishes it.' },
-        review_status: 'pending_review',
-        execution_status: 'not_executed',
+        skill_id: 'default',
+        platform_key: 'youtube',
+        status: 'connected',
+        connected_at: '2026-03-10T12:00:00Z',
+        last_verified_at: '2026-03-10T12:05:00Z',
         created_at: '2026-03-10T12:00:00Z',
-        updated_at: '2026-03-10T12:15:00Z',
+        updated_at: '2026-03-10T12:05:00Z',
       },
-    ],
-  }),
-}))
+    ]),
+  }
+})
 
 // Mock heavy page components so tests are fast
 vi.mock('../pages/authenticated/CommandCentre', () => ({
@@ -62,7 +94,13 @@ vi.mock('../pages/authenticated/Deliverables', () => ({
   default: () => <div data-testid="page-deliverables">Deliverables Page</div>,
 }))
 vi.mock('../pages/authenticated/Inbox', () => ({
-  default: () => <div data-testid="page-inbox">Inbox Page</div>,
+  default: ({ items }: { items?: Array<{ channelStatusLabel?: string | null; publishReadinessLabel?: string | null }> }) => (
+    <div data-testid="page-inbox">
+      Inbox Page
+      <div>{items?.[0]?.channelStatusLabel || 'No channel status'}</div>
+      <div>{items?.[0]?.publishReadinessLabel || 'No readiness state'}</div>
+    </div>
+  ),
 }))
 vi.mock('../pages/authenticated/UsageBilling', () => ({
   default: () => <div data-testid="page-billing">Billing Page</div>,

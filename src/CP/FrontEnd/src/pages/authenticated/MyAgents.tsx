@@ -13,7 +13,12 @@ import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInst
 import { upsertPlatformCredential } from '../../services/platformCredentials.service'
 import { upsertExchangeSetup } from '../../services/exchangeSetup.service'
 import { deleteHiredAgentGoal, listHiredAgentGoals, upsertHiredAgentGoal, type GoalInstance } from '../../services/hiredAgentGoals.service'
-import { listHiredAgentDeliverables, reviewHiredAgentDeliverable, type Deliverable } from '../../services/hiredAgentDeliverables.service'
+import {
+  getDeliverablePublishReadiness,
+  listHiredAgentDeliverables,
+  reviewHiredAgentDeliverable,
+  type Deliverable,
+} from '../../services/hiredAgentDeliverables.service'
 import {
   getThemeDiscoverySkill,
   isDigitalMarketingAgent,
@@ -21,8 +26,12 @@ import {
   type GoalSchemaField,
 } from '../../services/agentSkills.service'
 import { DigitalMarketingBriefSummaryCard } from '../../components/DigitalMarketingBriefSummaryCard'
+import { DigitalMarketingApprovalCard } from '../../components/DigitalMarketingApprovalCard'
+import { DigitalMarketingChannelStatusCard } from '../../components/DigitalMarketingChannelStatusCard'
+import { DigitalMarketingPublishReadinessCard } from '../../components/DigitalMarketingPublishReadinessCard'
 import { SkillsPanel } from '../../components/SkillsPanel'
 import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
+import { getPlatformConnectionSummary, listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 
 type JsonObject = Record<string, unknown>
@@ -879,6 +888,14 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   }, [definition, goalTemplateId])
 
   const settingsFields = activeTemplate?.settings_schema?.fields || []
+  const isDigitalMarketingInstance = useMemo(
+    () => isDigitalMarketingAgent(instance.agent_id, instance.agent_type_id),
+    [instance.agent_id, instance.agent_type_id]
+  )
+
+  const [connectionsLoading, setConnectionsLoading] = useState(false)
+  const [connectionsError, setConnectionsError] = useState<string | null>(null)
+  const [connections, setConnections] = useState<PlatformConnection[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -971,10 +988,54 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
     }
   }, [hiredInstanceId])
 
+  useEffect(() => {
+    let cancelled = false
+
+    const loadConnections = async () => {
+      if (!isDigitalMarketingInstance || !hiredInstanceId) {
+        setConnections([])
+        setConnectionsError(null)
+        return
+      }
+
+      setConnectionsLoading(true)
+      setConnectionsError(null)
+      try {
+        const next = await listPlatformConnections(hiredInstanceId)
+        if (!cancelled) setConnections(next)
+      } catch (e: any) {
+        if (!cancelled) {
+          setConnections([])
+          setConnectionsError(e?.message || 'Failed to load YouTube connection state')
+        }
+      } finally {
+        if (!cancelled) setConnectionsLoading(false)
+      }
+    }
+
+    void loadConnections()
+    return () => {
+      cancelled = true
+    }
+  }, [hiredInstanceId, isDigitalMarketingInstance])
+
   const activeDeliverable = useMemo(() => {
     if (!activeDeliverableId) return null
     return deliverables.find((d) => d.deliverable_id === activeDeliverableId) || null
   }, [deliverables, activeDeliverableId])
+
+  const youtubeConnectionSummary = useMemo(() => {
+    if (!isDigitalMarketingInstance) return null
+    return getPlatformConnectionSummary(connections, 'youtube')
+  }, [connections, isDigitalMarketingInstance])
+
+  const activeDeliverableReadiness = useMemo(() => {
+    if (!activeDeliverable || !isDigitalMarketingInstance) return null
+    return getDeliverablePublishReadiness(activeDeliverable, {
+      hasPlatformConnection: youtubeConnectionSummary?.isReady ?? null,
+      platformLabel: 'YouTube',
+    })
+  }, [activeDeliverable, isDigitalMarketingInstance, youtubeConnectionSummary])
 
   const onReviewDeliverable = async (decision: 'approved' | 'rejected') => {
     if (readOnly) return
@@ -1475,31 +1536,58 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
                       {isActive ? (
                         <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {isDigitalMarketingInstance ? (
+                            <DigitalMarketingChannelStatusCard
+                              summary={youtubeConnectionSummary}
+                              loading={connectionsLoading}
+                              error={connectionsError}
+                            />
+                          ) : null}
+
+                          {isDigitalMarketingInstance && activeDeliverableReadiness ? (
+                            <DigitalMarketingPublishReadinessCard readiness={activeDeliverableReadiness} />
+                          ) : null}
+
                           <div>
                             <div style={{ fontWeight: 600 }}>Draft payload</div>
                             <Textarea value={stableJsonStringify(d.payload || {})} readOnly />
                           </div>
 
-                          <div>
-                            <div style={{ fontWeight: 600 }}>Review notes</div>
-                            <Textarea
-                              aria-label="Review notes"
-                              value={reviewNotes}
-                              disabled={readOnly || reviewing}
-                              onChange={(_, data) => setReviewNotes(String(data.value || ''))}
-                              placeholder="Optional notes"
+                          {isDigitalMarketingInstance ? (
+                            <DigitalMarketingApprovalCard
+                              deliverable={d}
+                              reviewNotes={reviewNotes}
+                              reviewing={reviewing}
+                              reviewSaved={Boolean(reviewSavedAt)}
+                              readOnly={readOnly}
+                              onReviewNotesChange={setReviewNotes}
+                              onApprove={() => onReviewDeliverable('approved')}
+                              onReject={() => onReviewDeliverable('rejected')}
                             />
-                          </div>
+                          ) : (
+                            <>
+                              <div>
+                                <div style={{ fontWeight: 600 }}>Review notes</div>
+                                <Textarea
+                                  aria-label="Review notes"
+                                  value={reviewNotes}
+                                  disabled={readOnly || reviewing}
+                                  onChange={(_, data) => setReviewNotes(String(data.value || ''))}
+                                  placeholder="Optional notes"
+                                />
+                              </div>
 
-                          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <Button appearance="primary" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('approved')}>
-                              Approve
-                            </Button>
-                            <Button appearance="outline" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('rejected')}>
-                              Reject
-                            </Button>
-                            <SaveIndicator status={reviewing ? 'saving' : reviewSavedAt ? 'saved' : 'idle'} />
-                          </div>
+                              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <Button appearance="primary" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('approved')}>
+                                  Approve
+                                </Button>
+                                <Button appearance="outline" disabled={readOnly || reviewing} onClick={() => onReviewDeliverable('rejected')}>
+                                  Reject
+                                </Button>
+                                <SaveIndicator status={reviewing ? 'saving' : reviewSavedAt ? 'saved' : 'idle'} />
+                              </div>
+                            </>
+                          )}
                         </div>
                       ) : null}
                     </div>

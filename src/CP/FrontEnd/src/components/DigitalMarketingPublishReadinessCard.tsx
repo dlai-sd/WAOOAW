@@ -1,0 +1,28 @@
+import { Card } from '@fluentui/react-components'
+
+import { type DeliverablePublishReadiness } from '../services/hiredAgentDeliverables.service'
+
+type DigitalMarketingPublishReadinessCardProps = {
+  readiness: DeliverablePublishReadiness
+}
+
+function accentColor(tone: DeliverablePublishReadiness['tone']): string {
+  if (tone === 'success') return 'var(--colorPaletteGreenForeground1)'
+  if (tone === 'warning') return 'var(--colorPaletteYellowForeground1)'
+  if (tone === 'danger') return 'var(--colorPaletteRedForeground1)'
+  return 'var(--colorBrandForeground1)'
+}
+
+export function DigitalMarketingPublishReadinessCard(props: DigitalMarketingPublishReadinessCardProps) {
+  return (
+    <Card style={{ padding: '16px', borderLeft: `3px solid ${accentColor(props.readiness.tone)}` }}>
+      <div style={{ fontWeight: 700, marginBottom: '4px' }}>Publish readiness</div>
+      <div style={{ fontWeight: 600, color: accentColor(props.readiness.tone), marginBottom: '6px' }}>
+        {props.readiness.label}
+      </div>
+      <div style={{ fontSize: '13px', color: 'var(--colorNeutralForeground2)' }}>{props.readiness.message}</div>
+    </Card>
+  )
+}
+
+export default DigitalMarketingPublishReadinessCard

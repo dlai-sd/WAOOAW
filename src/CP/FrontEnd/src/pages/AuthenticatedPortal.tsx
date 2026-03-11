@@ -25,7 +25,13 @@ import Inbox, { type CustomerInboxItem } from './authenticated/Inbox'
 import UsageBilling from './authenticated/UsageBilling'
 import ProfileSettings from './authenticated/ProfileSettings'
 import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
-import { listHiredAgentDeliverables, type Deliverable } from '../services/hiredAgentDeliverables.service'
+import {
+  getDeliverablePublishReadiness,
+  listHiredAgentDeliverables,
+  type Deliverable,
+} from '../services/hiredAgentDeliverables.service'
+import { isDigitalMarketingAgent } from '../services/agentSkills.service'
+import { getPlatformConnectionSummary, listPlatformConnections, type PlatformConnection } from '../services/platformConnections.service'
 
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
@@ -77,11 +83,24 @@ function summarizePayload(payload: Record<string, unknown>): string {
   }
 }
 
-function toInboxItem(instance: MyAgentInstanceSummary, deliverable: Deliverable): CustomerInboxItem | null {
+function toInboxItem(
+  instance: MyAgentInstanceSummary,
+  deliverable: Deliverable,
+  connections: PlatformConnection[] = []
+): CustomerInboxItem | null {
   const normalizedStatus = String(deliverable.review_status || '').trim().toLowerCase()
   if (!['pending_review', 'approved', 'rejected'].includes(normalizedStatus)) {
     return null
   }
+
+  const isMarketing = isDigitalMarketingAgent(instance.agent_id, instance.agent_type_id)
+  const youtubeConnection = isMarketing ? getPlatformConnectionSummary(connections, 'youtube') : null
+  const publishReadiness = isMarketing
+    ? getDeliverablePublishReadiness(deliverable, {
+        hasPlatformConnection: youtubeConnection?.isReady ?? null,
+        platformLabel: 'YouTube',
+      })
+    : null
 
   return {
     deliverableId: deliverable.deliverable_id,
@@ -94,6 +113,9 @@ function toInboxItem(instance: MyAgentInstanceSummary, deliverable: Deliverable)
     reviewNotes: deliverable.review_notes || null,
     createdAt: deliverable.created_at || null,
     updatedAt: deliverable.updated_at || null,
+    channelStatusLabel: youtubeConnection?.label || null,
+    publishReadinessLabel: publishReadiness?.label || null,
+    publishReadinessGuidance: publishReadiness?.message || null,
   }
 }
 
@@ -149,10 +171,15 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
         const results = await Promise.allSettled(
           instances.map(async (instance) => {
             const hiredInstanceId = String(instance.hired_instance_id || '').trim()
-            const response = await listHiredAgentDeliverables(hiredInstanceId)
+            const isMarketing = isDigitalMarketingAgent(instance.agent_id, instance.agent_type_id)
+            const [response, connections] = await Promise.all([
+              listHiredAgentDeliverables(hiredInstanceId),
+              isMarketing ? listPlatformConnections(hiredInstanceId) : Promise.resolve([]),
+            ])
             return {
               instance,
               deliverables: (response?.deliverables || []).slice(),
+              connections,
             }
           })
         )
@@ -162,7 +189,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
         const nextItems = results.flatMap((result) => {
           if (result.status !== 'fulfilled') return []
           return result.value.deliverables
-            .map((deliverable) => toInboxItem(result.value.instance, deliverable))
+            .map((deliverable) => toInboxItem(result.value.instance, deliverable, result.value.connections))
             .filter((item): item is CustomerInboxItem => Boolean(item))
         })
 

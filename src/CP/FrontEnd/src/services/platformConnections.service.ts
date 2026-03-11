@@ -36,6 +36,76 @@ export interface CreateConnectionBody {
   credentials?: Record<string, unknown>
 }
 
+export type PlatformConnectionSummary = {
+  platformKey: string
+  label: string
+  message: string
+  tone: 'success' | 'warning' | 'danger' | 'informative'
+  isReady: boolean
+  connection: PlatformConnection | null
+}
+
+export function findPlatformConnection(
+  connections: PlatformConnection[],
+  platformKey: string
+): PlatformConnection | null {
+  const normalized = String(platformKey || '').trim().toLowerCase()
+  return connections.find((connection) => String(connection.platform_key || '').trim().toLowerCase() === normalized) || null
+}
+
+export function getPlatformConnectionSummary(
+  connections: PlatformConnection[],
+  platformKey: string
+): PlatformConnectionSummary {
+  const connection = findPlatformConnection(connections, platformKey)
+  const label = platformKey[0]?.toUpperCase() ? `${platformKey[0].toUpperCase()}${platformKey.slice(1)}` : 'Channel'
+
+  if (!connection) {
+    return {
+      platformKey,
+      label: `${label} not connected`,
+      message: `Connect ${label} before the agent can upload anything externally.`,
+      tone: 'danger',
+      isReady: false,
+      connection: null,
+    }
+  }
+
+  const status = String(connection.status || '').trim().toLowerCase()
+  if (status === 'connected' || status === 'active') {
+    return {
+      platformKey,
+      label: `${label} connected`,
+      message: connection.last_verified_at
+        ? `${label} was last verified on ${new Date(connection.last_verified_at).toLocaleString()}.`
+        : `${label} is connected and available for upload gating.`,
+      tone: 'success',
+      isReady: true,
+      connection,
+    }
+  }
+
+  if (status === 'pending') {
+    return {
+      platformKey,
+      label: `${label} pending verification`,
+      message: `${label} is connected but still needs verification before uploads should proceed.`,
+      tone: 'warning',
+      isReady: false,
+      connection,
+    }
+  }
+
+  return {
+    platformKey,
+    label: `${label} needs attention`,
+    message: `${label} has a connection record, but its current state is ${status || 'unknown'}. Review it before upload.`,
+    tone: 'warning',
+    isReady: false,
+    connection,
+  }
+}
+
 /**
  * List all platform connections for a hired agent.
  * Calls: GET /api/cp/hired-agents/{hired_instance_id}/platform-connections

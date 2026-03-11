@@ -463,7 +463,7 @@ cd src/CP/BackEnd && pytest tests -k "campaigns or marketing_review or platform_
 | Story | Title | Surface | Status | Dependency |
 |---|---|---|---|---|
 | I2-S1 | Build the CP Theme Discovery conversation and brief summary workflow | CP FrontEnd | Completed | Iteration 1 |
-| I2-S2 | Build the CP content review, approval, and YouTube readiness workflow | CP FrontEnd | Planned | I2-S1 |
+| I2-S2 | Build the CP content review, approval, and YouTube readiness workflow | CP FrontEnd | Completed | I2-S1 |
 | I2-S3 | Bring Theme Discovery and brief review to mobile | mobile | Planned | Iteration 1 |
 | I2-S4 | Bring approval, publish readiness, and progress state to mobile | mobile | Planned | I2-S3 |
 
@@ -553,7 +553,7 @@ Customers can review drafts, approve exact deliverables, connect or verify the t
 **Validation**
 
 ```bash
-cd src/CP/FrontEnd && npm run build && npx vitest run src/__tests__/MyAgents.test.tsx src/__tests__/AuthenticatedPortal.test.tsx src/__tests__/platformCredentials.service.test.ts
+cd src/CP/FrontEnd && npm run build && npx vitest run src/test/MyAgents.test.tsx src/__tests__/AuthenticatedPortal.test.tsx src/__tests__/GoalsSetup.test.tsx src/__tests__/agentSkills.service.test.ts src/__tests__/hiredAgentDeliverables.service.test.ts
 ```
 
 ### E4 — Customer can operate the same agent from mobile
