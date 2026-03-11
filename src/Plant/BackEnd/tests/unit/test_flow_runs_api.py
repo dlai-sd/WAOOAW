@@ -177,6 +177,55 @@ def test_get_flow_run_found():
 
 
 @pytest.mark.unit
+def test_get_flow_run_includes_dma_lifecycle_summary_and_audit_events():
+    """DMA flow runs expose lifecycle milestones and runtime audit events."""
+    from core.database import get_read_db_session
+
+    now = datetime.now(timezone.utc)
+    fake_row = FlowRunModel(
+        id="fr-dma-001",
+        hired_instance_id="hired-dma-001",
+        skill_id="skill-dma-001",
+        flow_name="ContentCreationFlow",
+        status="awaiting_approval",
+        current_step="step_2",
+        idempotency_key="idem-dma-001",
+        started_at=now,
+        updated_at=now,
+        run_context={
+            "customer_id": "cust-dma-1",
+            "goal_context": {"theme": "Founder launch diaries"},
+            "runtime_audit_events": [
+                {
+                    "event_type": "flow_started",
+                    "stage": "theme_discovery",
+                    "outcome": "started",
+                    "message": "ContentCreationFlow started for DMA runtime.",
+                    "reason": None,
+                    "metadata": {},
+                    "occurred_at": now.isoformat(),
+                }
+            ],
+        },
+    )
+
+    _app.dependency_overrides[get_read_db_session] = lambda: _db_with_row(fake_row)
+
+    with TestClient(_app) as client:
+        resp = client.get("/flow-runs/fr-dma-001")
+    _app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["audit_events"][0]["event_type"] == "flow_started"
+    assert body["lifecycle_summary"]["is_dma"] is True
+    assert body["lifecycle_summary"]["current_phase"] == "customer_approval"
+    milestones = {item["key"]: item for item in body["lifecycle_summary"]["milestones"]}
+    assert milestones["theme_discovery"]["state"] == "completed"
+    assert milestones["customer_approval"]["state"] == "blocked"
+
+
+@pytest.mark.unit
 def test_get_flow_run_not_found():
     """E6-S1-T4: GET unknown id → 404."""
     from core.database import get_read_db_session
@@ -274,6 +323,7 @@ def test_list_component_runs_returns_rows_for_parent_flow():
 
     assert resp.status_code == 200
     assert resp.json()[0]["id"] == "cr-1"
+    assert resp.json()[0]["lifecycle_stage"] == "theme_discovery"
 
 
 @pytest.mark.unit
@@ -315,6 +365,48 @@ def test_component_runs_alias_returns_rows_for_parent_flow():
 
     assert resp.status_code == 200
     assert resp.json()[0]["id"] == "cr-1"
+
+
+@pytest.mark.unit
+def test_component_runs_surface_publish_lifecycle_stage_for_youtube_components():
+    """Component-run history should narrate publish-stage components coherently for DMA."""
+    from core.database import get_read_db_session
+
+    now = datetime.now(timezone.utc)
+    flow_row = FlowRunModel(
+        id="fr-yt-1",
+        hired_instance_id="hired-yt-001",
+        skill_id="skill-yt-001",
+        flow_name="PublishingFlow",
+        status="failed",
+        current_step="youtube",
+        idempotency_key="idem-yt-1",
+        started_at=now,
+        updated_at=now,
+        run_context={"customer_id": "cust-1"},
+    )
+    component = MagicMock()
+    component.id = "cr-yt-1"
+    component.flow_run_id = "fr-yt-1"
+    component.component_type = "YouTubePublisher"
+    component.step_name = "youtube"
+    component.status = "failed"
+    component.input_context = {}
+    component.output = {}
+    component.duration_ms = 84
+    component.started_at = now
+    component.completed_at = now
+    component.error_message = "credential_ref_required_for_youtube_publish"
+
+    _app.dependency_overrides[get_read_db_session] = lambda: _db_with_component_rows(flow_row, [component])
+
+    with TestClient(_app) as client:
+        resp = client.get("/flow-runs/component-runs?flow_run_id=fr-yt-1")
+    _app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    assert resp.json()[0]["lifecycle_stage"] == "publish_execution"
+    assert resp.json()[0]["lifecycle_label"] == "Publish Execution"
 
 
 @pytest.mark.unit

@@ -1032,9 +1032,9 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembi
 
 | Environment | Connection | Driver |
 |-------------|-----------|--------|
-| Local (Docker) | `postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db` | asyncpg |
-| Local (no Docker) | `postgresql+asyncpg://waooaw:waooaw_dev_password@localhost:5432/waooaw_db` | asyncpg |
-| Demo/UAT/Prod | Cloud SQL via unix socket or private IP (set via `DATABASE_URL` env) | asyncpg |
+| Local regression stack only | `postgresql+asyncpg://waooaw:waooaw_dev_password@postgres:5432/waooaw_db` | asyncpg |
+| Local host fallback only | `postgresql+asyncpg://waooaw:waooaw_dev_password@localhost:5432/waooaw_db` | asyncpg |
+| Demo/UAT/Prod and all persistence work | Cloud SQL via Auth Proxy / unix socket / private IP (set via `DATABASE_URL` env) | asyncpg |
 
 ### Key database files
 
@@ -1054,8 +1054,10 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembi
 
 ### How to connect to demo DB from Codespace
 
-Cloud SQL `plant-sql-demo` has **public IP enabled** (patched 8 Mar 2026). Access still goes through the
-Cloud SQL Auth Proxy for IAM-based authentication — do not connect directly on port 5432.
+Agent rule: schema changes, persisted-behavior stories, and DB smoke validation must use Cloud SQL demo through the Auth Proxy. The Docker Postgres containers are only for isolated regression tests and must not be treated as the persistence source of truth.
+
+Cloud SQL `plant-sql-demo` must be reached through the Cloud SQL Auth Proxy for IAM-based authentication — do not connect directly on port 5432.
+The normal Codespaces path is the public-IP-backed proxy listener on `127.0.0.1:15432`; if the instance drifts to private-IP-only, first re-enable public IP with `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, then rerun `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh`.
 
 | Property | Value |
 |----------|-------|
@@ -1133,7 +1135,7 @@ uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
 #### Running migrations via psql directly (when alembic unavailable)
 
-> `alembic` is not installed in the Codespace venv — use psql with the migration DDL directly.
+> `alembic` is not installed in the default Codespace shell environment — use psql with the migration DDL directly.
 > All migration files are in `src/Plant/BackEnd/database/migrations/versions/`.
 
 ```bash
@@ -1318,9 +1320,9 @@ Steps:
 
 ## 11. Testing Strategy
 
-### ⚠️ MANDATORY RULE: Docker-only testing — NO venv
+### ⚠️ MANDATORY RULE: Codespace or Docker only — NO venv
 
-> **All tests MUST run inside Docker containers or Codespace (devcontainer).** Virtual environments (`venv`, `virtualenv`, `conda`) are **strictly prohibited**. This ensures parity with CI/CD and GCP Cloud Run.
+> **All tests MUST run inside Docker containers or Codespace (devcontainer).** Virtual environments (`venv`, `virtualenv`, `conda`) are **strictly prohibited**. Docker regression remains mandatory, but persistence stories also require a Cloud SQL demo migration/apply plus a live smoke query before the work is considered complete.
 
 ### Test suite locations (detailed)
 
@@ -1723,8 +1725,8 @@ Use this shortlist when the task is broader than runtime routes.
 | `deliverables_simple.py` | Deliverable tracking |
 | `skill_configs.py` | Customer-editable hired-agent skill config routes — legacy `/skill-configs/{hired_instance_id}/{skill_id}` plus canonical `/hired-agents/{hired_instance_id}/skills/{skill_id}/customer-config` |
 | `flow_runs.py` | Flow-run backing store plus public runtime aliases — `/flow-runs`, `/skill-runs`, `/component-runs` |
-| `campaigns.py` | Campaign management — 12 endpoints: `POST /campaigns` (create with ContentCreatorSkill theme generation), `GET /campaigns`, `GET /campaigns/{id}`, `POST .../themes/approve`, `POST .../posts/generate`, `POST .../posts`, `GET .../posts`, `POST .../posts/{post_id}/approve`, `POST .../posts/{post_id}/publish`; in-memory stores `_campaigns`, `_theme_items`, `_posts` (Phase 1 — PLANT-CONTENT-2 will persist to PostgreSQL). |
-| `marketing_drafts.py` | Marketing content drafts |
+| `campaigns.py` | Campaign management — DB-backed by default; persists campaign runtime rollups (`workflow_state`, `brief_summary`, `approval_state`, `draft_deliverables`) and YouTube publish-gating metadata on `content_posts`. Legacy in-memory fallback is test-only and must be explicitly opted into. |
+| `marketing_drafts.py` | Marketing content drafts — persisted in PostgreSQL (`marketing_draft_batches`, `marketing_draft_posts`), not JSONL |
 | `notifications.py` | Notification endpoints |
 | `usage_events.py` | Usage event tracking |
 | `reference_agents.py` | Reference agent catalog |
@@ -2154,7 +2156,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `SECRET_MANAGER_BACKEND` | CP BackEnd | `gcp` (demo/uat/prod via Terraform) or `local` (default for CI and local dev) — switches between `GcpSecretManagerAdapter` and `LocalSecretManagerAdapter` |
 | `XAI_API_KEY` | Plant BackEnd | Grok API key (from [console.x.ai](https://console.x.ai)) — enables live AI content generation in `ContentCreatorSkill` and `ContentPublisherSkill`; absent (or `EXECUTOR_BACKEND` not `"grok"`) means deterministic template mode (zero API cost, zero dependency) (PLANT-CONTENT-1 #869). |
 | `EXECUTOR_BACKEND` | Plant BackEnd | `"grok"` → use Grok API for content generation; any other value (or absent) → deterministic templates. Per-agent default — can be overridden via `ConstructBindings.processor_config` in future phases. (PLANT-CONTENT-1 #869). |
-| `CAMPAIGN_PERSISTENCE_MODE` | Plant BackEnd | `"memory"` (default) → in-memory campaign dict; `"db"` → Processor writes to PostgreSQL. |
+| `CAMPAIGN_PERSISTENCE_MODE` | Plant BackEnd | `"db"` (default) → campaign writes go to PostgreSQL; `"memory"` is explicit test-only fallback. |
 | `SCHEDULER_ENABLED` | Plant BackEnd | `"true"` (default) → all Scheduler firing is active; `"false"` → disable firing (test only). |
 | `APPROVAL_GATE_ENABLED` | Plant BackEnd | `"true"` (default) → `ApprovalGateHook` active at `PRE_PUBLISH`; `"false"` → bypass gate in dev/demo. |
 | `CIRCUIT_BREAKER_ENABLED` | Plant BackEnd | `"true"` (default); set `"false"` in unit tests only to avoid CB interference. |
@@ -2273,7 +2275,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **PII masking is automatic** | `PIIMaskingFilter` is wired at the root logger. Don't try to mask fields manually in route code. Debug by correlation ID or user_id — not by email (masked in logs). |
 | **C8 (PII DB encryption) is PARKED** | Decision: never implement application-layer field encryption for `email`/`phone`/`full_name`. CMEK + masking + email_hash + GDPR erasure cover the compliance requirement. See Section 5.6. |
 | **GCP auth is permanent in Codespace** | `waooaw-codespace-reader` SA activates automatically via `gcp-auth.sh` on every Codespace start. Run `gcloud auth list` to verify. Cloud SQL Proxy starts on port 15432 automatically. No user action needed. |
-| **Cloud SQL Auth Proxy required** | `plant-sql-demo` has public IP enabled (8 Mar 2026) but always connect via Cloud SQL Auth Proxy on `127.0.0.1:15432` for IAM auth. Never connect directly on port 5432. If you get `connection refused` on 15432, proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. gcloud is pre-installed via `setup-slim.sh`; `source /root/.env.db && psql` is all you need after the proxy starts. |
+| **Cloud SQL Auth Proxy required** | Always connect to `plant-sql-demo` via Cloud SQL Auth Proxy on `127.0.0.1:15432` for IAM auth. Never connect directly on port 5432. If you get `connection refused` on 15432, proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. If proxy startup or first connect fails with `instance does not have IP of type "PUBLIC"`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, wait for the operation to finish, then rerun the auth script. gcloud is pre-installed via `setup-slim.sh`; `source /root/.env.db && psql` is the canonical connect path after the proxy starts. For persistence work, this demo DB is the canonical validation target before Docker regression. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config MUST come from env vars (non-sensitive) or GCP Secret Manager (sensitive) — injected by terraform at deploy time. See §8.1 for the full checklist and §19 for code examples. **Terraform template anti-pattern that is BANNED**: `SOME_VAR = var.x != "" ? var.x : (var.environment == "demo" ? "value_a" : "value_b")` — this bakes environment-conditional logic into the template. Defaults belong in `variables.tf default =`, not in `main.tf` ternaries. Violations are reverted on review. This was found and fixed in PR #851 for CP Backend `PAYMENTS_MODE` and `OTP_DELIVERY_MODE`. |
 | **`SecretManagerAdapter` — never call GCP SDK directly in routes** | CP BackEnd `services/secret_manager.py` provides the ABC. Routes call `get_secret_manager_adapter()` which reads `SECRET_MANAGER_BACKEND`. For `local`/CI: in-memory `LocalSecretManagerAdapter`. For `gcp`: `GcpSecretManagerAdapter` using Application Default Credentials on Cloud Run — no key file needed. Never instantiate `secretmanager.SecretManagerServiceClient` directly in a route or service other than `GcpSecretManagerAdapter`. |

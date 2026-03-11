@@ -11,6 +11,9 @@ export type CustomerInboxItem = {
   reviewNotes?: string | null
   createdAt?: string | null
   updatedAt?: string | null
+  channelStatusLabel?: string | null
+  publishReadinessLabel?: string | null
+  publishReadinessGuidance?: string | null
 }
 
 type InboxProps = {
@@ -153,6 +156,17 @@ export default function Inbox(props: InboxProps) {
                     {item.preview}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground2)' }}>{status.guidance}</div>
+                  {item.channelStatusLabel ? (
+                    <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground2)', marginTop: '8px' }}>
+                      Channel: {item.channelStatusLabel}
+                    </div>
+                  ) : null}
+                  {item.publishReadinessLabel ? (
+                    <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground2)', marginTop: '4px' }}>
+                      Publish readiness: {item.publishReadinessLabel}
+                      {item.publishReadinessGuidance ? ` — ${item.publishReadinessGuidance}` : ''}
+                    </div>
+                  ) : null}
                   {item.reviewNotes ? (
                     <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground2)', marginTop: '8px' }}>
                       Latest note: {item.reviewNotes}

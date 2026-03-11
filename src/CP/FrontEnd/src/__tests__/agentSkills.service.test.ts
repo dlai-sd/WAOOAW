@@ -112,4 +112,23 @@ describe('agentSkills.service', () => {
       expect.anything()
     )
   })
+
+  it('identifies the Digital Marketing Agent by agent_id or type', async () => {
+    const svc = await import('../services/agentSkills.service')
+
+    expect(svc.isDigitalMarketingAgent('AGT-MKT-DMA-001', null)).toBe(true)
+    expect(svc.isDigitalMarketingAgent(null, 'marketing.digital_marketing.v1')).toBe(true)
+    expect(svc.isDigitalMarketingAgent('AGT-TRD-001', 'trading.share_trader.v1')).toBe(false)
+  })
+
+  it('finds the Theme Discovery skill from a hired-agent skill list', async () => {
+    const svc = await import('../services/agentSkills.service')
+
+    const result = svc.getThemeDiscoverySkill([
+      { skill_id: 'skill-1', name: 'content_creation', display_name: 'Content Creation' },
+      { skill_id: 'skill-2', name: 'theme_discovery', display_name: 'Theme Discovery' },
+    ])
+
+    expect(result?.skill_id).toBe('skill-2')
+  })
 })

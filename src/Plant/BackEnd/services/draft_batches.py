@@ -1,18 +1,20 @@
 """Draft batch storage.
 
-Phase 1 (Plant + PP): store draft batches for ops-assisted review.
-This uses a file-backed store to keep unit tests DB-free.
+Marketing drafts are persisted in PostgreSQL and accessed through an async store.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from agent_mold.skills.playbook import ChannelName
+from models.marketing_draft import MarketingDraftBatchModel, MarketingDraftPostModel
 
 
 _UNSET = object()
@@ -30,7 +32,10 @@ class DraftPostRecord(BaseModel):
 
     review_status: DraftReviewStatus = "pending_review"
     approval_id: Optional[str] = None
+    credential_ref: Optional[str] = None
     execution_status: DraftExecutionStatus = "not_scheduled"
+    visibility: str = "private"
+    public_release_requested: bool = False
 
     scheduled_at: Optional[datetime] = None
 
@@ -44,100 +49,203 @@ class DraftPostRecord(BaseModel):
 class DraftBatchRecord(BaseModel):
     batch_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
+    hired_instance_id: Optional[str] = None
+    campaign_id: Optional[str] = None
     customer_id: Optional[str] = None
 
     theme: str = Field(..., min_length=1)
     brand_name: str = Field(..., min_length=1)
+    brief_summary: Optional[str] = None
 
     created_at: datetime
     status: DraftReviewStatus = "pending_review"
+    workflow_state: str = "draft_ready_for_review"
 
     posts: List[DraftPostRecord] = Field(default_factory=list)
 
 
-class FileDraftBatchStore:
-    def __init__(self, path: str):
-        self._path = Path(path)
+class DatabaseDraftBatchStore:
+    def __init__(self, session: AsyncSession):
+        self._session = session
 
-    def save_batch(self, batch: DraftBatchRecord) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        with self._path.open("a", encoding="utf-8") as f:
-            f.write(batch.model_dump_json())
-            f.write("\n")
+    async def save_batch(self, batch: DraftBatchRecord) -> None:
+        batch_model = MarketingDraftBatchModel(
+            batch_id=batch.batch_id,
+            agent_id=batch.agent_id,
+            hired_instance_id=batch.hired_instance_id,
+            campaign_id=batch.campaign_id,
+            customer_id=batch.customer_id,
+            theme=batch.theme,
+            brand_name=batch.brand_name,
+            brief_summary=batch.brief_summary,
+            created_at=batch.created_at,
+            status=batch.status,
+            workflow_state=batch.workflow_state,
+        )
+        for post in batch.posts:
+            batch_model.posts.append(self._record_to_post_model(post, batch.campaign_id))
+        self._session.add(batch_model)
+        await self._session.flush()
 
-    def find_post(self, post_id: str) -> tuple[DraftBatchRecord, DraftPostRecord] | None:
-        for batch in self.load_batches():
-            for post in batch.posts:
-                if post.post_id == post_id:
-                    return batch, post
-        return None
+    async def find_post(self, post_id: str) -> tuple[DraftBatchRecord, DraftPostRecord] | None:
+        result = await self._session.execute(
+            select(MarketingDraftPostModel)
+            .options(
+                selectinload(MarketingDraftPostModel.batch)
+                .selectinload(MarketingDraftBatchModel.posts)
+            )
+            .where(MarketingDraftPostModel.post_id == post_id)
+        )
+        post_model = result.scalars().first()
+        if post_model is None or post_model.batch is None:
+            return None
+        batch = self._batch_model_to_record(post_model.batch)
+        match = next((post for post in batch.posts if post.post_id == post_id), None)
+        if match is None:
+            return None
+        return batch, match
 
-    def load_batches(self) -> List[DraftBatchRecord]:
-        if not self._path.exists():
-            return []
+    async def get_batch(self, batch_id: str) -> DraftBatchRecord | None:
+        result = await self._session.execute(
+            select(MarketingDraftBatchModel)
+            .options(selectinload(MarketingDraftBatchModel.posts))
+            .where(MarketingDraftBatchModel.batch_id == batch_id)
+        )
+        model = result.scalars().first()
+        return self._batch_model_to_record(model) if model is not None else None
 
-        batches: List[DraftBatchRecord] = []
-        for line in self._path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            batches.append(DraftBatchRecord.model_validate_json(line))
-        return batches
+    async def load_batches(self) -> List[DraftBatchRecord]:
+        result = await self._session.execute(
+            select(MarketingDraftBatchModel)
+            .options(selectinload(MarketingDraftBatchModel.posts))
+            .order_by(MarketingDraftBatchModel.created_at.asc())
+        )
+        return [self._batch_model_to_record(model) for model in result.scalars().all()]
 
-    def write_batches(self, batches: List[DraftBatchRecord]) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        with self._path.open("w", encoding="utf-8") as f:
-            for batch in batches:
-                f.write(batch.model_dump_json())
-                f.write("\n")
-
-    def update_post(
+    async def update_post(
         self,
         post_id: str,
         *,
         review_status: DraftReviewStatus | object = _UNSET,
         approval_id: str | None | object = _UNSET,
+        credential_ref: str | None | object = _UNSET,
         execution_status: DraftExecutionStatus | object = _UNSET,
+        visibility: str | object = _UNSET,
+        public_release_requested: bool | object = _UNSET,
         scheduled_at: datetime | None | object = _UNSET,
         attempts: int | object = _UNSET,
         last_error: str | None | object = _UNSET,
+        provider_post_id: str | None | object = _UNSET,
+        provider_post_url: str | None | object = _UNSET,
     ) -> bool:
-        batches = self.load_batches()
-        updated = False
+        result = await self._session.execute(
+            select(MarketingDraftPostModel)
+            .options(
+                selectinload(MarketingDraftPostModel.batch)
+                .selectinload(MarketingDraftBatchModel.posts)
+            )
+            .where(MarketingDraftPostModel.post_id == post_id)
+        )
+        post_model = result.scalars().first()
+        if post_model is None:
+            return False
 
-        for batch in batches:
-            for post in batch.posts:
-                if post.post_id != post_id:
-                    continue
-                if review_status is not _UNSET:
-                    post.review_status = review_status
-                if approval_id is not _UNSET:
-                    post.approval_id = approval_id
-                if execution_status is not _UNSET:
-                    post.execution_status = execution_status
-                if scheduled_at is not _UNSET:
-                    post.scheduled_at = scheduled_at
-                if attempts is not _UNSET:
-                    post.attempts = attempts
-                if last_error is not _UNSET:
-                    post.last_error = last_error
-                updated = True
-                break
+        if review_status is not _UNSET:
+            post_model.review_status = review_status
+        if approval_id is not _UNSET:
+            post_model.approval_id = approval_id
+        if credential_ref is not _UNSET:
+            post_model.credential_ref = credential_ref
+        if execution_status is not _UNSET:
+            post_model.execution_status = execution_status
+        if visibility is not _UNSET:
+            post_model.visibility = visibility
+        if public_release_requested is not _UNSET:
+            post_model.public_release_requested = public_release_requested
+        if scheduled_at is not _UNSET:
+            post_model.scheduled_at = scheduled_at
+        if attempts is not _UNSET:
+            post_model.attempts = attempts
+        if last_error is not _UNSET:
+            post_model.last_error = last_error
+        if provider_post_id is not _UNSET:
+            post_model.provider_post_id = provider_post_id
+        if provider_post_url is not _UNSET:
+            post_model.provider_post_url = provider_post_url
+        post_model.updated_at = datetime.now(timezone.utc)
 
-            if updated:
-                # Keep batch-level status in sync with post review statuses.
-                statuses = [p.review_status for p in batch.posts]
-                if all(s == "approved" for s in statuses):
-                    batch.status = "approved"
-                elif any(s == "changes_requested" for s in statuses):
-                    batch.status = "changes_requested"
-                elif any(s == "rejected" for s in statuses):
-                    batch.status = "rejected"
-                else:
-                    batch.status = "pending_review"
-                break
+        if post_model.batch is not None:
+            self._sync_batch_status(post_model.batch)
 
-        if updated:
-            self.write_batches(batches)
+        await self._session.flush()
+        return True
 
-        return updated
+    def _sync_batch_status(self, batch_model: MarketingDraftBatchModel) -> None:
+        statuses = [post.review_status for post in batch_model.posts]
+        if statuses and all(status == "approved" for status in statuses):
+            batch_model.status = "approved"
+        elif any(status == "changes_requested" for status in statuses):
+            batch_model.status = "changes_requested"
+        elif any(status == "rejected" for status in statuses):
+            batch_model.status = "rejected"
+        else:
+            batch_model.status = "pending_review"
+
+    def _batch_model_to_record(self, model: MarketingDraftBatchModel) -> DraftBatchRecord:
+        return DraftBatchRecord(
+            batch_id=model.batch_id,
+            agent_id=model.agent_id,
+            hired_instance_id=model.hired_instance_id,
+            campaign_id=model.campaign_id,
+            customer_id=model.customer_id,
+            theme=model.theme,
+            brand_name=model.brand_name,
+            brief_summary=model.brief_summary,
+            created_at=model.created_at,
+            status=model.status,
+            workflow_state=model.workflow_state,
+            posts=[self._post_model_to_record(post) for post in model.posts],
+        )
+
+    def _post_model_to_record(self, model: MarketingDraftPostModel) -> DraftPostRecord:
+        return DraftPostRecord(
+            post_id=model.post_id,
+            channel=ChannelName(model.channel),
+            text=model.text,
+            hashtags=list(model.hashtags or []),
+            review_status=model.review_status,
+            approval_id=model.approval_id,
+            credential_ref=model.credential_ref,
+            execution_status=model.execution_status,
+            visibility=model.visibility,
+            public_release_requested=model.public_release_requested,
+            scheduled_at=model.scheduled_at,
+            attempts=model.attempts,
+            last_error=model.last_error,
+            provider_post_id=model.provider_post_id,
+            provider_post_url=model.provider_post_url,
+        )
+
+    def _record_to_post_model(
+        self,
+        record: DraftPostRecord,
+        campaign_id: str | None,
+    ) -> MarketingDraftPostModel:
+        return MarketingDraftPostModel(
+            post_id=record.post_id,
+            campaign_id=campaign_id,
+            channel=record.channel.value,
+            text=record.text,
+            hashtags=record.hashtags,
+            review_status=record.review_status,
+            approval_id=record.approval_id,
+            credential_ref=record.credential_ref,
+            execution_status=record.execution_status,
+            visibility=record.visibility,
+            public_release_requested=record.public_release_requested,
+            scheduled_at=record.scheduled_at,
+            attempts=record.attempts,
+            last_error=record.last_error,
+            provider_post_id=record.provider_post_id,
+            provider_post_url=record.provider_post_url,
+        )

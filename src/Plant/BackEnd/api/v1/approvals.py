@@ -23,8 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
 from core.logging import PiiMaskingFilter, get_logger
+from core.metrics import record_dma_lifecycle_event
 from core.routing import waooaw_router
 from models.flow_run import FlowRunModel
+from services.audit_service import AuditService
 
 logger = get_logger(__name__)
 logger.addFilter(PiiMaskingFilter())
@@ -49,7 +51,15 @@ async def approve_flow_run(
     if not flow_run or flow_run.status != "awaiting_approval":
         raise HTTPException(status_code=409, detail="Not awaiting approval")
     flow_run.status = "running"
-    flow_run.run_context = {**flow_run.run_context, "auto_execute": True}
+    flow_run.run_context = AuditService.append_runtime_event(
+        {**flow_run.run_context, "auto_execute": True},
+        event_type="customer_approval",
+        stage="customer_approval",
+        outcome="approved",
+        message="Customer approved the exact deliverable, so execution may continue.",
+        metadata={"flow_run_id": flow_run_id},
+    )
+    record_dma_lifecycle_event("customer_approval", "approved")
     flow_run.updated_at = datetime.now(timezone.utc)
     await db.commit()
     return {"id": flow_run_id, "status": flow_run.status}
@@ -72,6 +82,16 @@ async def reject_flow_run(
         raise HTTPException(status_code=409, detail="Not awaiting approval")
     flow_run.status = "failed"
     flow_run.error_details = {"reason": "customer_rejected"}
+    flow_run.run_context = AuditService.append_runtime_event(
+        flow_run.run_context,
+        event_type="customer_approval",
+        stage="customer_approval",
+        outcome="rejected",
+        message="Customer rejected the current deliverable version.",
+        reason="customer_rejected",
+        metadata={"flow_run_id": flow_run_id},
+    )
+    record_dma_lifecycle_event("customer_approval", "rejected")
     flow_run.updated_at = datetime.now(timezone.utc)
     await db.commit()
     return {"id": flow_run_id, "status": flow_run.status}

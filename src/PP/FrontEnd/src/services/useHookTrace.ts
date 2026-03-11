@@ -10,6 +10,7 @@ export interface HookTraceEntry {
   reason: string
   emitted_at: string
   payload_summary: string
+  hook_class?: string | null
 }
 
 export function useHookTrace(hiredAgentId: string) {

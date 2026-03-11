@@ -42,6 +42,27 @@ class ReferenceAgent:
     dimensions: Dict[DimensionName, DimensionContract] = dc_field(default_factory=dict)
 
 
+DIGITAL_MARKETING_VISIBLE_SKILLS: List[str] = [
+    "Theme Discovery",
+    "Content Creation",
+    "Content Publishing",
+]
+
+THEME_DISCOVERY_REQUIRED_FIELDS: List[str] = [
+    "business_background",
+    "objective",
+    "industry",
+    "locality",
+    "target_audience",
+    "persona",
+    "tone",
+    "offer",
+    "channel_intent",
+    "posting_cadence",
+    "success_metrics",
+]
+
+
 def _marketing_spec(agent_id: str, *, industry: str, brand_name: str) -> AgentSpec:
     return AgentSpec(
         agent_id=agent_id,
@@ -58,6 +79,45 @@ def _marketing_spec(agent_id: str, *, industry: str, brand_name: str) -> AgentSp
                 "present": True,
                 "config": {
                     "industry": industry,
+                },
+            },
+            DimensionName.TRIAL: {"present": True, "config": {}},
+            DimensionName.BUDGET: {"present": True, "config": {}},
+        },
+        bindings=ConstructBindings(
+            processor_class=ContentCreatorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
+    )
+
+
+def _digital_marketing_spec(agent_id: str) -> AgentSpec:
+    return AgentSpec(
+        agent_id=agent_id,
+        agent_type="marketing",
+        dimensions={
+            DimensionName.SKILL: {
+                "present": True,
+                "config": {
+                    "primary_playbook_id": "MARKETING.MULTICHANNEL.POST.V1",
+                    "category": "marketing",
+                    "visible_skills": DIGITAL_MARKETING_VISIBLE_SKILLS,
+                    "supported_live_destinations": ["youtube"],
+                    "theme_discovery_required_fields": THEME_DISCOVERY_REQUIRED_FIELDS,
+                },
+            },
+            DimensionName.INDUSTRY: {
+                "present": True,
+                "config": {
+                    "industry": "digital_marketing",
+                },
+            },
+            DimensionName.UI: {
+                "present": True,
+                "config": {
+                    "ui": "guided_brief",
                 },
             },
             DimensionName.TRIAL: {"present": True, "config": {}},
@@ -145,6 +205,34 @@ def _trading_spec(agent_id: str) -> AgentSpec:
 
 
 REFERENCE_AGENTS: List[ReferenceAgent] = [
+    ReferenceAgent(
+        agent_id="AGT-MKT-DMA-001",
+        display_name="Digital Marketing Agent",
+        agent_type="marketing",
+        spec=_digital_marketing_spec("AGT-MKT-DMA-001"),
+        defaults={
+            "brand_name": "WAOOAW",
+            "business_background": "AI agent marketplace for businesses",
+            "objective": "Generate qualified discovery conversations from YouTube",
+            "industry": "AI services",
+            "locality": "India",
+            "target_audience": "SMB founders exploring AI execution",
+            "persona": "Growth-focused founder",
+            "tone": "clear, credible, energetic",
+            "offer": "7-day free trial with keep-the-work guarantee",
+            "supported_live_destinations": ["youtube"],
+        },
+        bindings=ConstructBindings(
+            processor_class=ContentCreatorSkill,
+            scheduler_class=_DefaultScheduler,
+            pump_class=GoalConfigPump,
+        ),
+        constraint_policy=ConstraintPolicy(),
+        dimensions={
+            DimensionName.TRIAL: TrialDimension(trial_task_limit=10),
+            DimensionName.BUDGET: BudgetDimension(max_tasks_per_day=3),
+        },
+    ),
     ReferenceAgent(
         agent_id="AGT-MKT-BEAUTY-001",
         display_name="Beauty Artist Marketing Agent",
@@ -291,6 +379,7 @@ def get_all_reference_agents() -> List[ReferenceAgent]:
 
 # Module-level aliases for direct import in tests and plan references
 marketing_agent: ReferenceAgent = next(a for a in REFERENCE_AGENTS if a.agent_type == "marketing")
+digital_marketing_agent: ReferenceAgent = next(a for a in REFERENCE_AGENTS if a.agent_id == "AGT-MKT-DMA-001")
 tutor_agent: ReferenceAgent = next(a for a in REFERENCE_AGENTS if a.agent_type == "tutor")
 trading_agent: ReferenceAgent = next(a for a in REFERENCE_AGENTS if a.agent_type == "trading")
 

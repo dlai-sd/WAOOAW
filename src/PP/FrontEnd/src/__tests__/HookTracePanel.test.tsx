@@ -15,6 +15,7 @@ const mockEntries = [
     reason: 'ok',
     emitted_at: '2026-03-07T09:00:00Z',
     payload_summary: 'payload data here',
+    hook_class: 'SchedulerPauseHook',
   },
   {
     event_id: 'evt-2',
@@ -22,9 +23,10 @@ const mockEntries = [
     hired_agent_id: 'HIRE-1',
     agent_type: 'marketing',
     result: 'halt',
-    reason: 'limit reached',
+    reason: 'approval_required_for_youtube_publish',
     emitted_at: '2026-03-07T09:01:00Z',
-    payload_summary: 'some other payload',
+    payload_summary: 'approval_id=APR-LOCKED-1 some other payload',
+    hook_class: 'ApprovalGateHook',
   },
 ]
 
@@ -47,6 +49,7 @@ test('HookTracePanel renders table with hook events', async () => {
   expect(screen.getAllByText('proceed').length).toBeGreaterThanOrEqual(1)
   expect(screen.getAllByText('post_processor').length).toBeGreaterThanOrEqual(1)
   expect(screen.getAllByText('halt').length).toBeGreaterThanOrEqual(1)
+  expect(screen.getByText('ApprovalGateHook')).toBeInTheDocument()
 })
 
 test('HookTracePanel renders up to 50 rows', async () => {
@@ -113,7 +116,18 @@ test('HookTracePanel halt rows have red tint background', async () => {
   })
 
   // The halt row text should be visible
-  expect(screen.getByText('limit reached')).toBeInTheDocument()
+  expect(screen.getByText('approval_required_for_youtube_publish')).toBeInTheDocument()
+})
+
+test('HookTracePanel surfaces latest blocker summary and approval lineage', async () => {
+  render(<HookTracePanel hiredAgentId="HIRE-1" />)
+
+  await waitFor(() => {
+    expect(screen.getByTestId('pp-hook-trace-signal-label')).toHaveTextContent('Approval gate halted publish')
+  })
+
+  expect(screen.getByTestId('pp-hook-trace-signal-message')).toHaveTextContent('lacks approval')
+  expect(screen.getByTestId('pp-hook-trace-approval-lineage')).toHaveTextContent('APR-LOCKED-1')
 })
 
 test('HookTracePanel payload_summary shows at most 100 chars', async () => {

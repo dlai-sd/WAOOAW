@@ -44,6 +44,13 @@ class PublishStatus(str, Enum):
     FAILED = "failed"
 
 
+class CampaignWorkflowState(str, Enum):
+    BRIEF_CAPTURED = "brief_captured"
+    DRAFT_READY_FOR_REVIEW = "draft_ready_for_review"
+    AWAITING_CUSTOMER_APPROVAL = "awaiting_customer_approval"
+    APPROVED_FOR_UPLOAD = "approved_for_upload"
+
+
 # ─── Campaign Brief (customer input) ─────────────────────────────────────────
 
 class DestinationRef(BaseModel):
@@ -72,6 +79,81 @@ class PostingSchedule(BaseModel):
         return v
 
 
+class PostingCadence(BaseModel):
+    """Structured cadence captured during Theme Discovery."""
+
+    posts_per_week: int = Field(1, ge=1, le=21)
+    preferred_days: List[str] = Field(default_factory=list)
+    preferred_hours_utc: List[int] = Field(default_factory=lambda: [9])
+
+    @validator("preferred_hours_utc", each_item=True)
+    def _valid_cadence_hour(cls, v: int) -> int:
+        if not 0 <= v <= 23:
+            raise ValueError(f"Hour must be 0-23, got {v}")
+        return v
+
+
+class ThemeDiscoveryChannelIntent(BaseModel):
+    """Customer intent for the first live publishing channel."""
+
+    primary_destination: str = Field(..., min_length=1)
+    supported_live_destinations: List[str] = Field(default_factory=lambda: ["youtube"], min_length=1)
+    content_formats: List[str] = Field(default_factory=list)
+    call_to_action: str = Field("", description="Primary CTA the content should drive")
+
+
+class SuccessMetric(BaseModel):
+    """Customer-facing definition of success for the campaign."""
+
+    name: str = Field(..., min_length=1)
+    target: str = Field(..., min_length=1)
+
+
+class ThemeDiscoveryBrief(BaseModel):
+    """Structured marketing brief captured before content creation begins."""
+
+    business_background: str = Field(..., min_length=3)
+    objective: str = Field(..., min_length=3)
+    industry: str = Field(..., min_length=2)
+    locality: str = Field(..., min_length=2)
+    target_audience: str = Field(..., min_length=3)
+    persona: str = Field(..., min_length=3)
+    tone: str = Field(..., min_length=2)
+    offer: str = Field(..., min_length=2)
+    channel_intent: ThemeDiscoveryChannelIntent
+    posting_cadence: PostingCadence = Field(default_factory=PostingCadence)
+    success_metrics: List[SuccessMetric] = Field(default_factory=list)
+
+
+class CampaignBriefSummary(BaseModel):
+    """Compact summary of the structured brief for CP, PP, and mobile surfaces."""
+
+    summary_text: str = Field(..., min_length=1)
+    target_audience: str = Field(..., min_length=1)
+    offer: str = Field("")
+    primary_destination: str = Field(..., min_length=1)
+    cadence_text: str = Field(..., min_length=1)
+    success_metrics: List[str] = Field(default_factory=list)
+
+
+class DraftDeliverableSummary(BaseModel):
+    """Small runtime view of reviewable draft deliverables."""
+
+    deliverable_id: str = Field(..., min_length=1)
+    theme_item_id: str = Field(..., min_length=1)
+    destination_type: str = Field(..., min_length=1)
+    review_status: ReviewStatus
+    publish_status: PublishStatus
+
+
+class CampaignApprovalState(BaseModel):
+    """Roll-up of approval progress for the campaign runtime."""
+
+    pending_review_count: int = 0
+    approved_count: int = 0
+    rejected_count: int = 0
+
+
 class CampaignBrief(BaseModel):
     """Customer-submitted campaign brief. Immutable after creation."""
     theme: str = Field(..., min_length=3,
@@ -88,6 +170,10 @@ class CampaignBrief(BaseModel):
     tone: str = Field("professional", description="Content tone, e.g. 'inspiring', 'casual'")
     language: str = Field("en", description="ISO 639-1 language code")
     approval_mode: ApprovalMode = Field(ApprovalMode.PER_ITEM)
+    theme_discovery: Optional[ThemeDiscoveryBrief] = Field(
+        None,
+        description="Structured Theme Discovery brief used by the Digital Marketing Agent",
+    )
     additional_context: str = Field("",
         description="Free-text extra instructions for the content creator")
 
@@ -150,6 +236,10 @@ class Campaign(BaseModel):
     brief: CampaignBrief
     cost_estimate: CostEstimate
     status: CampaignStatus = CampaignStatus.DRAFT
+    workflow_state: CampaignWorkflowState = CampaignWorkflowState.BRIEF_CAPTURED
+    brief_summary: Optional[CampaignBriefSummary] = None
+    draft_deliverables: List[DraftDeliverableSummary] = Field(default_factory=list)
+    approval_state: CampaignApprovalState = Field(default_factory=CampaignApprovalState)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -213,6 +303,9 @@ class PublishInput(BaseModel):
     post: ContentPost
     credential_ref: Optional[str] = Field(None,
         description="Secret Manager key for platform OAuth token, if required")
+    approval_id: Optional[str] = Field(None, description="Customer approval reference for the exact deliverable")
+    visibility: str = Field("private", description="Requested destination visibility, e.g. private/unlisted/public")
+    public_release_requested: bool = Field(False, description="Explicit customer action allowing a move to public visibility")
 
 
 class PublishReceipt(BaseModel):

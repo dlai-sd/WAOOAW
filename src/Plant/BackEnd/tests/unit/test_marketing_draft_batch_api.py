@@ -1,12 +1,12 @@
-def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
-
+def test_create_draft_batch_persists_posts_and_returns_ids(test_client, in_memory_marketing_draft_store):
     payload = {
         "agent_id": "AGT-MKT-HEALTH-001",
+        "hired_instance_id": "HIRED-001",
+        "campaign_id": "CAM-001",
         "customer_id": "CUST-001",
         "theme": "5 quick tips for managing seasonal allergies",
         "brand_name": "Care Clinic",
+        "brief_summary": "Seasonal allergy education for families in Pune via YouTube.",
         "offer": "Walk-in checkups available",
         "location": "Pune",
         "audience": "Families",
@@ -20,8 +20,12 @@ def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path
 
     assert data["batch_id"]
     assert data["agent_id"] == payload["agent_id"]
+    assert data["hired_instance_id"] == payload["hired_instance_id"]
+    assert data["campaign_id"] == payload["campaign_id"]
     assert data["customer_id"] == payload["customer_id"]
+    assert data["brief_summary"] == payload["brief_summary"]
     assert data["status"] == "pending_review"
+    assert data["workflow_state"] == "draft_ready_for_review"
 
     posts = data["posts"]
     assert len(posts) == 5  # default channels
@@ -31,16 +35,12 @@ def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path
     assert all(p["review_status"] == "pending_review" for p in posts)
     assert all(p["execution_status"] == "not_scheduled" for p in posts)
 
-    assert store_path.exists()
-    lines = store_path.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 1
-    assert "\"batch_id\"" in lines[0]
+    listed = test_client.get("/api/v1/marketing/draft-batches", params={"customer_id": payload["customer_id"]})
+    assert listed.status_code == 200
+    assert len(listed.json()) == 1
 
 
-def test_execute_draft_post_requires_approval_id(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
-
+def test_execute_draft_post_requires_approval_id(test_client, in_memory_marketing_draft_store):
     create = test_client.post(
         "/api/v1/marketing/draft-batches",
         json={

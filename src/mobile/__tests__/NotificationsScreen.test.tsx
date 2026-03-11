@@ -50,6 +50,8 @@ describe('resolveNavigationTarget', () => {
     ['approval_required', 'approvals'],
     ['deliverable_approved', 'recent'],
     ['deliverable_rejected', 'activity'],
+    ['publish_ready', 'recent'],
+    ['publish_blocked', 'health'],
     ['credential_expiring', 'health'],
     ['agent_paused', 'scheduler'],
     ['trial_ending', 'spend'],
@@ -74,5 +76,19 @@ describe('resolveNavigationTarget', () => {
 
     expect((approvalResult!.params as any).focusSection).toBe('approvals');
     expect((approvedDeliverableResult!.params as any).focusSection).toBe('recent');
+  });
+
+  it('keeps publish-ready and publish-blocked routes on different runtime surfaces', () => {
+    const readyResult = resolveNavigationTarget({
+      ...baseNotification,
+      type: 'publish_ready',
+    });
+    const blockedResult = resolveNavigationTarget({
+      ...baseNotification,
+      type: 'publish_blocked',
+    });
+
+    expect((readyResult!.params as any).focusSection).toBe('recent');
+    expect((blockedResult!.params as any).focusSection).toBe('health');
   });
 });

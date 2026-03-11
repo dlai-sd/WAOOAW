@@ -31,10 +31,14 @@ from agent_mold.skills.content_creator import ContentCreatorSkill
 from agent_mold.skills.content_models import (
     Campaign,
     CampaignBrief,
+    CampaignBriefSummary,
     CampaignStatus,
+    CampaignWorkflowState,
+    CampaignApprovalState,
     ContentPost,
     CostEstimate,
     DailyThemeItem,
+    DraftDeliverableSummary,
     PostGeneratorInput,
     PublishInput,
     PublishStatus,
@@ -57,7 +61,7 @@ router = waooaw_router(prefix="/campaigns", tags=["campaigns"])
 # ─── Feature flag ─────────────────────────────────────────────────────────────
 # "memory"  → existing in-memory dicts (default, backward-compatible)
 # "db"      → PostgreSQL via CampaignRepository (requires migration 026)
-CAMPAIGN_PERSISTENCE_MODE = os.getenv("CAMPAIGN_PERSISTENCE_MODE", "memory").lower()
+CAMPAIGN_PERSISTENCE_MODE = os.getenv("CAMPAIGN_PERSISTENCE_MODE", "db").lower()
 
 
 async def _get_write_db() -> AsyncGenerator[Optional[AsyncSession], None]:
@@ -81,7 +85,7 @@ async def _get_read_db() -> AsyncGenerator[Optional[AsyncSession], None]:
 # ─── ORM → Pydantic converters ────────────────────────────────────────────────
 
 def _orm_campaign_to_pydantic(m: CampaignModel) -> Campaign:
-    return Campaign.model_validate({
+    payload = {
         "campaign_id":       m.campaign_id,
         "hired_instance_id": m.hired_instance_id,
         "customer_id":       m.customer_id,
@@ -90,7 +94,16 @@ def _orm_campaign_to_pydantic(m: CampaignModel) -> Campaign:
         "status":            m.status,
         "created_at":        m.created_at,
         "updated_at":        m.updated_at,
-    })
+    }
+    if m.workflow_state:
+        payload["workflow_state"] = m.workflow_state
+    if isinstance(m.brief_summary, dict) and m.brief_summary.get("summary_text"):
+        payload["brief_summary"] = m.brief_summary
+    if m.approval_state:
+        payload["approval_state"] = m.approval_state
+    if m.draft_deliverables:
+        payload["draft_deliverables"] = m.draft_deliverables
+    return Campaign.model_validate(payload)
 
 
 def _orm_theme_item_to_pydantic(m: DailyThemeItemModel) -> DailyThemeItem:
@@ -108,11 +121,20 @@ def _orm_theme_item_to_pydantic(m: DailyThemeItemModel) -> DailyThemeItem:
 
 
 def _orm_post_to_pydantic(m: ContentPostModel) -> ContentPost:
+    destination = dict(m.destination or {})
+    metadata = dict(destination.get("metadata") or {})
+    if m.approval_id is not None:
+        metadata["approval_id"] = m.approval_id
+    if m.credential_ref is not None:
+        metadata["credential_ref"] = m.credential_ref
+    metadata["visibility"] = m.visibility
+    metadata["public_release_requested"] = str(m.public_release_requested).lower() == "true"
+    destination["metadata"] = metadata
     return ContentPost.model_validate({
         "post_id":              m.post_id,
         "campaign_id":          m.campaign_id,
         "theme_item_id":        m.theme_item_id,
-        "destination":          m.destination,
+        "destination":          destination,
         "content_text":         m.content_text,
         "hashtags":             m.hashtags or [],
         "scheduled_publish_at": m.scheduled_publish_at,
@@ -122,6 +144,123 @@ def _orm_post_to_pydantic(m: ContentPostModel) -> ContentPost:
         "created_at":           m.created_at,
         "updated_at":           m.updated_at,
     })
+
+
+def _build_brief_summary(brief: CampaignBrief) -> CampaignBriefSummary:
+    theme_discovery = brief.theme_discovery
+    if theme_discovery is not None:
+        cadence = theme_discovery.posting_cadence
+        cadence_text = f"{cadence.posts_per_week} posts/week"
+        success_metrics = [f"{metric.name}: {metric.target}" for metric in theme_discovery.success_metrics]
+        summary_text = (
+            f"{theme_discovery.objective} for {theme_discovery.target_audience} in "
+            f"{theme_discovery.locality} using {theme_discovery.channel_intent.primary_destination}."
+        )
+        return CampaignBriefSummary(
+            summary_text=summary_text,
+            target_audience=theme_discovery.target_audience,
+            offer=theme_discovery.offer,
+            primary_destination=theme_discovery.channel_intent.primary_destination,
+            cadence_text=cadence_text,
+            success_metrics=success_metrics,
+        )
+
+    first_destination = brief.destinations[0].destination_type if brief.destinations else "youtube"
+    cadence_text = f"{brief.schedule.times_per_day} posts/day"
+    summary_text = f"{brief.theme} for {brief.audience or 'the target audience'} on {first_destination}."
+    return CampaignBriefSummary(
+        summary_text=summary_text,
+        target_audience=brief.audience or "General audience",
+        offer="",
+        primary_destination=first_destination,
+        cadence_text=cadence_text,
+        success_metrics=[],
+    )
+
+
+def _build_draft_deliverables(posts: list[ContentPost]) -> list[DraftDeliverableSummary]:
+    return [
+        DraftDeliverableSummary(
+            deliverable_id=post.post_id,
+            theme_item_id=post.theme_item_id,
+            destination_type=post.destination.destination_type,
+            review_status=post.review_status,
+            publish_status=post.publish_status,
+        )
+        for post in posts
+    ]
+
+
+def _build_publish_input(post: ContentPost) -> PublishInput:
+    metadata = post.destination.metadata or {}
+    return PublishInput(
+        post=post,
+        credential_ref=metadata.get("credential_ref"),
+        approval_id=metadata.get("approval_id"),
+        visibility=str(metadata.get("visibility") or "private"),
+        public_release_requested=bool(metadata.get("public_release_requested", False)),
+    )
+
+
+def _build_approval_state(posts: list[ContentPost]) -> CampaignApprovalState:
+    pending = sum(1 for post in posts if post.review_status == ReviewStatus.PENDING_REVIEW)
+    approved = sum(1 for post in posts if post.review_status == ReviewStatus.APPROVED)
+    rejected = sum(1 for post in posts if post.review_status == ReviewStatus.REJECTED)
+    return CampaignApprovalState(
+        pending_review_count=pending,
+        approved_count=approved,
+        rejected_count=rejected,
+    )
+
+
+def _derive_workflow_state(
+    theme_items: list[DailyThemeItem],
+    posts: list[ContentPost],
+) -> CampaignWorkflowState:
+    if not theme_items and not posts:
+        return CampaignWorkflowState.BRIEF_CAPTURED
+    if posts and all(post.review_status == ReviewStatus.APPROVED for post in posts):
+        return CampaignWorkflowState.APPROVED_FOR_UPLOAD
+    if posts:
+        return CampaignWorkflowState.AWAITING_CUSTOMER_APPROVAL
+    return CampaignWorkflowState.DRAFT_READY_FOR_REVIEW
+
+
+def _enrich_campaign_runtime(
+    campaign: Campaign,
+    *,
+    theme_items: list[DailyThemeItem],
+    posts: list[ContentPost],
+) -> Campaign:
+    return campaign.model_copy(
+        update={
+            "workflow_state": _derive_workflow_state(theme_items, posts),
+            "brief_summary": _build_brief_summary(campaign.brief),
+            "draft_deliverables": _build_draft_deliverables(posts),
+            "approval_state": _build_approval_state(posts),
+        }
+    )
+
+
+async def _persist_campaign_runtime(repo: CampaignRepository, campaign_id: str) -> Campaign:
+    orm_campaign = await repo.get_campaign_by_id(campaign_id)
+    if orm_campaign is None:
+        raise ValueError(f"Campaign {campaign_id!r} not found")
+    orm_theme_items = await repo.list_theme_items_by_campaign(campaign_id)
+    orm_posts = await repo.list_posts_by_campaign(campaign_id)
+    campaign = _enrich_campaign_runtime(
+        _orm_campaign_to_pydantic(orm_campaign),
+        theme_items=[_orm_theme_item_to_pydantic(item) for item in orm_theme_items],
+        posts=[_orm_post_to_pydantic(post) for post in orm_posts],
+    )
+    await repo.update_campaign_runtime(
+        campaign_id,
+        workflow_state=campaign.workflow_state.value,
+        brief_summary=campaign.brief_summary.model_dump(mode="json") if campaign.brief_summary else {},
+        approval_state=campaign.approval_state.model_dump(mode="json"),
+        draft_deliverables=[draft.model_dump(mode="json") for draft in campaign.draft_deliverables],
+    )
+    return campaign
 
 # ─── In-memory stores (Phase 1) ───────────────────────────────────────────────
 _campaigns: dict[str, Campaign] = {}
@@ -232,6 +371,8 @@ async def create_campaign(
                 dimensions=item.dimensions,
                 theme_item_id=item.theme_item_id,
             )
+        campaign = await _persist_campaign_runtime(repo, campaign.campaign_id)
+        await db.commit()
         logger.info("Campaign created: campaign_id=%s customer_id=<masked>", campaign.campaign_id)
         return CreateCampaignResponse(
             campaign=campaign,
@@ -247,6 +388,7 @@ async def create_campaign(
         brief=body.brief,
         cost_estimate=cost,
     )
+    campaign = _enrich_campaign_runtime(campaign, theme_items=[], posts=[])
 
     skill = ContentCreatorSkill()
     creator_output = skill.generate_theme_list(campaign)
@@ -283,7 +425,11 @@ async def get_campaign(
     campaign = _campaigns.get(campaign_id)
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
-    return campaign
+    return _enrich_campaign_runtime(
+        campaign,
+        theme_items=list(_theme_items.get(campaign_id, {}).values()),
+        posts=list(_posts.get(campaign_id, {}).values()),
+    )
 
 
 @router.get("/{campaign_id}/theme-items", response_model=list[DailyThemeItem])
@@ -341,6 +487,8 @@ async def approve_theme_items(
         refreshed = await repo.list_theme_items_by_campaign(campaign_id)
         if refreshed and all(item.review_status == ReviewStatus.APPROVED.value for item in refreshed):
             await repo.update_campaign_status(campaign_id, CampaignStatus.THEME_APPROVED.value)
+        await _persist_campaign_runtime(repo, campaign_id)
+        await db.commit()
         return affected
 
     # --- memory mode (existing code, UNCHANGED) ---
@@ -402,6 +550,8 @@ async def patch_theme_item(
         refreshed = await repo.list_theme_items_by_campaign(campaign_id)
         if refreshed and all(item.review_status == ReviewStatus.APPROVED.value for item in refreshed):
             await repo.update_campaign_status(campaign_id, CampaignStatus.THEME_APPROVED.value)
+        await _persist_campaign_runtime(repo, campaign_id)
+        await db.commit()
         return _orm_theme_item_to_pydantic(updated)
 
     # --- memory mode (existing code, UNCHANGED) ---
@@ -462,6 +612,7 @@ async def generate_posts_for_theme_item(
         inp = PostGeneratorInput(campaign=campaign, theme_item=theme_item)
         post_output = skill.generate_posts_for_theme(inp)
         for post in post_output.posts:
+            metadata = post.destination.metadata or {}
             await repo.create_post(
                 campaign_id=post.campaign_id,
                 theme_item_id=post.theme_item_id,
@@ -470,7 +621,13 @@ async def generate_posts_for_theme_item(
                 scheduled_publish_at=post.scheduled_publish_at,
                 hashtags=post.hashtags,
                 post_id=post.post_id,
+                approval_id=metadata.get("approval_id"),
+                credential_ref=metadata.get("credential_ref"),
+                visibility=str(metadata.get("visibility") or "private"),
+                public_release_requested=bool(metadata.get("public_release_requested", False)),
             )
+        await _persist_campaign_runtime(repo, campaign_id)
+        await db.commit()
         logger.info(
             "Posts generated: campaign_id=%s theme_item_id=%s count=%d",
             campaign_id, item_id, len(post_output.posts),
@@ -568,6 +725,8 @@ async def approve_posts(
                 affected.append(_orm_post_to_pydantic(updated))
             except ValueError:
                 continue
+        await _persist_campaign_runtime(repo, campaign_id)
+        await db.commit()
         return affected
 
     # --- memory mode (existing code, UNCHANGED) ---
@@ -612,6 +771,8 @@ async def patch_post(
             updated = await repo.update_post_review_status(post_id, body.decision)
         except ValueError:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found.")
+        await _persist_campaign_runtime(repo, campaign_id)
+        await db.commit()
         return _orm_post_to_pydantic(updated)
 
     # --- memory mode (existing code, UNCHANGED) ---
@@ -675,11 +836,13 @@ async def publish_post(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Post is already published.",
             )
-        inp = PublishInput(post=post)
+        inp = _build_publish_input(post)
         receipt = default_engine.publish(inp)
         receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
         publish_status_str = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
         await repo.update_post_publish_status(post_id, publish_status_str, publish_receipt=receipt_dict)
+        await _persist_campaign_runtime(repo, campaign_id)
+        await db.commit()
         logger.info(
             "Post publish attempt: campaign_id=%s post_id=%s success=%s",
             campaign_id, post_id, receipt.success,
@@ -710,7 +873,7 @@ async def publish_post(
             detail="Post is already published.",
         )
 
-    inp = PublishInput(post=post)
+    inp = _build_publish_input(post)
     receipt = default_engine.publish(inp)
 
     now = datetime.now(timezone.utc)
@@ -764,12 +927,14 @@ async def publish_due(
         receipts: list[PublishReceipt] = []
         for orm_post in eligible_orm:
             post = _orm_post_to_pydantic(orm_post)
-            inp = PublishInput(post=post)
+            inp = _build_publish_input(post)
             receipt = default_engine.publish(inp)
             receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
             pub_status = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
             await repo.update_post_publish_status(orm_post.post_id, pub_status, publish_receipt=receipt_dict)
             receipts.append(receipt)
+        await _persist_campaign_runtime(repo, campaign_id)
+        await db.commit()
         logger.info(
             "publish-due: campaign_id=%s eligible=%d published=%d",
             campaign_id, len(eligible_orm), sum(1 for r in receipts if r.success),
@@ -794,7 +959,7 @@ async def publish_due(
 
     receipts: list[PublishReceipt] = []
     for post in eligible:
-        inp = PublishInput(post=post)
+        inp = _build_publish_input(post)
         receipt = default_engine.publish(inp)
         if receipt.success:
             post.publish_status = PublishStatus.PUBLISHED

@@ -49,11 +49,35 @@ async def test_list_reference_agents():
     agents = resp.json()
     assert isinstance(agents, list)
     assert {a["agent_id"] for a in agents} >= {
+        "AGT-MKT-DMA-001",
         "AGT-MKT-BEAUTY-001",
         "AGT-MKT-CAKE-001",
         "AGT-TUTOR-WB-001",
         "AGT-TRD-DELTA-001",
     }
+
+    dma = next(a for a in agents if a["agent_id"] == "AGT-MKT-DMA-001")
+    assert dma["display_name"] == "Digital Marketing Agent"
+    assert dma["visible_skills"] == [
+        "Theme Discovery",
+        "Content Creation",
+        "Content Publishing",
+    ]
+    assert dma["supported_destinations"] == ["youtube"]
+    skill_config = dma["spec"]["dimensions"]["skill"]["config"]
+    assert skill_config["theme_discovery_required_fields"] == [
+        "business_background",
+        "objective",
+        "industry",
+        "locality",
+        "target_audience",
+        "persona",
+        "tone",
+        "offer",
+        "channel_intent",
+        "posting_cadence",
+        "success_metrics",
+    ]
 
 
 @pytest.mark.asyncio

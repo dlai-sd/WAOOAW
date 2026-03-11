@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 
-def test_list_and_approve_draft_post(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
-
+def test_list_and_approve_draft_post(test_client, in_memory_marketing_draft_store):
     created = test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
@@ -58,10 +55,7 @@ def test_list_and_approve_draft_post(test_client, tmp_path, monkeypatch):
     assert match2["scheduled_at"]
 
 
-def test_reject_draft_post_resets_review_state(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
-
+def test_reject_draft_post_resets_review_state(test_client, in_memory_marketing_draft_store):
     created = test_client.post(
         "/api/v1/marketing/draft-batches",
         json={

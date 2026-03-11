@@ -308,6 +308,32 @@ async def test_update_theme_item_review_status_not_found_raises():
         await repo.update_theme_item_review_status("THM-MISSING", "approved")
 
 
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_get_campaign_runtime_counters_rolls_up_post_review_counts():
+    session = _make_mock_session()
+    repo = CampaignRepository(session)
+
+    with patch.object(repo, "list_theme_items_by_campaign", AsyncMock(return_value=[_make_theme_item()])):
+        approved = _make_post("PST-APPROVED")
+        approved.review_status = "approved"
+        pending = _make_post("PST-PENDING")
+        pending.review_status = "pending_review"
+        rejected = _make_post("PST-REJECTED")
+        rejected.review_status = "rejected"
+
+        with patch.object(repo, "list_posts_by_campaign", AsyncMock(return_value=[approved, pending, rejected])):
+            counters = await repo.get_campaign_runtime_counters("CAM-001")
+
+    assert counters == {
+        "theme_items": 1,
+        "posts": 3,
+        "pending_review_posts": 1,
+        "approved_posts": 1,
+        "rejected_posts": 1,
+    }
+
+
 # ── CampaignRepository — ContentPost ─────────────────────────────────────────
 
 @pytest.mark.asyncio

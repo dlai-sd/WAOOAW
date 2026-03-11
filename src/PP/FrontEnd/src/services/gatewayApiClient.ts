@@ -402,6 +402,16 @@ export const gatewayApiClient = {
       )
     ),
 
+  listOpsHiredAgentSkills: (hiredInstanceId: string) =>
+    gatewayRequestJson<unknown[]>(
+      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/skills`
+    ),
+
+  listOpsPlatformConnections: (hiredInstanceId: string) =>
+    gatewayRequestJson<unknown[]>(
+      `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/platform-connections`
+    ),
+
   getOpsConstructHealth: (hiredInstanceId: string) =>
     gatewayRequestJson<unknown>(
       `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/construct-health`

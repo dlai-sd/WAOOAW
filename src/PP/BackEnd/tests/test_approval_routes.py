@@ -207,12 +207,16 @@ async def test_approvals_review_queue_returns_enriched_context(app, client, monk
                             "posts": [
                                 {
                                     "post_id": "POST-1",
-                                    "channel": "linkedin",
+                                    "channel": "youtube",
                                     "text": "Draft follow-up reminder post for patients.",
                                     "review_status": "pending_review",
                                     "execution_status": "not_scheduled",
+                                    "approval_id": None,
+                                    "last_error": "credential_ref_required_for_youtube_publish",
                                 }
                             ],
+                            "youtube_visibility": "private",
+                            "public_release_requested": False,
                         }
                     ],
                 ),
@@ -240,6 +244,96 @@ async def test_approvals_review_queue_returns_enriched_context(app, client, monk
     assert approval["deliverable_preview"]["batch_id"] == "BATCH-1"
     assert approval["deliverable_preview"]["post_id"] == "POST-1"
     assert approval["deliverable_preview"]["brand_name"] == "WAOOAW Care"
+    assert approval["publish_diagnostics"]["publish_block"] == "approval_missing"
+    assert approval["publish_diagnostics"]["approval_lineage"] == "No approval id is attached to the exact deliverable yet."
+
+
+@pytest.mark.asyncio
+async def test_approvals_review_queue_surfaces_credential_and_lineage_diagnostics(app, client, monkeypatch, tmp_path: Path):
+    store_path = tmp_path / "approvals.jsonl"
+    monkeypatch.setenv("PP_APPROVALS_STORE_PATH", str(store_path))
+
+    from services import approvals as svc
+    from clients.plant_client import get_plant_client
+    from core.config import get_settings
+
+    svc.default_approval_store.cache_clear()
+    settings = get_settings()
+    token = _admin_token(settings, sub="admin-99")
+
+    created = await client.post(
+        "/api/pp/approvals",
+        headers={"authorization": f"Bearer {token}"},
+        json={
+            "customer_id": "CUST-2",
+            "agent_id": "AGT-MKT-DMA-001",
+            "action": "publish",
+            "purpose": "review_queue",
+        },
+    )
+    assert created.status_code == 200
+
+    plant = SimpleNamespace(
+        _request=AsyncMock(
+            side_effect=[
+                _make_plant(
+                    200,
+                    {
+                        "customer_id": "CUST-2",
+                        "instances": [
+                            {
+                                "hired_instance_id": "HAI-999",
+                                "agent_id": "AGT-MKT-DMA-001",
+                                "nickname": "Digital Marketing Agent",
+                            }
+                        ],
+                    },
+                ),
+                _make_plant(
+                    200,
+                    [
+                        {
+                            "batch_id": "BATCH-99",
+                            "agent_id": "AGT-MKT-DMA-001",
+                            "customer_id": "CUST-2",
+                            "brand_name": "WAOOAW Studio",
+                            "theme": "Founder launch diaries",
+                            "status": "approved",
+                            "youtube_visibility": "private",
+                            "public_release_requested": False,
+                            "posts": [
+                                {
+                                    "post_id": "POST-99",
+                                    "channel": "youtube",
+                                    "text": "Founder launch video draft.",
+                                    "review_status": "approved",
+                                    "execution_status": "scheduled",
+                                    "approval_id": "APR-LOCKED-99",
+                                    "last_error": "credential_ref_required_for_youtube_publish",
+                                }
+                            ],
+                        }
+                    ],
+                ),
+            ]
+        )
+    )
+    app.dependency_overrides[get_plant_client] = lambda: plant
+
+    try:
+        resp = await client.get(
+            "/api/pp/approvals/review-queue?customer_id=CUST-2",
+            headers={"authorization": f"Bearer {token}"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200
+    approval = resp.json()["approvals"][0]
+    assert approval["publish_diagnostics"]["publish_block"] == "credential_missing"
+    assert approval["publish_diagnostics"]["credential_state"] == "missing_youtube_credential_ref"
+    assert approval["publish_diagnostics"]["approval_lineage"] == "Approval APR-LOCKED-99 is currently attached to post POST-99."
+    assert approval["publish_diagnostics"]["youtube_visibility"] == "private"
 
 
 @pytest.mark.asyncio

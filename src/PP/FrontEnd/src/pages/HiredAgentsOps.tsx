@@ -63,16 +63,42 @@ type HiredAgentInstance = {
 type Deliverable = {
   deliverable_id: string
   created_at?: string
+  updated_at?: string
   goal_template_id?: string | null
   frequency?: string | null
   review_status?: string | null
   approval_id?: string | null
   execution_status?: string | null
+  payload?: Record<string, unknown> | null
 }
 
 type DeliverablesListResponse = {
   hired_instance_id: string
   deliverables: Deliverable[]
+}
+
+type GoalSchemaField = {
+  key: string
+  label: string
+  required?: boolean
+}
+
+type AgentSkill = {
+  skill_id: string
+  name?: string | null
+  display_name?: string | null
+  goal_schema?: {
+    fields?: GoalSchemaField[]
+  } | null
+  goal_config?: Record<string, unknown> | null
+}
+
+type PlatformConnection = {
+  id?: string
+  platform_key: string
+  status?: string | null
+  last_verified_at?: string | null
+  created_at?: string | null
 }
 
 type ApprovalRecord = {
@@ -111,6 +137,247 @@ type HiredRow = {
   subscription_id: string
   hired: HiredAgentInstance
   goals: GoalInstance[]
+}
+
+type PlatformConnectionSummary = {
+  label: string
+  message: string
+  tone: 'success' | 'warning' | 'danger' | 'informative'
+  isReady: boolean
+}
+
+type PublishReadiness = {
+  label: string
+  message: string
+  tone: 'success' | 'warning' | 'danger' | 'informative'
+  owner: 'customer' | 'platform' | 'ready' | 'published'
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function stringOrNull(value: unknown): string | null {
+  const normalized = String(value ?? '').trim()
+  return normalized ? normalized : null
+}
+
+function booleanFromUnknown(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  const normalized = String(value ?? '').trim().toLowerCase()
+  return normalized === 'true' || normalized === '1' || normalized === 'yes'
+}
+
+function hasValue(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0
+  if (value && typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0
+  return String(value ?? '').trim().length > 0
+}
+
+function formatBriefValue(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ')
+  if (value && typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return 'Structured response captured'
+    }
+  }
+  return String(value ?? '').trim()
+}
+
+function isDigitalMarketingAgent(agentId?: string | null, agentTypeId?: string | null): boolean {
+  return (
+    String(agentId || '').trim().toUpperCase() === 'AGT-MKT-DMA-001'
+    || String(agentTypeId || '').trim() === 'marketing.digital_marketing.v1'
+  )
+}
+
+function getThemeDiscoverySkill(skills: AgentSkill[]): AgentSkill | null {
+  return skills.find((skill) => {
+    const candidates = [skill.display_name, skill.name]
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean)
+    return candidates.some((value) => value === 'theme discovery' || value === 'theme_discovery')
+  }) || null
+}
+
+function getDeliverableChannelTarget(deliverable: Deliverable): {
+  platformKey: string | null
+  visibility: string
+  publicReleaseRequested: boolean
+  publishStatus: string
+  platformPostId: string | null
+} {
+  const payload = asRecord(deliverable.payload) || {}
+  const destination = asRecord(payload.destination) || asRecord(payload.destination_ref) || {}
+  const metadata = asRecord(destination.metadata) || asRecord(payload.metadata) || {}
+  const publishReceipt = asRecord(payload.publish_receipt) || {}
+
+  return {
+    platformKey:
+      stringOrNull(destination.destination_type)
+      || stringOrNull(payload.destination_type)
+      || stringOrNull(payload.channel)
+      || stringOrNull(payload.platform),
+    visibility: stringOrNull(metadata.visibility) || stringOrNull(payload.visibility) || 'private',
+    publicReleaseRequested:
+      booleanFromUnknown(metadata.public_release_requested)
+      || booleanFromUnknown(payload.public_release_requested),
+    publishStatus:
+      stringOrNull(payload.publish_status)
+      || stringOrNull(publishReceipt.status)
+      || 'not_published',
+    platformPostId:
+      stringOrNull(publishReceipt.platform_post_id)
+      || stringOrNull(payload.platform_post_id),
+  }
+}
+
+function getPlatformConnectionSummary(
+  connections: PlatformConnection[],
+  platformKey: string | null
+): PlatformConnectionSummary {
+  const normalized = String(platformKey || '').trim().toLowerCase()
+  const labelBase = normalized ? `${normalized[0].toUpperCase()}${normalized.slice(1)}` : 'Channel'
+  const connection = connections.find(
+    (item) => String(item.platform_key || '').trim().toLowerCase() === normalized
+  )
+
+  if (!connection) {
+    return {
+      label: `${labelBase} not connected`,
+      message: `Connect ${labelBase} before the agent can upload anything externally.`,
+      tone: 'danger',
+      isReady: false,
+    }
+  }
+
+  const status = String(connection.status || '').trim().toLowerCase()
+  if (status === 'connected' || status === 'active') {
+    return {
+      label: `${labelBase} connected`,
+      message: connection.last_verified_at
+        ? `${labelBase} was last verified on ${new Date(connection.last_verified_at).toLocaleString()}.`
+        : `${labelBase} is connected and available for upload gating.`,
+      tone: 'success',
+      isReady: true,
+    }
+  }
+
+  return {
+    label: `${labelBase} pending verification`,
+    message: `${labelBase} has a saved connection, but it still needs operator attention before uploads should proceed.`,
+    tone: 'warning',
+    isReady: false,
+  }
+}
+
+function getDeliverablePublishReadiness(
+  deliverable: Deliverable | null,
+  connectionSummary: PlatformConnectionSummary,
+  platformLabel: string
+): PublishReadiness {
+  if (!deliverable) {
+    return {
+      label: 'Waiting for first draft',
+      message: 'No deliverable has been created yet, so PP cannot verify approval or publish state.',
+      tone: 'informative',
+      owner: 'platform',
+    }
+  }
+
+  const reviewStatus = String(deliverable.review_status || '').trim().toLowerCase() || 'pending_review'
+  const executionStatus = String(deliverable.execution_status || '').trim().toLowerCase()
+  const channel = getDeliverableChannelTarget(deliverable)
+  const publishStatus = String(channel.publishStatus || '').trim().toLowerCase()
+
+  if (publishStatus === 'published' || channel.platformPostId) {
+    return {
+      label: 'Published',
+      message: `This deliverable already has a live ${platformLabel} publish receipt.`,
+      tone: 'success',
+      owner: 'published',
+    }
+  }
+
+  if (publishStatus === 'failed') {
+    return {
+      label: 'Publish failed',
+      message: `The last ${platformLabel} publish attempt failed. Review the runtime diagnostics before retrying.`,
+      tone: 'danger',
+      owner: 'platform',
+    }
+  }
+
+  if (reviewStatus === 'rejected') {
+    return {
+      label: 'Blocked by customer rejection',
+      message: 'The customer rejected this draft, so a revised deliverable must be approved before anything can upload.',
+      tone: 'danger',
+      owner: 'customer',
+    }
+  }
+
+  if (reviewStatus !== 'approved') {
+    return {
+      label: 'Waiting on customer approval',
+      message: 'The draft exists, but publish is still customer-blocked until the exact deliverable is approved.',
+      tone: 'warning',
+      owner: 'customer',
+    }
+  }
+
+  if (!connectionSummary.isReady) {
+    return {
+      label: 'Blocked by channel connection',
+      message: `Customer approval is complete, but ${platformLabel} still needs a verified connection before upload can happen.`,
+      tone: 'danger',
+      owner: 'platform',
+    }
+  }
+
+  if (executionStatus === 'executed' && channel.visibility !== 'public') {
+    return {
+      label: 'Uploaded as non-public',
+      message: `The content reached ${platformLabel}, but it is still ${channel.visibility} and not publicly released.`,
+      tone: 'informative',
+      owner: 'platform',
+    }
+  }
+
+  if (channel.publicReleaseRequested || channel.visibility === 'public') {
+    return {
+      label: 'Ready for public release',
+      message: `Approval and ${platformLabel} readiness are satisfied. The next publish step can make this public.`,
+      tone: 'success',
+      owner: 'ready',
+    }
+  }
+
+  return {
+    label: 'Ready for upload',
+    message: `Approval is in place and ${platformLabel} is ready. The agent can upload this without implying automatic public release.`,
+    tone: 'success',
+    owner: 'ready',
+  }
+}
+
+function selectLatestDeliverable(deliverables: Deliverable[]): Deliverable | null {
+  if (!deliverables.length) return null
+  return [...deliverables].sort((left, right) => {
+    const leftTs = new Date(left.updated_at || left.created_at || 0).getTime()
+    const rightTs = new Date(right.updated_at || right.created_at || 0).getTime()
+    return rightTs - leftTs
+  })[0]
+}
+
+function toneStyles(tone: 'success' | 'warning' | 'danger' | 'informative'): { background: string; color: string } {
+  if (tone === 'success') return { background: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }
+  if (tone === 'warning') return { background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' }
+  if (tone === 'danger') return { background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' }
+  return { background: 'rgba(0, 242, 254, 0.12)', color: '#00f2fe' }
 }
 
 function buildHiredAgentsSearch(filters: {
@@ -154,6 +421,8 @@ export default function HiredAgentsOps() {
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([])
   const [denials, setDenials] = useState<PolicyDenialRecord[]>([])
+  const [skills, setSkills] = useState<AgentSkill[]>([])
+  const [platformConnections, setPlatformConnections] = useState<PlatformConnection[]>([])
 
   const [correlationId, setCorrelationId] = useState(() => searchParams.get('correlation_id') || '')
   const [selectedDenial, setSelectedDenial] = useState<PolicyDenialRecord | null>(null)
@@ -213,6 +482,8 @@ export default function HiredAgentsOps() {
     setDeliverables([])
     setApprovals([])
     setDenials([])
+    setSkills([])
+    setPlatformConnections([])
 
     try {
       // Use new dedicated ops routes (not the catch-all /v1/ proxy)
@@ -275,7 +546,7 @@ export default function HiredAgentsOps() {
         correlationId: corr || '',
       })
 
-      const [deliverablesRes, approvalsRes, denialsRes] = await Promise.all([
+      const [deliverablesRes, approvalsRes, denialsRes, skillsRes, platformConnectionsRes] = await Promise.all([
         gatewayApiClient.listOpsHiredAgentDeliverables(row.hired.hired_instance_id, {
           customer_id: cust,
           as_of: normalizedAsOf,
@@ -291,7 +562,9 @@ export default function HiredAgentsOps() {
           customer_id: cust,
           agent_id: row.hired.agent_id,
           limit: 200
-        }) as Promise<unknown>
+        }) as Promise<unknown>,
+        gatewayApiClient.listOpsHiredAgentSkills(row.hired.hired_instance_id) as Promise<unknown>,
+        gatewayApiClient.listOpsPlatformConnections(row.hired.hired_instance_id) as Promise<unknown>
       ])
 
       const d = (deliverablesRes as DeliverablesListResponse)?.deliverables || []
@@ -302,6 +575,20 @@ export default function HiredAgentsOps() {
 
       const p = (denialsRes as PolicyDenialsResponse)?.records || []
       setDenials(p)
+
+      const runtimeSkills = Array.isArray(skillsRes)
+        ? skillsRes as AgentSkill[]
+        : Array.isArray((skillsRes as { skills?: AgentSkill[] })?.skills)
+          ? ((skillsRes as { skills?: AgentSkill[] }).skills || [])
+          : []
+      setSkills(runtimeSkills)
+
+      const runtimeConnections = Array.isArray(platformConnectionsRes)
+        ? platformConnectionsRes as PlatformConnection[]
+        : Array.isArray((platformConnectionsRes as { connections?: PlatformConnection[] })?.connections)
+          ? ((platformConnectionsRes as { connections?: PlatformConnection[] }).connections || [])
+          : []
+      setPlatformConnections(runtimeConnections)
     } catch (e: any) {
       setError(e)
     } finally {
@@ -347,6 +634,26 @@ export default function HiredAgentsOps() {
         selectedHiredInstanceId: selected.hired.hired_instance_id,
       }).toString()
     : ''
+
+  const selectedIsDigitalMarketing = Boolean(
+    selected && isDigitalMarketingAgent(selected.hired.agent_id, selected.hired.agent_type_id)
+  )
+  const themeDiscoverySkill = selectedIsDigitalMarketing ? getThemeDiscoverySkill(skills) : null
+  const briefFields = themeDiscoverySkill?.goal_schema?.fields || []
+  const briefValues = themeDiscoverySkill?.goal_config || {}
+  const requiredFieldCount = briefFields.filter((field) => field.required).length
+  const completedRequiredFieldCount = briefFields.filter(
+    (field) => field.required && hasValue(briefValues[field.key])
+  ).length
+  const latestDeliverable = selectLatestDeliverable(deliverables)
+  const channelTarget = latestDeliverable ? getDeliverableChannelTarget(latestDeliverable) : null
+  const platformLabel = channelTarget?.platformKey
+    ? `${channelTarget.platformKey[0].toUpperCase()}${channelTarget.platformKey.slice(1)}`
+    : 'Publishing channel'
+  const connectionSummary = getPlatformConnectionSummary(platformConnections, channelTarget?.platformKey || 'youtube')
+  const publishReadiness = getDeliverablePublishReadiness(latestDeliverable, connectionSummary, platformLabel)
+  const readinessTone = toneStyles(publishReadiness.tone)
+  const connectionTone = toneStyles(connectionSummary.tone)
 
   return (
     <div className="page-container" data-testid="pp-hired-agents-page">
@@ -639,6 +946,69 @@ export default function HiredAgentsOps() {
 
           {detailTab === 'overview' && (
             <>
+          {selectedIsDigitalMarketing && (
+            <div style={{ marginTop: 16, display: 'grid', gap: 16, gridTemplateColumns: 'minmax(0, 1.1fr) minmax(320px, 0.9fr)' }}>
+              <Card data-testid="pp-dma-brief-summary-card">
+                <CardHeader
+                  header={<Text weight="semibold">Theme Discovery brief</Text>}
+                  description={<Text size={200}>{completedRequiredFieldCount}/{requiredFieldCount || briefFields.length} core details captured</Text>}
+                />
+                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <Text size={200} style={{ opacity: 0.82 }}>
+                    PP sees the customer’s structured brief here so support can explain why drafts or publish states look the way they do without asking the customer to restate their intent.
+                  </Text>
+                  {briefFields.filter((field) => hasValue(briefValues[field.key])).length === 0 ? (
+                    <Card appearance="outline" style={{ padding: 12 }}>
+                      <Text>No Theme Discovery brief has been saved yet. This runtime is still missing structured customer intent.</Text>
+                    </Card>
+                  ) : (
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      {briefFields.map((field) => {
+                        if (!hasValue(briefValues[field.key])) return null
+                        return (
+                          <Card key={field.key} appearance="outline" style={{ padding: 12 }}>
+                            <Text size={200} style={{ display: 'block', opacity: 0.7 }}>{field.label}</Text>
+                            <Text style={{ display: 'block', marginTop: 6 }}>{formatBriefValue(briefValues[field.key])}</Text>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </Card>
+
+              <div style={{ display: 'grid', gap: 16 }}>
+                <Card data-testid="pp-dma-publish-state-card">
+                  <CardHeader
+                    header={<Text weight="semibold">Publish state</Text>}
+                    description={<Text size={200}>Customer-blocked and platform-blocked states are called out explicitly.</Text>}
+                  />
+                  <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="fui-Text" style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: 999, background: readinessTone.background, color: readinessTone.color }}>
+                        {publishReadiness.label}
+                      </span>
+                      <span className="fui-Text" style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: 999, background: connectionTone.background, color: connectionTone.color }}>
+                        {connectionSummary.label}
+                      </span>
+                    </div>
+                    <Text data-testid="pp-dma-publish-readiness">Publish readiness: {publishReadiness.label}</Text>
+                    <Text data-testid="pp-dma-publish-message">{publishReadiness.message}</Text>
+                    <Text data-testid="pp-dma-block-owner">
+                      Block owner: {publishReadiness.owner === 'customer' ? 'Customer action required' : publishReadiness.owner === 'platform' ? 'Platform action required' : publishReadiness.owner === 'published' ? 'Already published' : 'Ready for next runtime step'}
+                    </Text>
+                    <Text data-testid="pp-dma-channel-status">Channel: {connectionSummary.label}</Text>
+                    {latestDeliverable?.approval_id ? (
+                      <Text>Approval lineage: deliverable is tied to {latestDeliverable.approval_id} and PP should treat that as the exact customer-approved version.</Text>
+                    ) : (
+                      <Text>Approval lineage: this deliverable does not yet carry an approval id, so nothing should imply publish authorization.</Text>
+                    )}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          )}
+
           <Card style={{ marginTop: 16 }}>
             <CardHeader header={<Text weight="semibold">Config</Text>} />
             <div style={{ padding: 16 }}>

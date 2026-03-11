@@ -16,14 +16,16 @@ from uuid import uuid4
 from fastapi import Depends, Request
 from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_mold.enforcement import default_hook_bus
 from agent_mold.hooks import HookEvent, HookStage
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import load_playbook
 from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
+from core.database import get_db_session, get_read_db_session
 from core.exceptions import PolicyEnforcementError
-from services.draft_batches import DraftBatchRecord, DraftPostRecord, FileDraftBatchStore
+from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord
 from services.policy_denial_audit import (
     PolicyDenialAuditRecord,
     PolicyDenialAuditStore,
@@ -43,21 +45,23 @@ def _marketing_multichannel_playbook():
     )
     return load_playbook(path)
 
-def get_draft_batch_store() -> FileDraftBatchStore:
-    path = os.getenv("DRAFT_BATCH_STORE_PATH", "/app/data/draft_batches.jsonl")
-    return FileDraftBatchStore(path)
-
 class CreateDraftBatchRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
+    hired_instance_id: Optional[str] = None
+    campaign_id: Optional[str] = None
     customer_id: Optional[str] = None
 
     theme: str
     brand_name: str
+    brief_summary: Optional[str] = None
     offer: Optional[str] = None
     location: Optional[str] = None
     audience: Optional[str] = None
     tone: Optional[str] = None
     language: Optional[str] = None
+    youtube_credential_ref: Optional[str] = None
+    youtube_visibility: str = "private"
+    public_release_requested: bool = False
 
     channels: Optional[List[ChannelName]] = None
 
@@ -70,9 +74,10 @@ async def list_draft_batches(
     customer_id: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 50,
-    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    db: AsyncSession = Depends(get_read_db_session),
 ) -> List[DraftBatchRecord]:
-    batches = store.load_batches()
+    store = DatabaseDraftBatchStore(db)
+    batches = await store.load_batches()
     if agent_id:
         batches = [b for b in batches if b.agent_id == agent_id]
     if customer_id:
@@ -86,11 +91,12 @@ async def list_draft_batches(
 @router.get("/draft-batches/{batch_id}", response_model=DraftBatchRecord)
 async def get_draft_batch(
     batch_id: str,
-    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    db: AsyncSession = Depends(get_read_db_session),
 ) -> DraftBatchRecord:
-    for batch in store.load_batches():
-        if batch.batch_id == batch_id:
-            return batch
+    store = DatabaseDraftBatchStore(db)
+    batch = await store.get_batch(batch_id)
+    if batch is not None:
+        return batch
     raise PolicyEnforcementError(
         "Unknown draft batch",
         reason="unknown_batch_id",
@@ -100,8 +106,9 @@ async def get_draft_batch(
 @router.post("/draft-batches", response_model=CreateDraftBatchResponse)
 async def create_draft_batch(
     body: CreateDraftBatchRequest,
-    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    db: AsyncSession = Depends(get_db_session),
 ) -> CreateDraftBatchResponse:
+    store = DatabaseDraftBatchStore(db)
     playbook = _marketing_multichannel_playbook()
 
     result = execute_marketing_multichannel_v1(
@@ -125,6 +132,9 @@ async def create_draft_batch(
             channel=v.channel,
             text=v.text,
             hashtags=v.hashtags,
+            credential_ref=body.youtube_credential_ref if v.channel == ChannelName.YOUTUBE else None,
+            visibility=body.youtube_visibility if v.channel == ChannelName.YOUTUBE else "private",
+            public_release_requested=body.public_release_requested if v.channel == ChannelName.YOUTUBE else False,
         )
         for v in result.output.variants
     ]
@@ -132,14 +142,18 @@ async def create_draft_batch(
     batch = DraftBatchRecord(
         batch_id=batch_id,
         agent_id=body.agent_id,
+        hired_instance_id=body.hired_instance_id,
+        campaign_id=body.campaign_id,
         customer_id=body.customer_id,
         theme=result.output.canonical.theme,
         brand_name=body.brand_name,
+        brief_summary=body.brief_summary,
         created_at=datetime.utcnow(),
         posts=posts,
     )
 
-    store.save_batch(batch)
+    await store.save_batch(batch)
+    await db.commit()
     return CreateDraftBatchResponse(**batch.model_dump())
 
 class ExecuteDraftPostRequest(BaseModel):
@@ -169,9 +183,10 @@ class ApproveDraftPostResponse(BaseModel):
 async def approve_draft_post(
     post_id: str,
     body: ApproveDraftPostRequest,
-    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    db: AsyncSession = Depends(get_db_session),
 ) -> ApproveDraftPostResponse:
-    found = store.find_post(post_id)
+    store = DatabaseDraftBatchStore(db)
+    found = await store.find_post(post_id)
     if found is None:
         raise PolicyEnforcementError(
             "Unknown draft post",
@@ -183,7 +198,7 @@ async def approve_draft_post(
     if not approval_id:
         approval_id = f"APR-{uuid4()}"
 
-    updated = store.update_post(post_id, review_status="approved", approval_id=approval_id)
+    updated = await store.update_post(post_id, review_status="approved", approval_id=approval_id)
     if not updated:
         raise PolicyEnforcementError(
             "Unable to update draft post",
@@ -191,6 +206,7 @@ async def approve_draft_post(
             details={"post_id": post_id},
         )
 
+    await db.commit()
     return ApproveDraftPostResponse(post_id=post_id, review_status="approved", approval_id=approval_id)
 
 
@@ -202,9 +218,10 @@ class RejectDraftPostResponse(BaseModel):
 @router.post("/draft-posts/{post_id}/reject", response_model=RejectDraftPostResponse)
 async def reject_draft_post(
     post_id: str,
-    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    db: AsyncSession = Depends(get_db_session),
 ) -> RejectDraftPostResponse:
-    found = store.find_post(post_id)
+    store = DatabaseDraftBatchStore(db)
+    found = await store.find_post(post_id)
     if found is None:
         raise PolicyEnforcementError(
             "Unknown draft post",
@@ -212,7 +229,7 @@ async def reject_draft_post(
             details={"post_id": post_id},
         )
 
-    updated = store.update_post(
+    updated = await store.update_post(
         post_id,
         review_status="rejected",
         approval_id=None,
@@ -227,6 +244,7 @@ async def reject_draft_post(
             details={"post_id": post_id},
         )
 
+    await db.commit()
     return RejectDraftPostResponse(post_id=post_id, review_status="rejected")
 
 class ScheduleDraftPostRequest(BaseModel):
@@ -242,9 +260,10 @@ class ScheduleDraftPostResponse(BaseModel):
 async def schedule_draft_post(
     post_id: str,
     body: ScheduleDraftPostRequest,
-    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    db: AsyncSession = Depends(get_db_session),
 ) -> ScheduleDraftPostResponse:
-    found = store.find_post(post_id)
+    store = DatabaseDraftBatchStore(db)
+    found = await store.find_post(post_id)
     if found is None:
         raise PolicyEnforcementError(
             "Unknown draft post",
@@ -268,7 +287,7 @@ async def schedule_draft_post(
             details={"post_id": post_id},
         )
 
-    updated = store.update_post(
+    updated = await store.update_post(
         post_id,
         execution_status="scheduled",
         scheduled_at=body.scheduled_at,
@@ -282,6 +301,7 @@ async def schedule_draft_post(
             details={"post_id": post_id},
         )
 
+    await db.commit()
     return ScheduleDraftPostResponse(
         post_id=post_id,
         execution_status="scheduled",
@@ -293,10 +313,11 @@ async def execute_draft_post(
     post_id: str,
     body: ExecuteDraftPostRequest,
     request: Request,
-    store: FileDraftBatchStore = Depends(get_draft_batch_store),
+    db: AsyncSession = Depends(get_read_db_session),
     policy_audit: PolicyDenialAuditStore = Depends(get_policy_denial_audit_store),
 ) -> ExecuteDraftPostResponse:
-    found = store.find_post(post_id)
+    store = DatabaseDraftBatchStore(db)
+    found = await store.find_post(post_id)
     if found is None:
         raise PolicyEnforcementError(
             "Unknown draft post",

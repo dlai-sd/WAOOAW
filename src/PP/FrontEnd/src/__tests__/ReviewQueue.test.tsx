@@ -10,6 +10,8 @@ vi.mock('../services/gatewayApiClient', () => ({
     listReviewQueueApprovals: vi.fn(async () => ({ approvals: [] })),
     approveMarketingDraftPost: vi.fn(async () => ({})),
     rejectMarketingDraftPost: vi.fn(async () => ({})),
+    listOpsHiredAgentDeliverables: vi.fn(async () => ({ deliverables: [] })),
+    listOpsPlatformConnections: vi.fn(async () => ([])),
   },
 }))
 

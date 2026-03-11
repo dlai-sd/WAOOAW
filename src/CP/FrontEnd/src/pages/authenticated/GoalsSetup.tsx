@@ -1,395 +1,385 @@
-import { Card, Button, Textarea, Input } from '@fluentui/react-components'
-import { useEffect, useRef, useState } from 'react'
-import { listPlatformCredentials, upsertPlatformCredential, type PlatformCredential } from '../../services/platformCredentials.service'
-import { listExchangeSetups, upsertExchangeSetup, type ExchangeSetup } from '../../services/exchangeSetup.service'
-import { listTradingStrategyConfigs, upsertTradingStrategyConfig, type TradingStrategyConfig } from '../../services/tradingStrategy.service'
+import { Badge, Button, Card, Select } from '@fluentui/react-components'
+import { useEffect, useMemo, useState } from 'react'
+
+import { DigitalMarketingBriefStepCard } from '../../components/DigitalMarketingBriefStepCard'
+import { DigitalMarketingBriefSummaryCard } from '../../components/DigitalMarketingBriefSummaryCard'
+import { FeedbackMessage, LoadingIndicator } from '../../components/FeedbackIndicators'
+import {
+  getThemeDiscoverySkill,
+  isDigitalMarketingAgent,
+  listHiredAgentSkills,
+  saveGoalConfig,
+  type GoalSchemaField,
+} from '../../services/agentSkills.service'
+import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../../services/myAgentsSummary.service'
+
+type BriefStepDefinition = {
+  key: string
+  title: string
+  description: string
+  prompt: string
+  fieldKeys: string[]
+}
+
+const BRIEF_STEP_DEFINITIONS: BriefStepDefinition[] = [
+  {
+    key: 'context',
+    title: 'Map the business context',
+    description: 'Give the agent enough context to sound like your business instead of generic marketing copy.',
+    prompt: 'What business is this agent speaking for, which market are you in, and what locality should shape the examples, language, and proof points?',
+    fieldKeys: ['business_background', 'industry', 'locality'],
+  },
+  {
+    key: 'audience',
+    title: 'Define the audience and promise',
+    description: 'Clarify who this content is for and what offer should move them to act.',
+    prompt: 'Who exactly are you trying to reach, what persona should the agent keep in mind, and what offer or promise should the content keep reinforcing?',
+    fieldKeys: ['target_audience', 'persona', 'offer'],
+  },
+  {
+    key: 'channel',
+    title: 'Shape the YouTube angle',
+    description: 'Translate the business goal into a channel-specific operating brief for YouTube.',
+    prompt: 'What outcome should YouTube drive, what does success look like there, and how often should the agent aim to publish?',
+    fieldKeys: ['objective', 'channel_intent', 'posting_cadence'],
+  },
+  {
+    key: 'voice',
+    title: 'Lock the voice and proof signal',
+    description: 'Finish with how the work should sound and what signal tells you the brief is working.',
+    prompt: 'What tone should the agent protect in every draft, and which business signals should tell you the content is doing its job?',
+    fieldKeys: ['tone', 'success_metrics'],
+  },
+]
+
+function hasValue(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0
+  if (value && typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0
+  return String(value ?? '').trim().length > 0
+}
+
+function isFieldVisible(field: GoalSchemaField, values: Record<string, unknown>): boolean {
+  if (!field.show_if) return true
+  return values[field.show_if.key] === field.show_if.value
+}
+
+function isFieldComplete(field: GoalSchemaField, values: Record<string, unknown>): boolean {
+  if (!isFieldVisible(field, values)) return true
+  if (!field.required) return true
+  return hasValue(values[field.key])
+}
+
+function buildBriefSteps(fields: GoalSchemaField[]) {
+  const usedKeys = new Set<string>()
+  const steps = BRIEF_STEP_DEFINITIONS.map((step) => {
+    const stepFields = step.fieldKeys
+      .map((key) => fields.find((field) => field.key === key))
+      .filter((field): field is GoalSchemaField => Boolean(field))
+
+    stepFields.forEach((field) => usedKeys.add(field.key))
+
+    return {
+      ...step,
+      fields: stepFields,
+    }
+  }).filter((step) => step.fields.length > 0)
+
+  const extraFields = fields.filter((field) => !usedKeys.has(field.key))
+  if (extraFields.length > 0) {
+    if (steps.length > 0) {
+      steps[steps.length - 1] = {
+        ...steps[steps.length - 1],
+        fields: [...steps[steps.length - 1].fields, ...extraFields],
+      }
+    } else {
+      steps.push({
+        key: 'brief',
+        title: 'Capture the brief',
+        description: 'Capture the core operating details the agent needs before it can draft.',
+        prompt: 'Complete the structured brief so the agent can create specific, credible content instead of guessing.',
+        fieldKeys: extraFields.map((field) => field.key),
+        fields: extraFields,
+      })
+    }
+  }
+
+  return steps
+}
+
+function getDigitalMarketingInstances(instances: MyAgentInstanceSummary[]): MyAgentInstanceSummary[] {
+  return instances.filter(
+    (instance) =>
+      Boolean(String(instance.hired_instance_id || '').trim()) &&
+      isDigitalMarketingAgent(instance.agent_id, instance.agent_type_id)
+  )
+}
 
 export default function GoalsSetup() {
-  const isMountedRef = useRef(true)
-
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
-  const [platform, setPlatform] = useState('instagram')
-  const [postingIdentity, setPostingIdentity] = useState('')
-  const [accessToken, setAccessToken] = useState('')
+  const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
+  const [instancesLoading, setInstancesLoading] = useState(true)
+  const [instancesError, setInstancesError] = useState<string | null>(null)
+  const [selectedHiredInstanceId, setSelectedHiredInstanceId] = useState('')
+  const [skillsLoading, setSkillsLoading] = useState(false)
+  const [skillsError, setSkillsError] = useState<string | null>(null)
+  const [themeDiscoveryFields, setThemeDiscoveryFields] = useState<GoalSchemaField[]>([])
+  const [themeDiscoverySkillId, setThemeDiscoverySkillId] = useState('')
+  const [values, setValues] = useState<Record<string, unknown>>({})
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [connections, setConnections] = useState<PlatformCredential[]>([])
-
-  const [exchangeProvider, setExchangeProvider] = useState('delta_exchange_india')
-  const [exchangeApiKey, setExchangeApiKey] = useState('')
-  const [exchangeApiSecret, setExchangeApiSecret] = useState('')
-  const [defaultCoin, setDefaultCoin] = useState('BTC')
-  const [allowedCoins, setAllowedCoins] = useState('BTC,ETH')
-  const [maxUnitsPerOrder, setMaxUnitsPerOrder] = useState('1')
-  const [maxNotionalInr, setMaxNotionalInr] = useState('')
-  const [isSavingExchange, setIsSavingExchange] = useState(false)
-  const [exchangeError, setExchangeError] = useState<string | null>(null)
-  const [exchangeSetups, setExchangeSetups] = useState<ExchangeSetup[]>([])
-
-  const [strategyAgentId, setStrategyAgentId] = useState('AGT-TRD-DELTA-001')
-  const [intervalSeconds, setIntervalSeconds] = useState('300')
-  const [windowStart, setWindowStart] = useState('09:15')
-  const [windowEnd, setWindowEnd] = useState('15:30')
-  const [strategyParamsJson, setStrategyParamsJson] = useState('')
-  const [isSavingStrategy, setIsSavingStrategy] = useState(false)
-  const [strategyError, setStrategyError] = useState<string | null>(null)
-  const [strategyConfigs, setStrategyConfigs] = useState<TradingStrategyConfig[]>([])
-
-  const refreshConnections = async () => {
-    try {
-      const rows = await listPlatformCredentials()
-      if (!isMountedRef.current) return
-      setConnections(rows)
-    } catch (e: any) {
-      if (!isMountedRef.current) return
-      setError(e?.message || 'Failed to load platform connections')
-    }
-  }
-
-  const refreshExchangeSetups = async () => {
-    try {
-      const rows = await listExchangeSetups()
-      if (!isMountedRef.current) return
-      setExchangeSetups(rows)
-    } catch (e: any) {
-      if (!isMountedRef.current) return
-      setExchangeError(e?.message || 'Failed to load exchange setup')
-    }
-  }
-
-  const refreshStrategyConfigs = async () => {
-    try {
-      const rows = await listTradingStrategyConfigs(strategyAgentId)
-      if (!isMountedRef.current) return
-      setStrategyConfigs(rows)
-    } catch (e: any) {
-      if (!isMountedRef.current) return
-      setStrategyError(e?.message || 'Failed to load trading strategy config')
-    }
-  }
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
   useEffect(() => {
-    refreshConnections()
-    refreshExchangeSetups()
-    refreshStrategyConfigs()
+    let cancelled = false
+
+    const loadInstances = async () => {
+      setInstancesLoading(true)
+      setInstancesError(null)
+      try {
+        const response = await getMyAgentsSummary()
+        if (cancelled) return
+        const nextInstances = getDigitalMarketingInstances(response?.instances || [])
+        setInstances(nextInstances)
+        setSelectedHiredInstanceId((current) => current || String(nextInstances[0]?.hired_instance_id || ''))
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setInstancesError(error instanceof Error ? error.message : 'Failed to load your hired agents')
+        }
+      } finally {
+        if (!cancelled) setInstancesLoading(false)
+      }
+    }
+
+    void loadInstances()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const onConnect = async () => {
-    setError(null)
-    setIsSaving(true)
-    try {
-      await upsertPlatformCredential({
-        platform,
-        posting_identity: postingIdentity || undefined,
-        access_token: accessToken
-      })
-      setAccessToken('')
-      setPostingIdentity('')
-      await refreshConnections()
-    } catch (e: any) {
-      setError(e?.message || 'Failed to connect platform')
-    } finally {
-      setIsSaving(false)
+  useEffect(() => {
+    let cancelled = false
+    const hiredInstanceId = String(selectedHiredInstanceId || '').trim()
+
+    if (!hiredInstanceId) {
+      setThemeDiscoveryFields([])
+      setThemeDiscoverySkillId('')
+      setValues({})
+      setCurrentStepIndex(0)
+      return
     }
-  }
 
-  const onSaveExchangeSetup = async () => {
-    setExchangeError(null)
-    setIsSavingExchange(true)
-    try {
-      const allowed = allowedCoins
-        .split(',')
-        .map((s) => s.trim().toUpperCase())
-        .filter(Boolean)
+    const loadSkills = async () => {
+      setSkillsLoading(true)
+      setSkillsError(null)
+      setSaveError(null)
+      setSaveSuccess(null)
 
-      await upsertExchangeSetup({
-        exchange_provider: exchangeProvider,
-        api_key: exchangeApiKey,
-        api_secret: exchangeApiSecret,
-        default_coin: defaultCoin.trim().toUpperCase(),
-        allowed_coins: allowed.length ? allowed : undefined,
-        max_units_per_order: Number(maxUnitsPerOrder || '0'),
-        ...(maxNotionalInr.trim() ? { max_notional_inr: Number(maxNotionalInr) } : {})
-      })
+      try {
+        const skills = await listHiredAgentSkills(hiredInstanceId)
+        if (cancelled) return
 
-      setExchangeApiKey('')
-      setExchangeApiSecret('')
-      await refreshExchangeSetups()
-    } catch (e: any) {
-      setExchangeError(e?.message || 'Failed to save exchange setup')
-    } finally {
-      setIsSavingExchange(false)
-    }
-  }
-
-  const onSaveStrategyConfig = async () => {
-    setStrategyError(null)
-    setIsSavingStrategy(true)
-    try {
-      const interval = intervalSeconds.trim() ? Number(intervalSeconds) : undefined
-
-      let strategyParams: Record<string, unknown> | undefined = undefined
-      if (strategyParamsJson.trim()) {
-        try {
-          const parsed = JSON.parse(strategyParamsJson)
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            strategyParams = parsed
-          } else {
-            throw new Error('strategy params must be a JSON object')
-          }
-        } catch (e: any) {
-          setStrategyError(e?.message || 'Invalid strategy params JSON')
+        const skill = getThemeDiscoverySkill(skills)
+        if (!skill) {
+          setThemeDiscoveryFields([])
+          setThemeDiscoverySkillId('')
+          setValues({})
+          setSkillsError('This hired agent does not expose the Theme Discovery skill yet.')
           return
         }
+
+        setThemeDiscoveryFields(skill.goal_schema?.fields || [])
+        setThemeDiscoverySkillId(skill.skill_id)
+        setValues(skill.goal_config || {})
+        setCurrentStepIndex(0)
+      } catch (error: unknown) {
+        if (!cancelled) {
+          setThemeDiscoveryFields([])
+          setThemeDiscoverySkillId('')
+          setValues({})
+          setSkillsError(error instanceof Error ? error.message : 'Failed to load Theme Discovery')
+        }
+      } finally {
+        if (!cancelled) setSkillsLoading(false)
       }
+    }
 
-      await upsertTradingStrategyConfig({
-        agent_id: strategyAgentId,
-        ...(interval ? { interval_seconds: interval } : {}),
-        ...(windowStart.trim() && windowEnd.trim()
-          ? { active_window_start: windowStart.trim(), active_window_end: windowEnd.trim() }
-          : {})
-        ,
-        ...(strategyParams ? { strategy_params: strategyParams } : {})
-      })
+    void loadSkills()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedHiredInstanceId])
 
-      await refreshStrategyConfigs()
-    } catch (e: any) {
-      setStrategyError(e?.message || 'Failed to save trading strategy config')
+  const selectedInstance = useMemo(
+    () => instances.find((instance) => String(instance.hired_instance_id || '') === selectedHiredInstanceId) || null,
+    [instances, selectedHiredInstanceId]
+  )
+
+  const steps = useMemo(() => buildBriefSteps(themeDiscoveryFields), [themeDiscoveryFields])
+  const currentStep = steps[currentStepIndex] || null
+  const visibleFields = useMemo(
+    () => themeDiscoveryFields.filter((field) => isFieldVisible(field, values)),
+    [themeDiscoveryFields, values]
+  )
+
+  const missingFieldLabels = useMemo(() => {
+    if (!currentStep) return []
+    return currentStep.fields
+      .filter((field) => !isFieldComplete(field, values))
+      .map((field) => field.label)
+  }, [currentStep, values])
+
+  const canContinue = missingFieldLabels.length === 0
+
+  const setField = (key: string, value: unknown) => {
+    setSaveError(null)
+    setSaveSuccess(null)
+    setValues((current) => ({ ...current, [key]: value }))
+  }
+
+  const onSave = async () => {
+    if (!selectedHiredInstanceId || !themeDiscoverySkillId) return
+
+    setIsSaving(true)
+    setSaveError(null)
+    setSaveSuccess(null)
+    try {
+      const updatedSkill = await saveGoalConfig(selectedHiredInstanceId, themeDiscoverySkillId, values)
+      setValues(updatedSkill.goal_config || values)
+      setSaveSuccess('Theme Discovery brief saved. Content Creation will use this structured brief.')
+    } catch (error: unknown) {
+      setSaveError(error instanceof Error ? error.message : 'Failed to save Theme Discovery brief')
     } finally {
-      setIsSavingStrategy(false)
+      setIsSaving(false)
     }
   }
 
   return (
     <div className="goals-setup-page">
       <div className="page-header">
-        <h1>Configure Goals for: Content Marketing Agent</h1>
         <div>
-          <Button appearance="outline">Save Draft</Button>
-          <Button appearance="primary">Submit for Genesis Validation</Button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <Badge appearance="filled" color="informative">Digital Marketing Agent</Badge>
+            <Badge appearance="tint">Theme Discovery</Badge>
+          </div>
+          <h1 style={{ marginBottom: '0.5rem' }}>Build a brief the agent can actually use</h1>
+          <div style={{ opacity: 0.82, maxWidth: '760px', lineHeight: 1.6 }}>
+            This guided conversation captures business context, audience, offer, YouTube intent, cadence, and success signals so the agent can create precise drafts instead of guessing from a one-line prompt.
+          </div>
         </div>
       </div>
 
-      <Card className="wizard-card">
-        <h2>Connect Platforms (Customer Setup)</h2>
+      {instancesLoading ? <LoadingIndicator message="Loading your Digital Marketing Agent brief..." size="medium" /> : null}
+      {instancesError ? (
+        <FeedbackMessage intent="error" title="We could not load your hired agents" message={instancesError} />
+      ) : null}
 
-        <div className="form-group">
-          <label>Platform *</label>
-          <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="filter-select">
-            <option value="youtube">YouTube</option>
-            <option value="instagram">Instagram</option>
-            <option value="facebook">Facebook</option>
-            <option value="linkedin">LinkedIn</option>
-            <option value="whatsapp">WhatsApp</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Posting identity (page/channel/account)</label>
-          <Input value={postingIdentity} onChange={(_, data) => setPostingIdentity(data.value)} placeholder="e.g., DrSharmaClinic" />
-        </div>
-
-        <div className="form-group">
-          <label>Access token *</label>
-          <Input value={accessToken} onChange={(_, data) => setAccessToken(data.value)} placeholder="Paste token (stored server-side)" type="password" />
-        </div>
-
-        {error && <div style={{ color: '#ef4444' }}>{error}</div>}
-
-        <div className="wizard-nav">
-          <Button appearance="primary" onClick={onConnect} disabled={!accessToken || isSaving}>
-            {isSaving ? 'Saving…' : 'Save Connection'}
-          </Button>
-        </div>
-
-        <h3 style={{ marginTop: '1rem' }}>Existing connections ({connections.length})</h3>
-        <ul>
-          {connections.map((c) => (
-            <li key={c.credential_ref}>
-              {c.platform} {c.posting_identity ? `— ${c.posting_identity}` : ''} (ref: {c.credential_ref})
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      <Card className="wizard-card">
-        <h2>Connect Exchange (Trading Setup)</h2>
-
-        <div className="form-group">
-          <label>Exchange provider *</label>
-          <select value={exchangeProvider} onChange={(e) => setExchangeProvider(e.target.value)} className="filter-select">
-            <option value="delta_exchange_india">Delta Exchange India</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>API key *</label>
-          <Input value={exchangeApiKey} onChange={(_, data) => setExchangeApiKey(data.value)} placeholder="Stored server-side" type="password" />
-        </div>
-
-        <div className="form-group">
-          <label>API secret *</label>
-          <Input value={exchangeApiSecret} onChange={(_, data) => setExchangeApiSecret(data.value)} placeholder="Stored server-side" type="password" />
-        </div>
-
-        <div className="form-group">
-          <label>Default coin *</label>
-          <Input value={defaultCoin} onChange={(_, data) => setDefaultCoin(data.value)} placeholder="BTC" />
-        </div>
-
-        <div className="form-group">
-          <label>Allowed coins (comma-separated)</label>
-          <Input value={allowedCoins} onChange={(_, data) => setAllowedCoins(data.value)} placeholder="BTC,ETH" />
-        </div>
-
-        <div className="form-group">
-          <label>Max units per order *</label>
-          <Input value={maxUnitsPerOrder} onChange={(_, data) => setMaxUnitsPerOrder(data.value)} placeholder="1" />
-        </div>
-
-        <div className="form-group">
-          <label>Max notional (INR) (optional)</label>
-          <Input value={maxNotionalInr} onChange={(_, data) => setMaxNotionalInr(data.value)} placeholder="e.g., 100000" />
-        </div>
-
-        {exchangeError && <div style={{ color: '#ef4444' }}>{exchangeError}</div>}
-
-        <div className="wizard-nav">
-          <Button
-            appearance="primary"
-            onClick={onSaveExchangeSetup}
-            disabled={!exchangeApiKey || !exchangeApiSecret || !defaultCoin || isSavingExchange}
-          >
-            {isSavingExchange ? 'Saving…' : 'Save Exchange Setup'}
-          </Button>
-        </div>
-
-        <h3 style={{ marginTop: '1rem' }}>Saved exchange setups ({exchangeSetups.length})</h3>
-        <ul>
-          {exchangeSetups.map((s) => (
-            <li key={s.credential_ref}>
-              {s.exchange_provider} — default {s.default_coin} — allowed [{(s.allowed_coins || []).join(', ')}] — max units {s.risk_limits?.max_units_per_order}
-              {s.risk_limits?.max_notional_inr ? ` — max notional ₹${s.risk_limits.max_notional_inr}` : ''} (ref: {s.credential_ref})
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      <Card className="wizard-card">
-        <h2>Trading Strategy (Interval Setup)</h2>
-
-        <div className="form-group">
-          <label>Agent ID</label>
-          <Input value={strategyAgentId} onChange={(_, data) => setStrategyAgentId(data.value)} />
-        </div>
-
-        <div className="form-group">
-          <label>Interval seconds (optional)</label>
-          <Input value={intervalSeconds} onChange={(_, data) => setIntervalSeconds(data.value)} placeholder="300" />
-        </div>
-
-        <div className="form-group">
-          <label>Active window start (optional)</label>
-          <Input value={windowStart} onChange={(_, data) => setWindowStart(data.value)} placeholder="09:15" />
-        </div>
-
-        <div className="form-group">
-          <label>Active window end (optional)</label>
-          <Input value={windowEnd} onChange={(_, data) => setWindowEnd(data.value)} placeholder="15:30" />
-        </div>
-
-        <div className="form-group">
-          <label>Strategy params (optional JSON)</label>
-          <Textarea
-            value={strategyParamsJson}
-            onChange={(_, data) => setStrategyParamsJson(String(data.value || ''))}
-            placeholder='e.g., {"mode":"paper","max_trades_per_day":2}'
-          />
-        </div>
-
-        {strategyError && <div style={{ color: '#ef4444' }}>{strategyError}</div>}
-
-        <div className="wizard-nav">
-          <Button appearance="primary" onClick={onSaveStrategyConfig} disabled={isSavingStrategy}>
-            {isSavingStrategy ? 'Saving…' : 'Save Strategy Config'}
-          </Button>
-        </div>
-
-        <h3 style={{ marginTop: '1rem' }}>Saved strategy configs ({strategyConfigs.length})</h3>
-        <ul>
-          {strategyConfigs.map((c) => (
-            <li key={c.config_ref}>
-              {c.agent_id} — interval {c.interval_seconds ?? '—'}s — window {c.active_window ? `${c.active_window.start}–${c.active_window.end}` : '—'} (ref: {c.config_ref})
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      <Card className="wizard-card">
-        <h2>Wizard: Step 1/5 - Goal Statement</h2>
-        
-        <div className="form-group">
-          <label>Primary Goal *</label>
-          <Textarea 
-            placeholder="Publish 5 HIPAA-compliant blog posts per week about diabetes management"
-            rows={4}
-          />
-          <div className="character-count">Character count: 85/500</div>
-        </div>
-
-        <div className="form-group">
-          <label>Use Template:</label>
-          <div className="template-buttons">
-            <Button appearance="outline">Healthcare Content</Button>
-            <Button appearance="outline">Marketing Campaign</Button>
-            <Button appearance="outline">Sales</Button>
+      {!instancesLoading && !instancesError && instances.length === 0 ? (
+        <Card style={{ padding: '1.25rem' }}>
+          <h2 style={{ marginTop: 0 }}>No Digital Marketing Agent found yet</h2>
+          <div style={{ opacity: 0.82, lineHeight: 1.6 }}>
+            Hire the Digital Marketing Agent first. Once the hire exists, Theme Discovery will save directly into its runtime brief.
           </div>
-        </div>
-
-        <div className="form-group">
-          <label>Priority Level:</label>
-          <div className="radio-group">
-            <label><input type="radio" name="priority" /> P0 Critical</label>
-            <label><input type="radio" name="priority" defaultChecked /> P1 High</label>
-            <label><input type="radio" name="priority" /> P2 Medium</label>
-            <label><input type="radio" name="priority" /> P3 Low</label>
-          </div>
-        </div>
-
-        <div className="form-group">
-          <label>Timeline:</label>
-          <div className="radio-group">
-            <label><input type="radio" name="timeline" /> Immediate</label>
-            <label><input type="radio" name="timeline" defaultChecked /> Weekly</label>
-            <label><input type="radio" name="timeline" /> Monthly</label>
-          </div>
-        </div>
-
-        <div className="wizard-nav">
-          <Button appearance="outline">← Back</Button>
-          <Button appearance="primary">Next: Criteria →</Button>
-        </div>
-      </Card>
-
-      <section className="existing-goals">
-        <h2>Existing Goals (3)</h2>
-        <Card className="goal-item">
-          <div className="goal-header">
-            <span>✅ Goal 1: Publish 5 blog posts/week</span>
-            <span>[P1] [Active]</span>
-          </div>
-          <div className="goal-status">
-            Status: 3/5 complete this week (60%)
-          </div>
-          <Button appearance="subtle">Edit</Button>
         </Card>
-      </section>
+      ) : null}
+
+      {!instancesLoading && !instancesError && instances.length > 0 ? (
+        <div style={{ display: 'grid', gap: '1rem' }}>
+          <Card style={{ padding: '1rem 1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div>
+                <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.7 }}>
+                  Active hire
+                </div>
+                <div style={{ marginTop: '0.35rem', fontSize: '1.05rem', fontWeight: 600 }}>
+                  {selectedInstance?.nickname || selectedInstance?.agent_id || 'Digital Marketing Agent'}
+                </div>
+                <div style={{ marginTop: '0.3rem', opacity: 0.78 }}>
+                  The brief you save here becomes the structured context for content generation and YouTube readiness.
+                </div>
+              </div>
+              {instances.length > 1 ? (
+                <div style={{ minWidth: '260px' }}>
+                  <label htmlFor="digital-marketing-agent-select" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                    Choose hired agent
+                  </label>
+                  <Select
+                    id="digital-marketing-agent-select"
+                    value={selectedHiredInstanceId}
+                    onChange={(_, data) => setSelectedHiredInstanceId(data.value)}
+                  >
+                    {instances.map((instance) => (
+                      <option key={String(instance.hired_instance_id)} value={String(instance.hired_instance_id)}>
+                        {instance.nickname || instance.agent_id}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ) : null}
+            </div>
+          </Card>
+
+          {skillsLoading ? <LoadingIndicator message="Loading Theme Discovery fields..." size="medium" /> : null}
+          {skillsError ? (
+            <FeedbackMessage intent="error" title="Theme Discovery is not ready" message={skillsError} />
+          ) : null}
+
+          {!skillsLoading && !skillsError && currentStep ? (
+            <div
+              style={{
+                display: 'grid',
+                gap: '1rem',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                alignItems: 'start',
+              }}
+            >
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <DigitalMarketingBriefStepCard
+                  title={currentStep.title}
+                  description={currentStep.description}
+                  prompt={currentStep.prompt}
+                  fields={currentStep.fields}
+                  values={values}
+                  stepIndex={currentStepIndex}
+                  stepCount={steps.length}
+                  canGoBack={currentStepIndex > 0}
+                  canContinue={canContinue}
+                  isSaving={isSaving}
+                  isLastStep={currentStepIndex === steps.length - 1}
+                  missingFieldLabels={missingFieldLabels}
+                  onChange={setField}
+                  onBack={() => setCurrentStepIndex((index) => Math.max(0, index - 1))}
+                  onNext={() => setCurrentStepIndex((index) => Math.min(steps.length - 1, index + 1))}
+                  onSave={onSave}
+                />
+
+                {(saveSuccess || saveError) && (
+                  <FeedbackMessage
+                    intent={saveError ? 'error' : 'success'}
+                    title={saveError ? 'Theme Discovery was not saved' : 'Theme Discovery saved'}
+                    message={saveError || saveSuccess || ''}
+                  />
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gap: '1rem' }}>
+                <DigitalMarketingBriefSummaryCard
+                  title="Structured brief summary"
+                  subtitle="This is the exact brief the agent will carry forward into draft creation."
+                  fields={visibleFields}
+                  values={values}
+                />
+
+                <Card style={{ padding: '1rem 1.1rem' }}>
+                  <div style={{ fontWeight: 600 }}>Why this matters</div>
+                  <div style={{ marginTop: '0.5rem', opacity: 0.82, lineHeight: 1.6 }}>
+                    Theme Discovery is the customer-approved source of truth for the Digital Marketing Agent. Better brief quality here reduces generic drafts and false-positive publish readiness later.
+                  </div>
+                </Card>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -43,6 +43,17 @@ class ReferenceAgentPublic(BaseModel):
     display_name: str
     agent_type: str
     spec: Dict[str, Any]
+    visible_skills: List[str] = Field(default_factory=list)
+    supported_destinations: List[str] = Field(default_factory=list)
+
+
+def _extract_skill_contract(agent_spec: Any) -> Dict[str, List[str]]:
+    skill_dimension = (agent_spec.dimensions or {}).get(DimensionName.SKILL)
+    config = (skill_dimension.config if skill_dimension else {}) or {}
+    return {
+        "visible_skills": list(config.get("visible_skills") or []),
+        "supported_destinations": list(config.get("supported_live_destinations") or []),
+    }
 
 class TutorLessonPlanResult(BaseModel):
     subject: str
@@ -109,6 +120,8 @@ async def list_reference_agents() -> List[ReferenceAgentPublic]:
             display_name=a.display_name,
             agent_type=a.agent_type,
             spec=a.spec.model_dump(mode="json"),
+            visible_skills=_extract_skill_contract(a.spec)["visible_skills"],
+            supported_destinations=_extract_skill_contract(a.spec)["supported_destinations"],
         )
         for a in REFERENCE_AGENTS
     ]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 
 def test_platform_credentials_upsert_and_list(client, auth_headers, monkeypatch, tmp_path: Path):
@@ -36,3 +37,44 @@ def test_platform_credentials_upsert_and_list(client, auth_headers, monkeypatch,
     assert isinstance(rows, list)
     assert len(rows) == 1
     assert rows[0]["credential_ref"] == body["credential_ref"]
+
+
+def test_connect_youtube_credential_ref_proxies_to_plant(client, auth_headers, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
+
+    from main import app
+    from api.platform_credentials import get_plant_gateway_client
+
+    fake = AsyncMock()
+    fake.request_json.return_value = type(
+        "R",
+        (),
+        {
+            "status_code": 201,
+            "json": {
+                "id": "conn-1",
+                "hired_instance_id": "HIRED-1",
+                "skill_id": "skill-1",
+                "platform_key": "youtube",
+                "status": "pending",
+            },
+            "headers": {},
+        },
+    )()
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    resp = client.post(
+        "/api/cp/platform-credentials/youtube",
+        headers=auth_headers,
+        json={
+            "hired_instance_id": "HIRED-1",
+            "skill_id": "skill-1",
+            "credential_ref": "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest",
+        },
+    )
+
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["platform_key"] == "youtube"
+    fake.request_json.assert_awaited_once()
+    app.dependency_overrides.clear()

@@ -15,6 +15,9 @@ from agent_mold.skills.content_models import (
     DestinationRef,
     PostingSchedule,
     ReviewStatus,
+    SuccessMetric,
+    ThemeDiscoveryBrief,
+    ThemeDiscoveryChannelIntent,
     estimate_cost,
 )
 
@@ -106,3 +109,31 @@ def test_campaign_and_daily_theme_item_serialize_to_json():
     assert "theme_item_id" in theme_json
     assert campaign.status == CampaignStatus.DRAFT
     assert theme_item.review_status == ReviewStatus.PENDING_REVIEW
+
+
+@pytest.mark.unit
+def test_campaign_brief_accepts_structured_theme_discovery_brief():
+    brief = _make_brief()
+    theme_discovery = ThemeDiscoveryBrief(
+        business_background="AI agent marketplace helping businesses validate value before paying.",
+        objective="Generate YouTube-led inbound discovery calls.",
+        industry="AI services",
+        locality="India",
+        target_audience="SMB founders and growth leaders",
+        persona="Founder evaluating AI execution help",
+        tone="clear and credible",
+        offer="7-day free trial with keep-the-work guarantee",
+        channel_intent=ThemeDiscoveryChannelIntent(
+            primary_destination="youtube",
+            supported_live_destinations=["youtube"],
+            content_formats=["shorts", "community_posts"],
+            call_to_action="Book a discovery call",
+        ),
+        success_metrics=[SuccessMetric(name="qualified_leads", target="10 per month")],
+    )
+
+    enriched = brief.model_copy(update={"theme_discovery": theme_discovery})
+
+    assert enriched.theme_discovery is not None
+    assert enriched.theme_discovery.channel_intent.primary_destination == "youtube"
+    assert enriched.theme_discovery.success_metrics[0].name == "qualified_leads"

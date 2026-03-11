@@ -16,6 +16,8 @@ from core.metrics import (
     setup_metrics,
     record_http_request,
     record_db_query,
+    record_dma_lifecycle_event,
+    record_dma_publish_outcome,
     update_db_connection_metrics,
     update_business_metrics,
     MetricsMiddleware,
@@ -28,6 +30,8 @@ from core.metrics import (
     agents_available_total,
     goals_created_total,
     goals_executed_total,
+    dma_lifecycle_events_total,
+    dma_publish_outcomes_total,
     customer_signups_total,
     application_version,
     uptime_seconds,
@@ -192,6 +196,26 @@ class TestGoalMetrics:
         )._value.get()
         
         assert success_count >= 2
+
+
+class TestDigitalMarketingMetrics:
+    """Test Digital Marketing Agent observability counters."""
+
+    def test_record_dma_lifecycle_event(self):
+        initial = dma_lifecycle_events_total.labels(stage='customer_approval', outcome='approved')._value.get()
+
+        record_dma_lifecycle_event('customer_approval', 'approved')
+
+        final = dma_lifecycle_events_total.labels(stage='customer_approval', outcome='approved')._value.get()
+        assert final == initial + 1
+
+    def test_record_dma_publish_outcome(self):
+        initial = dma_publish_outcomes_total.labels(destination='youtube', outcome='blocked')._value.get()
+
+        record_dma_publish_outcome('youtube', 'blocked')
+
+        final = dma_publish_outcomes_total.labels(destination='youtube', outcome='blocked')._value.get()
+        assert final == initial + 1
 
 
 class TestCustomerMetrics:

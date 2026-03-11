@@ -17,7 +17,6 @@ Routes (prefix /cp/campaigns):
 """
 from __future__ import annotations
 
-import logging as _logging
 import os
 
 import httpx
@@ -26,8 +25,7 @@ from fastapi import Depends, HTTPException, Query, Request
 from api.auth.dependencies import get_current_user
 from core.routing import waooaw_router
 from models.user import User
-
-_logger = _logging.getLogger(__name__)  # PIIMaskingFilter applied at app startup
+from services.audit_dependency import AuditLogger, get_audit_logger
 
 router = waooaw_router(prefix="/cp/campaigns", tags=["cp-campaigns"])
 
@@ -179,6 +177,7 @@ async def approve_theme_items(
     body: dict,
     request: Request,
     _user: User = Depends(get_current_user),
+    audit: AuditLogger = Depends(get_audit_logger),
 ) -> dict | list:
     """Batch approve/reject theme items. Proxies POST /api/v1/campaigns/{id}/theme-items/approve."""
     try:
@@ -191,6 +190,13 @@ async def approve_theme_items(
         body=body,
         authorization=request.headers.get("Authorization"),
         correlation_id=request.headers.get("X-Correlation-ID"),
+    )
+    await audit.log(
+        "cp_campaigns",
+        "theme_items_reviewed",
+        "success",
+        user_id=_user.id,
+        metadata={"campaign_id": campaign_id, "decision": body.get("decision")},
     )
     return result  # type: ignore[return-value]
 
@@ -277,6 +283,7 @@ async def patch_post(
     body: dict,
     request: Request,
     _user: User = Depends(get_current_user),
+    audit: AuditLogger = Depends(get_audit_logger),
 ) -> dict:
     """Approve or reject a single post. Proxies PATCH /api/v1/campaigns/{id}/posts/{post_id}."""
     try:
@@ -284,12 +291,48 @@ async def patch_post(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
-    return await _plant_patch_json(
+    result = await _plant_patch_json(
         url=f"{base}/api/v1/campaigns/{campaign_id}/posts/{post_id}",
         body=body,
         authorization=request.headers.get("Authorization"),
         correlation_id=request.headers.get("X-Correlation-ID"),
     )
+    await audit.log(
+        "cp_campaigns",
+        "draft_post_reviewed",
+        "success",
+        user_id=_user.id,
+        metadata={"campaign_id": campaign_id, "post_id": post_id, "decision": body.get("decision")},
+    )
+    return result
+
+
+@router.get("/{campaign_id}/upload-eligibility")
+async def get_upload_eligibility(
+    campaign_id: str,
+    request: Request,
+    _user: User = Depends(get_current_user),
+) -> dict:
+    """Expose Plant's campaign workflow state for CP upload-readiness surfaces."""
+
+    try:
+        base = _plant_base_url()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    result = await _plant_get_json(
+        url=f"{base}/api/v1/campaigns/{campaign_id}",
+        authorization=request.headers.get("Authorization"),
+        correlation_id=request.headers.get("X-Correlation-ID"),
+    )
+    campaign = result if isinstance(result, dict) else {}
+    return {
+        "campaign_id": campaign.get("campaign_id", campaign_id),
+        "workflow_state": campaign.get("workflow_state"),
+        "approval_state": campaign.get("approval_state") or {},
+        "brief_summary": campaign.get("brief_summary") or {},
+        "draft_deliverables": campaign.get("draft_deliverables") or [],
+    }
 
 
 @router.post("/{campaign_id}/posts/{post_id}/publish")

@@ -11,8 +11,12 @@
 
 import React from 'react';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { AgentOperationsScreen } from '@/screens/agents/AgentOperationsScreen';
+
+const mockCpGet = jest.fn();
+const mockCpPatch = jest.fn();
+const mockCpPost = jest.fn(() => Promise.resolve({ data: {} }));
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -45,7 +49,12 @@ jest.mock('@/hooks/useTheme', () => ({
 
 jest.mock('@/hooks/useHiredAgents', () => ({
   useHiredAgentById: jest.fn(() => ({
-    data: { agent_id: 'agent-1', nickname: 'My Agent', hired_instance_id: 'hi-1' },
+    data: {
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'My Agent',
+      hired_instance_id: 'hi-1'
+    },
     isLoading: false,
     error: null,
   })),
@@ -62,8 +71,11 @@ jest.mock('@/hooks/useApprovalQueue', () => ({
 }));
 
 jest.mock('@/lib/cpApiClient', () => ({
+  __esModule: true,
   default: {
-    post: jest.fn(() => Promise.resolve({ data: {} })),
+    get: (...args: unknown[]) => mockCpGet(...args),
+    patch: (...args: unknown[]) => mockCpPatch(...args),
+    post: (...args: unknown[]) => mockCpPost(...args),
   },
 }));
 
@@ -84,6 +96,32 @@ const mockNavigation = {
 describe('AgentOperationsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCpGet.mockResolvedValue({
+      data: [
+        {
+          skill_id: 'skill-theme-discovery',
+          name: 'theme_discovery',
+          display_name: 'Theme Discovery',
+          goal_schema: {
+            fields: [
+              { key: 'business_background', label: 'Business Background', type: 'text', required: true },
+              { key: 'industry', label: 'Industry', type: 'text', required: true },
+              { key: 'locality', label: 'Locality', type: 'text', required: true },
+              { key: 'target_audience', label: 'Target Audience', type: 'text', required: true },
+              { key: 'persona', label: 'Persona', type: 'text', required: true },
+              { key: 'offer', label: 'Offer', type: 'text', required: true },
+              { key: 'objective', label: 'Objective', type: 'text', required: true },
+              { key: 'channel_intent', label: 'YouTube Intent', type: 'text', required: true },
+              { key: 'posting_cadence', label: 'Posting Cadence', type: 'text', required: true },
+              { key: 'tone', label: 'Tone', type: 'text', required: true },
+              { key: 'success_metrics', label: 'Success Metrics', type: 'text', required: true },
+            ],
+          },
+          goal_config: {},
+        },
+      ],
+    });
+    mockCpPatch.mockResolvedValue({ data: { goal_config: {} } });
   });
 
   it('renders agent name and operations hub heading', () => {
@@ -133,7 +171,7 @@ describe('AgentOperationsScreen', () => {
 
   it('shows approval badge when there are pending approvals', () => {
     const useApprovalQueue = require('@/hooks/useApprovalQueue').useApprovalQueue;
-    (useApprovalQueue as jest.Mock).mockReturnValueOnce({
+    (useApprovalQueue as jest.Mock).mockReturnValue({
       deliverables: [{ id: 'd-1', hired_agent_id: 'hi-1', type: 'content_draft' }],
       isLoading: false,
       error: null,
@@ -143,7 +181,54 @@ describe('AgentOperationsScreen', () => {
     const { getByText } = render(
       <AgentOperationsScreen navigation={mockNavigation} route={mockRoute as any} />
     );
-    expect(getByText('1')).toBeTruthy();
+    expect(getByText('1 approvals')).toBeTruthy();
+  });
+
+  it('shows approval-gated DMA publish copy in the approvals section', async () => {
+    const useApprovalQueue = require('@/hooks/useApprovalQueue').useApprovalQueue;
+    (useApprovalQueue as jest.Mock).mockReturnValue({
+      deliverables: [
+        {
+          id: 'd-yt-1',
+          hired_agent_id: 'hi-1',
+          type: 'content_draft',
+          title: 'YouTube explainer draft',
+          target_platform: 'YouTube',
+          content_preview: 'Draft explainer awaiting exact customer approval before upload.',
+          review_status: 'pending_review',
+          approval_id: null,
+          payload: {
+            destination: {
+              destination_type: 'youtube',
+              metadata: {
+                visibility: 'private',
+                public_release_requested: false,
+              },
+            },
+          },
+        },
+      ],
+      isLoading: false,
+      error: null,
+      approve: jest.fn(),
+      reject: jest.fn(),
+    });
+
+    const routeWithFocus = {
+      ...mockRoute,
+      params: { hiredAgentId: 'hi-1', focusSection: 'approvals' },
+    };
+
+    const { getByText } = render(
+      <AgentOperationsScreen navigation={mockNavigation} route={routeWithFocus as any} />
+    );
+
+    await waitFor(() => {
+      expect(getByText(/Approve exact deliverable/)).toBeTruthy();
+    });
+
+    expect(getByText('Exact approval required before YouTube action')).toBeTruthy();
+    expect(getByText('YouTube')).toBeTruthy();
   });
 
   it('auto-expands the focusSection when provided', () => {
@@ -164,5 +249,126 @@ describe('AgentOperationsScreen', () => {
     );
     fireEvent.press(getByText('← Back'));
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('resumes Theme Discovery in the goals section from saved brief progress', async () => {
+    mockCpGet.mockResolvedValueOnce({
+      data: [
+        {
+          skill_id: 'skill-theme-discovery',
+          name: 'theme_discovery',
+          display_name: 'Theme Discovery',
+          goal_schema: {
+            fields: [
+              { key: 'business_background', label: 'Business Background', type: 'text', required: true },
+              { key: 'industry', label: 'Industry', type: 'text', required: true },
+              { key: 'locality', label: 'Locality', type: 'text', required: true },
+              { key: 'target_audience', label: 'Target Audience', type: 'text', required: true },
+              { key: 'persona', label: 'Persona', type: 'text', required: true },
+              { key: 'offer', label: 'Offer', type: 'text', required: true },
+              { key: 'objective', label: 'Objective', type: 'text', required: true },
+              { key: 'channel_intent', label: 'YouTube Intent', type: 'text', required: true },
+              { key: 'posting_cadence', label: 'Posting Cadence', type: 'text', required: true },
+              { key: 'tone', label: 'Tone', type: 'text', required: true },
+              { key: 'success_metrics', label: 'Success Metrics', type: 'text', required: true },
+            ],
+          },
+          goal_config: {
+            business_background: 'Dental clinic with two branches',
+            industry: 'Healthcare',
+            locality: 'Bengaluru',
+          },
+        },
+      ],
+    });
+
+    const routeWithFocus = {
+      ...mockRoute,
+      params: { hiredAgentId: 'hi-1', focusSection: 'goals' },
+    };
+
+    const { getByText } = render(
+      <AgentOperationsScreen navigation={mockNavigation} route={routeWithFocus as any} />
+    );
+
+    await waitFor(() => {
+      expect(getByText('Define the audience and promise')).toBeTruthy();
+      expect(getByText('Structured brief summary')).toBeTruthy();
+      expect(getByText('Dental clinic with two branches')).toBeTruthy();
+    });
+  });
+
+  it('saves the Theme Discovery brief from mobile', async () => {
+    mockCpPatch.mockResolvedValueOnce({
+      data: {
+        goal_config: {
+          business_background: 'Dental clinic with two branches',
+          industry: 'Healthcare',
+          locality: 'Bengaluru',
+          target_audience: 'Working parents',
+          persona: 'Care-seeking parent',
+          offer: 'Free first consultation',
+          objective: 'Drive qualified appointment requests',
+          channel_intent: 'Educational shorts and explainers',
+          posting_cadence: 'Three videos per week',
+          tone: 'Clear and reassuring',
+          success_metrics: 'Consult bookings and watch-through rate',
+        },
+      },
+    });
+
+    const routeWithFocus = {
+      ...mockRoute,
+      params: { hiredAgentId: 'hi-1', focusSection: 'goals' },
+    };
+
+    const { getByText, getByLabelText } = render(
+      <AgentOperationsScreen navigation={mockNavigation} route={routeWithFocus as any} />
+    );
+
+    await waitFor(() => {
+      expect(getByText('Map the business context')).toBeTruthy();
+    });
+
+    fireEvent.changeText(getByLabelText('Business Background *'), 'Dental clinic with two branches');
+    fireEvent.changeText(getByLabelText('Industry *'), 'Healthcare');
+    fireEvent.changeText(getByLabelText('Locality *'), 'Bengaluru');
+    fireEvent.press(getByText('Continue'));
+
+    await waitFor(() => expect(getByText('Define the audience and promise')).toBeTruthy());
+
+    fireEvent.changeText(getByLabelText('Target Audience *'), 'Working parents');
+    fireEvent.changeText(getByLabelText('Persona *'), 'Care-seeking parent');
+    fireEvent.changeText(getByLabelText('Offer *'), 'Free first consultation');
+    fireEvent.press(getByText('Continue'));
+
+    await waitFor(() => expect(getByText('Shape the YouTube angle')).toBeTruthy());
+
+    fireEvent.changeText(getByLabelText('Objective *'), 'Drive qualified appointment requests');
+    fireEvent.changeText(getByLabelText('YouTube Intent *'), 'Educational shorts and explainers');
+    fireEvent.changeText(getByLabelText('Posting Cadence *'), 'Three videos per week');
+    fireEvent.press(getByText('Continue'));
+
+    await waitFor(() => expect(getByText('Lock the voice and proof signal')).toBeTruthy());
+
+    fireEvent.changeText(getByLabelText('Tone *'), 'Clear and reassuring');
+    fireEvent.changeText(getByLabelText('Success Metrics *'), 'Consult bookings and watch-through rate');
+    fireEvent.press(getByText('Save Theme Discovery brief'));
+
+    await waitFor(() => {
+      expect(mockCpPatch).toHaveBeenCalledWith(
+        '/cp/hired-agents/hi-1/skills/skill-theme-discovery/goal-config',
+        expect.objectContaining({
+          goal_config: expect.objectContaining({
+            objective: 'Drive qualified appointment requests',
+            success_metrics: 'Consult bookings and watch-through rate',
+          }),
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(getByText('Theme Discovery saved')).toBeTruthy();
+    });
   });
 });

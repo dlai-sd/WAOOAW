@@ -26,12 +26,55 @@ from sqlalchemy.orm import Session
 
 from components import ComponentInput, get_component
 from core.logging import PiiMaskingFilter, get_logger
+from core.metrics import record_dma_lifecycle_event, record_dma_publish_outcome
 from models.component_run import ComponentRunModel
 from models.deliverable import DeliverableModel
 from models.flow_run import FlowRunModel
+from services.audit_service import AuditService
 
 logger = get_logger(__name__)
 logger.addFilter(PiiMaskingFilter())
+
+
+def _is_dma_flow(flow_run: FlowRunModel) -> bool:
+    return flow_run.flow_name in {"ContentCreationFlow", "PublishingFlow"}
+
+
+def _component_stage(component_type: str, step_name: str, error_message: str | None = None) -> str:
+    joined = f"{component_type} {step_name}".lower()
+    if "pump" in joined:
+        return "theme_discovery"
+    if "processor" in joined or "content" in joined:
+        return "content_creation"
+    if error_message == "public_release_requires_explicit_customer_action":
+        return "public_release"
+    if "youtube" in joined or "linkedin" in joined or "publish" in joined:
+        return "publish_execution"
+    return "runtime"
+
+
+def _append_dma_event(
+    flow_run: FlowRunModel,
+    *,
+    event_type: str,
+    stage: str,
+    outcome: str,
+    message: str,
+    reason: str | None = None,
+    metadata: dict | None = None,
+) -> None:
+    if not _is_dma_flow(flow_run):
+        return
+    flow_run.run_context = AuditService.append_runtime_event(
+        flow_run.run_context,
+        event_type=event_type,
+        stage=stage,
+        outcome=outcome,
+        message=message,
+        reason=reason,
+        metadata=metadata,
+    )
+    record_dma_lifecycle_event(stage, outcome)
 
 
 async def execute_sequential_flow(
@@ -54,6 +97,15 @@ async def execute_sequential_flow(
             if not flow_run.run_context.get("auto_execute", False):
                 flow_run.status = "awaiting_approval"
                 flow_run.current_step = step["step_name"]
+                _append_dma_event(
+                    flow_run,
+                    event_type="approval_gate",
+                    stage="customer_approval",
+                    outcome="requested",
+                    message="Customer approval is required before execution can continue.",
+                    reason="awaiting_customer_approval",
+                    metadata={"step_name": step["step_name"]},
+                )
                 flow_run.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 return
@@ -79,6 +131,7 @@ async def execute_sequential_flow(
         db.add(comp_run)
         db.commit()
         result = await comp.safe_execute(comp_input)
+        stage = _component_stage(step["component_type"], step["step_name"], result.error_message)
         comp_run.status = "completed" if result.success else "failed"
         comp_run.output = result.data
         comp_run.error_message = result.error_message
@@ -88,9 +141,26 @@ async def execute_sequential_flow(
         if not result.success:
             flow_run.status = "failed"
             flow_run.error_details = {"step": step["step_name"], "error": result.error_message}
+            _append_dma_event(
+                flow_run,
+                event_type="component_run",
+                stage=stage,
+                outcome="failed",
+                message=f"{step['step_name']} failed during DMA execution.",
+                reason=result.error_message,
+                metadata={"step_name": step["step_name"], "component_type": step["component_type"]},
+            )
             flow_run.updated_at = datetime.now(timezone.utc)
             db.commit()
             return
+        _append_dma_event(
+            flow_run,
+            event_type="component_run",
+            stage=stage,
+            outcome="completed",
+            message=f"{step['step_name']} completed successfully.",
+            metadata={"step_name": step["step_name"], "component_type": step["component_type"]},
+        )
         prev_output = result.data
     flow_run.status = "completed"
     flow_run.completed_at = datetime.now(timezone.utc)
@@ -135,7 +205,7 @@ async def execute_parallel_flow(
     flow_run.status = "running"
     db.commit()
 
-    async def run_one(step: dict) -> tuple[str, bool, dict]:
+    async def run_one(step: dict) -> tuple[str, bool, dict, str | None, str]:
         comp = get_component(step["component_type"])
         comp_input = ComponentInput(
             flow_run_id=flow_run.id,
@@ -162,18 +232,43 @@ async def execute_parallel_flow(
         comp_run.duration_ms = result.duration_ms
         comp_run.completed_at = datetime.now(timezone.utc)
         db.commit()
-        return step["step_name"], result.success, result.data
+        return step["step_name"], result.success, result.data, result.error_message, step["component_type"]
 
     outcomes = await asyncio.gather(*[run_one(s) for s in parallel_steps])
-    all_ok = all(ok for _, ok, _ in outcomes)
-    any_ok = any(ok for _, ok, _ in outcomes)
+    all_ok = all(ok for _, ok, _, _, _ in outcomes)
+    any_ok = any(ok for _, ok, _, _, _ in outcomes)
+    step_errors = {
+        name: error for name, ok, _, error, _ in outcomes if (not ok and error)
+    }
+    for name, ok, _, error, component_type in outcomes:
+        stage = _component_stage(component_type, name, error)
+        if _is_dma_flow(flow_run):
+            publish_outcome = "completed" if ok else "blocked" if error in {
+                "approval_required_for_youtube_publish",
+                "credential_ref_required_for_youtube_publish",
+                "public_release_requires_explicit_customer_action",
+            } else "failed"
+            record_dma_publish_outcome(name.lower(), publish_outcome)
+            _append_dma_event(
+                flow_run,
+                event_type="publish_attempt",
+                stage=stage,
+                outcome=publish_outcome,
+                message=f"{name} publish {'completed' if ok else 'did not complete'}.",
+                reason=error,
+                metadata={"destination": name, "component_type": component_type},
+            )
     if all_ok:
         flow_run.status = "completed"
     elif any_ok:
         flow_run.status = "partial_failure"
-        flow_run.error_details = {"failed_steps": [n for n, ok, _ in outcomes if not ok]}
+        flow_run.error_details = {
+            "failed_steps": [n for n, ok, _, _, _ in outcomes if not ok],
+            "step_errors": step_errors,
+        }
     else:
         flow_run.status = "failed"
+        flow_run.error_details = {"step_errors": step_errors} if step_errors else flow_run.error_details
     flow_run.completed_at = datetime.now(timezone.utc)
     flow_run.updated_at = datetime.now(timezone.utc)
     db.commit()

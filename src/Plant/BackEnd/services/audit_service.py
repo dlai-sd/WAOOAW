@@ -1,7 +1,10 @@
 """
-Audit service - L0/L1 compliance checks + hash chain validation
+Audit service - L0/L1 compliance checks + hash chain validation.
+
+Also provides small runtime-audit helpers used by DMA lifecycle surfaces.
 """
 
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,9 +20,46 @@ from security.hash_chain import validate_chain
 
 class AuditService:
     """Service for constitutional compliance audits."""
+
+    RUNTIME_AUDIT_KEY = "runtime_audit_events"
+    RUNTIME_AUDIT_LIMIT = 50
     
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    def append_runtime_event(
+        run_context: Dict[str, Any] | None,
+        *,
+        event_type: str,
+        stage: str,
+        outcome: str,
+        message: str,
+        reason: str | None = None,
+        metadata: Dict[str, Any] | None = None,
+        occurred_at: str | None = None,
+    ) -> Dict[str, Any]:
+        """Append a bounded runtime audit event into flow-run context."""
+        next_context = dict(run_context or {})
+        events = list(next_context.get(AuditService.RUNTIME_AUDIT_KEY) or [])
+        events.append(
+            {
+                "event_type": event_type,
+                "stage": stage,
+                "outcome": outcome,
+                "message": message,
+                "reason": reason,
+                "metadata": dict(metadata or {}),
+                "occurred_at": occurred_at or datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        next_context[AuditService.RUNTIME_AUDIT_KEY] = events[-AuditService.RUNTIME_AUDIT_LIMIT :]
+        return next_context
+
+    @staticmethod
+    def get_runtime_events(run_context: Dict[str, Any] | None) -> List[Dict[str, Any]]:
+        """Return runtime audit events from flow-run context."""
+        return list(dict(run_context or {}).get(AuditService.RUNTIME_AUDIT_KEY) or [])
     
     async def run_compliance_audit(
         self,

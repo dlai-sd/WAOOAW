@@ -51,6 +51,7 @@ export interface Deliverable {
   deliverable_id: string;
   hired_instance_id: string;
   agent_id: string;
+  goal_instance_id?: string | null;
   
   // Content
   title: string;
@@ -58,16 +59,20 @@ export interface Deliverable {
   type: DeliverableType;
   url?: string | null;
   file_path?: string | null;
+  payload?: Record<string, unknown> | null;
   
   // Status
   review_status: DeliverableReviewStatus;
+  review_notes?: string | null;
+  approval_id?: string | null;
   execution_status?: string | null;
+  executed_at?: string | null;
   
   // Metadata
   goal_template_id?: string | null;
   frequency?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 /**

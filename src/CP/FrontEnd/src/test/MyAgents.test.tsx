@@ -66,38 +66,50 @@ vi.mock('../services/platformCredentials.service', () => ({
   upsertPlatformCredential: vi.fn()
 }))
 
+vi.mock('../services/platformConnections.service', async () => {
+  const actual = await vi.importActual<any>('../services/platformConnections.service')
+  return {
+    ...actual,
+    listPlatformConnections: vi.fn().mockResolvedValue([]),
+  }
+})
+
 vi.mock('../services/exchangeSetup.service', () => ({
   upsertExchangeSetup: vi.fn()
 }))
 
-vi.mock('../services/hiredAgentDeliverables.service', () => ({
-  listHiredAgentDeliverables: vi.fn().mockResolvedValue({
-    hired_instance_id: 'HIRED-1',
-    deliverables: [
-      {
-        deliverable_id: 'DEL-1',
-        hired_instance_id: 'HIRED-1',
-        goal_instance_id: 'GOAL-1',
-        goal_template_id: 'trading.trade_intent_draft.v1',
-        title: 'Trade intent draft',
-        payload: { plan: 'do_something' },
-        review_status: 'pending_review',
-        review_notes: null,
-        approval_id: null,
-        execution_status: 'not_executed',
-        executed_at: null,
-        created_at: null,
-        updated_at: null
-      }
-    ]
-  }),
-  reviewHiredAgentDeliverable: vi.fn().mockResolvedValue({
-    deliverable_id: 'DEL-1',
-    review_status: 'approved',
-    approval_id: 'APR-1',
-    updated_at: null
-  })
-}))
+vi.mock('../services/hiredAgentDeliverables.service', async () => {
+  const actual = await vi.importActual<any>('../services/hiredAgentDeliverables.service')
+  return {
+    ...actual,
+    listHiredAgentDeliverables: vi.fn().mockResolvedValue({
+      hired_instance_id: 'HIRED-1',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-1',
+          hired_instance_id: 'HIRED-1',
+          goal_instance_id: 'GOAL-1',
+          goal_template_id: 'trading.trade_intent_draft.v1',
+          title: 'Trade intent draft',
+          payload: { plan: 'do_something' },
+          review_status: 'pending_review',
+          review_notes: null,
+          approval_id: null,
+          execution_status: 'not_executed',
+          executed_at: null,
+          created_at: null,
+          updated_at: null
+        }
+      ]
+    }),
+    reviewHiredAgentDeliverable: vi.fn().mockResolvedValue({
+      deliverable_id: 'DEL-1',
+      review_status: 'approved',
+      approval_id: 'APR-1',
+      updated_at: null
+    })
+  }
+})
 
 
 vi.mock('../services/hiredAgentGoals.service', () => ({
@@ -227,5 +239,163 @@ describe('MyAgents Component', () => {
       expect(reviewHiredAgentDeliverable).toHaveBeenCalledTimes(1)
     })
     expect(reviewHiredAgentDeliverable).toHaveBeenCalledWith('DEL-1', { decision: 'approved', notes: 'Looks good' })
+  })
+
+  it('shows YouTube connection and approval gating for digital marketing drafts', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
+    const connectionsModule = await import('../services/platformConnections.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-MKT-1',
+          agent_id: 'AGT-MKT-YT-001',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-MKT-1',
+          agent_type_id: 'marketing.digital_marketing.v1'
+        }
+      ]
+    })
+
+    vi.mocked(deliverablesModule.listHiredAgentDeliverables).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-MKT-1',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-MKT-1',
+          hired_instance_id: 'HIRED-MKT-1',
+          goal_instance_id: 'GOAL-MKT-1',
+          goal_template_id: 'marketing.theme_discovery.v1',
+          title: 'YouTube explainer draft',
+          payload: {
+            destination: {
+              destination_type: 'youtube',
+              metadata: {
+                visibility: 'private',
+                public_release_requested: false,
+              },
+            },
+            summary: 'Draft explainer for approval.'
+          },
+          review_status: 'pending_review',
+          review_notes: null,
+          approval_id: null,
+          execution_status: 'not_executed',
+          created_at: null,
+          updated_at: null,
+        }
+      ]
+    })
+
+    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValueOnce([])
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Youtube not connected')).toBeInTheDocument()
+    expect(screen.getByText('Blocked by approval')).toBeInTheDocument()
+    expect(screen.getByText('Customer approval')).toBeInTheDocument()
+    expect(screen.getByText('Approve exact deliverable')).toBeInTheDocument()
+  })
+
+  it('shows YouTube connected state for approved digital marketing drafts', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
+    const connectionsModule = await import('../services/platformConnections.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-MKT-2',
+          agent_id: 'AGT-MKT-YT-002',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-MKT-2',
+          agent_type_id: 'marketing.digital_marketing.v1'
+        }
+      ]
+    })
+
+    vi.mocked(deliverablesModule.listHiredAgentDeliverables).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-MKT-2',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-MKT-2',
+          hired_instance_id: 'HIRED-MKT-2',
+          goal_instance_id: 'GOAL-MKT-2',
+          goal_template_id: 'marketing.theme_discovery.v1',
+          title: 'YouTube short draft',
+          payload: {
+            destination: {
+              destination_type: 'youtube',
+              metadata: {
+                visibility: 'private',
+              },
+            },
+            summary: 'Short draft approved and waiting for upload.'
+          },
+          review_status: 'approved',
+          review_notes: 'Ship it',
+          approval_id: 'APR-MKT-2',
+          execution_status: 'not_executed',
+          created_at: null,
+          updated_at: null,
+        }
+      ]
+    })
+
+    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValue([
+      {
+        id: 'CONN-1',
+        hired_instance_id: 'HIRED-MKT-2',
+        skill_id: 'default',
+        platform_key: 'youtube',
+        status: 'connected',
+        connected_at: '2026-03-10T10:00:00Z',
+        last_verified_at: '2026-03-10T10:05:00Z',
+        created_at: '2026-03-10T10:00:00Z',
+        updated_at: '2026-03-10T10:05:00Z',
+      }
+    ])
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Youtube connected')).toBeInTheDocument()
+    })
   })
 })

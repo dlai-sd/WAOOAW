@@ -91,6 +91,10 @@ class CampaignRepository:
         cost_estimate: dict[str, Any],
         campaign_id: str | None = None,
         status: str = "draft",
+        workflow_state: str = "brief_captured",
+        brief_summary: dict[str, Any] | None = None,
+        approval_state: dict[str, Any] | None = None,
+        draft_deliverables: list[dict[str, Any]] | None = None,
     ) -> CampaignModel:
         """Create and persist a new campaign record.
 
@@ -113,6 +117,10 @@ class CampaignRepository:
             brief=brief,
             cost_estimate=cost_estimate,
             status=status,
+            workflow_state=workflow_state,
+            brief_summary=brief_summary,
+            approval_state=approval_state,
+            draft_deliverables=draft_deliverables,
             created_at=now,
             updated_at=now,
         )
@@ -120,6 +128,27 @@ class CampaignRepository:
         await self.session.flush()
         await self.session.refresh(model)
         return model
+
+    async def update_campaign_runtime(
+        self,
+        campaign_id: str,
+        *,
+        workflow_state: str,
+        brief_summary: dict[str, Any],
+        approval_state: dict[str, Any],
+        draft_deliverables: list[dict[str, Any]],
+    ) -> CampaignModel:
+        existing = await self.get_campaign_by_id(campaign_id)
+        if existing is None:
+            raise ValueError(f"Campaign {campaign_id!r} not found")
+        existing.workflow_state = workflow_state
+        existing.brief_summary = brief_summary
+        existing.approval_state = approval_state
+        existing.draft_deliverables = draft_deliverables
+        existing.updated_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        await self.session.refresh(existing)
+        return existing
 
     async def update_campaign_status(
         self, campaign_id: str, status: str
@@ -321,6 +350,19 @@ class CampaignRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_campaign_runtime_counters(self, campaign_id: str) -> dict[str, int]:
+        """Return lightweight counters used to derive campaign runtime progress."""
+
+        theme_items = await self.list_theme_items_by_campaign(campaign_id)
+        posts = await self.list_posts_by_campaign(campaign_id)
+        return {
+            "theme_items": len(theme_items),
+            "posts": len(posts),
+            "pending_review_posts": sum(1 for post in posts if post.review_status == "pending_review"),
+            "approved_posts": sum(1 for post in posts if post.review_status == "approved"),
+            "rejected_posts": sum(1 for post in posts if post.review_status == "rejected"),
+        }
+
     async def list_posts_due_for_publish(
         self, before: datetime | None = None
     ) -> list[ContentPostModel]:
@@ -353,6 +395,10 @@ class CampaignRepository:
         scheduled_publish_at: datetime,
         hashtags: list[str] | None = None,
         post_id: str | None = None,
+        approval_id: str | None = None,
+        credential_ref: str | None = None,
+        visibility: str = "private",
+        public_release_requested: bool = False,
     ) -> ContentPostModel:
         """Create and persist a content post.
 
@@ -379,6 +425,10 @@ class CampaignRepository:
             scheduled_publish_at=scheduled_publish_at,
             review_status="pending_review",
             publish_status="not_published",
+            approval_id=approval_id,
+            credential_ref=credential_ref,
+            visibility=visibility,
+            public_release_requested=public_release_requested,
             publish_receipt=None,
             created_at=now,
             updated_at=now,

@@ -15,7 +15,7 @@ Run:
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Generator
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -111,6 +111,25 @@ class FakeCampaignRepository:
         m.updated_at = datetime.now(timezone.utc)
         return m
 
+    async def update_campaign_runtime(
+        self,
+        campaign_id: str,
+        *,
+        workflow_state: str,
+        brief_summary: dict[str, Any],
+        approval_state: dict[str, Any],
+        draft_deliverables: list[dict[str, Any]],
+    ) -> CampaignModel:
+        m = _fake_state.campaigns.get(campaign_id)
+        if m is None:
+            raise ValueError(f"Campaign {campaign_id!r} not found")
+        m.workflow_state = workflow_state
+        m.brief_summary = brief_summary
+        m.approval_state = approval_state
+        m.draft_deliverables = draft_deliverables
+        m.updated_at = datetime.now(timezone.utc)
+        return m
+
     # ── DailyThemeItem ────────────────────────────────────────────────────────
 
     async def list_theme_items_by_campaign(self, campaign_id: str) -> list[DailyThemeItemModel]:
@@ -181,6 +200,10 @@ class FakeCampaignRepository:
         scheduled_publish_at: datetime,
         hashtags: list[str] | None = None,
         post_id: str | None = None,
+        approval_id: str | None = None,
+        credential_ref: str | None = None,
+        visibility: str = "private",
+        public_release_requested: bool = False,
     ) -> ContentPostModel:
         now = datetime.now(timezone.utc)
         m = ContentPostModel(
@@ -191,6 +214,10 @@ class FakeCampaignRepository:
             content_text=content_text,
             hashtags=hashtags or [],
             scheduled_publish_at=scheduled_publish_at,
+            approval_id=approval_id,
+            credential_ref=credential_ref,
+            visibility=visibility,
+            public_release_requested=public_release_requested,
             created_at=now,
             updated_at=now,
         )
@@ -235,7 +262,7 @@ def campaigns_app() -> FastAPI:
 
 
 @pytest.fixture(autouse=True)
-def _db_mode(campaigns_app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> None:
+def _db_mode(campaigns_app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     """Switch to db mode and inject FakeCampaignRepository for every test."""
     monkeypatch.setattr(camp_module, "CAMPAIGN_PERSISTENCE_MODE", "db")
     monkeypatch.setattr(camp_module, "CampaignRepository", FakeCampaignRepository)

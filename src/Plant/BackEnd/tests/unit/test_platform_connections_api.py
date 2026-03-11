@@ -100,6 +100,25 @@ def test_to_response_fields_present():
     assert resp.platform_key == conn.platform_key
 
 
+@pytest.mark.asyncio
+async def test_get_connected_platform_connection_returns_only_connected_rows(mock_db):
+    from api.v1.platform_connections import get_connected_platform_connection
+
+    conn = _make_conn_model(status="connected", platform_key="youtube")
+    result_mock = MagicMock()
+    result_mock.scalars.return_value.first.return_value = conn
+    mock_db.execute = AsyncMock(return_value=result_mock)
+
+    found = await get_connected_platform_connection(
+        mock_db,
+        hired_instance_id=conn.hired_instance_id,
+        skill_id=conn.skill_id,
+        platform_key="youtube",
+    )
+
+    assert found is conn
+
+
 # ── Endpoint logic (mocked DB) ───────────────────────────────────────────────
 
 @pytest.fixture

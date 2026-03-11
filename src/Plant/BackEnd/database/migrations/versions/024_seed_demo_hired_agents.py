@@ -18,6 +18,7 @@ customer_ids (from demo DB customer_entity table — confirmed 2026-03-01):
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from alembic import op
@@ -100,6 +101,11 @@ def _rows() -> list[dict]:
 
 
 def upgrade() -> None:
+    environment = os.getenv("ENVIRONMENT", "").lower()
+    if environment not in ("demo", "uat"):
+        print(f"⏭️  Skipping demo hired-agent seed (environment: {environment or 'not set'})")
+        return
+
     connection = op.get_bind()
     for row in _rows():
         # agent_type_id was added in migration 015 which is not yet applied to
@@ -117,7 +123,7 @@ def upgrade() -> None:
                 )
                 VALUES (
                     :hired_instance_id, :subscription_id, :agent_id,
-                    :customer_id, :nickname, :theme, :config::jsonb,
+                    :customer_id, :nickname, :theme, CAST(:config AS jsonb),
                     :configured, :goals_completed, :active,
                     :trial_status, :trial_start_at, :trial_end_at,
                     :created_at, :updated_at
@@ -130,6 +136,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    environment = os.getenv("ENVIRONMENT", "").lower()
+    if environment not in ("demo", "uat"):
+        return
+
     connection = op.get_bind()
     sub_ids = [
         f"{u['sub_prefix']}-{i:02d}"

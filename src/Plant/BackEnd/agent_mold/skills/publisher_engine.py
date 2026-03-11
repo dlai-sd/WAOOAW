@@ -74,8 +74,47 @@ class PublisherEngine:
     def __init__(self, registry: DestinationRegistry) -> None:
         self._registry = registry
 
+    def _check_publish_eligibility(self, inp: PublishInput) -> PublishReceipt | None:
+        dest_type = inp.post.destination.destination_type.lower()
+        metadata = inp.post.destination.metadata or {}
+
+        approval_id = inp.approval_id or metadata.get("approval_id")
+        credential_ref = inp.credential_ref or metadata.get("credential_ref")
+        visibility = str(metadata.get("visibility") or inp.visibility or "private").lower()
+        public_release_requested = bool(
+            metadata.get("public_release_requested") or inp.public_release_requested
+        )
+
+        if dest_type == "youtube":
+            if not approval_id:
+                return PublishReceipt(
+                    post_id=inp.post.post_id,
+                    destination_type=dest_type,
+                    success=False,
+                    error="approval_required_for_youtube_publish",
+                )
+            if not credential_ref:
+                return PublishReceipt(
+                    post_id=inp.post.post_id,
+                    destination_type=dest_type,
+                    success=False,
+                    error="credential_ref_required_for_youtube_publish",
+                )
+            if visibility == "public" and not public_release_requested:
+                return PublishReceipt(
+                    post_id=inp.post.post_id,
+                    destination_type=dest_type,
+                    success=False,
+                    error="public_release_requires_explicit_customer_action",
+                )
+
+        return None
+
     def publish(self, inp: PublishInput) -> PublishReceipt:
         dest_type = inp.post.destination.destination_type.lower()
+        eligibility_failure = self._check_publish_eligibility(inp)
+        if eligibility_failure is not None:
+            return eligibility_failure
         adapter_class = self._registry.get(dest_type)
         if adapter_class is None:
             return PublishReceipt(
@@ -106,6 +145,7 @@ def build_default_registry() -> DestinationRegistry:
     registry.register("simulated", SimulatedAdapter)
     registry.register("x", SimulatedAdapter)          # X/Twitter: simulated in Phase 1
     registry.register("twitter", SimulatedAdapter)    # alias
+    registry.register("youtube", SimulatedAdapter)
     # Phase 2: uncomment when OAuth adapters are built
     # from agent_mold.skills.adapters_linkedin import LinkedInAdapter
     # registry.register("linkedin", LinkedInAdapter)

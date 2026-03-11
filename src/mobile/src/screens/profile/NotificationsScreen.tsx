@@ -38,6 +38,8 @@ export type NotificationType =
   | 'agent_paused'         // → AgentOperationsScreen, section: "scheduler"
   | 'trial_ending'         // → AgentOperationsScreen, section: "spend"
   | 'goal_run_failed'      // → AgentOperationsScreen, section: "activity"
+  | 'publish_ready'        // → AgentOperationsScreen, section: "recent"
+  | 'publish_blocked'      // → AgentOperationsScreen, section: "health"
   | 'generic';             // → no navigation
 
 export interface Notification {
@@ -110,6 +112,16 @@ export function resolveNavigationTarget(
         screen: 'AgentOperations',
         params: { hiredAgentId: runtimeId, focusSection: 'activity' },
       };
+    case 'publish_ready':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: runtimeId, focusSection: 'recent' },
+      };
+    case 'publish_blocked':
+      return {
+        screen: 'AgentOperations',
+        params: { hiredAgentId: runtimeId, focusSection: 'health' },
+      };
     case 'credential_expiring':
       return {
         screen: 'AgentOperations',
@@ -160,6 +172,22 @@ export const NotificationsScreen = ({ navigation }: Props) => {
       body: 'Your approved draft is moving into the runtime stream so you can verify the publication outcome.',
       hired_instance_id: 'demo-hired-agent-1',
       created_at: '42m ago',
+    },
+    {
+      id: 'demo-publish-ready',
+      type: 'publish_ready',
+      title: 'YouTube upload is ready to proceed',
+      body: 'Approval and channel readiness are satisfied, so you can confirm the latest publishing state from runtime progress.',
+      hired_instance_id: 'demo-hired-agent-1',
+      created_at: '1h ago',
+    },
+    {
+      id: 'demo-publish-blocked',
+      type: 'publish_blocked',
+      title: 'YouTube publish blocked by connection state',
+      body: 'The agent is approved to continue, but the connected YouTube channel still needs attention before upload can happen.',
+      hired_instance_id: 'demo-hired-agent-1',
+      created_at: '90m ago',
     },
     {
       id: 'demo-rejected',
