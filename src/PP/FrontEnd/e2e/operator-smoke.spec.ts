@@ -17,7 +17,7 @@ function createJwt(userId: string): string {
 }
 
 test.describe('PP operator smoke', () => {
-  test('moves from review queue to hired-agent runtime context and back to review queue handoff', async ({ page }) => {
+  test('moves from review queue to DMA runtime diagnostics and back to review queue handoff', async ({ page }) => {
     const accessToken = createJwt('pp-operator-user')
 
     await page.route('**/api/**', async (route) => {
@@ -46,8 +46,8 @@ test.describe('PP operator smoke', () => {
                 approval_id: 'APR-PP-1',
                 customer_id: 'CUST-PP-1',
                 customer_label: 'Care Clinic',
-                agent_id: 'AGT-MKT-HEALTH-001',
-                agent_label: 'Healthcare Content Agent',
+                agent_id: 'AGT-MKT-DMA-001',
+                agent_label: 'Digital Marketing Agent',
                 action: 'publish',
                 requested_by: 'ops-admin',
                 correlation_id: 'corr-pp-1',
@@ -61,9 +61,18 @@ test.describe('PP operator smoke', () => {
                   batch_id: 'BATCH-1',
                   post_id: 'POST-1',
                   brand_name: 'Care Clinic',
-                  theme: 'Healthy habits',
-                  channel: 'linkedin',
-                  text_preview: 'Preview text for clinic campaign',
+                  theme: 'Healthy habits for busy parents',
+                  channel: 'youtube',
+                  text_preview: 'Preview script for the next YouTube explainer',
+                },
+                publish_diagnostics: {
+                  publish_block: 'credential_missing',
+                  publish_reason: 'The draft is approved, but the YouTube credential reference is still missing.',
+                  credential_state: 'missing_youtube_credential_ref',
+                  approval_lineage: 'Approval APR-PP-1 is currently attached to post POST-1.',
+                  youtube_visibility: 'private',
+                  public_release_requested: false,
+                  last_error: 'credential_ref_required_for_youtube_publish',
                 },
               },
             ],
@@ -79,7 +88,7 @@ test.describe('PP operator smoke', () => {
           body: JSON.stringify([
             {
               subscription_id: 'SUB-PP-1',
-              agent_id: 'AGT-MKT-HEALTH-001',
+              agent_id: 'AGT-MKT-DMA-001',
               status: 'active',
               duration: 'monthly',
             },
@@ -96,7 +105,7 @@ test.describe('PP operator smoke', () => {
             {
               hired_instance_id: 'HIRE-PP-1',
               subscription_id: 'SUB-PP-1',
-              agent_id: 'AGT-MKT-HEALTH-001',
+              agent_id: 'AGT-MKT-DMA-001',
               configured: true,
               goals_completed: true,
               trial_status: 'active',
@@ -116,9 +125,9 @@ test.describe('PP operator smoke', () => {
             goals: [
               {
                 goal_instance_id: 'GOI-1',
-                goal_template_id: 'marketing.daily_micro_post.v1',
-                frequency: 'daily',
-                settings: { platform: 'linkedin' },
+                goal_template_id: 'marketing.daily_youtube_short.v1',
+                frequency: 'three_per_week',
+                settings: { platform: 'youtube' },
               },
             ],
           }),
@@ -135,16 +144,44 @@ test.describe('PP operator smoke', () => {
             deliverables: [
               {
                 deliverable_id: 'DEL-1',
-                goal_template_id: 'marketing.daily_micro_post.v1',
-                frequency: 'daily',
-                review_status: 'pending_review',
+                goal_template_id: 'marketing.daily_youtube_short.v1',
+                frequency: 'three_per_week',
+                review_status: 'approved',
                 approval_id: 'APR-PP-1',
                 execution_status: 'not_executed',
+                payload: {
+                  destination: {
+                    destination_type: 'youtube',
+                    metadata: { visibility: 'private' },
+                    publish_status: 'not_published',
+                  },
+                },
                 created_at: '2026-03-10T13:05:00Z',
               },
             ],
           }),
         })
+        return
+      }
+
+      if (path.endsWith('/api/pp/ops/hired-agents/HIRE-PP-1/skills')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              skill_id: 'skill-theme-discovery',
+              display_name: 'Theme Discovery',
+              goal_schema: { fields: [{ key: 'business_name', label: 'Business name', required: true }] },
+              goal_config: { business_name: 'WAOOAW Studio' },
+            },
+          ]),
+        })
+        return
+      }
+
+      if (path.endsWith('/api/pp/ops/hired-agents/HIRE-PP-1/platform-connections')) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
         return
       }
 
@@ -158,7 +195,7 @@ test.describe('PP operator smoke', () => {
               {
                 approval_id: 'APR-PP-1',
                 customer_id: 'CUST-PP-1',
-                agent_id: 'AGT-MKT-HEALTH-001',
+                agent_id: 'AGT-MKT-DMA-001',
                 action: 'publish',
                 correlation_id: 'corr-pp-1',
                 created_at: '2026-03-10T13:00:00Z',
@@ -181,10 +218,10 @@ test.describe('PP operator smoke', () => {
                 created_at: '2026-03-10T13:02:00Z',
                 correlation_id: 'corr-pp-1',
                 decision_id: 'DEC-1',
-                agent_id: 'AGT-MKT-HEALTH-001',
+                agent_id: 'AGT-MKT-DMA-001',
                 customer_id: 'CUST-PP-1',
                 action: 'publish',
-                reason: 'approval_required',
+                reason: 'approval_required_for_youtube_publish',
                 path: '/api/v1/deliverables/DEL-1/execute',
                 details: { message: 'missing approval_id' },
               },
@@ -209,12 +246,55 @@ test.describe('PP operator smoke', () => {
       }
 
       if (path.endsWith('/api/pp/ops/hired-agents/HIRE-PP-1/scheduler-diagnostics')) {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            hired_agent_id: 'HIRE-PP-1',
+            cron_expression: '0 9 * * 1-5',
+            next_run_at: '2026-03-12T09:00:00Z',
+            last_run_at: '2026-03-11T09:00:00Z',
+            lag_seconds: 60,
+            dlq_depth: 1,
+            dlq_entries: [
+              {
+                dlq_id: 'dlq-1',
+                hired_agent_id: 'HIRE-PP-1',
+                failed_at: '2026-03-11T09:01:00Z',
+                hook_stage: 'pre_publish',
+                error_message: 'credential_ref_required_for_youtube_publish',
+                retry_count: 1,
+              },
+            ],
+            tasks_used_today: 2,
+            trial_task_limit: 10,
+            pause_state: 'RUNNING',
+            latest_failure_reason: 'credential_ref_required_for_youtube_publish',
+            latest_approval_id: 'APR-PP-1',
+            latest_deliverable_id: 'DEL-1',
+          }),
+        })
         return
       }
 
       if (path.endsWith('/api/pp/ops/hired-agents/HIRE-PP-1/hook-trace')) {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              event_id: 'evt-1',
+              stage: 'pre_publish',
+              hired_agent_id: 'HIRE-PP-1',
+              agent_type: 'marketing',
+              result: 'halt',
+              reason: 'approval_required_for_youtube_publish',
+              emitted_at: '2026-03-11T09:01:00Z',
+              payload_summary: 'approval_id=APR-PP-1 deliverable_id=DEL-1',
+              hook_class: 'ApprovalGateHook',
+            },
+          ]),
+        })
         return
       }
 
@@ -250,29 +330,36 @@ test.describe('PP operator smoke', () => {
 
     await expect(page.getByTestId('pp-review-queue-page')).toBeVisible()
     await page.getByTestId('pp-review-queue-customer-id').fill('CUST-PP-1')
-    await page.getByTestId('pp-review-queue-agent-id').fill('AGT-MKT-HEALTH-001')
+    await page.getByTestId('pp-review-queue-agent-id').fill('AGT-MKT-DMA-001')
     await page.getByTestId('pp-review-queue-correlation-id').fill('corr-pp-1')
     await page.getByTestId('pp-review-queue-load').click()
 
     await expect(page.getByTestId('pp-review-queue-workspace')).toBeVisible()
-    await expect(page.getByTestId('pp-review-queue-workspace').getByText('APR-PP-1')).toBeVisible()
-    await expect(page.getByTestId('pp-review-queue-workspace').getByText('Preview text for clinic campaign')).toBeVisible()
+    await expect(page.getByTestId('pp-review-queue-workspace').getByText('approval_id: APR-PP-1', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('pp-review-queue-workspace').getByText('Preview script for the next YouTube explainer')).toBeVisible()
+    await expect(page.getByTestId('pp-review-queue-publish-readiness')).toContainText('Blocked by channel connection')
+    await expect(page.getByTestId('pp-review-queue-channel-status')).toContainText('Youtube not connected')
 
     await page.getByTestId('pp-review-queue-open-runtime-context').click()
 
     await expect(page.getByTestId('pp-hired-agents-page')).toBeVisible()
     await expect(page.getByTestId('pp-hired-agents-row-HIRE-PP-1')).toBeVisible()
-    await expect(page.getByTestId('pp-hired-agents-correlation-id')).toHaveValue('corr-pp-1')
-    await expect(page.getByText('1 deliverables')).toBeVisible()
-    await expect(page.getByText('1 approvals')).toBeVisible()
-    await expect(page.getByText('1 denials')).toBeVisible()
-    await expect(page.getByText('/api/v1/deliverables/DEL-1/execute')).toBeVisible()
+    await expect(page.getByTestId('pp-dma-brief-summary-card')).toBeVisible()
+    await expect(page.getByText('WAOOAW Studio')).toBeVisible()
+    await expect(page.getByTestId('pp-dma-publish-readiness')).toContainText('Blocked by channel connection')
+    await expect(page.getByTestId('pp-dma-channel-status')).toContainText('Youtube not connected')
+
+    await page.locator('button').filter({ hasText: 'Scheduler' }).click()
+    await expect(page.getByTestId('pp-scheduler-blocker-label')).toContainText('Missing YouTube credential')
+
+    await page.locator('button').filter({ hasText: 'Hook Trace' }).click()
+    await expect(page.getByTestId('pp-hook-trace-signal-label')).toContainText('Approval gate halted publish')
 
     await page.getByTestId('pp-hired-agents-open-review-queue').click()
 
     await expect(page.getByTestId('pp-review-queue-page')).toBeVisible()
     await expect(page.getByTestId('pp-review-queue-customer-id')).toHaveValue('CUST-PP-1')
-    await expect(page.getByTestId('pp-review-queue-agent-id')).toHaveValue('AGT-MKT-HEALTH-001')
+    await expect(page.getByTestId('pp-review-queue-agent-id')).toHaveValue('AGT-MKT-DMA-001')
     await expect(page.getByTestId('pp-review-queue-correlation-id')).toHaveValue('corr-pp-1')
   })
 })

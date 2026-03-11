@@ -77,4 +77,18 @@ describe('resolveNavigationTarget', () => {
     expect((approvalResult!.params as any).focusSection).toBe('approvals');
     expect((approvedDeliverableResult!.params as any).focusSection).toBe('recent');
   });
+
+  it('keeps publish-ready and publish-blocked routes on different runtime surfaces', () => {
+    const readyResult = resolveNavigationTarget({
+      ...baseNotification,
+      type: 'publish_ready',
+    });
+    const blockedResult = resolveNavigationTarget({
+      ...baseNotification,
+      type: 'publish_blocked',
+    });
+
+    expect((readyResult!.params as any).focusSection).toBe('recent');
+    expect((blockedResult!.params as any).focusSection).toBe('health');
+  });
 });

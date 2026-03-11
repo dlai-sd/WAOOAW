@@ -691,6 +691,8 @@ describe('MyAgentsScreen', () => {
         expect(getByText('Publish readiness: Blocked by missing channel connection')).toBeTruthy();
         expect(getByText('Channel: Youtube not connected')).toBeTruthy();
       });
+
+      expect(getByText('Approve is complete, but YouTube still needs a verified connection before upload can happen.')).toBeTruthy();
     });
   });
 

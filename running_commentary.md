@@ -1,14 +1,21 @@
 # Running Commentary — 2026-03-10
 
 > **Purpose:** Track the UI/UX revamp follow-through on CP, PP, and mobile so connection issues do not lose the plan or checkpoint state.
-> **Branch:** `feat/ui-ux-revamp`
-> **Fallback checkpoint:** `9237c55` (`fix(frontend): wire command centre fallback nav props`)
+> **Branch:** `feat/plant-dma-1-it3-s4-regression-release`
+> **Fallback checkpoint:** `35efae2` (current I3-S4 regression closeout checkpoint)
 
 ---
 
 ## Current State
 
-The UI/UX revamp is implemented and pushed on `feat/ui-ux-revamp`.
+The DMA sellable-agent regression closeout is in progress on `feat/plant-dma-1-it3-s4-regression-release`.
+### DMA sellable-agent release boundary — 2026-03-11
+
+| Boundary | Status | Note |
+|---|---|---|
+| Theme Discovery → draft review → approval → publish-readiness regression | ✅ Covered | CP, PP, and mobile now each assert the approval-gated YouTube journey for the first sellable Digital Marketing Agent |
+| Live publish scope | ⚠️ Limited | MVP release truth remains YouTube-first only; multi-network expansion is future work rather than implied capability |
+| Validation caveat | ⚠️ Known | Broad Plant pytest collection is currently blocked by a missing BDD feature asset, so narrow Docker test paths remain the reliable release-closeout path for targeted backend changes |
 
 ### Completed baseline
 

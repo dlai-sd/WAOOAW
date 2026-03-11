@@ -184,6 +184,53 @@ describe('AgentOperationsScreen', () => {
     expect(getByText('1 approvals')).toBeTruthy();
   });
 
+  it('shows approval-gated DMA publish copy in the approvals section', async () => {
+    const useApprovalQueue = require('@/hooks/useApprovalQueue').useApprovalQueue;
+    (useApprovalQueue as jest.Mock).mockReturnValue({
+      deliverables: [
+        {
+          id: 'd-yt-1',
+          hired_agent_id: 'hi-1',
+          type: 'content_draft',
+          title: 'YouTube explainer draft',
+          target_platform: 'YouTube',
+          content_preview: 'Draft explainer awaiting exact customer approval before upload.',
+          review_status: 'pending_review',
+          approval_id: null,
+          payload: {
+            destination: {
+              destination_type: 'youtube',
+              metadata: {
+                visibility: 'private',
+                public_release_requested: false,
+              },
+            },
+          },
+        },
+      ],
+      isLoading: false,
+      error: null,
+      approve: jest.fn(),
+      reject: jest.fn(),
+    });
+
+    const routeWithFocus = {
+      ...mockRoute,
+      params: { hiredAgentId: 'hi-1', focusSection: 'approvals' },
+    };
+
+    const { getByText } = render(
+      <AgentOperationsScreen navigation={mockNavigation} route={routeWithFocus as any} />
+    );
+
+    await waitFor(() => {
+      expect(getByText(/Approve exact deliverable/)).toBeTruthy();
+    });
+
+    expect(getByText('Exact approval required before YouTube action')).toBeTruthy();
+    expect(getByText('YouTube')).toBeTruthy();
+  });
+
   it('auto-expands the focusSection when provided', () => {
     const routeWithFocus = {
       ...mockRoute,

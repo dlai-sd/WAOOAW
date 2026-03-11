@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test'
 
-const agentId = 'AGT-MKT-HEALTH-001'
-const jobRoleId = 'ROLE-MKT-HEALTH-001'
-const skillIds = ['SKILL-CONTENT-001', 'SKILL-SOCIAL-001']
+const agentId = 'AGT-MKT-DMA-001'
+const jobRoleId = 'ROLE-MKT-DMA-001'
+const skillIds = ['SKILL-THEME-DISCOVERY-001', 'SKILL-YOUTUBE-PUBLISH-001']
 const subscriptionId = 'SUB-CP-HIRE-001'
 const orderId = 'ORDER-CP-HIRE-001'
 const hiredInstanceId = 'HIRED-CP-HIRE-001'
@@ -22,7 +22,7 @@ function createJwt(userId: string): string {
 }
 
 test.describe('CP hire journey', () => {
-  test('moves from discovery to receipt, setup, and truthful post-activation landing', async ({ page }) => {
+  test('moves from discovery to DMA runtime truth with approval-gated YouTube readiness', async ({ page }) => {
     const accessToken = createJwt('cp-hire-journey-user')
 
     await page.route('**/api/**', async (route) => {
@@ -32,11 +32,7 @@ test.describe('CP hire journey', () => {
       const method = request.method()
 
       if (path.endsWith('/api/auth/refresh')) {
-        await route.fulfill({
-          status: 401,
-          contentType: 'application/json',
-          body: JSON.stringify({ detail: 'No refresh session' }),
-        })
+        await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ detail: 'No refresh session' }) })
         return
       }
 
@@ -71,8 +67,8 @@ test.describe('CP hire journey', () => {
           body: JSON.stringify([
             {
               id: agentId,
-              name: 'Healthcare Growth Copilot',
-              description: 'Builds compliant growth campaigns for clinics and care brands.',
+              name: 'Digital Marketing Agent',
+              description: 'Captures Theme Discovery, generates drafts, and keeps YouTube publish gated by exact customer approval.',
               job_role_id: jobRoleId,
               industry: 'marketing',
               entity_type: 'agent',
@@ -93,8 +89,8 @@ test.describe('CP hire journey', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             id: agentId,
-            name: 'Healthcare Growth Copilot',
-            description: 'Builds compliant growth campaigns for clinics and care brands.',
+            name: 'Digital Marketing Agent',
+            description: 'Captures Theme Discovery, generates drafts, and keeps YouTube publish gated by exact customer approval.',
             job_role_id: jobRoleId,
             industry: 'marketing',
             entity_type: 'agent',
@@ -114,8 +110,8 @@ test.describe('CP hire journey', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             id: jobRoleId,
-            name: 'Healthcare Growth Strategist',
-            description: 'Designs and operates patient acquisition campaigns.',
+            name: 'Digital Marketing Strategist',
+            description: 'Owns Theme Discovery, content generation, approvals, and approved YouTube publishing.',
             required_skills: skillIds,
             seniority_level: 'senior',
             entity_type: 'job_role',
@@ -132,8 +128,8 @@ test.describe('CP hire journey', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             id: skillIds[0],
-            name: 'Healthcare Content Ops',
-            description: 'Creates compliant campaign content.',
+            name: 'Theme Discovery',
+            description: 'Captures the structured business brief before content generation starts.',
             category: 'domain_expertise',
             entity_type: 'skill',
             status: 'certified',
@@ -149,8 +145,8 @@ test.describe('CP hire journey', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             id: skillIds[1],
-            name: 'Social Publishing',
-            description: 'Schedules and publishes channel content.',
+            name: 'Approved YouTube Publishing',
+            description: 'Publishes only after exact deliverable approval and customer channel readiness exist.',
             category: 'technical',
             entity_type: 'skill',
             status: 'certified',
@@ -181,20 +177,12 @@ test.describe('CP hire journey', () => {
       }
 
       if (path.endsWith(`/api/cp/hire/wizard/by-subscription/${subscriptionId}`)) {
-        await route.fulfill({
-          status: 404,
-          contentType: 'application/json',
-          body: JSON.stringify({ detail: 'Draft not found' }),
-        })
+        await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'Draft not found' }) })
         return
       }
 
       if (path.endsWith('/api/cp/platform-credentials') && method === 'PUT') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ credential_ref: 'cred-instagram-001' }),
-        })
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ credential_ref: 'cred-youtube-001' }) })
         return
       }
 
@@ -207,7 +195,7 @@ test.describe('CP hire journey', () => {
             hired_instance_id: hiredInstanceId,
             subscription_id: body.subscription_id,
             agent_id: body.agent_id,
-            nickname: body.nickname || 'Clinic Growth Desk',
+            nickname: body.nickname || 'YouTube Growth Desk',
             theme: body.theme || 'default',
             config: body.config || {},
             configured: true,
@@ -229,14 +217,14 @@ test.describe('CP hire journey', () => {
             hired_instance_id: hiredInstanceId,
             subscription_id: subscriptionId,
             agent_id: agentId,
-            nickname: 'Clinic Growth Desk',
+            nickname: 'YouTube Growth Desk',
             theme: 'dark',
             config: {
               platforms: [
                 {
-                  platform: 'instagram',
-                  credential_ref: 'cred-instagram-001',
-                  posting_identity: 'DrSharmaClinic',
+                  platform: 'youtube',
+                  credential_ref: 'cred-youtube-001',
+                  posting_identity: 'ClinicGrowthStudio',
                 },
               ],
             },
@@ -267,7 +255,7 @@ test.describe('CP hire journey', () => {
                 cancel_at_period_end: false,
                 hired_instance_id: hiredInstanceId,
                 agent_type_id: 'marketing.digital_marketing.v1',
-                nickname: 'Clinic Growth Desk',
+                nickname: 'YouTube Growth Desk',
                 configured: true,
                 goals_completed: true,
                 trial_status: 'active',
@@ -290,14 +278,14 @@ test.describe('CP hire journey', () => {
             subscription_id: subscriptionId,
             agent_id: agentId,
             agent_type_id: 'marketing.digital_marketing.v1',
-            nickname: 'Clinic Growth Desk',
+            nickname: 'YouTube Growth Desk',
             theme: 'dark',
             config: {
               platforms: [
                 {
-                  platform: 'instagram',
-                  credential_ref: 'cred-instagram-001',
-                  posting_identity: 'DrSharmaClinic',
+                  platform: 'youtube',
+                  credential_ref: 'cred-youtube-001',
+                  posting_identity: 'ClinicGrowthStudio',
                 },
               ],
             },
@@ -321,45 +309,121 @@ test.describe('CP hire journey', () => {
                 { key: 'platforms', label: 'Platforms', type: 'list', required: false },
               ],
             },
-            goal_templates: [],
-            enforcement_defaults: { approval_required: true, deterministic: false },
+            goal_templates: [
+              {
+                goal_template_id: 'marketing.daily_youtube_short.v1',
+                name: 'Daily YouTube short',
+                default_frequency: 'three_per_week',
+                settings_schema: {
+                  fields: [
+                    {
+                      key: 'platform',
+                      label: 'Platform',
+                      type: 'enum',
+                      required: true,
+                      options: ['youtube'],
+                    },
+                  ],
+                },
+                skill_binding: 'skill-theme-discovery',
+              },
+            ],
+            enforcement_defaults: { approval_required: true, deterministic: true },
           }),
         })
         return
       }
 
-      if (path.includes(`/api/cp/hired-agents/${hiredInstanceId}/goals`)) {
+      if (path.endsWith(`/api/cp/hired-agents/${hiredInstanceId}/goals`)) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ hired_instance_id: hiredInstanceId, goals: [] }),
+          body: JSON.stringify({
+            hired_instance_id: hiredInstanceId,
+            goals: [
+              {
+                goal_instance_id: 'GOAL-DMA-1',
+                goal_template_id: 'marketing.daily_youtube_short.v1',
+                frequency: 'three_per_week',
+                settings: { platform: 'youtube' },
+              },
+            ],
+          }),
         })
         return
       }
 
-      if (path.includes(`/api/cp/hired-agents/${hiredInstanceId}/deliverables`)) {
+      if (path.endsWith(`/api/cp/hired-agents/${hiredInstanceId}/skills`)) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ hired_instance_id: hiredInstanceId, deliverables: [] }),
+          body: JSON.stringify([
+            {
+              skill_id: 'skill-theme-discovery',
+              display_name: 'Theme Discovery',
+              goal_schema: {
+                fields: [
+                  { key: 'business_name', label: 'Business name', required: true },
+                  { key: 'brand_voice', label: 'Brand voice', required: true },
+                ],
+              },
+              goal_config: {
+                business_name: 'Clinic Growth Studio',
+                brand_voice: 'Trusted specialist guidance for busy parents on YouTube.',
+              },
+            },
+          ]),
         })
         return
       }
 
-      if (path.includes(`/api/cp/hired-agents/${hiredInstanceId}/performance-stats`)) {
+      if (path.endsWith(`/api/cp/hired-agents/${hiredInstanceId}/platform-connections`)) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+        return
+      }
+
+      if (path.endsWith(`/api/cp/hired-agents/${hiredInstanceId}/deliverables`)) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([]),
+          body: JSON.stringify({
+            hired_instance_id: hiredInstanceId,
+            deliverables: [
+              {
+                deliverable_id: 'DEL-DMA-1',
+                hired_instance_id: hiredInstanceId,
+                goal_instance_id: 'GOAL-DMA-1',
+                goal_template_id: 'marketing.daily_youtube_short.v1',
+                title: 'YouTube explainer draft',
+                payload: {
+                  destination: {
+                    destination_type: 'youtube',
+                    metadata: {
+                      visibility: 'private',
+                      public_release_requested: false,
+                    },
+                  },
+                  summary: 'Draft explainer awaiting exact customer approval before publish.',
+                },
+                review_status: 'pending_review',
+                review_notes: null,
+                approval_id: null,
+                execution_status: 'not_executed',
+                created_at: '2026-03-10T10:00:00Z',
+                updated_at: '2026-03-10T10:00:00Z',
+              },
+            ],
+          }),
         })
         return
       }
 
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({}),
-      })
+      if (path.endsWith(`/api/cp/hired-agents/${hiredInstanceId}/performance-stats`)) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+        return
+      }
+
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) })
     })
 
     await page.goto(`/auth/callback?access_token=${encodeURIComponent(accessToken)}&expires_in=3600`)
@@ -368,7 +432,7 @@ test.describe('CP hire journey', () => {
 
     await page.getByTestId('cp-nav-discover').click()
     await expect(page.getByTestId('cp-discover-page')).toBeVisible()
-    await page.getByTestId('cp-discover-search-input').fill('Healthcare')
+    await page.getByTestId('cp-discover-search-input').fill('Digital Marketing')
     await page.getByTestId('cp-discover-search-button').click()
 
     await expect(page.getByTestId(`cp-agent-card-${agentId}`)).toBeVisible()
@@ -391,23 +455,16 @@ test.describe('CP hire journey', () => {
 
     await page.waitForURL(new RegExp(`/hire/setup/${subscriptionId}`))
     await expect(page.getByTestId('cp-hire-setup-page')).toBeVisible()
-    await expect(page.getByTestId('cp-hire-setup-step-1')).toBeVisible()
 
-    await page.getByTestId('cp-hire-setup-nickname').fill('Clinic Growth Desk')
+    await page.getByTestId('cp-hire-setup-nickname').fill('YouTube Growth Desk')
     await page.getByTestId('cp-hire-setup-next').click()
-    await expect(page.getByTestId('cp-hire-setup-step-2')).toBeVisible()
-
     await page.getByTestId('cp-hire-setup-theme').selectOption('dark')
     await page.getByTestId('cp-hire-setup-next').click()
-    await expect(page.getByTestId('cp-hire-setup-step-3')).toBeVisible()
-
-    await page.getByTestId('cp-hire-setup-platform').selectOption('instagram')
-    await page.getByTestId('cp-hire-setup-posting-identity').fill('DrSharmaClinic')
+    await page.getByTestId('cp-hire-setup-platform').selectOption('youtube')
+    await page.getByTestId('cp-hire-setup-posting-identity').fill('ClinicGrowthStudio')
     await page.getByTestId('cp-hire-setup-access-token').fill('token-123')
     await page.getByTestId('cp-hire-setup-refresh-token').fill('refresh-123')
     await page.getByTestId('cp-hire-setup-next').click()
-    await expect(page.getByTestId('cp-hire-setup-step-4')).toBeVisible()
-
     await page.getByTestId('cp-hire-setup-goals-completed').click()
     await page.getByTestId('cp-hire-setup-activate').click()
 
@@ -415,5 +472,19 @@ test.describe('CP hire journey', () => {
     await expect(page.getByTestId('cp-portal-entry-banner')).toBeVisible()
     await expect(page.getByText(`${agentId} is now in runtime setup`)).toBeVisible()
     await expect(page.getByText('You landed in My Agents because that is the first truthful place to confirm the runtime, monitor hydration, and continue operating without guessing.')).toBeVisible()
+
+    await page.locator('button').filter({ hasText: 'Goal Setting' }).click()
+    await expect(page.getByText('Saved Theme Discovery brief')).toBeVisible()
+    await expect(page.getByText('Business name')).toBeVisible()
+    await expect(page.getByText('Clinic Growth Studio')).toBeVisible()
+    await expect(page.getByText('Drafts (1)')).toBeVisible()
+    await page.locator('button').filter({ hasText: 'Review' }).click()
+
+    await expect(page.getByText('YouTube channel status')).toBeVisible()
+    await expect(page.getByText('Publish readiness')).toBeVisible()
+    await expect(page.getByText('Youtube not connected')).toBeVisible()
+    await expect(page.getByText('Blocked by approval')).toBeVisible()
+    await expect(page.getByText('Customer approval', { exact: true })).toBeVisible()
+    await expect(page.getByText('Approve exact deliverable')).toBeVisible()
   })
 })
