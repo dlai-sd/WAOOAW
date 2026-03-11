@@ -31,10 +31,14 @@ from agent_mold.skills.content_creator import ContentCreatorSkill
 from agent_mold.skills.content_models import (
     Campaign,
     CampaignBrief,
+    CampaignBriefSummary,
     CampaignStatus,
+    CampaignWorkflowState,
+    CampaignApprovalState,
     ContentPost,
     CostEstimate,
     DailyThemeItem,
+    DraftDeliverableSummary,
     PostGeneratorInput,
     PublishInput,
     PublishStatus,
@@ -122,6 +126,91 @@ def _orm_post_to_pydantic(m: ContentPostModel) -> ContentPost:
         "created_at":           m.created_at,
         "updated_at":           m.updated_at,
     })
+
+
+def _build_brief_summary(brief: CampaignBrief) -> CampaignBriefSummary:
+    theme_discovery = brief.theme_discovery
+    if theme_discovery is not None:
+        cadence = theme_discovery.posting_cadence
+        cadence_text = f"{cadence.posts_per_week} posts/week"
+        success_metrics = [f"{metric.name}: {metric.target}" for metric in theme_discovery.success_metrics]
+        summary_text = (
+            f"{theme_discovery.objective} for {theme_discovery.target_audience} in "
+            f"{theme_discovery.locality} using {theme_discovery.channel_intent.primary_destination}."
+        )
+        return CampaignBriefSummary(
+            summary_text=summary_text,
+            target_audience=theme_discovery.target_audience,
+            offer=theme_discovery.offer,
+            primary_destination=theme_discovery.channel_intent.primary_destination,
+            cadence_text=cadence_text,
+            success_metrics=success_metrics,
+        )
+
+    first_destination = brief.destinations[0].destination_type if brief.destinations else "youtube"
+    cadence_text = f"{brief.schedule.times_per_day} posts/day"
+    summary_text = f"{brief.theme} for {brief.audience or 'the target audience'} on {first_destination}."
+    return CampaignBriefSummary(
+        summary_text=summary_text,
+        target_audience=brief.audience or "General audience",
+        offer="",
+        primary_destination=first_destination,
+        cadence_text=cadence_text,
+        success_metrics=[],
+    )
+
+
+def _build_draft_deliverables(posts: list[ContentPost]) -> list[DraftDeliverableSummary]:
+    return [
+        DraftDeliverableSummary(
+            deliverable_id=post.post_id,
+            theme_item_id=post.theme_item_id,
+            destination_type=post.destination.destination_type,
+            review_status=post.review_status,
+            publish_status=post.publish_status,
+        )
+        for post in posts
+    ]
+
+
+def _build_approval_state(posts: list[ContentPost]) -> CampaignApprovalState:
+    pending = sum(1 for post in posts if post.review_status == ReviewStatus.PENDING_REVIEW)
+    approved = sum(1 for post in posts if post.review_status == ReviewStatus.APPROVED)
+    rejected = sum(1 for post in posts if post.review_status == ReviewStatus.REJECTED)
+    return CampaignApprovalState(
+        pending_review_count=pending,
+        approved_count=approved,
+        rejected_count=rejected,
+    )
+
+
+def _derive_workflow_state(
+    theme_items: list[DailyThemeItem],
+    posts: list[ContentPost],
+) -> CampaignWorkflowState:
+    if not theme_items and not posts:
+        return CampaignWorkflowState.BRIEF_CAPTURED
+    if posts and all(post.review_status == ReviewStatus.APPROVED for post in posts):
+        return CampaignWorkflowState.APPROVED_FOR_UPLOAD
+    if posts:
+        return CampaignWorkflowState.AWAITING_CUSTOMER_APPROVAL
+    return CampaignWorkflowState.DRAFT_READY_FOR_REVIEW
+
+
+def _enrich_campaign_runtime(
+    campaign: Campaign,
+    *,
+    theme_items: list[DailyThemeItem],
+    posts: list[ContentPost],
+) -> Campaign:
+    return campaign.model_copy(
+        update={
+            "workflow_state": _derive_workflow_state(theme_items, posts),
+            "brief_summary": _build_brief_summary(campaign.brief),
+            "draft_deliverables": _build_draft_deliverables(posts),
+            "approval_state": _build_approval_state(posts),
+        }
+    )
 
 # ─── In-memory stores (Phase 1) ───────────────────────────────────────────────
 _campaigns: dict[str, Campaign] = {}
@@ -219,6 +308,7 @@ async def create_campaign(
             campaign_id=campaign_pydantic.campaign_id,
         )
         campaign = _orm_campaign_to_pydantic(orm_campaign)
+        campaign = _enrich_campaign_runtime(campaign, theme_items=[], posts=[])
         skill = ContentCreatorSkill()
         creator_output = skill.generate_theme_list(campaign)
         theme_items_list = creator_output.theme_items
@@ -247,6 +337,7 @@ async def create_campaign(
         brief=body.brief,
         cost_estimate=cost,
     )
+    campaign = _enrich_campaign_runtime(campaign, theme_items=[], posts=[])
 
     skill = ContentCreatorSkill()
     creator_output = skill.generate_theme_list(campaign)
@@ -278,12 +369,22 @@ async def get_campaign(
         orm_campaign = await repo.get_campaign_by_id(campaign_id)
         if not orm_campaign:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
-        return _orm_campaign_to_pydantic(orm_campaign)
+        orm_theme_items = await repo.list_theme_items_by_campaign(campaign_id)
+        orm_posts = await repo.list_posts_by_campaign(campaign_id)
+        return _enrich_campaign_runtime(
+            _orm_campaign_to_pydantic(orm_campaign),
+            theme_items=[_orm_theme_item_to_pydantic(item) for item in orm_theme_items],
+            posts=[_orm_post_to_pydantic(post) for post in orm_posts],
+        )
     # --- memory mode ---
     campaign = _campaigns.get(campaign_id)
     if not campaign:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found.")
-    return campaign
+    return _enrich_campaign_runtime(
+        campaign,
+        theme_items=list(_theme_items.get(campaign_id, {}).values()),
+        posts=list(_posts.get(campaign_id, {}).values()),
+    )
 
 
 @router.get("/{campaign_id}/theme-items", response_model=list[DailyThemeItem])

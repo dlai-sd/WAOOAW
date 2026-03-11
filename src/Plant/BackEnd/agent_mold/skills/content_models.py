@@ -44,6 +44,13 @@ class PublishStatus(str, Enum):
     FAILED = "failed"
 
 
+class CampaignWorkflowState(str, Enum):
+    BRIEF_CAPTURED = "brief_captured"
+    DRAFT_READY_FOR_REVIEW = "draft_ready_for_review"
+    AWAITING_CUSTOMER_APPROVAL = "awaiting_customer_approval"
+    APPROVED_FOR_UPLOAD = "approved_for_upload"
+
+
 # ─── Campaign Brief (customer input) ─────────────────────────────────────────
 
 class DestinationRef(BaseModel):
@@ -116,6 +123,35 @@ class ThemeDiscoveryBrief(BaseModel):
     channel_intent: ThemeDiscoveryChannelIntent
     posting_cadence: PostingCadence = Field(default_factory=PostingCadence)
     success_metrics: List[SuccessMetric] = Field(default_factory=list)
+
+
+class CampaignBriefSummary(BaseModel):
+    """Compact summary of the structured brief for CP, PP, and mobile surfaces."""
+
+    summary_text: str = Field(..., min_length=1)
+    target_audience: str = Field(..., min_length=1)
+    offer: str = Field("")
+    primary_destination: str = Field(..., min_length=1)
+    cadence_text: str = Field(..., min_length=1)
+    success_metrics: List[str] = Field(default_factory=list)
+
+
+class DraftDeliverableSummary(BaseModel):
+    """Small runtime view of reviewable draft deliverables."""
+
+    deliverable_id: str = Field(..., min_length=1)
+    theme_item_id: str = Field(..., min_length=1)
+    destination_type: str = Field(..., min_length=1)
+    review_status: ReviewStatus
+    publish_status: PublishStatus
+
+
+class CampaignApprovalState(BaseModel):
+    """Roll-up of approval progress for the campaign runtime."""
+
+    pending_review_count: int = 0
+    approved_count: int = 0
+    rejected_count: int = 0
 
 
 class CampaignBrief(BaseModel):
@@ -200,6 +236,10 @@ class Campaign(BaseModel):
     brief: CampaignBrief
     cost_estimate: CostEstimate
     status: CampaignStatus = CampaignStatus.DRAFT
+    workflow_state: CampaignWorkflowState = CampaignWorkflowState.BRIEF_CAPTURED
+    brief_summary: Optional[CampaignBriefSummary] = None
+    draft_deliverables: List[DraftDeliverableSummary] = Field(default_factory=list)
+    approval_state: CampaignApprovalState = Field(default_factory=CampaignApprovalState)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

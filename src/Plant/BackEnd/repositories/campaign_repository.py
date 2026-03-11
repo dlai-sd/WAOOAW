@@ -321,6 +321,19 @@ class CampaignRepository:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_campaign_runtime_counters(self, campaign_id: str) -> dict[str, int]:
+        """Return lightweight counters used to derive campaign runtime progress."""
+
+        theme_items = await self.list_theme_items_by_campaign(campaign_id)
+        posts = await self.list_posts_by_campaign(campaign_id)
+        return {
+            "theme_items": len(theme_items),
+            "posts": len(posts),
+            "pending_review_posts": sum(1 for post in posts if post.review_status == "pending_review"),
+            "approved_posts": sum(1 for post in posts if post.review_status == "approved"),
+            "rejected_posts": sum(1 for post in posts if post.review_status == "rejected"),
+        }
+
     async def list_posts_due_for_publish(
         self, before: datetime | None = None
     ) -> list[ContentPostModel]:

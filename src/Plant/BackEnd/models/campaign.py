@@ -34,7 +34,9 @@ from core.database import Base
 class CampaignModel(Base):
     """Persisted campaign record — maps 1-to-1 with the Campaign Pydantic model.
 
-    Status lifecycle: draft → theme_approved → running → paused → completed
+    Persisted status lifecycle: draft → theme_approved → running → paused → completed.
+    The richer digital-marketing workflow state is derived at the API layer from
+    the persisted brief, theme items, and content-post review state.
     """
 
     __tablename__ = "campaigns"

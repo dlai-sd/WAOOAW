@@ -4,9 +4,12 @@ def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path
 
     payload = {
         "agent_id": "AGT-MKT-HEALTH-001",
+        "hired_instance_id": "HIRED-001",
+        "campaign_id": "CAM-001",
         "customer_id": "CUST-001",
         "theme": "5 quick tips for managing seasonal allergies",
         "brand_name": "Care Clinic",
+        "brief_summary": "Seasonal allergy education for families in Pune via YouTube.",
         "offer": "Walk-in checkups available",
         "location": "Pune",
         "audience": "Families",
@@ -20,8 +23,12 @@ def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path
 
     assert data["batch_id"]
     assert data["agent_id"] == payload["agent_id"]
+    assert data["hired_instance_id"] == payload["hired_instance_id"]
+    assert data["campaign_id"] == payload["campaign_id"]
     assert data["customer_id"] == payload["customer_id"]
+    assert data["brief_summary"] == payload["brief_summary"]
     assert data["status"] == "pending_review"
+    assert data["workflow_state"] == "draft_ready_for_review"
 
     posts = data["posts"]
     assert len(posts) == 5  # default channels

@@ -44,13 +44,17 @@ class DraftPostRecord(BaseModel):
 class DraftBatchRecord(BaseModel):
     batch_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
+    hired_instance_id: Optional[str] = None
+    campaign_id: Optional[str] = None
     customer_id: Optional[str] = None
 
     theme: str = Field(..., min_length=1)
     brand_name: str = Field(..., min_length=1)
+    brief_summary: Optional[str] = None
 
     created_at: datetime
     status: DraftReviewStatus = "pending_review"
+    workflow_state: str = "draft_ready_for_review"
 
     posts: List[DraftPostRecord] = Field(default_factory=list)
 

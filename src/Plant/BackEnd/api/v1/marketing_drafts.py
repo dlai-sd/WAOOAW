@@ -49,10 +49,13 @@ def get_draft_batch_store() -> FileDraftBatchStore:
 
 class CreateDraftBatchRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
+    hired_instance_id: Optional[str] = None
+    campaign_id: Optional[str] = None
     customer_id: Optional[str] = None
 
     theme: str
     brand_name: str
+    brief_summary: Optional[str] = None
     offer: Optional[str] = None
     location: Optional[str] = None
     audience: Optional[str] = None
@@ -132,9 +135,12 @@ async def create_draft_batch(
     batch = DraftBatchRecord(
         batch_id=batch_id,
         agent_id=body.agent_id,
+        hired_instance_id=body.hired_instance_id,
+        campaign_id=body.campaign_id,
         customer_id=body.customer_id,
         theme=result.output.canonical.theme,
         brand_name=body.brand_name,
+        brief_summary=body.brief_summary,
         created_at=datetime.utcnow(),
         posts=posts,
     )
