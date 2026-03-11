@@ -1488,9 +1488,15 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `feat/ui-ux-revamp` (frontend UX revamp + QA/test/smoke complete, PR #917 in review — 2026-03-10)
+### Current branch: `feat/ui-ux-revamp` (PR #917 merged to `main`; release-readiness follow-ups committed on branch — 2026-03-11)
 
-### In review — 2026-03-10
+### Ready to PR — 2026-03-11
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **branch-only** | `feat/ui-ux-revamp` | **Release-readiness closeout after PR #917** — CP and PP Vite chunking now splits Fluent/Griffel/router/auth vendor families with a deliberate `chunkSizeWarningLimit`; PP runtime config loads from `src/main.tsx` instead of `index.html`; mobile Jest noise was reduced without hiding failures; targeted CP, PP, and mobile smoke lanes were rerun green before docs closeout. | `src/CP/FrontEnd/vite.config.ts`, `src/PP/FrontEnd/vite.config.ts`, `src/PP/FrontEnd/src/main.tsx`, `src/mobile/jest.config.js`, `src/mobile/tsconfig.json`, `src/mobile/jest.setup.js`, `src/PP/FrontEnd/src/pages/ReviewQueue.test.tsx`, `docs/MVP1_Mar_10_2026.md` |
+
+### Recently merged — 2026-03-10
 
 | PR | Branch | Summary | Key files |
 |----|--------|---------|----------|
@@ -2279,6 +2285,8 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **Google Sign-In — Play App Signing SHA-1** | When distributing via Play Store (even internal testing), Google re-signs the AAB. The device presents Play App Signing SHA-1 to GCP OAuth, not the EAS keystore SHA-1. **FIXED (PR #755, 2026-02-24)**: Play App Signing SHA-1 `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` is now registered in: (1) `google-services.json` (type-1 Android OAuth client), (2) Firebase Console → waooaw-oauth → `com.waooaw.app` → SHA certificate fingerprints, (3) GCP Console → Credentials → Android OAuth client `270293855600-2shlgots…`. Access: Play Console → Your app → Setup → App integrity → App signing → App signing key certificate. |
 | **`eas build:view` has no `--non-interactive` flag** | The flag is invalid and causes a hard failure. CI uses `eas build:view "$BUILD_ID" --json` (no flag). EAS CLI emits spinner text before the JSON; always strip with `awk '/^[{\[]/{found=1} found{print}'` before piping to `jq`. |
 | **EAS `test-apk` profile** | Direct APK install that bypasses Play Store re-signing. Uses EAS keystore SHA-1 (`14f7ccef…`) which is already registered in GCP. Use this for testing Google Sign-In without Play Store. Download from Expo dashboard, install with "unknown sources" enabled. |
+| **PP runtime config must stay runtime-loaded** | `src/PP/FrontEnd/pp-runtime-config.js` is deployment-time config, not a bundled source module. Do not add it back to `index.html` as a static script include if Vite starts warning or trying to process it. Load it from `src/main.tsx` before rendering so runtime env injection stays external and build output stays clean. |
+| **Mobile Jest `isolatedModules` belongs in tsconfig** | Keep `"isolatedModules": true` in `src/mobile/tsconfig.json`, not as an inline `ts-jest` transform option. The ts-jest warning is non-actionable noise there, while the TypeScript config preserves the intended transpile behavior. |
 
 ---
 
@@ -3220,7 +3228,7 @@ START: User reports an issue
 > **Full reference**: `docs/mobile/mobile_approach.md`  
 > **Current status**: Active — Android (Play Store internal testing) + iOS (EAS profile added, Apple Sign-In wired — MOBILE-NFR-1 #868).  
 > **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.  
-> **Last updated**: 2026-03-07
+> **Last updated**: 2026-03-11
 
 ---
 
@@ -3251,6 +3259,8 @@ Mobile work is tracked in `docs/mobile/iterations/`.
 | `docs/mobile/iterations/MOBILE-NFR-1-nfr-hardening.md` | Both iterations merged — Sentry active, React Query retry + interceptor retry, sign-up throttle, OTP cooldown, iOS EAS profile, Apple Sign-In (PR #868 — 2026-03-06) | `@sentry/react-native` real import; DSN injected per-environment (env-gated). React Query hooks have `retryDelay` exponential back-off. `cpApiClient.ts` response interceptor retries 429/5xx up to 3 times. Sign-Up submit throttle (2s cooldown) + 60s OTP resend timer added. iOS EAS build profile added to `eas.json`; `expo-apple-authentication` added and Apple Sign-In button wired. |
 
 > **Testing rule (mobile)**: All tests are executed in Docker/Codespace (no local venv/virtualenv assumption for backend parity). Mobile unit tests run via `cd src/mobile && npm test` in the devcontainer environment.
+>
+> **Release-readiness test lane (2026-03-11)**: Fast mobile smoke = `cd src/mobile && npm run typecheck && npm test -- --runTestsByPath src/screens/agents/__tests__/MyAgentsScreen.test.tsx __tests__/NotificationsScreen.test.tsx --maxWorkers=2`. Full coverage was revalidated green at 38 suites / 497 tests after moving `isolatedModules` into `tsconfig.json` and filtering only known non-signal logs in `jest.setup.js`.
 
 ---
 
