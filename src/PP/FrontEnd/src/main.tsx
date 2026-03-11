@@ -2,8 +2,21 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+function loadRuntimeConfig(): Promise<void> {
+  return new Promise((resolve) => {
+    const script = document.createElement('script')
+    script.src = '/pp-runtime-config.js'
+    script.async = false
+    script.onload = () => resolve()
+    script.onerror = () => resolve()
+    document.head.appendChild(script)
+  })
+}
+
+void loadRuntimeConfig().finally(() => {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  )
+})
