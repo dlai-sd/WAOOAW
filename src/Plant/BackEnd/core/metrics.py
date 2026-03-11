@@ -113,6 +113,20 @@ goals_executed_total = Counter(
     registry=registry
 )
 
+dma_lifecycle_events_total = Counter(
+    'dma_lifecycle_events_total',
+    'Digital Marketing Agent lifecycle events',
+    ['stage', 'outcome'],
+    registry=registry
+)
+
+dma_publish_outcomes_total = Counter(
+    'dma_publish_outcomes_total',
+    'Digital Marketing Agent publish outcomes by destination',
+    ['destination', 'outcome'],
+    registry=registry
+)
+
 customer_signups_total = Counter(
     'customer_signups_total',
     'Total number of customer signups',
@@ -202,6 +216,16 @@ def update_business_metrics(
         agents_available_total.labels(status='working').set(working_agents)
     if offline_agents is not None:
         agents_available_total.labels(status='offline').set(offline_agents)
+
+
+def record_dma_lifecycle_event(stage: str, outcome: str) -> None:
+    """Record a lifecycle event for the Digital Marketing Agent runtime."""
+    dma_lifecycle_events_total.labels(stage=stage, outcome=outcome).inc()
+
+
+def record_dma_publish_outcome(destination: str, outcome: str) -> None:
+    """Record publish outcome counters for destination-level DMA diagnostics."""
+    dma_publish_outcomes_total.labels(destination=destination, outcome=outcome).inc()
 
 
 # ========== METRICS ENDPOINT ==========
