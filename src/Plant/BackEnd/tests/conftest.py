@@ -7,7 +7,9 @@ They should not depend on a developer's local Postgres.
 """
 
 import os
+import sys
 import importlib
+from copy import deepcopy
 from pathlib import Path
 from typing import AsyncGenerator
 import logging
@@ -28,6 +30,7 @@ from models.job_role import JobRole
 from models.team import Team
 from models.agent import Agent
 from models.industry import Industry
+from services.draft_batches import DraftBatchRecord, DraftPostRecord, _UNSET
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +44,13 @@ def _default_persistence_mode_for_tests(monkeypatch: pytest.MonkeyPatch) -> None
 
     if "PERSISTENCE_MODE" not in os.environ:
         monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+
+    if "CAMPAIGN_PERSISTENCE_MODE" not in os.environ:
+        monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    campaigns_module = sys.modules.get("api.v1.campaigns")
+    if campaigns_module is not None:
+        monkeypatch.setattr(campaigns_module, "CAMPAIGN_PERSISTENCE_MODE", "memory", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -102,6 +112,144 @@ def db_test_client(monkeypatch, test_db_url, migrated_db):
 
     with TestClient(main_module.app) as client:
         yield client
+
+
+class _DummyAsyncSession:
+    async def commit(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+
+class _InMemoryDraftBatchStore:
+    def __init__(self) -> None:
+        self._batches: dict[str, DraftBatchRecord] = {}
+
+    async def save_batch(self, batch: DraftBatchRecord) -> None:
+        self._batches[batch.batch_id] = self._copy_batch(batch)
+
+    async def find_post(self, post_id: str) -> tuple[DraftBatchRecord, DraftPostRecord] | None:
+        for batch in self._batches.values():
+            for post in batch.posts:
+                if post.post_id == post_id:
+                    return self._copy_batch(batch), deepcopy(post)
+        return None
+
+    async def get_batch(self, batch_id: str) -> DraftBatchRecord | None:
+        batch = self._batches.get(batch_id)
+        return self._copy_batch(batch) if batch is not None else None
+
+    async def load_batches(self) -> list[DraftBatchRecord]:
+        return [self._copy_batch(batch) for batch in self._batches.values()]
+
+    async def update_post(
+        self,
+        post_id: str,
+        *,
+        review_status: str | object = _UNSET,
+        approval_id: str | None | object = _UNSET,
+        credential_ref: str | None | object = _UNSET,
+        execution_status: str | object = _UNSET,
+        visibility: str | object = _UNSET,
+        public_release_requested: bool | object = _UNSET,
+        scheduled_at: datetime | None | object = _UNSET,
+        attempts: int | object = _UNSET,
+        last_error: str | None | object = _UNSET,
+        provider_post_id: str | None | object = _UNSET,
+        provider_post_url: str | None | object = _UNSET,
+    ) -> bool:
+        for batch in self._batches.values():
+            for post in batch.posts:
+                if post.post_id != post_id:
+                    continue
+
+                if review_status is not _UNSET:
+                    post.review_status = review_status
+                if approval_id is not _UNSET:
+                    post.approval_id = approval_id
+                if credential_ref is not _UNSET:
+                    post.credential_ref = credential_ref
+                if execution_status is not _UNSET:
+                    post.execution_status = execution_status
+                if visibility is not _UNSET:
+                    post.visibility = visibility
+                if public_release_requested is not _UNSET:
+                    post.public_release_requested = public_release_requested
+                if scheduled_at is not _UNSET:
+                    post.scheduled_at = scheduled_at
+                if attempts is not _UNSET:
+                    post.attempts = attempts
+                if last_error is not _UNSET:
+                    post.last_error = last_error
+                if provider_post_id is not _UNSET:
+                    post.provider_post_id = provider_post_id
+                if provider_post_url is not _UNSET:
+                    post.provider_post_url = provider_post_url
+
+                self._sync_batch_status(batch)
+                return True
+
+        return False
+
+    @staticmethod
+    def _copy_batch(batch: DraftBatchRecord) -> DraftBatchRecord:
+        return DraftBatchRecord.model_validate(batch.model_dump(mode="python"))
+
+    @staticmethod
+    def _sync_batch_status(batch: DraftBatchRecord) -> None:
+        statuses = [post.review_status for post in batch.posts]
+        if statuses and all(status == "approved" for status in statuses):
+            batch.status = "approved"
+        elif any(status == "changes_requested" for status in statuses):
+            batch.status = "changes_requested"
+        elif any(status == "rejected" for status in statuses):
+            batch.status = "rejected"
+        else:
+            batch.status = "pending_review"
+
+
+@pytest.fixture
+def in_memory_marketing_draft_store(monkeypatch: pytest.MonkeyPatch):
+    from main import app
+    import api.v1.marketing_drafts as marketing_drafts_module
+    import services.marketing_scheduler as marketing_scheduler_module
+    from core.database import get_db_session, get_read_db_session
+
+    store = _InMemoryDraftBatchStore()
+
+    class FakeDraftBatchStore:
+        def __init__(self, _session) -> None:
+            self._store = store
+
+        async def save_batch(self, batch: DraftBatchRecord) -> None:
+            await self._store.save_batch(batch)
+
+        async def find_post(self, post_id: str) -> tuple[DraftBatchRecord, DraftPostRecord] | None:
+            return await self._store.find_post(post_id)
+
+        async def get_batch(self, batch_id: str) -> DraftBatchRecord | None:
+            return await self._store.get_batch(batch_id)
+
+        async def load_batches(self) -> list[DraftBatchRecord]:
+            return await self._store.load_batches()
+
+        async def update_post(self, post_id: str, **kwargs):
+            return await self._store.update_post(post_id, **kwargs)
+
+    async def _fake_db_session():
+        yield _DummyAsyncSession()
+
+    monkeypatch.setattr(marketing_drafts_module, "DatabaseDraftBatchStore", FakeDraftBatchStore)
+    monkeypatch.setattr(marketing_scheduler_module, "DatabaseDraftBatchStore", FakeDraftBatchStore)
+    app.dependency_overrides[get_db_session] = _fake_db_session
+    app.dependency_overrides[get_read_db_session] = _fake_db_session
+
+    try:
+        yield store
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
+        app.dependency_overrides.pop(get_read_db_session, None)
 
 
 # ========== SESSION & EVENT LOOP ==========

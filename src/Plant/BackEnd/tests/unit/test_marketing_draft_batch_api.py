@@ -1,4 +1,4 @@
-def test_create_draft_batch_persists_posts_and_returns_ids(db_test_client):
+def test_create_draft_batch_persists_posts_and_returns_ids(test_client, in_memory_marketing_draft_store):
     payload = {
         "agent_id": "AGT-MKT-HEALTH-001",
         "hired_instance_id": "HIRED-001",
@@ -14,7 +14,7 @@ def test_create_draft_batch_persists_posts_and_returns_ids(db_test_client):
         "language": "English",
     }
 
-    resp = db_test_client.post("/api/v1/marketing/draft-batches", json=payload)
+    resp = test_client.post("/api/v1/marketing/draft-batches", json=payload)
     assert resp.status_code == 200
     data = resp.json()
 
@@ -35,13 +35,13 @@ def test_create_draft_batch_persists_posts_and_returns_ids(db_test_client):
     assert all(p["review_status"] == "pending_review" for p in posts)
     assert all(p["execution_status"] == "not_scheduled" for p in posts)
 
-    listed = db_test_client.get("/api/v1/marketing/draft-batches", params={"customer_id": payload["customer_id"]})
+    listed = test_client.get("/api/v1/marketing/draft-batches", params={"customer_id": payload["customer_id"]})
     assert listed.status_code == 200
     assert len(listed.json()) == 1
 
 
-def test_execute_draft_post_requires_approval_id(db_test_client):
-    create = db_test_client.post(
+def test_execute_draft_post_requires_approval_id(test_client, in_memory_marketing_draft_store):
+    create = test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -53,7 +53,7 @@ def test_execute_draft_post_requires_approval_id(db_test_client):
     assert create.status_code == 200
     post_id = create.json()["posts"][0]["post_id"]
 
-    denied = db_test_client.post(
+    denied = test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/execute",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -66,7 +66,7 @@ def test_execute_draft_post_requires_approval_id(db_test_client):
     assert denied_body["reason"] == "approval_required"
     assert denied_body["correlation_id"]
 
-    allowed = db_test_client.post(
+    allowed = test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/execute",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",

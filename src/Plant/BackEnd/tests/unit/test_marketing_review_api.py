@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 
-def test_list_and_approve_draft_post(db_test_client):
-    created = db_test_client.post(
+def test_list_and_approve_draft_post(test_client, in_memory_marketing_draft_store):
+    created = test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -16,27 +16,27 @@ def test_list_and_approve_draft_post(db_test_client):
     assert batch["batch_id"]
     assert batch["posts"]
 
-    listed = db_test_client.get("/api/v1/marketing/draft-batches", params={"customer_id": "CUST-001"})
+    listed = test_client.get("/api/v1/marketing/draft-batches", params={"customer_id": "CUST-001"})
     assert listed.status_code == 200
     batches = listed.json()
     assert len(batches) == 1
     post_id = batches[0]["posts"][0]["post_id"]
 
-    approved = db_test_client.post(f"/api/v1/marketing/draft-posts/{post_id}/approve", json={})
+    approved = test_client.post(f"/api/v1/marketing/draft-posts/{post_id}/approve", json={})
     assert approved.status_code == 200
     body = approved.json()
     assert body["post_id"] == post_id
     assert body["review_status"] == "approved"
     assert body["approval_id"].startswith("APR-")
 
-    reread = db_test_client.get(f"/api/v1/marketing/draft-batches/{batch['batch_id']}")
+    reread = test_client.get(f"/api/v1/marketing/draft-batches/{batch['batch_id']}")
     assert reread.status_code == 200
     reread_body = reread.json()
     match = [p for p in reread_body["posts"] if p["post_id"] == post_id][0]
     assert match["review_status"] == "approved"
     assert match["approval_id"] == body["approval_id"]
 
-    scheduled = db_test_client.post(
+    scheduled = test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/schedule",
         json={
             "scheduled_at": "2026-02-06T00:00:00+00:00",
@@ -47,7 +47,7 @@ def test_list_and_approve_draft_post(db_test_client):
     assert scheduled_body["post_id"] == post_id
     assert scheduled_body["execution_status"] == "scheduled"
 
-    reread2 = db_test_client.get(f"/api/v1/marketing/draft-batches/{batch['batch_id']}")
+    reread2 = test_client.get(f"/api/v1/marketing/draft-batches/{batch['batch_id']}")
     assert reread2.status_code == 200
     reread2_body = reread2.json()
     match2 = [p for p in reread2_body["posts"] if p["post_id"] == post_id][0]
@@ -55,8 +55,8 @@ def test_list_and_approve_draft_post(db_test_client):
     assert match2["scheduled_at"]
 
 
-def test_reject_draft_post_resets_review_state(db_test_client):
-    created = db_test_client.post(
+def test_reject_draft_post_resets_review_state(test_client, in_memory_marketing_draft_store):
+    created = test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -69,24 +69,24 @@ def test_reject_draft_post_resets_review_state(db_test_client):
     batch = created.json()
     post_id = batch["posts"][0]["post_id"]
 
-    approved = db_test_client.post(
+    approved = test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/approve",
         json={"approval_id": "APR-123"},
     )
     assert approved.status_code == 200
 
-    scheduled = db_test_client.post(
+    scheduled = test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/schedule",
         json={"scheduled_at": "2026-02-06T00:00:00+00:00", "approval_id": "APR-123"},
     )
     assert scheduled.status_code == 200
 
-    rejected = db_test_client.post(f"/api/v1/marketing/draft-posts/{post_id}/reject")
+    rejected = test_client.post(f"/api/v1/marketing/draft-posts/{post_id}/reject")
     assert rejected.status_code == 200
     rejected_body = rejected.json()
     assert rejected_body == {"post_id": post_id, "review_status": "rejected"}
 
-    reread = db_test_client.get(f"/api/v1/marketing/draft-batches/{batch['batch_id']}")
+    reread = test_client.get(f"/api/v1/marketing/draft-batches/{batch['batch_id']}")
     assert reread.status_code == 200
     reread_body = reread.json()
     match = [p for p in reread_body["posts"] if p["post_id"] == post_id][0]
