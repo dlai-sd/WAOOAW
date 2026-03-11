@@ -63,7 +63,10 @@ vi.mock('../services/gatewayApiClient', () => {
 
 test('ReviewQueue loads enriched approvals and can approve or deny a selected item', async () => {
   render(
-    <MemoryRouter initialEntries={['/review-queue']}>
+    <MemoryRouter
+      initialEntries={['/review-queue']}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/review-queue" element={<ReviewQueue />} />
       </Routes>
@@ -134,7 +137,10 @@ test('ReviewQueue preserves operator context for the next PP surface', async () 
   const user = userEvent.setup()
 
   render(
-    <MemoryRouter initialEntries={['/review-queue?customer_id=CUST-001&agent_id=AGT-MKT-HEALTH-001&correlation_id=corr-1']}>
+    <MemoryRouter
+      initialEntries={['/review-queue?customer_id=CUST-001&agent_id=AGT-MKT-HEALTH-001&correlation_id=corr-1']}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/review-queue" element={<ReviewQueue />} />
         <Route path="/hired-agents" element={<LocationEcho />} />

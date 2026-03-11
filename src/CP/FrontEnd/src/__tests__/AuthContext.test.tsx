@@ -15,6 +15,7 @@ describe('AuthContext', () => {
           access_token: 'mock-access-token',
           user: { id: '1', email: 'test@example.com', name: 'Test User' }
         }),
+        silentRefresh: vi.fn().mockResolvedValue(null),
         getCurrentUser: vi.fn().mockResolvedValue({
           id: '1',
           email: 'test@example.com',

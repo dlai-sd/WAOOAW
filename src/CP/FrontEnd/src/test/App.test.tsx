@@ -83,12 +83,28 @@ describe('App Component', () => {
 
   it('redirects to sign-in when Browse Agents is clicked while unauthenticated', async () => {
     renderWithProvider(<App />)
-    fireEvent.click(screen.getByRole('button', { name: 'Browse Agents' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Browse Agents' }))
     expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/signin')
+    expect(decodeURIComponent(window.location.search)).toContain('next=/discover')
+  })
+
+  it('redirects to sign-in with preserved intent when Start Free Trial is clicked while unauthenticated', async () => {
+    renderWithProvider(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Start Free Trial' }))
+    expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/signin')
+    expect(decodeURIComponent(window.location.search)).toContain('next=/discover')
   })
 
   it('redirects to sign-in when visiting /discover unauthenticated', async () => {
     window.history.pushState({}, '', '/discover')
+    renderWithProvider(<App />)
+    expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
+  })
+
+  it('redirects to sign-in when visiting /my-agents unauthenticated', async () => {
+    window.history.pushState({}, '', '/my-agents')
     renderWithProvider(<App />)
     expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
   })

@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let authService: (typeof import('../services/auth.service'))['authService']
+const SESSION_HINT_STORAGE_KEY = 'waooaw:session-restorable'
 
 describe('auth.service', () => {
   beforeEach(async () => {
     localStorage.clear();
+    sessionStorage.clear();
     vi.resetModules();
+    vi.restoreAllMocks();
     ;({ authService } = await import('../services/auth.service'));
   });
 
@@ -23,44 +26,27 @@ describe('auth.service', () => {
     expect(decoded).toBeTruthy();
   });
 
-  it('fails closed when JWT is expired (clears cp_access_token)', async () => {
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' })).replace(/=+$/g, '')
-    const payload = btoa(
-      JSON.stringify({ user_id: '1', email: 'test@example.com', token_type: 'access', exp: nowSeconds - 10, iat: nowSeconds - 100 })
-    )
-      .replace(/=+$/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-    const token = `${header}.${payload}.sig`
-
-    localStorage.setItem('cp_access_token', token)
+  it('clears legacy stored tokens on startup', async () => {
+    localStorage.setItem('cp_access_token', 'legacy-access')
+    localStorage.setItem('access_token', 'legacy-access-2')
+    localStorage.setItem('refresh_token', 'legacy-refresh')
+    localStorage.setItem('token_expires_at', '999999999')
 
     vi.resetModules()
     ;({ authService } = await import('../services/auth.service'))
 
     expect(authService.isAuthenticated()).toBe(false)
     expect(localStorage.getItem('cp_access_token')).toBeNull()
+    expect(localStorage.getItem('access_token')).toBeNull()
+    expect(localStorage.getItem('refresh_token')).toBeNull()
+    expect(localStorage.getItem('token_expires_at')).toBeNull()
   })
 
-  it('migrates legacy access_token to cp_access_token on startup', async () => {
-    const nowSeconds = Math.floor(Date.now() / 1000)
-    const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' })).replace(/=+$/g, '')
-    const payload = btoa(
-      JSON.stringify({ user_id: '1', email: 'test@example.com', token_type: 'access', exp: nowSeconds + 3600, iat: nowSeconds - 10 })
-    )
-      .replace(/=+$/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-    const legacyToken = `${header}.${payload}.sig`
+  it('skips silent refresh when no session hint exists', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
 
-    localStorage.setItem('access_token', legacyToken)
-
-    vi.resetModules()
-    ;({ authService } = await import('../services/auth.service'))
-
-    expect(localStorage.getItem('cp_access_token')).toBe(legacyToken)
-    expect(localStorage.getItem('access_token')).toBeNull()
+    await expect(authService.silentRefresh()).resolves.toBeNull()
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   it('returns null for invalid token', () => {
@@ -77,7 +63,8 @@ describe('auth.service', () => {
 
     const tokens = authService.handleOAuthCallback();
     expect(tokens).toBeTruthy();
-    expect(localStorage.getItem('cp_access_token')).toBe('token123');
+    expect(authService.getAccessToken()).toBe('token123');
+    expect(localStorage.getItem(SESSION_HINT_STORAGE_KEY)).toBe('1');
   });
 
   it('returns null when no tokens in URL', () => {
@@ -91,13 +78,13 @@ describe('auth.service', () => {
   });
 
   it('saves tokens to localStorage', () => {
-    authService.handleOAuthCallback = vi.fn().mockReturnValue({
+    authService.setTokens({
       access_token: 'test_token',
-      expires_in: 3600
+      expires_in: 3600,
+      token_type: 'bearer'
     });
 
-    const tokens = authService.handleOAuthCallback();
-    expect(tokens).toBeTruthy();
-    expect(tokens!.access_token).toBe('test_token');
+    expect(authService.getAccessToken()).toBe('test_token');
+    expect(localStorage.getItem(SESSION_HINT_STORAGE_KEY)).toBe('1');
   });
 });
