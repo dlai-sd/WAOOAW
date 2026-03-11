@@ -56,7 +56,7 @@ vi.mock('../pages/authenticated/MyAgents', () => ({
   default: () => <div data-testid="page-my-agents">My Agents Page</div>,
 }))
 vi.mock('../pages/authenticated/GoalsSetup', () => ({
-  default: () => <div data-testid="page-goals">Goals Page</div>,
+  default: () => <div data-testid="page-goals">Theme Discovery Goals Page</div>,
 }))
 vi.mock('../pages/authenticated/Deliverables', () => ({
   default: () => <div data-testid="page-deliverables">Deliverables Page</div>,
@@ -154,6 +154,13 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     await renderPortal()
     fireEvent.click(screen.getByText('Deliverables'))
     expect(screen.getByTestId('page-deliverables')).toBeTruthy()
+  })
+
+  it('switches to Goals page when sidebar item clicked', async () => {
+    await renderPortal()
+    fireEvent.click(screen.getByText('Goals'))
+    expect(screen.getByTestId('page-goals')).toBeTruthy()
+    expect(screen.getByText('Theme Discovery Goals Page')).toBeTruthy()
   })
 
   it('switches to Inbox page when sidebar item clicked', async () => {

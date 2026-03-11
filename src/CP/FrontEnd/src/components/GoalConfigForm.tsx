@@ -47,6 +47,7 @@ interface ObjectFieldInputProps {
 
 function ObjectFieldInput({ field, value, readOnly, onChange }: ObjectFieldInputProps) {
   const [localText, setLocalText] = useState(safeJsonStringify(value ?? {}))
+  const inputId = `goal-field-${field.key}`
 
   useEffect(() => {
     setLocalText(safeJsonStringify(value ?? {}))
@@ -56,8 +57,9 @@ function ObjectFieldInput({ field, value, readOnly, onChange }: ObjectFieldInput
 
   return (
     <div className="form-group">
-      <label>{label}</label>
+      <label htmlFor={inputId}>{label}</label>
       <Textarea
+        id={inputId}
         value={localText}
         disabled={readOnly}
         onChange={(_, data) => {
@@ -91,6 +93,7 @@ export interface GoalFieldRendererProps {
 
 export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFieldRendererProps) {
   const label = field.required ? `${field.label} *` : field.label
+  const inputId = `goal-field-${field.key}`
 
   if (field.type === 'boolean') {
     return (
@@ -111,8 +114,9 @@ export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFiel
   if (field.type === 'enum' && Array.isArray(field.options) && field.options.length > 0) {
     return (
       <div className="form-group">
-        <label>{label}</label>
+        <label htmlFor={inputId}>{label}</label>
         <Select
+          id={inputId}
           value={String(value ?? '')}
           disabled={readOnly}
           onChange={(_, data) => onChange(field.key, data.value)}
@@ -136,8 +140,9 @@ export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFiel
     const text = listValue.map((x) => String(x ?? '')).join('\n')
     return (
       <div className="form-group">
-        <label>{label}</label>
+        <label htmlFor={inputId}>{label}</label>
         <Textarea
+          id={inputId}
           value={text}
           disabled={readOnly}
           placeholder="One per line"
@@ -164,8 +169,9 @@ export function GoalFieldRenderer({ field, value, readOnly, onChange }: GoalFiel
   // Default: text or number
   return (
     <div className="form-group">
-      <label>{label}</label>
+      <label htmlFor={inputId}>{label}</label>
       <Input
+        id={inputId}
         type={field.type === 'number' ? 'number' : 'text'}
         value={String(value ?? '')}
         disabled={readOnly}

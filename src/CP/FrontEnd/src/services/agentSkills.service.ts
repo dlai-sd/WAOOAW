@@ -36,6 +36,30 @@ export interface AgentSkill {
   goal_config?: Record<string, unknown>
 }
 
+export const DIGITAL_MARKETING_AGENT_ID = 'AGT-MKT-DMA-001'
+
+export function isDigitalMarketingAgent(
+  agentId?: string | null,
+  agentTypeId?: string | null
+): boolean {
+  return (
+    String(agentId || '').trim().toUpperCase() === DIGITAL_MARKETING_AGENT_ID ||
+    String(agentTypeId || '').trim() === 'marketing.digital_marketing.v1'
+  )
+}
+
+export function getThemeDiscoverySkill(skills: AgentSkill[]): AgentSkill | null {
+  const match = skills.find((skill) => {
+    const candidates = [skill.display_name, skill.name]
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean)
+
+    return candidates.some((value) => value === 'theme discovery' || value === 'theme_discovery')
+  })
+
+  return match || null
+}
+
 /**
  * Fetch all skills assigned to a hired agent.
  * Calls: GET /api/cp/hired-agents/{hired_instance_id}/skills

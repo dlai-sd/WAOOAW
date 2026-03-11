@@ -14,6 +14,13 @@ import { upsertPlatformCredential } from '../../services/platformCredentials.ser
 import { upsertExchangeSetup } from '../../services/exchangeSetup.service'
 import { deleteHiredAgentGoal, listHiredAgentGoals, upsertHiredAgentGoal, type GoalInstance } from '../../services/hiredAgentGoals.service'
 import { listHiredAgentDeliverables, reviewHiredAgentDeliverable, type Deliverable } from '../../services/hiredAgentDeliverables.service'
+import {
+  getThemeDiscoverySkill,
+  isDigitalMarketingAgent,
+  listHiredAgentSkills,
+  type GoalSchemaField,
+} from '../../services/agentSkills.service'
+import { DigitalMarketingBriefSummaryCard } from '../../components/DigitalMarketingBriefSummaryCard'
 import { SkillsPanel } from '../../components/SkillsPanel'
 import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
@@ -110,6 +117,69 @@ function renderFrequencyLabel(freq: string): string {
   if (!key) return '—'
   if (key === 'on_demand') return 'On demand'
   return key[0].toUpperCase() + key.slice(1)
+}
+
+function DigitalMarketingBriefPreview(props: { hiredInstanceId: string }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [fields, setFields] = useState<GoalSchemaField[]>([])
+  const [values, setValues] = useState<Record<string, unknown>>({})
+
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      const hiredInstanceId = String(props.hiredInstanceId || '').trim()
+      if (!hiredInstanceId) {
+        setFields([])
+        setValues({})
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+      try {
+        const skills = await listHiredAgentSkills(hiredInstanceId)
+        if (cancelled) return
+
+        const themeDiscoverySkill = getThemeDiscoverySkill(skills)
+        setFields(themeDiscoverySkill?.goal_schema?.fields || [])
+        setValues(themeDiscoverySkill?.goal_config || {})
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || 'Failed to load Theme Discovery brief')
+          setFields([])
+          setValues({})
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [props.hiredInstanceId])
+
+  if (loading) {
+    return <LoadingIndicator message="Loading saved Theme Discovery brief..." size="small" />
+  }
+
+  if (error) {
+    return <FeedbackMessage intent="error" title="Theme Discovery unavailable" message={error} />
+  }
+
+  return (
+    <DigitalMarketingBriefSummaryCard
+      title="Saved Theme Discovery brief"
+      subtitle="This structured brief is the current context driving content generation for this hire."
+      fields={fields}
+      values={values}
+      emptyMessage="No brief has been saved yet. Use the Goals page to complete Theme Discovery before asking for drafts."
+      compact
+    />
+  )
 }
 
 function JsonObjectTextarea(props: {
@@ -1907,6 +1977,12 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                     <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
                       Create and manage goals for this agent. Drafts require approval before any external action.
                     </div>
+
+                    {selectedInstance.hired_instance_id && isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <DigitalMarketingBriefPreview hiredInstanceId={String(selectedInstance.hired_instance_id)} />
+                      </div>
+                    )}
 
                     <GoalSettingPanel instance={selectedInstance} readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention} />
                   </>

@@ -462,7 +462,7 @@ cd src/CP/BackEnd && pytest tests -k "campaigns or marketing_review or platform_
 
 | Story | Title | Surface | Status | Dependency |
 |---|---|---|---|---|
-| I2-S1 | Build the CP Theme Discovery conversation and brief summary workflow | CP FrontEnd | Planned | Iteration 1 |
+| I2-S1 | Build the CP Theme Discovery conversation and brief summary workflow | CP FrontEnd | Completed | Iteration 1 |
 | I2-S2 | Build the CP content review, approval, and YouTube readiness workflow | CP FrontEnd | Planned | I2-S1 |
 | I2-S3 | Bring Theme Discovery and brief review to mobile | mobile | Planned | Iteration 1 |
 | I2-S4 | Bring approval, publish readiness, and progress state to mobile | mobile | Planned | I2-S3 |
