@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.5  
-**Date**: 2026-03-09  
+**Version**: 2.6  
+**Date**: 2026-03-10  
 **Purpose**: Single-source operating manual for handing WAOOAW work to AI agents, especially zero-cost and small-context agents, so they can navigate, understand, plan, and execute complex platform tasks with minimal drift.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
@@ -495,7 +495,7 @@ Use this table when deciding where a change belongs before you open any file.
 
 | Domain | Primary responsibility | Edit here first | Route/API entrypoint | Test home |
 |---|---|---|---|---|
-| CP FrontEnd | Customer-facing web UX and request shaping | `src/CP/FrontEnd/src/pages/`, `src/CP/FrontEnd/src/services/` | Browser calls `/api/cp/...` or Gateway-backed endpoints | `src/CP/FrontEnd/src/__tests__/`, Playwright in `tests/` |
+| CP FrontEnd | Customer-facing web UX and request shaping | `src/CP/FrontEnd/src/pages/`, `src/CP/FrontEnd/src/services/` | Browser calls `/api/cp/...` or Gateway-backed endpoints | `src/CP/FrontEnd/src/__tests__/`, `src/CP/FrontEnd/e2e/` |
 | CP BackEnd | Thin proxy and customer-auth support flows | `src/CP/BackEnd/api/`, `src/CP/BackEnd/services/plant_gateway_client.py` | `/api/cp/...` | `src/CP/BackEnd/tests/` |
 | PP FrontEnd | Internal operator UX, governor/admin tools | `src/PP/FrontEnd/src/pages/`, `src/PP/FrontEnd/src/components/` | Browser calls `/pp/...` or PP proxy routes | `src/PP/FrontEnd/src/` tests |
 | PP BackEnd | Operator thin proxy, admin workflows, observability hooks | `src/PP/BackEnd/api/`, `src/PP/BackEnd/clients/plant_client.py` | `/pp/...` | `src/PP/BackEnd/tests/` |
@@ -1343,8 +1343,8 @@ Steps:
 | **Property-based** | Plant Backend | `src/Plant/BackEnd/tests/property/` | pytest + Hypothesis | `plant-backend-test` | Invariant proofs: usage ledger, trial billing, hash chain |
 | **BDD** | Plant BackEnd, CP BackEnd | `src/Plant/BackEnd/tests/bdd/`, `src/CP/BackEnd/tests/bdd/` | pytest-bdd | `plant-backend-test`, `cp-backend-test` | Gherkin feature specs (trial lifecycle, hire wizard) |
 | **Contract (Pact)** | CP→Gateway, PP→Gateway, Mobile→Gateway | `src/CP/BackEnd/tests/pact/consumer/`, `src/Plant/Gateway/tests/pact/provider/` | pact-python | `cp-backend-test`, `plant-gateway-test` | Consumer/provider contract tests |
-| **Web E2E** | CP+PP+Plant stack | `tests/e2e/web/auth/`, `tests/e2e/web/hire/`, `tests/e2e/web/admin/` | Playwright | `playwright` | OTP auth, hire wizard, PP agent approval journeys |
-| **Mobile E2E** | Mobile | `tests/e2e/mobile/` | Maestro | `maestro` | OTP auth, hire agent, browse agents (YAML-driven) |
+| **Web E2E** | CP + PP frontends | `src/CP/FrontEnd/e2e/`, `src/PP/FrontEnd/e2e/` | Playwright | local frontend Playwright containers | CP hire journey and PP operator smoke |
+| **Mobile E2E** | Mobile | `tests/e2e/mobile/` | Maestro | device-backed opt-in lane | OTP auth, hire flow, and checkpointed notification runtime re-entry YAML |
 | **Performance** | Plant Gateway | `tests/performance/` | Locust | `locust` | p95 < 500 ms @ 50 rps, trial concurrency |
 | **Security SAST** | All Python | via `scripts/security-scan.sh` | Bandit + Safety + Semgrep | Any | High-severity findings block CI |
 
@@ -1358,8 +1358,8 @@ Steps:
 | `docker-compose.local.yml` → `cp-frontend-test` | CP frontend test container (Vitest) |
 | `docker-compose.local.yml` → `pp-frontend-test` | PP frontend test container (Vitest) |
 | `docker-compose.test.yml` | **Dedicated regression test stack** — includes plant-backend-test, cp-backend-test, pp-backend-test, playwright, maestro, locust, zap services |
-| `scripts/test-web.sh` | Convenience wrapper — runs full or `--quick` web regression via docker-compose.test.yml |
-| `scripts/test-mobile.sh` | Convenience wrapper — runs mobile regression (Jest + Maestro) |
+| `scripts/test-web.sh` | Convenience wrapper — runs backend regression plus the CP/PP Playwright journey specs in Docker |
+| `scripts/test-mobile.sh` | Convenience wrapper — runs mobile Jest/accessibility by default; native Maestro remains opt-in via `RUN_MOBILE_NATIVE_E2E=1` |
 | `.github/workflows/waooaw-regression.yml` | Manual `workflow_dispatch` regression — 9 stages, `scope=full\|quick` |
 | `.github/workflows/mobile-regression.yml` | Manual `workflow_dispatch` mobile regression — 6 stages |
 
@@ -1390,10 +1390,11 @@ docker compose -f docker-compose.test.yml run --rm cp-backend-test pytest src/CP
 docker compose -f docker-compose.test.yml run --rm plant-gateway-test pytest src/Plant/Gateway/tests/pact/provider/
 
 # --- Web E2E (Playwright) ---
-docker compose -f docker-compose.test.yml run playwright npx playwright test
+docker run --rm -v "$PWD/src/CP/FrontEnd":/work -w /work mcr.microsoft.com/playwright:v1.57.0-noble sh -lc "npm install --silent && npx playwright test e2e/hire-journey.spec.ts --project=chromium"
+docker run --rm -v "$PWD/src/PP/FrontEnd":/work -w /work mcr.microsoft.com/playwright:v1.58.0-noble sh -lc "npm install --silent && npx playwright test e2e/operator-smoke.spec.ts --project=chromium"
 
-# --- Mobile E2E (Maestro) ---
-docker compose -f docker-compose.test.yml run maestro maestro test tests/e2e/mobile/auth_otp.yaml
+# --- Mobile E2E (Maestro, opt-in only when a real device/emulator target exists) ---
+RUN_MOBILE_NATIVE_E2E=1 bash scripts/test-mobile.sh
 
 # --- Performance (Locust) ---
 docker compose -f docker-compose.test.yml run locust --headless -u 50 -r 5 --run-time 60s
@@ -1487,7 +1488,19 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
-### Current branch: `main` (PP-MOULD-1 construct diagnostic toolkit + MOULD-GAP-1 docs merged — 2026-03-07)
+### Current branch: `feat/ui-ux-revamp` (PR #917 merged to `main`; release-readiness follow-ups committed on branch — 2026-03-11)
+
+### Ready to PR — 2026-03-11
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **branch-only** | `feat/ui-ux-revamp` | **Release-readiness closeout after PR #917** — CP and PP Vite chunking now splits Fluent/Griffel/router/auth vendor families with a deliberate `chunkSizeWarningLimit`; PP runtime config loads from `src/main.tsx` instead of `index.html`; mobile Jest noise was reduced without hiding failures; targeted CP, PP, and mobile smoke lanes were rerun green before docs closeout. | `src/CP/FrontEnd/vite.config.ts`, `src/PP/FrontEnd/vite.config.ts`, `src/PP/FrontEnd/src/main.tsx`, `src/mobile/jest.config.js`, `src/mobile/tsconfig.json`, `src/mobile/jest.setup.js`, `src/PP/FrontEnd/src/pages/ReviewQueue.test.tsx`, `docs/MVP1_Mar_10_2026.md` |
+
+### Recently merged — 2026-03-10
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#917** | `feat/ui-ux-revamp` | **Cross-frontend UX revamp + regression coverage** — Iteration 1 repaired CP, PP, and mobile journey continuity; Iteration 2 removed misleading runtime defaults across CP, PP, and mobile; Iteration 3 completed the PP operator loop and surfaced outcomes in CP/mobile; Iteration 4 added Docker-validated CP and PP Playwright journeys, checkpointed mobile runtime re-entry selectors/flow, and wired the real browser journeys into shared regression scripts and CI. | `src/CP/FrontEnd/e2e/hire-journey.spec.ts`, `src/PP/FrontEnd/e2e/operator-smoke.spec.ts`, `scripts/test-web.sh`, `scripts/test-mobile.sh`, `.github/workflows/waooaw-regression.yml`, `.github/workflows/mobile-regression.yml`, `docs/MVP1_Mar_10_2026.md` |
 
 ### Recently merged — 2026-03-07
 
@@ -2272,6 +2285,8 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **Google Sign-In — Play App Signing SHA-1** | When distributing via Play Store (even internal testing), Google re-signs the AAB. The device presents Play App Signing SHA-1 to GCP OAuth, not the EAS keystore SHA-1. **FIXED (PR #755, 2026-02-24)**: Play App Signing SHA-1 `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` is now registered in: (1) `google-services.json` (type-1 Android OAuth client), (2) Firebase Console → waooaw-oauth → `com.waooaw.app` → SHA certificate fingerprints, (3) GCP Console → Credentials → Android OAuth client `270293855600-2shlgots…`. Access: Play Console → Your app → Setup → App integrity → App signing → App signing key certificate. |
 | **`eas build:view` has no `--non-interactive` flag** | The flag is invalid and causes a hard failure. CI uses `eas build:view "$BUILD_ID" --json` (no flag). EAS CLI emits spinner text before the JSON; always strip with `awk '/^[{\[]/{found=1} found{print}'` before piping to `jq`. |
 | **EAS `test-apk` profile** | Direct APK install that bypasses Play Store re-signing. Uses EAS keystore SHA-1 (`14f7ccef…`) which is already registered in GCP. Use this for testing Google Sign-In without Play Store. Download from Expo dashboard, install with "unknown sources" enabled. |
+| **PP runtime config must stay runtime-loaded** | `src/PP/FrontEnd/pp-runtime-config.js` is deployment-time config, not a bundled source module. Do not add it back to `index.html` as a static script include if Vite starts warning or trying to process it. Load it from `src/main.tsx` before rendering so runtime env injection stays external and build output stays clean. |
+| **Mobile Jest `isolatedModules` belongs in tsconfig** | Keep `"isolatedModules": true` in `src/mobile/tsconfig.json`, not as an inline `ts-jest` transform option. The ts-jest warning is non-actionable noise there, while the TypeScript config preserves the intended transpile behavior. |
 
 ---
 
@@ -3213,7 +3228,7 @@ START: User reports an issue
 > **Full reference**: `docs/mobile/mobile_approach.md`  
 > **Current status**: Active — Android (Play Store internal testing) + iOS (EAS profile added, Apple Sign-In wired — MOBILE-NFR-1 #868).  
 > **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.  
-> **Last updated**: 2026-03-07
+> **Last updated**: 2026-03-11
 
 ---
 
@@ -3244,6 +3259,8 @@ Mobile work is tracked in `docs/mobile/iterations/`.
 | `docs/mobile/iterations/MOBILE-NFR-1-nfr-hardening.md` | Both iterations merged — Sentry active, React Query retry + interceptor retry, sign-up throttle, OTP cooldown, iOS EAS profile, Apple Sign-In (PR #868 — 2026-03-06) | `@sentry/react-native` real import; DSN injected per-environment (env-gated). React Query hooks have `retryDelay` exponential back-off. `cpApiClient.ts` response interceptor retries 429/5xx up to 3 times. Sign-Up submit throttle (2s cooldown) + 60s OTP resend timer added. iOS EAS build profile added to `eas.json`; `expo-apple-authentication` added and Apple Sign-In button wired. |
 
 > **Testing rule (mobile)**: All tests are executed in Docker/Codespace (no local venv/virtualenv assumption for backend parity). Mobile unit tests run via `cd src/mobile && npm test` in the devcontainer environment.
+>
+> **Release-readiness test lane (2026-03-11)**: Fast mobile smoke = `cd src/mobile && npm run typecheck && npm test -- --runTestsByPath src/screens/agents/__tests__/MyAgentsScreen.test.tsx __tests__/NotificationsScreen.test.tsx --maxWorkers=2`. Full coverage was revalidated green at 38 suites / 497 tests after moving `isolatedModules` into `tsconfig.json` and filtering only known non-signal logs in `jest.setup.js`.
 
 ---
 
