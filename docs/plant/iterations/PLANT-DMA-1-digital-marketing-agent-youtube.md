@@ -71,9 +71,13 @@ The first sellable Digital Marketing Agent exposes three customer-visible skills
 
 `Theme Discovery` is not a plain text field. It is a guided conversation skill that produces a structured marketing brief. `Content Creation` consumes that brief and generates customer-reviewable deliverables. `Content Publishing` is a governed publish skill that remains hard-blocked until the customer approves the exact deliverable.
 
+The Theme Discovery output must also capture the campaign goal and success signal for the hired agent. For MVP planning, that means the brief includes at minimum: business objective, target audience, locality, profession/persona, offer, tone, YouTube intent, posting frequency, and a small set of customer-readable success metrics or expected outcomes.
+
 ### Approval invariant
 
 No external platform handshake, upload, schedule execution, or publish submit is allowed before customer approval of the exact deliverable. For this MVP, that invariant applies to YouTube first and must be enforced in Plant runtime state and scheduler logic, not only in CP/mobile UI.
+
+For YouTube specifically, the plan must distinguish `approved for upload` from `approved for public release`. MVP default should be fail-safe: if the workflow supports non-public YouTube visibility (`private` or `unlisted`), any later move to `public` is a second explicit customer action, never an automatic side effect.
 
 ### Channel scope
 
@@ -94,6 +98,8 @@ Common product components must be stateless and reusable across CP, PP, and mobi
 ### Runtime rule
 
 Plant remains the source of truth for hired-agent state, skill config, deliverables, approval state, scheduler eligibility, publish receipts, and observability. CP and mobile are customer operating surfaces. PP is the operator and governance surface.
+
+Mobile should follow the platform default: use Plant Gateway-backed routes directly unless a capability is genuinely CP-only. Do not route mobile through CP BackEnd by habit.
 
 ---
 
@@ -117,8 +123,9 @@ Plant remains the source of truth for hired-agent state, skill config, deliverab
 4. Keep CP BackEnd and PP BackEnd as thin proxies only.
 5. Plant owns publish eligibility, approval state, scheduler gating, and destination execution truth.
 6. All external publish flows must fail closed if approval is absent, expired, revoked, or the platform credential reference is missing.
-7. Every story ends with the exact validation command written in its card.
-8. **CHECKPOINT RULE**: After completing each epic (all tests passing), run:
+7. Mobile uses Plant Gateway-backed contracts by default; only use CP BackEnd if the capability is truly CP-only.
+8. Every story ends with the exact validation command written in its card.
+9. **CHECKPOINT RULE**: After completing each epic (all tests passing), run:
 
 ```bash
 git add -A && git commit -m "feat([plan-id]): [epic-id] — [epic title]" && git push
@@ -126,7 +133,7 @@ git add -A && git commit -m "feat([plan-id]): [epic-id] — [epic title]" && git
 
 Do this BEFORE starting the next epic. If interrupted, completed epics are already saved.
 
-9. **STUCK PROTOCOL**: if blocked for more than 20 minutes on one story, open a draft PR titled `WIP: PLANT-DMA-1 [story-id] — [blocker]`, post the blocker, and halt.
+10. **STUCK PROTOCOL**: if blocked for more than 20 minutes on one story, open a draft PR titled `WIP: PLANT-DMA-1 [story-id] — [blocker]`, post the blocker, and halt.
 
 ---
 
@@ -241,13 +248,14 @@ The platform can hire a first-class `Digital Marketing Agent` whose visible skil
 - `src/Plant/BackEnd/agent_mold/reference_agents.py`
 - `src/Plant/BackEnd/agent_mold/skills/content_models.py`
 - `src/Plant/BackEnd/api/v1/reference_agents.py`
-- `src/Plant/BackEnd/tests/unit/` marketing-agent runtime tests
+- `src/Plant/BackEnd/tests/unit/test_reference_agents_api.py`
+- `src/Plant/BackEnd/tests/unit/test_agent_spec_v2.py`
 
 **Implementation**
 
 - Add or evolve the reference agent definition so `Digital Marketing Agent` is a first-class mould entry instead of a generic content helper.
 - Model the three visible skills explicitly and ensure their runtime vocabulary matches the platform hierarchy: skill config, skill run, deliverable, approval, and publish outcome.
-- Extend the content models so the structured Theme Discovery brief includes business background, objective, industry, locality, target audience, profession/persona, tone, offer, and channel intent.
+- Extend the content models so the structured Theme Discovery brief includes business background, objective, industry, locality, target audience, profession/persona, tone, offer, channel intent, posting cadence, and customer-facing success metrics.
 - Keep the destination abstraction open-ended while marking YouTube as the only supported live destination in this MVP.
 
 **Code patterns to copy exactly**
@@ -289,14 +297,16 @@ Plant treats Theme Discovery, content draft generation, and approval staging as 
 
 - `src/Plant/BackEnd/api/v1/campaigns.py`
 - `src/Plant/BackEnd/models/campaign.py`
+- `src/Plant/BackEnd/repositories/campaign_repository.py`
 - `src/Plant/BackEnd/services/draft_batches.py`
-- `src/Plant/BackEnd/tests/unit/` campaign or marketing draft route tests
+- `src/Plant/BackEnd/tests/unit/test_campaign_repository.py`
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
 
 **Implementation**
 
 - Extend campaign runtime state so one hired instance can store a structured Theme Discovery brief, a generated brief summary, draft deliverables, and approval state.
 - Keep the existing campaign and draft flow where it helps, but converge on one truthful model for digital-marketing runtime instead of parallel temporary storage.
-- Add explicit state transitions for `brief_captured`, `draft_ready_for_review`, and `awaiting_customer_approval` so customer and operator surfaces can render truthful progress.
+- Add explicit state transitions for `brief_captured`, `draft_ready_for_review`, `awaiting_customer_approval`, and `approved_for_upload` so customer and operator surfaces can render truthful progress.
 - Make sure deliverables remain reviewable before any external publish action is even considered.
 
 **Code patterns to copy exactly**
@@ -351,12 +361,15 @@ Plant refuses to handshake or publish to YouTube until the exact deliverable is 
 - `src/Plant/BackEnd/api/v1/platform_connections.py`
 - `src/Plant/BackEnd/agent_mold/skills/publisher_engine.py`
 - `src/Plant/BackEnd/services/marketing_scheduler.py`
-- `src/Plant/BackEnd/tests/unit/` publish-gating and scheduler tests
+- `src/Plant/BackEnd/tests/unit/test_platform_connections_api.py`
+- `src/Plant/BackEnd/tests/unit/test_marketing_scheduled_posting.py`
+- `src/Plant/BackEnd/tests/unit/test_youtube_publisher.py`
 
 **Implementation**
 
 - Add YouTube as the first supported destination in the publisher engine and keep the abstraction open for later channels.
 - Enforce a hard runtime rule: approval state plus YouTube credential reference plus channel selection must all be valid before scheduling or publishing proceeds.
+- If the YouTube workflow supports `private` or `unlisted` upload, require a second explicit customer release action before any move to `public` visibility.
 - Make scheduler execution fail closed if approval is missing, revoked, stale, or not tied to the exact deliverable.
 - Ensure publish receipts and failure reasons are recorded so CP and PP can expose truthful state.
 
@@ -371,6 +384,7 @@ router = waooaw_router(prefix="/platform-connections", tags=["platform-connectio
 **Acceptance criteria**
 
 - No YouTube publish path can execute without customer approval of the exact deliverable.
+- Public YouTube release cannot happen as an automatic side effect of approval or upload.
 - The scheduler rejects ineligible publish jobs instead of attempting external execution.
 - Publish failures and denials are persisted in a way PP can diagnose later.
 - The platform-connection model still stores only secret references, never raw secrets.
@@ -392,20 +406,22 @@ CP BackEnd exposes the Theme Discovery, draft review, approval, and YouTube conn
 **Files to read first**
 
 1. `src/CP/BackEnd/api/campaigns.py`
-2. `src/CP/BackEnd/api/cp_skills.py`
+2. `src/CP/BackEnd/api/marketing_review.py`
 3. `src/CP/BackEnd/api/platform_credentials.py`
 
 **Files to create / modify**
 
 - `src/CP/BackEnd/api/campaigns.py`
-- `src/CP/BackEnd/api/cp_skills.py`
+- `src/CP/BackEnd/api/marketing_review.py`
 - `src/CP/BackEnd/api/platform_credentials.py`
-- `src/CP/BackEnd/tests/` campaign or platform-credential proxy tests
+- `src/CP/BackEnd/tests/test_campaigns_proxy.py`
+- `src/CP/BackEnd/tests/test_marketing_review_routes.py`
+- `src/CP/BackEnd/tests/test_platform_credentials_routes.py`
 
 **Implementation**
 
 - Keep CP BackEnd as a thin proxy and response-mapping layer only.
-- Add or extend the proxy routes so CP can create or update Theme Discovery briefs, fetch reviewable deliverables, submit approvals, and store YouTube credential refs.
+- Add or extend the proxy routes so CP can create or update Theme Discovery briefs, fetch reviewable deliverables, submit approvals, request upload eligibility, and store YouTube credential refs.
 - Preserve correlation ID propagation and audit dependency patterns already used in CP.
 - Do not add customer-side business logic, scheduler logic, or external publish logic in CP BackEnd.
 
@@ -435,7 +451,7 @@ async def approve_campaign_item(
 **Validation**
 
 ```bash
-cd src/CP/BackEnd && pytest tests -k "campaigns or cp_skills or platform_credentials" -x -v
+cd src/CP/BackEnd && pytest tests -k "campaigns or marketing_review or platform_credentials" -x -v
 ```
 
 ## Iteration 2 — Customer Workflow On CP And Mobile
@@ -465,18 +481,20 @@ CP gives the customer a guided conversational Theme Discovery experience that le
 
 1. `src/CP/FrontEnd/src/services/agentSkills.service.ts`
 2. `src/CP/FrontEnd/src/services/gatewayApiClient.ts`
-3. `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`
+3. `src/CP/FrontEnd/src/pages/authenticated/GoalsSetup.tsx`
 
 **Files to create / modify**
 
-- `src/CP/FrontEnd/src/pages/` digital-marketing Theme Discovery page or panel
+- `src/CP/FrontEnd/src/pages/authenticated/GoalsSetup.tsx`
+- `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx`
 - `src/CP/FrontEnd/src/services/agentSkills.service.ts`
-- `src/CP/FrontEnd/src/components/` stateless brief-step cards and summary components
-- `src/CP/FrontEnd/src/__tests__/` Theme Discovery tests
+- `src/CP/FrontEnd/src/components/DigitalMarketingBriefStepCard.tsx`
+- `src/CP/FrontEnd/src/components/DigitalMarketingBriefSummaryCard.tsx`
+- `src/CP/FrontEnd/src/__tests__/AuthenticatedPortal.test.tsx`
 
 **Implementation**
 
-- Design Theme Discovery as a guided multi-step or chat-like conversation that asks for business background, objective, locality, target audience, profession/persona, tone, offer, and YouTube intent.
+- Design Theme Discovery as a guided multi-step or chat-like conversation that asks for business background, objective, locality, target audience, profession/persona, tone, offer, YouTube intent, posting cadence, and expected success signal.
 - Render a structured brief summary so the customer can verify what the system understood before drafts are created.
 - Keep shared components stateless so the same cards and summary sections can be reused later in PP and mobile.
 - Make the UI feel like the first impression of a sellable agent, not an admin form.
@@ -491,7 +509,7 @@ CP gives the customer a guided conversational Theme Discovery experience that le
 **Validation**
 
 ```bash
-cd src/CP/FrontEnd && npm run build && npx vitest run src/__tests__/ --grep "Theme Discovery|Digital Marketing"
+cd src/CP/FrontEnd && npm run build && npx vitest run src/__tests__/GoalsSetup.test.tsx src/__tests__/AuthenticatedPortal.test.tsx src/__tests__/agentSkills.service.test.ts
 ```
 
 #### I2-S2 — Build the CP content review, approval, and YouTube readiness workflow
@@ -513,13 +531,16 @@ Customers can review drafts, approve exact deliverables, connect or verify the t
 - `src/CP/FrontEnd/src/services/platformConnections.service.ts`
 - `src/CP/FrontEnd/src/services/hiredAgentDeliverables.service.ts`
 - `src/CP/FrontEnd/src/pages/authenticated/Inbox.tsx`
-- `src/CP/FrontEnd/src/components/` stateless approval, channel-status, and publish-readiness cards
+- `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx`
+- `src/CP/FrontEnd/src/components/DigitalMarketingApprovalCard.tsx`
+- `src/CP/FrontEnd/src/components/DigitalMarketingChannelStatusCard.tsx`
+- `src/CP/FrontEnd/src/components/DigitalMarketingPublishReadinessCard.tsx`
 
 **Implementation**
 
 - Reuse stateless approval and status components to show draft content, exact approval action, YouTube channel state, and publish readiness.
 - Make the approval copy explicit that approval precedes any external posting.
-- Show schedule and publish readiness truthfully: ready, blocked by missing approval, blocked by missing YouTube connection, or already queued.
+- Show schedule and publish readiness truthfully: ready for upload, blocked by missing approval, blocked by missing YouTube connection, uploaded as non-public, ready for public release, or already published.
 - Feed the same state into My Agents or portal progress surfaces so the customer can monitor the agent after setup.
 
 **Acceptance criteria**
@@ -532,7 +553,7 @@ Customers can review drafts, approve exact deliverables, connect or verify the t
 **Validation**
 
 ```bash
-cd src/CP/FrontEnd && npm run build && npx vitest run src/__tests__/ --grep "approval|publish readiness|Digital Marketing"
+cd src/CP/FrontEnd && npm run build && npx vitest run src/__tests__/MyAgents.test.tsx src/__tests__/AuthenticatedPortal.test.tsx src/__tests__/platformCredentials.service.test.ts
 ```
 
 ### E4 — Customer can operate the same agent from mobile
@@ -549,18 +570,21 @@ Mobile customers can complete or continue Theme Discovery and review the resulti
 
 1. `src/mobile/src/screens/agents/AgentOperationsScreen.tsx`
 2. `src/mobile/src/navigation/MainNavigator.tsx`
-3. `src/mobile/src/lib/cpApiClient.ts`
+3. `src/mobile/src/lib/apiClient.ts`
 
 **Files to create / modify**
 
 - `src/mobile/src/screens/agents/AgentOperationsScreen.tsx`
 - `src/mobile/src/navigation/MainNavigator.tsx`
-- `src/mobile/src/components/` stateless brief-summary or discovery-step cards
-- `src/mobile/__tests__/` or `src/mobile/src/screens/agents/__tests__/` digital-marketing tests
+- `src/mobile/src/components/DigitalMarketingBriefSummaryCard.tsx`
+- `src/mobile/src/components/DigitalMarketingBriefStepCard.tsx`
+- `src/mobile/__tests__/AgentOperationsScreen.test.tsx`
+- `src/mobile/__tests__/MyAgentsScreen.test.tsx`
 
 **Implementation**
 
 - Add a mobile-friendly Theme Discovery continuation flow rather than trying to mirror the full CP layout.
+- Use Gateway-backed contracts by default; do not add a CP-specific mobile dependency unless a CP-only route is required.
 - Reuse the same stateless brief-summary concepts so CP and mobile stay semantically aligned.
 - Ensure the customer can resume where they left off and review the structured brief before draft generation.
 - Keep mobile navigation precise so notifications or agent-entry routes can land on the correct digital-marketing view.
@@ -574,7 +598,7 @@ Mobile customers can complete or continue Theme Discovery and review the resulti
 **Validation**
 
 ```bash
-cd src/mobile && npm test -- --runTestsByPath src/screens/agents/__tests__/MyAgentsScreen.test.tsx __tests__/NotificationsScreen.test.tsx --maxWorkers=2
+cd src/mobile && npm test -- --runTestsByPath __tests__/AgentOperationsScreen.test.tsx __tests__/MyAgentsScreen.test.tsx --maxWorkers=2
 ```
 
 #### I2-S4 — Bring approval, publish readiness, and progress state to mobile
@@ -597,11 +621,12 @@ Mobile customers can approve deliverables, confirm YouTube publish readiness, an
 - `src/mobile/src/screens/agents/MyAgentsScreen.tsx`
 - `src/mobile/src/screens/profile/NotificationsScreen.tsx`
 - `src/mobile/src/services/hiredAgents/hiredAgents.service.ts`
+- `src/mobile/__tests__/NotificationsScreen.test.tsx`
 
 **Implementation**
 
 - Extend the existing approval-card pattern to represent digital-marketing deliverables, explicit approval, and YouTube readiness.
-- Surface blocked-vs-ready-vs-published states in My Agents so the customer sees truthful progress.
+- Surface blocked-vs-ready-vs-uploaded-vs-public states in My Agents so the customer sees truthful progress.
 - Route notification taps into the right approval or publish-readiness screen.
 - Keep approval exact and explicit: no mobile action should imply publish without approval.
 
@@ -614,7 +639,7 @@ Mobile customers can approve deliverables, confirm YouTube publish readiness, an
 **Validation**
 
 ```bash
-cd src/mobile && npm run typecheck && npm test -- --runTestsByPath src/screens/agents/__tests__/MyAgentsScreen.test.tsx __tests__/NotificationsScreen.test.tsx --maxWorkers=2
+cd src/mobile && npm run typecheck && npm test -- --runTestsByPath __tests__/MyAgentsScreen.test.tsx __tests__/NotificationsScreen.test.tsx --maxWorkers=2
 ```
 
 ## Iteration 3 — PP Governance, Monitoring, And Release Hardening
@@ -651,13 +676,15 @@ PP users can inspect the customer’s marketing brief, approval queue, YouTube r
 - `src/PP/BackEnd/api/ops_hired_agents.py`
 - `src/PP/FrontEnd/src/pages/HiredAgentsOps.tsx`
 - `src/PP/FrontEnd/src/pages/ReviewQueue.tsx`
-- `src/PP/BackEnd/tests/` or `src/PP/FrontEnd/src/__tests__/` oversight tests
+- `src/PP/BackEnd/tests/test_ops_hired_agents.py`
+- `src/PP/FrontEnd/src/__tests__/HiredAgentsOps.test.tsx`
+- `src/PP/FrontEnd/src/pages/ReviewQueue.test.tsx`
 
 **Implementation**
 
 - Extend PP runtime views so the Digital Marketing Agent surfaces the brief summary, approval queue state, channel readiness, and publish outcomes in one coherent workflow.
 - Reuse the same stateless summary concepts from customer surfaces where practical, but with operator-focused labels and diagnostics.
-- Make clear whether a deliverable is waiting on customer approval, waiting on YouTube credentials, queued, published, or failed.
+- Make clear whether a deliverable is waiting on customer approval, waiting on YouTube credentials, uploaded in non-public visibility, waiting on public release, published, or failed.
 
 **Code patterns to copy exactly**
 
@@ -700,10 +727,12 @@ PP can diagnose why a YouTube publish did not happen and whether the blocker was
 - `src/PP/FrontEnd/src/components/HookTracePanel.tsx`
 - `src/PP/BackEnd/api/approvals.py`
 - `src/PP/BackEnd/tests/test_approval_routes.py`
+- `src/PP/FrontEnd/src/__tests__/SchedulerDiagnosticsPanel.test.tsx`
+- `src/PP/FrontEnd/src/__tests__/HookTracePanel.test.tsx`
 
 **Implementation**
 
-- Surface publish-block reasons explicitly: no approval, revoked approval, missing YouTube credential ref, scheduler denial, external publish failure.
+- Surface publish-block reasons explicitly: no approval, revoked approval, missing YouTube credential ref, scheduler denial, uploaded non-public and awaiting release, external publish failure.
 - Show enough hook and scheduler trace context for PP to support the first sellable agent without direct database inspection.
 - Make approval lineage visible so operators can verify which deliverable version the customer approved.
 
@@ -740,12 +769,14 @@ The Digital Marketing Agent exposes a complete audit and progress spine for Them
 
 - `src/Plant/BackEnd/api/v1/flow_runs.py`
 - `src/CP/BackEnd/api/cp_flow_runs.py`
-- `src/Plant/BackEnd/core/metrics.py` or related observability files
-- `src/Plant/BackEnd/tests/` flow-run or audit tests
+- `src/Plant/BackEnd/core/metrics.py`
+- `src/Plant/BackEnd/services/audit_service.py`
+- `src/Plant/BackEnd/tests/unit/test_flow_runs_api.py`
+- `src/Plant/BackEnd/tests/unit/test_metrics.py`
 
 **Implementation**
 
-- Ensure Theme Discovery, Content Creation, approval, and publish execution appear coherently in skill-run and component-run history.
+- Ensure Theme Discovery, Content Creation, approval, upload, public-release, and publish execution appear coherently in skill-run and component-run history.
 - Emit audit and metric coverage for customer approval, scheduler gate decisions, and publish outcomes.
 - Keep the naming aligned with the canonical runtime vocabulary so CP, PP, and mobile can all narrate progress consistently.
 
@@ -772,16 +803,20 @@ The first sellable Digital Marketing Agent has enough regression coverage, smoke
 
 **Files to read first**
 
-1. `src/CP/FrontEnd/e2e/`
-2. `src/PP/FrontEnd/e2e/`
+1. `src/CP/FrontEnd/e2e/hire-journey.spec.ts`
+2. `src/PP/FrontEnd/e2e/operator-smoke.spec.ts`
 3. `scripts/test-web.sh`
 
 **Files to create / modify**
 
-- `src/CP/FrontEnd/e2e/` Digital Marketing Agent journey spec
-- `src/mobile/__tests__/` targeted Digital Marketing Agent tests
-- `scripts/test-web.sh` or `scripts/test-mobile.sh` only if the new journey must be added to shared regression entrypoints
+- `src/CP/FrontEnd/e2e/hire-journey.spec.ts`
+- `src/PP/FrontEnd/e2e/operator-smoke.spec.ts`
+- `src/mobile/__tests__/AgentOperationsScreen.test.tsx`
+- `src/mobile/__tests__/MyAgentsScreen.test.tsx`
+- `src/mobile/__tests__/NotificationsScreen.test.tsx`
+- `scripts/test-web.sh` only if the new web journey must be added to a shared regression entrypoint
 - `running_commentary.md` for residual risk notes
+- `scripts/test-mobile.sh` only if the new mobile journey must be added to a shared regression entrypoint
 
 **Implementation**
 
