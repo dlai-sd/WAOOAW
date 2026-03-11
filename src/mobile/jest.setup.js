@@ -3,6 +3,39 @@
 
 global.__DEV__ = true;
 
+const originalConsoleError = console.error;
+const originalConsoleLog = console.log;
+
+const ignoredConsoleErrorSnippets = [
+  'react-test-renderer is deprecated',
+  'An update to AppComponent inside a test was not wrapped in act(...)',
+];
+
+const ignoredConsoleLogPrefixes = [
+  '[API Config]',
+  '[API]',
+  '[App]',
+  '[Crashlytics]',
+  '[Sentry]',
+  '🔧 Environment Configuration Loaded:',
+];
+
+console.error = (...args) => {
+  const firstArg = typeof args[0] === 'string' ? args[0] : '';
+  if (ignoredConsoleErrorSnippets.some((snippet) => firstArg.includes(snippet))) {
+    return;
+  }
+  originalConsoleError(...args);
+};
+
+console.log = (...args) => {
+  const firstArg = typeof args[0] === 'string' ? args[0] : '';
+  if (ignoredConsoleLogPrefixes.some((prefix) => firstArg.startsWith(prefix))) {
+    return;
+  }
+  originalConsoleLog(...args);
+};
+
 // Mock expo modules
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(),
