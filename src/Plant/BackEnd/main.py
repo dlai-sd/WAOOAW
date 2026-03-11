@@ -553,11 +553,8 @@ async def startup_event():
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
         from api.v1.agent_mold import get_usage_event_store
-        from services.draft_batches import FileDraftBatchStore
         from services.marketing_scheduler import run_due_posts_once
 
-        store_path = os.getenv("DRAFT_BATCH_STORE_PATH", "/app/data/draft_batches.jsonl")
-        store = FileDraftBatchStore(store_path)
         usage_events = get_usage_event_store()
 
         scheduler = AsyncIOScheduler()
@@ -565,7 +562,7 @@ async def startup_event():
             run_due_posts_once,
             trigger="interval",
             seconds=int(os.getenv("MARKETING_SCHEDULER_INTERVAL_SECONDS", "30")),
-            args=[store, None, usage_events],
+            kwargs={"usage_events": usage_events},
             id="marketing_due_posts",
             replace_existing=True,
         )

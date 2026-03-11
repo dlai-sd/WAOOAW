@@ -1,25 +1,27 @@
-"""Marketing scheduled posting runner.
-
-Phase 1: deterministic, idempotent runner that can be invoked by a scheduler.
-No external network posting is performed yet.
-"""
+"""Marketing scheduled posting runner."""
 
 from __future__ import annotations
 
 import os
 from datetime import datetime
 
-from services.draft_batches import FileDraftBatchStore
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import get_connector
+from services.draft_batches import DatabaseDraftBatchStore
 from services.marketing_providers import default_social_provider, provider_allowlist
 from services.usage_events import UsageEvent, UsageEventStore, UsageEventType
 
 
-def run_due_posts_once(
-    store: FileDraftBatchStore,
+async def run_due_posts_once(
     now: datetime | None = None,
     usage_events: UsageEventStore | None = None,
+    db: AsyncSession | None = None,
 ) -> int:
     now = now or datetime.utcnow()
+    owns_session = db is None
+    session = db or await get_connector().get_session()
+    store = DatabaseDraftBatchStore(session)
 
     max_attempts = int(os.getenv("MARKETING_SCHEDULER_MAX_ATTEMPTS", "3"))
     fail_channel = os.getenv("MARKETING_FAKE_FAIL_CHANNEL")
@@ -27,69 +29,82 @@ def run_due_posts_once(
     allowlist = provider_allowlist()
     provider = default_social_provider()
 
-    batches = store.load_batches()
+    batches = await store.load_batches()
     executed = 0
     updated = False
 
-    for batch in batches:
-        for post in batch.posts:
-            if post.review_status != "approved":
-                continue
-            if post.execution_status not in {"scheduled", "failed"}:
-                continue
-            if post.scheduled_at is None or post.scheduled_at > now:
-                continue
-            if post.attempts >= max_attempts:
-                continue
+    try:
+        for batch in batches:
+            for post in batch.posts:
+                if post.review_status != "approved":
+                    continue
+                if post.execution_status not in {"scheduled", "failed"}:
+                    continue
+                if post.scheduled_at is None or post.scheduled_at > now:
+                    continue
+                if post.attempts >= max_attempts:
+                    continue
 
-            # Idempotency: we only run scheduled posts; transition away from scheduled means it's done.
-            post.execution_status = "running"
-            post.attempts += 1
-
-            try:
-                if post.channel.value == "youtube" and not post.approval_id:
-                    raise RuntimeError("approval_required_for_youtube_publish")
-                if post.channel.value == "youtube" and not post.credential_ref:
-                    raise RuntimeError("credential_ref_required_for_youtube_publish")
-                if post.channel.value == "youtube" and post.visibility == "public" and not post.public_release_requested:
-                    raise RuntimeError("public_release_requires_explicit_customer_action")
-
-                # Deterministic placeholder for provider execution.
-                # For unit tests we can inject a transient failure by channel.
-                if fail_channel and post.channel.value == fail_channel:
-                    raise RuntimeError(f"Simulated transient failure for channel={fail_channel}")
-
-                allowlist.ensure_allowed(post.channel)
-
-                published = provider.publish_text(
-                    channel=post.channel,
-                    text=post.text,
-                    hashtags=post.hashtags,
+                attempt_count = post.attempts + 1
+                await store.update_post(
+                    post.post_id,
+                    execution_status="running",
+                    attempts=attempt_count,
                 )
 
-                post.execution_status = "posted"
-                post.last_error = None
-                post.provider_post_id = published.provider_post_id
-                post.provider_post_url = published.provider_post_url
+                try:
+                    if post.channel.value == "youtube" and not post.approval_id:
+                        raise RuntimeError("approval_required_for_youtube_publish")
+                    if post.channel.value == "youtube" and not post.credential_ref:
+                        raise RuntimeError("credential_ref_required_for_youtube_publish")
+                    if post.channel.value == "youtube" and post.visibility == "public" and not post.public_release_requested:
+                        raise RuntimeError("public_release_requires_explicit_customer_action")
 
-                if usage_events is not None:
-                    usage_events.append(
-                        UsageEvent(
-                            event_type=UsageEventType.PUBLISH_ACTION,
-                            correlation_id=f"draft_post:{post.post_id}",
-                            customer_id=batch.customer_id,
-                            agent_id=batch.agent_id,
-                            purpose="marketing_publish",
-                        )
+                    if fail_channel and post.channel.value == fail_channel:
+                        raise RuntimeError(f"Simulated transient failure for channel={fail_channel}")
+
+                    allowlist.ensure_allowed(post.channel)
+
+                    published = provider.publish_text(
+                        channel=post.channel,
+                        text=post.text,
+                        hashtags=post.hashtags,
                     )
-            except Exception as exc:
-                post.execution_status = "failed"
-                post.last_error = str(exc)
 
-            executed += 1
-            updated = True
+                    await store.update_post(
+                        post.post_id,
+                        execution_status="posted",
+                        attempts=attempt_count,
+                        last_error=None,
+                        provider_post_id=published.provider_post_id,
+                        provider_post_url=published.provider_post_url,
+                    )
 
-    if updated:
-        store.write_batches(batches)
+                    if usage_events is not None:
+                        usage_events.append(
+                            UsageEvent(
+                                event_type=UsageEventType.PUBLISH_ACTION,
+                                correlation_id=f"draft_post:{post.post_id}",
+                                customer_id=batch.customer_id,
+                                agent_id=batch.agent_id,
+                                purpose="marketing_publish",
+                            )
+                        )
+                except Exception as exc:
+                    await store.update_post(
+                        post.post_id,
+                        execution_status="failed",
+                        attempts=attempt_count,
+                        last_error=str(exc),
+                    )
 
-    return executed
+                executed += 1
+                updated = True
+
+        if owns_session and updated:
+            await session.commit()
+
+        return executed
+    finally:
+        if owns_session:
+            await session.close()

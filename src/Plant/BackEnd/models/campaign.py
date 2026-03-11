@@ -16,6 +16,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import (
+    Boolean,
     Column,
     Date,
     DateTime,
@@ -64,6 +65,11 @@ class CampaignModel(Base):
     # Status lifecycle
     status = Column(String, nullable=False, default="draft", index=True)
 
+    workflow_state = Column(String(64), nullable=False, default="brief_captured", index=True)
+    brief_summary = Column(JSONB, nullable=False, default=dict)
+    approval_state = Column(JSONB, nullable=False, default=dict)
+    draft_deliverables = Column(JSONB, nullable=False, default=list)
+
     # Audit timestamps
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
@@ -86,6 +92,7 @@ class CampaignModel(Base):
         Index("ix_campaigns_hired_instance_id", "hired_instance_id"),
         Index("ix_campaigns_customer_id", "customer_id"),
         Index("ix_campaigns_status", "status"),
+        Index("ix_campaigns_workflow_state", "workflow_state"),
         Index("ix_campaigns_created_at", "created_at"),
     )
 
@@ -97,6 +104,10 @@ class CampaignModel(Base):
         brief: dict[str, Any],
         cost_estimate: dict[str, Any],
         status: str = "draft",
+        workflow_state: str = "brief_captured",
+        brief_summary: dict[str, Any] | None = None,
+        approval_state: dict[str, Any] | None = None,
+        draft_deliverables: list[dict[str, Any]] | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
     ) -> None:
@@ -106,6 +117,14 @@ class CampaignModel(Base):
         self.brief = brief
         self.cost_estimate = cost_estimate
         self.status = status
+        self.workflow_state = workflow_state
+        self.brief_summary = brief_summary or {}
+        self.approval_state = approval_state or {
+            "pending_review_count": 0,
+            "approved_count": 0,
+            "rejected_count": 0,
+        }
+        self.draft_deliverables = draft_deliverables or []
         now = datetime.now(timezone.utc)
         self.created_at = created_at or now
         self.updated_at = updated_at or now
@@ -240,6 +259,11 @@ class ContentPostModel(Base):
     # Publish state: not_published | published | failed
     publish_status = Column(String, nullable=False, default="not_published", index=True)
 
+    approval_id = Column(String(255), nullable=True, index=True)
+    credential_ref = Column(Text, nullable=True)
+    visibility = Column(String(32), nullable=False, default="private")
+    public_release_requested = Column(Boolean, nullable=False, default=False)
+
     # Adapter-specific response JSON
     publish_receipt = Column(JSONB, nullable=True)
 
@@ -257,6 +281,8 @@ class ContentPostModel(Base):
         Index("ix_content_posts_theme_item_id", "theme_item_id"),
         Index("ix_content_posts_review_status", "review_status"),
         Index("ix_content_posts_publish_status", "publish_status"),
+        Index("ix_content_posts_approval_id", "approval_id"),
+        Index("ix_content_posts_campaign_review_publish", "campaign_id", "review_status", "publish_status"),
         Index("ix_content_posts_scheduled_publish_at", "scheduled_publish_at"),
     )
 
@@ -271,6 +297,10 @@ class ContentPostModel(Base):
         scheduled_publish_at: datetime | None = None,
         review_status: str = "pending_review",
         publish_status: str = "not_published",
+        approval_id: str | None = None,
+        credential_ref: str | None = None,
+        visibility: str = "private",
+        public_release_requested: bool = False,
         publish_receipt: dict[str, Any] | None = None,
         created_at: datetime | None = None,
         updated_at: datetime | None = None,
@@ -285,6 +315,10 @@ class ContentPostModel(Base):
         self.scheduled_publish_at = scheduled_publish_at or now
         self.review_status = review_status
         self.publish_status = publish_status
+        self.approval_id = approval_id
+        self.credential_ref = credential_ref
+        self.visibility = visibility
+        self.public_release_requested = public_release_requested
         self.publish_receipt = publish_receipt
         self.created_at = created_at or now
         self.updated_at = updated_at or now

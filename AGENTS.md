@@ -59,6 +59,7 @@ docs/                All platform docs (start with CONTEXT_AND_INDEX.md)
 - Python: pytest, **≥ 80 % coverage required** — PRs below threshold are blocked
 - Mobile: Jest, all existing tests must pass
 - Run commands are in `docs/CONTEXT_AND_INDEX.md` §11
+- For persistence or migration stories: apply and smoke-check against Cloud SQL demo via the Auth Proxy first; Docker Postgres is regression-only and not the source of truth for persisted schema changes.
 
 ---
 

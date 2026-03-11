@@ -76,6 +76,8 @@ cd src/mobile && node_modules/.bin/jest --forceExit
 docker-compose -f docker-compose.test.yml run cp-test pytest -x -v
 ```
 
+Persistence rule: when a story changes schema or persisted behavior, validate the migration and a smoke query against Cloud SQL demo through the Auth Proxy before treating Docker regression as complete. Docker Postgres is for isolated regression only, not the persistence source of truth.
+
 ---
 
 ## Git

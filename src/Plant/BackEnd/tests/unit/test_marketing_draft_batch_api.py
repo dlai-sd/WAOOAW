@@ -1,7 +1,4 @@
-def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
-
+def test_create_draft_batch_persists_posts_and_returns_ids(db_test_client):
     payload = {
         "agent_id": "AGT-MKT-HEALTH-001",
         "hired_instance_id": "HIRED-001",
@@ -17,7 +14,7 @@ def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path
         "language": "English",
     }
 
-    resp = test_client.post("/api/v1/marketing/draft-batches", json=payload)
+    resp = db_test_client.post("/api/v1/marketing/draft-batches", json=payload)
     assert resp.status_code == 200
     data = resp.json()
 
@@ -38,17 +35,13 @@ def test_create_draft_batch_persists_posts_and_returns_ids(test_client, tmp_path
     assert all(p["review_status"] == "pending_review" for p in posts)
     assert all(p["execution_status"] == "not_scheduled" for p in posts)
 
-    assert store_path.exists()
-    lines = store_path.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 1
-    assert "\"batch_id\"" in lines[0]
+    listed = db_test_client.get("/api/v1/marketing/draft-batches", params={"customer_id": payload["customer_id"]})
+    assert listed.status_code == 200
+    assert len(listed.json()) == 1
 
 
-def test_execute_draft_post_requires_approval_id(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
-
-    create = test_client.post(
+def test_execute_draft_post_requires_approval_id(db_test_client):
+    create = db_test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -60,7 +53,7 @@ def test_execute_draft_post_requires_approval_id(test_client, tmp_path, monkeypa
     assert create.status_code == 200
     post_id = create.json()["posts"][0]["post_id"]
 
-    denied = test_client.post(
+    denied = db_test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/execute",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -73,7 +66,7 @@ def test_execute_draft_post_requires_approval_id(test_client, tmp_path, monkeypa
     assert denied_body["reason"] == "approval_required"
     assert denied_body["correlation_id"]
 
-    allowed = test_client.post(
+    allowed = db_test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/execute",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",

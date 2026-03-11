@@ -1,15 +1,15 @@
 from datetime import datetime, timedelta
 
-from services.draft_batches import FileDraftBatchStore
 from services.marketing_scheduler import run_due_posts_once
 from services.usage_events import InMemoryUsageEventStore, UsageEventType
 
 
-def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
+import pytest
 
-    create = test_client.post(
+
+@pytest.mark.asyncio
+async def test_scheduled_posting_runs_due_post_once(db_test_client, async_session, monkeypatch):
+    create = db_test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -22,9 +22,11 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
     assert create.status_code == 200
     post_id = create.json()["posts"][0]["post_id"]
 
-    store = FileDraftBatchStore(str(store_path))
+    from services.draft_batches import DatabaseDraftBatchStore
+
+    store = DatabaseDraftBatchStore(async_session)
     events = InMemoryUsageEventStore()
-    assert store.update_post(
+    assert await store.update_post(
         post_id,
         review_status="approved",
         approval_id="APR-123",
@@ -32,23 +34,21 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
         scheduled_at=datetime.utcnow() - timedelta(seconds=1),
     )
 
-    # First run fails (simulated transient failure), post is marked failed.
     monkeypatch.setenv("MARKETING_FAKE_FAIL_CHANNEL", "youtube")
-    executed = run_due_posts_once(store, usage_events=events)
+    executed = await run_due_posts_once(usage_events=events, db=async_session)
     assert executed == 1
 
-    _batch, post = store.find_post(post_id)  # type: ignore[assignment]
+    _batch, post = await store.find_post(post_id)  # type: ignore[assignment]
     assert post.execution_status == "failed"
     assert post.attempts == 1
     assert post.last_error
 
-    # Retry succeeds when failure injection is removed.
     monkeypatch.delenv("MARKETING_FAKE_FAIL_CHANNEL", raising=False)
     monkeypatch.delenv("MARKETING_ALLOWED_CHANNELS", raising=False)
-    executed_retry = run_due_posts_once(store, usage_events=events)
+    executed_retry = await run_due_posts_once(usage_events=events, db=async_session)
     assert executed_retry == 1
 
-    _batch, post = store.find_post(post_id)  # type: ignore[assignment]
+    _batch, post = await store.find_post(post_id)  # type: ignore[assignment]
     assert post.execution_status == "posted"
     assert post.attempts == 2
     assert post.last_error is None
@@ -59,16 +59,13 @@ def test_scheduled_posting_runs_due_post_once(test_client, tmp_path, monkeypatch
     assert len(publish_events) == 1
     assert publish_events[0].correlation_id == f"draft_post:{post_id}"
 
-    # Re-run should be idempotent (post is no longer 'scheduled')
-    executed_again = run_due_posts_once(store, usage_events=events)
+    executed_again = await run_due_posts_once(usage_events=events, db=async_session)
     assert executed_again == 0
 
 
-def test_scheduler_rejects_youtube_without_approval_or_credential_ref(test_client, tmp_path, monkeypatch):
-    store_path = tmp_path / "draft_batches.jsonl"
-    monkeypatch.setenv("DRAFT_BATCH_STORE_PATH", str(store_path))
-
-    create = test_client.post(
+@pytest.mark.asyncio
+async def test_scheduler_rejects_youtube_without_approval_or_credential_ref(db_test_client, async_session):
+    create = db_test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
             "agent_id": "AGT-MKT-HEALTH-001",
@@ -80,31 +77,33 @@ def test_scheduler_rejects_youtube_without_approval_or_credential_ref(test_clien
     assert create.status_code == 200
     post_id = create.json()["posts"][0]["post_id"]
 
-    store = FileDraftBatchStore(str(store_path))
-    assert store.update_post(
+    from services.draft_batches import DatabaseDraftBatchStore
+
+    store = DatabaseDraftBatchStore(async_session)
+    assert await store.update_post(
         post_id,
         review_status="approved",
         execution_status="scheduled",
         scheduled_at=datetime.utcnow() - timedelta(seconds=1),
     )
 
-    executed = run_due_posts_once(store)
+    executed = await run_due_posts_once(db=async_session)
     assert executed == 1
 
-    _batch, post = store.find_post(post_id)  # type: ignore[assignment]
+    _batch, post = await store.find_post(post_id)  # type: ignore[assignment]
     assert post.execution_status == "failed"
     assert post.last_error == "approval_required_for_youtube_publish"
 
-    assert store.update_post(
+    assert await store.update_post(
         post_id,
         approval_id="APR-123",
         execution_status="scheduled",
         last_error=None,
     )
 
-    executed_again = run_due_posts_once(store)
+    executed_again = await run_due_posts_once(db=async_session)
     assert executed_again == 1
 
-    _batch, post = store.find_post(post_id)  # type: ignore[assignment]
+    _batch, post = await store.find_post(post_id)  # type: ignore[assignment]
     assert post.execution_status == "failed"
     assert post.last_error == "credential_ref_required_for_youtube_publish"

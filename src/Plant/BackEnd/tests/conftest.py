@@ -7,6 +7,7 @@ They should not depend on a developer's local Postgres.
 """
 
 import os
+import importlib
 from pathlib import Path
 from typing import AsyncGenerator
 import logging
@@ -81,6 +82,28 @@ def test_client(monkeypatch):
         yield client
 
 
+@pytest.fixture
+def db_test_client(monkeypatch, test_db_url, migrated_db):
+    _apply_alembic_migrations(test_db_url)
+    monkeypatch.setenv("DATABASE_URL", test_db_url)
+
+    import core.config as config_module
+    config_module.get_settings.cache_clear()
+    config_module.settings = config_module.get_settings()
+
+    import core.database as database_module
+    database_module.settings = config_module.settings
+    database_module._connector = database_module.DatabaseConnector()
+
+    import main as main_module
+    importlib.reload(main_module)
+
+    from fastapi.testclient import TestClient
+
+    with TestClient(main_module.app) as client:
+        yield client
+
+
 # ========== SESSION & EVENT LOOP ==========
 # Use pytest-asyncio's default event loop management
 # Don't override event_loop fixture to avoid deprecation warnings
@@ -125,6 +148,9 @@ def _apply_alembic_migrations(db_url: str) -> None:
         conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
         conn.execute(text("CREATE SCHEMA public"))
         conn.execute(text("GRANT ALL ON SCHEMA public TO public"))
+        conn.execute(text(
+            "CREATE TABLE alembic_version (version_num VARCHAR(255) NOT NULL PRIMARY KEY)"
+        ))
     sync_engine.dispose()
 
     from alembic import command
