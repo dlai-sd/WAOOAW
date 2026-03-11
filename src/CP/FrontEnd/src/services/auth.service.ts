@@ -37,6 +37,7 @@ export interface DecodedToken {
 }
 
 const DEFAULT_EXP_SKEW_SECONDS = 30
+const SESSION_HINT_STORAGE_KEY = 'waooaw:session-restorable'
 
 class AuthService {
   /** E1-S4: Access token held in memory only — never persisted to localStorage/sessionStorage */
@@ -50,6 +51,30 @@ class AuthService {
     // E1-S4: On construction, clear any legacy stored tokens.
     // The access token will be restored by a silent refresh call on app mount.
     this._clearLegacyStorage()
+  }
+
+  private hasSessionRecoveryHint(): boolean {
+    try {
+      return localStorage.getItem(SESSION_HINT_STORAGE_KEY) === '1'
+    } catch {
+      return false
+    }
+  }
+
+  private markSessionRecoveryHint(): void {
+    try {
+      localStorage.setItem(SESSION_HINT_STORAGE_KEY, '1')
+    } catch {
+      // ignore
+    }
+  }
+
+  private clearSessionRecoveryHint(): void {
+    try {
+      localStorage.removeItem(SESSION_HINT_STORAGE_KEY)
+    } catch {
+      // ignore
+    }
   }
 
   private _clearLegacyStorage(): void {
@@ -69,6 +94,10 @@ class AuthService {
    * Returns the new access_token or null if refresh fails.
    */
   async silentRefresh(): Promise<string | null> {
+    if (!this.accessToken && !this.hasSessionRecoveryHint()) {
+      return null
+    }
+
     // Prevent concurrent refresh calls (queue them behind the same promise)
     if (this._isRefreshing && this._refreshPromise) {
       return this._refreshPromise
@@ -84,15 +113,16 @@ class AuthService {
         })
 
         if (!response.ok) {
-          this.accessToken = null
+          this.clearTokens()
           return null
         }
 
         const data: TokenResponse = await response.json()
         this.accessToken = data.access_token
+        this.markSessionRecoveryHint()
         return data.access_token
       } catch {
-        this.accessToken = null
+        this.clearTokens()
         return null
       } finally {
         this._isRefreshing = false
@@ -148,6 +178,7 @@ class AuthService {
    */
   setTokens(tokens: TokenResponse): void {
     this.accessToken = tokens.access_token
+    this.markSessionRecoveryHint()
   }
 
   /**
@@ -155,6 +186,7 @@ class AuthService {
    */
   private clearTokens(): void {
     this.accessToken = null
+    this.clearSessionRecoveryHint()
   }
 
   /**
@@ -180,6 +212,7 @@ class AuthService {
 
     const tokens: TokenResponse = await response.json()
     this.accessToken = tokens.access_token  // E1-S4: memory only
+    this.markSessionRecoveryHint()
     
     return tokens
   }
@@ -271,6 +304,7 @@ class AuthService {
 
       // E1-S4: memory only
       this.accessToken = tokens.access_token
+      this.markSessionRecoveryHint()
 
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname)
