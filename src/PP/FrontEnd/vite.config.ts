@@ -1,8 +1,44 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+function manualChunks(id: string): string | undefined {
+  if (!id.includes('node_modules')) {
+    return undefined
+  }
+
+  if (id.includes('@fluentui/react-icons')) {
+    return 'fluent-icons'
+  }
+
+  if (id.includes('@griffel/')) {
+    return 'griffel'
+  }
+
+  if (id.includes('@fluentui/')) {
+    return 'fluent-ui'
+  }
+
+  if (id.includes('react-router-dom') || id.includes('@remix-run/router')) {
+    return 'router'
+  }
+
+  if (id.includes('@react-oauth/google') || id.includes('jwt-decode')) {
+    return 'auth'
+  }
+
+  return undefined
+}
+
 export default defineConfig({
   plugins: [react()],
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks,
+      },
+    },
+  },
   server: {
     port: 8080,
     host: '0.0.0.0',
