@@ -23,6 +23,11 @@ export type TokenResponse = {
   expires_in: number
 }
 
+async function parseOtpError(response: Response): Promise<Error> {
+  const err = await response.json().catch(() => null)
+  return new Error(err?.detail || err?.error?.message || 'Failed to start OTP')
+}
+
 
 /**
  * BUG-1 fix: start registration OTP BEFORE saving the customer.
@@ -67,19 +72,37 @@ export async function startOtp(registrationId: string): Promise<OtpStartResponse
 }
 
 export async function startLoginOtp(payload: { email?: string; phone?: string; channel?: 'email' | 'phone' }): Promise<OtpStartResponse> {
+  const requestBody = {
+    email: payload.email,
+    phone: payload.phone,
+    channel: payload.channel
+  }
+
   const response = await fetch(`${config.apiBaseUrl}/cp/auth/otp/login/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: payload.email,
-      phone: payload.phone,
-      channel: payload.channel
-    })
+    body: JSON.stringify(requestBody)
   })
 
+  if (response.status === 404 && payload.email) {
+    const fallbackResponse = await fetch(`${config.apiBaseUrl}/cp/auth/otp/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: payload.email,
+        channel: payload.channel
+      })
+    })
+
+    if (!fallbackResponse.ok) {
+      throw await parseOtpError(fallbackResponse)
+    }
+
+    return fallbackResponse.json()
+  }
+
   if (!response.ok) {
-    const err = await response.json().catch(() => null)
-    throw new Error(err?.detail || err?.error?.message || 'Failed to start OTP')
+    throw await parseOtpError(response)
   }
 
   return response.json()

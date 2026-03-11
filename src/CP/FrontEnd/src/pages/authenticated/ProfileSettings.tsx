@@ -41,6 +41,9 @@ export default function ProfileSettings() {
     }
   }
 
+  const openSupport = () => {
+    window.location.href = 'mailto:customersupport@dlaisd.com?subject=WAOOAW%20Customer%20Support'
+  }
   const sections = [
     {
       title: 'Account',
@@ -174,7 +177,7 @@ export default function ProfileSettings() {
               {section.items.map((item) => (
                 <button
                   key={item}
-                  onClick={item === 'Edit Profile' ? handleEditClick : undefined}
+                  onClick={item === 'Edit Profile' ? handleEditClick : item === 'Contact Support' ? openSupport : undefined}
                   style={{
                     textAlign: 'left',
                     padding: '10px 12px',

@@ -5,6 +5,7 @@ import os
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.utils import formataddr, parseaddr
 from typing import Literal
 
 import anyio
@@ -121,11 +122,18 @@ def _smtp_config() -> dict:
     }
 
 
+def _sender_header(sender: str) -> str:
+    display_name, email_address = parseaddr(sender)
+    if display_name or not email_address:
+        return sender
+    return formataddr(("WAOOAW Customer Support", email_address))
+
+
 def _send_email_smtp_sync(*, to_email: str, subject: str, body: str, html_body: str | None = None) -> None:
     cfg = _smtp_config()
 
     msg = EmailMessage()
-    msg["From"] = cfg["sender"]
+    msg["From"] = _sender_header(cfg["sender"])
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.set_content(body)

@@ -93,6 +93,12 @@ describe('App Component', () => {
     expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
   })
 
+  it('redirects to sign-in when visiting /my-agents unauthenticated', async () => {
+    window.history.pushState({}, '', '/my-agents')
+    renderWithProvider(<App />)
+    expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
+  })
+
   it('allows theme toggle', () => {
     renderWithProvider(<App />)
     const themeButton = screen.getByLabelText('Toggle theme')

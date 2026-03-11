@@ -126,6 +126,20 @@ function AppContent() {
               />
             )
           } />
+          <Route path="/my-agents" element={
+            isLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
+                <Spinner size="large" />
+              </div>
+            ) : isAuthenticated ? (
+              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} initialPage="my-agents" />
+            ) : (
+              <Navigate
+                to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
+                replace
+              />
+            )
+          } />
           <Route path="/agent/:agentId" element={
             isLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
