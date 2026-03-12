@@ -93,8 +93,8 @@ class AuthService {
    * Should be called on app mount and on any 401 response.
    * Returns the new access_token or null if refresh fails.
    */
-  async silentRefresh(): Promise<string | null> {
-    if (!this.accessToken && !this.hasSessionRecoveryHint()) {
+  async silentRefresh(force: boolean = false): Promise<string | null> {
+    if (!force && !this.accessToken && !this.hasSessionRecoveryHint()) {
       return null
     }
 
@@ -227,7 +227,7 @@ class AuthService {
 
     if (this.isTokenExpired()) {
       // Try silent refresh before giving up
-      const newToken = await this.silentRefresh()
+      const newToken = await this.silentRefresh(true)
       if (!newToken) {
         this.clearTokens()
         throw new Error('Session expired')
@@ -243,7 +243,7 @@ class AuthService {
     if (!response.ok) {
       if (response.status === 401) {
         // Try silent refresh once
-        const newToken = await this.silentRefresh()
+        const newToken = await this.silentRefresh(true)
         if (!newToken) {
           this.clearTokens()
           throw new Error('Session expired')

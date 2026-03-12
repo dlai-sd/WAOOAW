@@ -43,6 +43,11 @@ function isTokenExpiredProblem(problem?: ApiProblemDetails): boolean {
   return type.includes('token-expired') || title === 'token expired' || detail.includes('token has expired')
 }
 
+function isUserInitializationProblem(problem?: ApiProblemDetails): boolean {
+  const detail = String(problem?.detail || '').toLowerCase()
+  return detail.includes('user not found')
+}
+
 function markAuthExpiredAndBroadcast(): void {
   // E1-S4: Clear in-memory token (localStorage no longer holds tokens)
   try {
@@ -139,7 +144,7 @@ export async function gatewayRequestJson<T>(
 
   // E1-S4: on 401, attempt one silent refresh then retry
   if (res.status === 401) {
-    const newToken = await authService.silentRefresh()
+    const newToken = await authService.silentRefresh(true)
     if (newToken) {
       res = await doFetch(newToken)
     }
@@ -158,6 +163,16 @@ export async function gatewayRequestJson<T>(
       if (lowerDetail.includes('customer not found')) {
         throw new GatewayApiError(
           'Your account setup is incomplete. Please contact support to activate your account.',
+          {
+            status: res.status,
+            problem,
+            correlationId: res.headers.get('x-correlation-id') || correlationId
+          }
+        )
+      }
+      if (isUserInitializationProblem(problem)) {
+        throw new GatewayApiError(
+          'Your account session is still initializing. Please retry in a moment.',
           {
             status: res.status,
             problem,

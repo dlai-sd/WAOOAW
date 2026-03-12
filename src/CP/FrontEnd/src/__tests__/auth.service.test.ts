@@ -49,6 +49,26 @@ describe('auth.service', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('allows forced silent refresh without a session hint', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: 'forced-refresh-token',
+          token_type: 'bearer',
+          expires_in: 3600,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    )
+
+    await expect(authService.silentRefresh(true)).resolves.toBe('forced-refresh-token')
+    expect(authService.getAccessToken()).toBe('forced-refresh-token')
+    expect(localStorage.getItem(SESSION_HINT_STORAGE_KEY)).toBe('1')
+  })
+
   it('returns null for invalid token', () => {
     const decoded = authService.decodeToken('invalid');
     expect(decoded).toBeNull();

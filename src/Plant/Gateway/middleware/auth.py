@@ -139,6 +139,7 @@ PUBLIC_ENDPOINTS = [
     "/healthz",
     "/ready",
     "/docs",
+    "/docs/oauth2-redirect",
     "/redoc",
     "/openapi.json",
     "/metrics",
@@ -188,6 +189,12 @@ def _is_public_path(path: str) -> bool:
     # Some deployments mount the application under a path prefix (e.g. `/api`).
     # Treat the mobile login endpoint as public even when it is prefixed.
     if normalized.endswith("/auth/google/verify"):
+        return True
+
+    if normalized.endswith("/docs") or normalized.endswith("/docs/oauth2-redirect"):
+        return True
+
+    if normalized.endswith("/redoc") or normalized.endswith("/openapi.json"):
         return True
 
     # Note: Health endpoints may have nested paths (e.g. /api/health/stream).

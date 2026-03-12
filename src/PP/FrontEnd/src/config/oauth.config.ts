@@ -5,6 +5,15 @@ interface EnvironmentConfig {
   googleClientId: string
 }
 
+interface ApiEndpoints {
+  googleLogin: string
+  googleCallback: string
+  googleVerify: string
+  refresh: string
+  logout: string
+  me: string
+}
+
 type PPRuntimeConfig = Partial<{
   environment: string
   apiBaseUrl: string
@@ -38,7 +47,7 @@ function detectEnvironment(): string {
   return 'development'
 }
 
-function getEnvironmentConfig(): EnvironmentConfig {
+export function getEnvironmentConfig(): EnvironmentConfig {
   const runtime = getPPRuntimeConfig()
   const env = runtime.environment || import.meta.env.VITE_ENVIRONMENT || detectEnvironment()
   const protocol = window.location.protocol
@@ -85,15 +94,53 @@ function getEnvironmentConfig(): EnvironmentConfig {
   return configs[env] || configs.development
 }
 
-export const config = getEnvironmentConfig()
+export function getApiEndpoints(): ApiEndpoints {
+  const currentConfig = getEnvironmentConfig()
 
-export const API_ENDPOINTS = {
-  googleLogin: `${config.apiBaseUrl}/auth/google/login`,
-  googleCallback: `${config.apiBaseUrl}/auth/google/callback`,
-  googleVerify: `${config.apiBaseUrl}/auth/google/verify`,
-  refresh: `${config.apiBaseUrl}/auth/refresh`,
-  logout: `${config.apiBaseUrl}/auth/logout`,
-  me: `${config.apiBaseUrl}/auth/me`
+  return {
+    googleLogin: `${currentConfig.apiBaseUrl}/auth/google/login`,
+    googleCallback: `${currentConfig.apiBaseUrl}/auth/google/callback`,
+    googleVerify: `${currentConfig.apiBaseUrl}/auth/google/verify`,
+    refresh: `${currentConfig.apiBaseUrl}/auth/refresh`,
+    logout: `${currentConfig.apiBaseUrl}/auth/logout`,
+    me: `${currentConfig.apiBaseUrl}/auth/me`
+  }
+}
+
+export const config: EnvironmentConfig = {
+  get name() {
+    return getEnvironmentConfig().name
+  },
+  get apiBaseUrl() {
+    return getEnvironmentConfig().apiBaseUrl
+  },
+  get frontendUrl() {
+    return getEnvironmentConfig().frontendUrl
+  },
+  get googleClientId() {
+    return getEnvironmentConfig().googleClientId
+  }
+}
+
+export const API_ENDPOINTS: ApiEndpoints = {
+  get googleLogin() {
+    return getApiEndpoints().googleLogin
+  },
+  get googleCallback() {
+    return getApiEndpoints().googleCallback
+  },
+  get googleVerify() {
+    return getApiEndpoints().googleVerify
+  },
+  get refresh() {
+    return getApiEndpoints().refresh
+  },
+  get logout() {
+    return getApiEndpoints().logout
+  },
+  get me() {
+    return getApiEndpoints().me
+  }
 }
 
 export default config
