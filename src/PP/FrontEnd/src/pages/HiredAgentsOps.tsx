@@ -23,13 +23,6 @@ import SchedulerDiagnosticsPanel from '../components/SchedulerDiagnosticsPanel'
 import HookTracePanel from '../components/HookTracePanel'
 import { gatewayApiClient } from '../services/gatewayApiClient'
 
-type Subscription = {
-  subscription_id: string
-  agent_id?: string | null
-  status?: string | null
-  duration?: string | null
-}
-
 type GoalInstance = {
   goal_instance_id: string
   goal_template_id: string
@@ -486,37 +479,35 @@ export default function HiredAgentsOps() {
     setPlatformConnections([])
 
     try {
-      // Use new dedicated ops routes (not the catch-all /v1/ proxy)
-      const subs = (await gatewayApiClient.listOpsSubscriptions({
+      const hiredRows = (await gatewayApiClient.listOpsHiredAgents({
         customer_id: cust,
         as_of: normalizedAsOf,
-      })) as Subscription[]
+      })) as HiredAgentInstance[]
 
-      const hiredInstances = await Promise.all(
-        (subs || []).map(async (s) => {
-          // Ops list endpoint returns an array; take first matching instance
-          const hiredArr = (await gatewayApiClient.listOpsHiredAgents({
-            subscription_id: s.subscription_id,
-            customer_id: cust,
-            as_of: normalizedAsOf,
-          })) as HiredAgentInstance[]
-          const hired = hiredArr?.[0]
+      const rowsWithGoals = await Promise.all(
+        (hiredRows || []).map(async (hired) => {
           if (!hired?.hired_instance_id) return null
 
-          const goalsRes = (await gatewayApiClient.listOpsHiredAgentGoals(
-            hired.hired_instance_id,
-            { customer_id: cust, as_of: normalizedAsOf }
-          )) as GoalsListResponse
+          let goals: GoalInstance[] = []
+          try {
+            const goalsRes = (await gatewayApiClient.listOpsHiredAgentGoals(
+              hired.hired_instance_id,
+              { customer_id: cust, as_of: normalizedAsOf }
+            )) as GoalsListResponse
+            goals = goalsRes?.goals || []
+          } catch {
+            goals = []
+          }
 
           return {
-            subscription_id: s.subscription_id,
+            subscription_id: hired.subscription_id,
             hired,
-            goals: goalsRes?.goals || [],
+            goals,
           } satisfies HiredRow
         })
       )
 
-      const sorted = hiredInstances
+      const sorted = rowsWithGoals
         .filter((r): r is HiredRow => !!r?.hired?.hired_instance_id)
         .sort((a, b) => (a.hired.created_at || '').localeCompare(b.hired.created_at || ''))
 
