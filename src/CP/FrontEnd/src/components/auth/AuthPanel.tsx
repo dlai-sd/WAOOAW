@@ -61,6 +61,168 @@ const useStyles = makeStyles({
     gap: '10px',
     padding: '4px 0'
   },
+  formShell: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '18px'
+  },
+  formIntro: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px'
+  },
+  formEyebrow: {
+    textTransform: 'uppercase',
+    letterSpacing: '0.12em',
+    fontSize: '11px',
+    fontWeight: '700',
+    color: tokens.colorBrandForeground1,
+  },
+  formHeading: {
+    fontSize: '24px',
+    lineHeight: '1.15',
+    fontWeight: '700',
+    color: tokens.colorNeutralForeground1,
+    margin: 0,
+  },
+  formBody: {
+    fontSize: '13px',
+    lineHeight: '1.65',
+    color: tokens.colorNeutralForeground2,
+    margin: 0,
+  },
+  stageCard: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+    padding: '18px',
+    borderRadius: '20px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    boxShadow: tokens.shadow4,
+  },
+  stageCardTight: {
+    gap: '12px',
+  },
+  stageCardHeader: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  stageCardEyebrow: {
+    fontSize: '11px',
+    fontWeight: '700',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color: tokens.colorBrandForeground1,
+  },
+  stageCardTitle: {
+    fontSize: '16px',
+    lineHeight: '1.35',
+    fontWeight: '700',
+    color: tokens.colorNeutralForeground1,
+  },
+  stageCardBody: {
+    fontSize: '12px',
+    lineHeight: '1.6',
+    color: tokens.colorNeutralForeground2,
+  },
+  dividerRow: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  dividerLine: {
+    flex: 1,
+    height: '1px',
+    backgroundColor: tokens.colorNeutralStroke2,
+  },
+  dividerText: {
+    fontSize: '11px',
+    fontWeight: '700',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: tokens.colorNeutralForeground3,
+  },
+  otpPanel: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    padding: '14px',
+    borderRadius: '16px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
+  },
+  otpMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  otpTitle: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: tokens.colorNeutralForeground1,
+  },
+  otpSubtitle: {
+    fontSize: '12px',
+    lineHeight: '1.5',
+    color: tokens.colorNeutralForeground2,
+  },
+  successBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 12px',
+    borderRadius: '14px',
+    border: `1px solid ${tokens.colorStatusSuccessBorder1}`,
+    backgroundColor: tokens.colorStatusSuccessBackground1,
+    color: tokens.colorStatusSuccessForeground1,
+    fontSize: '13px',
+    fontWeight: '600',
+  },
+  actionRow: {
+    width: '100%',
+    display: 'flex',
+    gap: '10px',
+    alignItems: 'center',
+    '@media (max-width: 640px)': {
+      flexDirection: 'column',
+      alignItems: 'stretch',
+    }
+  },
+  inlineActions: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    flexWrap: 'wrap',
+  },
+  ghostButton: {
+    color: tokens.colorNeutralForeground2,
+    paddingLeft: 0,
+    paddingRight: 0,
+  },
+  legalText: {
+    fontSize: '11px',
+    lineHeight: '1.6',
+    color: tokens.colorNeutralForeground3,
+    textAlign: 'left',
+  },
+  otpGrid: {
+    display: 'flex',
+    gap: '8px',
+    justifyContent: 'flex-start',
+    flexWrap: 'nowrap',
+    '@media (max-width: 420px)': {
+      gap: '6px',
+    }
+  },
   subtitle: {
     textAlign: 'center',
     color: tokens.colorNeutralForeground2,
@@ -738,6 +900,14 @@ export default function AuthPanel({
     }
   }
 
+  const handleSigninChangeEmail = () => {
+    setSigninOtpId(null)
+    setSigninOtpDigits(['', '', '', '', '', ''])
+    setSigninOtpHint(null)
+    setSigninOtpError(null)
+    setSigninResendSecondsLeft(0)
+  }
+
   const requestSignUp = () => {
     if (onRequestSignUp) return onRequestSignUp()
     setMode('register')
@@ -746,6 +916,26 @@ export default function AuthPanel({
   const requestSignIn = () => {
     if (onRequestSignIn) return onRequestSignIn()
     setMode('signin')
+  }
+
+  const handleRegisterPrimaryAction = () => {
+    if (duplicateEmailDetected) {
+      setDuplicateEmailDetected(false)
+      requestSignIn()
+      return
+    }
+
+    if (step1State === 'otp-pending') {
+      handleStep1VerifyOtp()
+      return
+    }
+
+    if (step1State === 'verified') {
+      setRegStep(2)
+      return
+    }
+
+    handleStep1Continue()
   }
 
   const handleCancel = () => {
@@ -766,7 +956,7 @@ export default function AuthPanel({
 
       <div className={`${styles.content} ${isRegisterMode ? styles.contentCompact : ''}`}>
         {mode === 'signin' ? (
-          <>
+          <div className={styles.formShell}>
             {/* Logo + tagline only when rendered standalone (not embedded in unified card) */}
             {!embedded && (
               <>
@@ -779,118 +969,156 @@ export default function AuthPanel({
               </>
             )}
 
-            <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
-
-            {/* Email field */}
-            <div className="form-group">
-              <label>Work email *</label>
-              <Input
-                className={styles.fullWidth}
-                type="email"
-                value={signinEmail}
-                placeholder="you@company.com"
-                onChange={(e) => setSigninEmail(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !signinOtpId) handleSigninStartOtp() }}
-              />
+            <div className={styles.formIntro}>
+              <div className={styles.formEyebrow}>Fast entry</div>
+              <h2 className={styles.formHeading}>Sign in without the usual auth friction.</h2>
+              <p className={styles.formBody}>
+                Pick the fastest route in. Use Google for instant access, or verify your work email and continue in one clean flow.
+              </p>
             </div>
 
-            {/* Helper text — always visible, left-aligned */}
-            <div className={styles.helperText} style={{ textAlign: 'left', marginTop: 0 }}>
-              We will send a 6-digit code to verify your identity. No password needed.
-            </div>
-
-            {/* OTP field — always rendered, dimmed until code is sent */}
-            <div style={{ opacity: signinOtpId ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
-              <div className="form-group">
-                <label>Verification code *</label>
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  {signinOtpDigits.map((digit, i) => (
-                    <input
-                      key={i}
-                      aria-label={`OTP digit ${i + 1}`}
-                      className="auth-otp-digit"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      disabled={!signinOtpId}
-                      autoFocus={signinOtpId !== null && i === 0}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '').slice(-1)
-                        const next = [...signinOtpDigits]
-                        next[i] = val
-                        setSigninOtpDigits(next)
-                        if (val && i < 5) {
-                          const nextBox = document.querySelector<HTMLInputElement>(`[data-signin-otp="${i + 1}"]`)
-                          nextBox?.focus()
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Backspace' && !signinOtpDigits[i] && i > 0) {
-                          const prevBox = document.querySelector<HTMLInputElement>(`[data-signin-otp="${i - 1}"]`)
-                          prevBox?.focus()
-                        }
-                        if (e.key === 'Enter' && signinOtpId) handleSigninVerifyOtp()
-                      }}
-                      onPaste={(e) => {
-                        const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-                        if (paste) {
-                          const next = ['', '', '', '', '', '']
-                          for (let j = 0; j < paste.length; j++) next[j] = paste[j]
-                          setSigninOtpDigits(next)
-                          const focusIdx = Math.min(paste.length, 5)
-                          const box = document.querySelector<HTMLInputElement>(`[data-signin-otp="${focusIdx}"]`)
-                          box?.focus()
-                          e.preventDefault()
-                        }
-                      }}
-                      data-signin-otp={i}
-                    />
-                  ))}
-                </div>
+            <div className={`${styles.stageCard} ${styles.stageCardTight}`}>
+              <div className={styles.stageCardHeader}>
+                <div className={styles.stageCardEyebrow}>Instant option</div>
+                <div className={styles.stageCardTitle}>Continue with Google</div>
+                <div className={styles.stageCardBody}>Best for founders and operators who just want to get to the portal immediately.</div>
               </div>
+              <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
             </div>
 
-            {/* Error / hint band below OTP — reserved slot, no shift */}
-            <div style={{ minHeight: '18px', marginTop: '-4px', width: '100%' }}>
-              {signinOtpError ? (
-                <div className={styles.errorText}>{signinOtpError}</div>
-              ) : signinOtpHint ? (
-                <div className={styles.helperText} style={{ marginTop: 0 }}>{signinOtpHint}</div>
-              ) : null}
+            <div className={styles.dividerRow}>
+              <div className={styles.dividerLine} />
+              <div className={styles.dividerText}>or use your work email</div>
+              <div className={styles.dividerLine} />
             </div>
 
-            {/* Single adaptive action button */}
-            <Button
-              appearance="primary"
-              onClick={signinOtpId ? handleSigninVerifyOtp : handleSigninStartOtp}
-              disabled={signinSubmitting || (signinOtpId ? signinOtpCode.trim().length === 0 : signinEmail.trim().length === 0)}
-              className={styles.fullWidth}
-            >
-              {signinSubmitting
-                ? (signinOtpId ? 'Verifying…' : 'Sending…')
-                : signinOtpId ? 'Verify & Sign in' : 'Send OTP'}
-            </Button>
+            <div className={styles.stageCard}>
+              <div className={styles.stageCardHeader}>
+                <div className={styles.stageCardEyebrow}>Email OTP</div>
+                <div className={styles.stageCardTitle}>Passwordless sign in for your team</div>
+                <div className={styles.stageCardBody}>We will send a 6-digit code to verify your identity. No password reset loops.</div>
+              </div>
 
-            <Button
-              appearance="subtle"
-              onClick={handleSigninResendOtp}
-              disabled={signinSubmitting || !signinOtpId || signinResendSecondsLeft > 0}
-              className={styles.fullWidth}
-            >
-              {signinResendSecondsLeft > 0 ? `Resend OTP (${signinResendSecondsLeft}s)` : 'Resend OTP'}
-            </Button>
+              <div className="form-group">
+                <label>Work email *</label>
+                <Input
+                  className={styles.fullWidth}
+                  type="email"
+                  value={signinEmail}
+                  placeholder="you@company.com"
+                  disabled={Boolean(signinOtpId)}
+                  onChange={(e) => setSigninEmail(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !signinOtpId) handleSigninStartOtp() }}
+                />
+              </div>
 
-            <Button appearance="subtle" onClick={requestSignUp} className={styles.fullWidth}>
-              Don’t have an account? Sign up
-            </Button>
+              {!signinOtpId ? (
+                <Button
+                  appearance="primary"
+                  onClick={handleSigninStartOtp}
+                  disabled={signinSubmitting || signinEmail.trim().length === 0}
+                  className={styles.fullWidth}
+                >
+                  {signinSubmitting ? 'Sending…' : 'Send OTP'}
+                </Button>
+              ) : (
+                <div className={styles.otpPanel}>
+                  <div className={styles.otpMeta}>
+                    <div className={styles.otpTitle}>Verification code</div>
+                    <div className={styles.otpSubtitle}>Enter the code we sent to {signinEmail} to unlock your workspace.</div>
+                  </div>
+                  <div className={styles.otpGrid}>
+                    {signinOtpDigits.map((digit, i) => (
+                      <input
+                        key={i}
+                        aria-label={`OTP digit ${i + 1}`}
+                        className="auth-otp-digit"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        disabled={!signinOtpId}
+                        autoFocus={signinOtpId !== null && i === 0}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(-1)
+                          const next = [...signinOtpDigits]
+                          next[i] = val
+                          setSigninOtpDigits(next)
+                          if (val && i < 5) {
+                            const nextBox = document.querySelector<HTMLInputElement>(`[data-signin-otp="${i + 1}"]`)
+                            nextBox?.focus()
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Backspace' && !signinOtpDigits[i] && i > 0) {
+                            const prevBox = document.querySelector<HTMLInputElement>(`[data-signin-otp="${i - 1}"]`)
+                            prevBox?.focus()
+                          }
+                          if (e.key === 'Enter' && signinOtpId) handleSigninVerifyOtp()
+                        }}
+                        onPaste={(e) => {
+                          const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                          if (paste) {
+                            const next = ['', '', '', '', '', '']
+                            for (let j = 0; j < paste.length; j++) next[j] = paste[j]
+                            setSigninOtpDigits(next)
+                            const focusIdx = Math.min(paste.length, 5)
+                            const box = document.querySelector<HTMLInputElement>(`[data-signin-otp="${focusIdx}"]`)
+                            box?.focus()
+                            e.preventDefault()
+                          }
+                        }}
+                        data-signin-otp={i}
+                      />
+                    ))}
+                  </div>
 
-            <div className={`${styles.footer} ${styles.footerText}`}>
-              By signing in, you agree to our Terms of Service and Privacy Policy
+                  <div style={{ minHeight: '18px', width: '100%' }}>
+                    {signinOtpError ? (
+                      <div className={styles.errorText}>{signinOtpError}</div>
+                    ) : signinOtpHint ? (
+                      <div className={styles.helperText} style={{ marginTop: 0 }}>{signinOtpHint}</div>
+                    ) : null}
+                  </div>
+
+                  <div className={styles.actionRow}>
+                    <Button
+                      appearance="primary"
+                      onClick={handleSigninVerifyOtp}
+                      disabled={signinSubmitting || signinOtpCode.trim().length === 0}
+                      className={styles.fullWidth}
+                    >
+                      {signinSubmitting ? 'Verifying…' : 'Verify & Sign in'}
+                    </Button>
+                    <Button appearance="subtle" onClick={handleSigninChangeEmail} className={styles.ghostButton}>
+                      Change email
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          </>
+
+            <div className={styles.inlineActions}>
+              <Button
+                appearance="subtle"
+                onClick={handleSigninResendOtp}
+                disabled={signinSubmitting || !signinOtpId || signinResendSecondsLeft > 0}
+                className={styles.ghostButton}
+              >
+                {signinResendSecondsLeft > 0 ? `Resend OTP (${signinResendSecondsLeft}s)` : 'Resend OTP'}
+              </Button>
+
+              <Button appearance="subtle" onClick={requestSignUp} className={styles.ghostButton}>
+                Don’t have an account? Sign up
+              </Button>
+            </div>
+
+            <div className={styles.legalText}>
+              By signing in, you agree to our Terms of Service and Privacy Policy.
+            </div>
+          </div>
         ) : (
-          <>
+          <div className={styles.formShell}>
             {/* Step dots — only shown standalone (left panel plays this role when embedded) */}
             {!embedded && (
               <div className={styles.stepDots}>
@@ -907,12 +1135,27 @@ export default function AuthPanel({
               </div>
             )}
 
+            <div className={styles.formIntro}>
+              <div className={styles.formEyebrow}>Startup onboarding</div>
+              <h2 className={styles.formHeading}>
+                {regStep === 1 ? 'Launch your first trial with a cleaner setup flow.' : regStep === 2 ? 'Tell us enough to personalise the first agent shortlist.' : 'Finish setup and unlock your workspace.'}
+              </h2>
+              <p className={styles.formBody}>
+                {regStep === 1 ? 'We start with fast verification so you can move from curiosity to trial without losing momentum.' : regStep === 2 ? 'This business context helps WAOOAW feel more like a modern operating system than a generic lead form.' : 'One last contact step, then your account is ready for live agent trials and deliverables.'}
+              </p>
+            </div>
+
             {regStep === 1 ? (
               /* ── Step 1 : Email → OTP verify ─────────────────────────── */
               <>
                 {/* Google prefill shortcut */}
                 {step1State === 'email' && (
-                  <>
+                  <div className={`${styles.stageCard} ${styles.stageCardTight}`}>
+                    <div className={styles.stageCardHeader}>
+                      <div className={styles.stageCardEyebrow}>Shortcut</div>
+                      <div className={styles.stageCardTitle}>Prefill with Google</div>
+                      <div className={styles.stageCardBody}>Useful when you want your name and work email dropped into the flow instantly.</div>
+                    </div>
                     <GoogleLoginButton
                       mode="prefill"
                       onPrefill={({ name, email }) =>
@@ -924,80 +1167,87 @@ export default function AuthPanel({
                       }
                       onError={(e) => setRegisterError(e)}
                     />
-                  </>
+                  </div>
                 )}
 
-                {!embedded && (
-                  <>
-                    <div className={styles.stepHeading}>
-                      {step1State === 'otp-pending' ? 'Check your inbox' : "Let's get started"}
-                    </div>
-                    <div className={styles.stepSubHeading}>
-                      {step1State === 'otp-pending'
-                        ? `Enter the code we sent to ${formData.email}`
-                        : step1State === 'verified'
-                        ? 'Email verified — continue below or change your email'
-                        : 'Enter your work email to create your account'}
-                    </div>
-                  </>
-                )}
-
-                {/* Email field — always visible */}
-                <div className="form-group">
-                  <label>Work email *</label>
-                  <Input
-                    className={styles.fullWidth}
-                    type="email"
-                    value={formData.email}
-                    placeholder="you@company.com"
-                    autoFocus={step1State === 'email'}
-                    disabled={step1State === 'otp-pending' || step1State === 'verified'}
-                    onChange={(e) => {
-                      setFormData((p) => ({ ...p, email: e.target.value }))
-                      if (step1State === 'verified') handleChangeEmail()
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && step1State === 'email') handleStep1Continue()
-                    }}
-                  />
-                </div>
-
-                {/* Fixed-height message band */}
-                <div style={{ minHeight: '20px', width: '100%' }}>
-                  {errors.email ? (
-                    <div className={styles.errorText}>{errors.email}</div>
-                  ) : step1State === 'verified' ? (
-                    <div style={{ color: 'var(--colorStatusSuccessForeground1)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>✅</span>
-                      <span style={{ flex: 1 }}>Email verified</span>
-                      <Button appearance="subtle" size="small" onClick={handleChangeEmail}>Change</Button>
-                    </div>
-                  ) : (
-                    <div className={styles.helperText}>
-                      We’ll send a 6-digit code to verify your email before creating your account.
-                    </div>
-                  )}
-                </div>
-
-                {/* Captcha — only needed before sending OTP */}
                 {step1State === 'email' && (
-                  <>  
-                    {turnstileSiteKey ? (
-                      <div className="form-group">
-                        <CaptchaWidget key={captchaResetKey} siteKey={turnstileSiteKey} onToken={handleCaptchaToken} onError={handleCaptchaError} />
-                        {captchaError && <div className="field-error">{captchaError}</div>}
+                  <div className={styles.dividerRow}>
+                    <div className={styles.dividerLine} />
+                    <div className={styles.dividerText}>or verify with work email</div>
+                    <div className={styles.dividerLine} />
+                  </div>
+                )}
+
+                <div className={styles.stageCard}>
+                  <div className={styles.stageCardHeader}>
+                    <div className={styles.stageCardEyebrow}>Step 1 of 3</div>
+                    <div className={styles.stageCardTitle}>
+                      {step1State === 'otp-pending' ? 'Check your inbox' : step1State === 'verified' ? "Let's get started" : "Let's get started"}
+                    </div>
+                    <div className={styles.stageCardBody}>
+                      {step1State === 'otp-pending'
+                        ? `Enter the code we sent to ${formData.email}.`
+                        : step1State === 'verified'
+                        ? 'Your email is ready. Continue into business setup or change it if needed.'
+                        : 'Use the email you want tied to your trial account and future deliverables.'}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Work email *</label>
+                    <Input
+                      className={styles.fullWidth}
+                      type="email"
+                      value={formData.email}
+                      placeholder="you@company.com"
+                      autoFocus={step1State === 'email'}
+                      disabled={step1State === 'otp-pending' || step1State === 'verified'}
+                      onChange={(e) => {
+                        setFormData((p) => ({ ...p, email: e.target.value }))
+                        if (step1State === 'verified') handleChangeEmail()
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && step1State === 'email') handleStep1Continue()
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ minHeight: '20px', width: '100%' }}>
+                    {errors.email ? (
+                      <div className={styles.errorText}>{errors.email}</div>
+                    ) : step1State === 'verified' ? (
+                      <div className={styles.successBadge}>
+                        <span>✅</span>
+                        <span style={{ flex: 1 }}>Email verified</span>
+                        <Button appearance="subtle" size="small" onClick={handleChangeEmail}>Change</Button>
                       </div>
                     ) : (
-                      !isProduction && <div style={{ fontSize: '0.75rem', color: 'var(--colorNeutralForeground3)' }}>CAPTCHA not configured (dev mode)</div>
+                      <div className={styles.helperText}>
+                        We’ll send a 6-digit code before creating your account.
+                      </div>
                     )}
-                  </>
-                )}
+                  </div>
 
-                {/* OTP field — always rendered, dimmed until active */}
-                <div style={{ opacity: step1State === 'otp-pending' ? 1 : 0.38, transition: 'opacity 0.2s', width: '100%' }}>
-                  <div className="form-group">
-                    <label>Verification code *</label>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  {step1State === 'email' && (
+                    <>
+                      {turnstileSiteKey ? (
+                        <div className="form-group">
+                          <CaptchaWidget key={captchaResetKey} siteKey={turnstileSiteKey} onToken={handleCaptchaToken} onError={handleCaptchaError} />
+                          {captchaError && <div className="field-error">{captchaError}</div>}
+                        </div>
+                      ) : (
+                        !isProduction && <div style={{ fontSize: '0.75rem', color: 'var(--colorNeutralForeground3)' }}>CAPTCHA not configured (dev mode)</div>
+                      )}
+                    </>
+                  )}
+
+                  {step1State === 'otp-pending' && (
+                    <div className={styles.otpPanel}>
+                      <div className={styles.otpMeta}>
+                        <div className={styles.otpTitle}>Verification code</div>
+                        <div className={styles.otpSubtitle}>Paste the code from your inbox to unlock the next onboarding step.</div>
+                      </div>
+                      <div className={styles.otpGrid}>
                       {otpDigits.map((digit, i) => (
                         <input
                           key={i}
@@ -1042,12 +1292,11 @@ export default function AuthPanel({
                           data-reg-otp={i}
                         />
                       ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* OTP message band — shows otpError, otpHint, or registerError; reserved slot */}
-                <div style={{ minHeight: '18px', marginTop: '-4px', width: '100%' }}>
+                  <div style={{ minHeight: '18px', width: '100%' }}>
                   {otpError ? (
                     <div className={styles.errorText}>{otpError}</div>
                   ) : otpHint ? (
@@ -1055,216 +1304,228 @@ export default function AuthPanel({
                   ) : registerError ? (
                     <div className={styles.errorText}>{registerError}</div>
                   ) : null}
-                </div>
-                {duplicateEmailDetected && (
-                  <div className={styles.errorText} style={{ textAlign: 'center' }}>
-                    <p style={{ marginBottom: '8px' }}>This email is already registered.</p>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <Button appearance="primary" size="small" onClick={() => { setDuplicateEmailDetected(false); requestSignIn() }}>
-                        Sign in instead
-                      </Button>
-                      <Button appearance="secondary" size="small" onClick={() => { setDuplicateEmailDetected(false); setFormData((p) => ({ ...p, email: '' })); setErrors({}) }}>
-                        Use different email
-                      </Button>
-                    </div>
                   </div>
-                )}
 
-                {/* Single adaptive action button */}
-                <Button
-                  appearance="secondary"
-                  className={styles.fullWidth}
-                  disabled={registerSubmitting || (step1State === 'otp-pending' && otpCode.trim().length === 0)}
-                  onClick={
-                    step1State === 'otp-pending' ? handleStep1VerifyOtp
-                    : step1State === 'verified' ? () => setRegStep(2)
-                    : handleStep1Continue
-                  }
-                >
-                  {registerSubmitting
-                    ? (step1State === 'otp-pending' ? 'Verifying…' : 'Sending code…')
-                    : step1State === 'otp-pending' ? 'Verify email →'
-                    : 'Continue →'}
-                </Button>
+                  {duplicateEmailDetected && (
+                    <div className={styles.errorText} style={{ textAlign: 'center' }}>
+                      <p style={{ marginBottom: '8px' }}>This email is already registered.</p>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <Button appearance="primary" size="small" onClick={() => { setDuplicateEmailDetected(false); requestSignIn() }}>
+                          Sign in instead
+                        </Button>
+                        <Button appearance="secondary" size="small" onClick={() => { setDuplicateEmailDetected(false); setFormData((p) => ({ ...p, email: '' })); setErrors({}) }}>
+                          Use different email
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
-                <Button
-                  appearance="subtle"
-                  onClick={handleResendRegisterOtp}
-                  disabled={registerSubmitting || step1State !== 'otp-pending' || registerResendSecondsLeft > 0}
-                  className={styles.fullWidth}
-                >
-                  {registerResendSecondsLeft > 0 ? `Resend code in ${registerResendSecondsLeft}s` : 'Resend code'}
-                </Button>
+                  <div className={styles.actionRow}>
+                    <Button
+                      appearance="primary"
+                      onClick={handleRegisterPrimaryAction}
+                      disabled={registerSubmitting || (step1State === 'otp-pending' && otpCode.trim().length === 0)}
+                      className={styles.fullWidth}
+                    >
+                      {duplicateEmailDetected ? 'Sign in instead' : registerSubmitting
+                        ? (step1State === 'otp-pending' ? 'Verifying…' : 'Sending code…')
+                        : step1State === 'otp-pending' ? 'Verify email →'
+                        : 'Continue →'}
+                    </Button>
 
-                <Button appearance="subtle" onClick={requestSignIn} className={styles.fullWidth}>
-                  Already have an account? Sign in
-                </Button>
+                    {step1State === 'otp-pending' ? (
+                      <Button appearance="subtle" onClick={handleChangeEmail} className={styles.ghostButton}>
+                        Change email
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className={styles.inlineActions}>
+                  <Button
+                    appearance="subtle"
+                    onClick={handleResendRegisterOtp}
+                    disabled={registerSubmitting || step1State !== 'otp-pending' || registerResendSecondsLeft > 0}
+                    className={styles.ghostButton}
+                  >
+                    {registerResendSecondsLeft > 0 ? `Resend code in ${registerResendSecondsLeft}s` : 'Resend code'}
+                  </Button>
+
+                  <Button appearance="subtle" onClick={requestSignIn} className={styles.ghostButton}>
+                    Already have an account? Sign in
+                  </Button>
+                </div>
               </>
 
             ) : regStep === 2 ? (
               /* ── Step 2 : Name · Business · Industry ─────────────────── */
               <>
-                {!embedded && (
-                  <>
-                    <div className={styles.stepHeading}>Tell us about you</div>
-                    <div className={styles.stepSubHeading}>This helps us personalise your agent recommendations</div>
-                  </>
-                )}
+                <div className={styles.stageCard}>
+                  <div className={styles.stageCardHeader}>
+                    <div className={styles.stageCardEyebrow}>Step 2 of 3</div>
+                    <div className={styles.stageCardTitle}>Tell us about you</div>
+                    <div className={styles.stageCardBody}>Enough context to make the agent marketplace feel curated instead of generic.</div>
+                  </div>
 
-                <div className="form-group">
-                  <label>Your full name *</label>
-                  <Input
-                    className={styles.fullWidth}
-                    value={formData.fullName}
-                    placeholder="Jane Smith"
-                    autoFocus
-                    onChange={(e) => setFormData((p) => ({ ...p, fullName: e.target.value }))}
-                  />
-                  {errors.fullName && <div className="field-error">{errors.fullName}</div>}
-                </div>
+                  <div className={styles.twoColGrid}>
+                    <div className="form-group">
+                      <label>Your full name *</label>
+                      <Input
+                        className={styles.fullWidth}
+                        value={formData.fullName}
+                        placeholder="Jane Smith"
+                        autoFocus
+                        onChange={(e) => setFormData((p) => ({ ...p, fullName: e.target.value }))}
+                      />
+                      {errors.fullName && <div className="field-error">{errors.fullName}</div>}
+                    </div>
 
-                <div className="form-group">
-                  <label>Business name *</label>
-                  <Input
-                    className={styles.fullWidth}
-                    value={formData.businessName}
-                    placeholder="Acme Inc."
-                    onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
-                  />
-                  {errors.businessName && <div className="field-error">{errors.businessName}</div>}
-                </div>
+                    <div className="form-group">
+                      <label>Business name *</label>
+                      <Input
+                        className={styles.fullWidth}
+                        value={formData.businessName}
+                        placeholder="Acme Inc."
+                        onChange={(e) => setFormData((p) => ({ ...p, businessName: e.target.value }))}
+                      />
+                      {errors.businessName && <div className="field-error">{errors.businessName}</div>}
+                    </div>
 
-                <div className="form-group">
-                  <label>Industry *</label>
-                  <Select
-                    value={formData.businessIndustry}
-                    onChange={(_, data) => setFormData((p) => ({ ...p, businessIndustry: String(data.value || '') }))}
-                  >
-                    <option value="">Select your industry</option>
-                    {INDUSTRY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </Select>
-                  {errors.businessIndustry && <div className="field-error">{errors.businessIndustry}</div>}
-                </div>
+                    <div className="form-group">
+                      <label>Industry *</label>
+                      <Select
+                        value={formData.businessIndustry}
+                        onChange={(_, data) => setFormData((p) => ({ ...p, businessIndustry: String(data.value || '') }))}
+                      >
+                        <option value="">Select your industry</option>
+                        {INDUSTRY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </Select>
+                      {errors.businessIndustry && <div className="field-error">{errors.businessIndustry}</div>}
+                    </div>
 
-                <div className="form-group">
-                  <label>Business address (optional)</label>
-                  <Input
-                    className={styles.fullWidth}
-                    value={formData.businessAddress}
-                    placeholder="City, State, Country"
-                    onChange={(e) => setFormData((p) => ({ ...p, businessAddress: e.target.value }))}
-                  />
-                </div>
+                    <div className="form-group">
+                      <label>Business address (optional)</label>
+                      <Input
+                        className={styles.fullWidth}
+                        value={formData.businessAddress}
+                        placeholder="City, State, Country"
+                        onChange={(e) => setFormData((p) => ({ ...p, businessAddress: e.target.value }))}
+                      />
+                    </div>
+                  </div>
 
-                <div className={styles.navRow}>
-                  <Button appearance="secondary" onClick={() => { setErrors({}); setRegStep(1) }} style={{ flex: 1 }}>
-                    ← Back
-                  </Button>
-                  <Button
-                    appearance="secondary"
-                    onClick={() => { if (validateStep2()) setRegStep(3) }}
-                    style={{ flex: 1 }}
-                  >
-                    Continue →
-                  </Button>
+                  <div className={styles.navRow}>
+                    <Button appearance="secondary" onClick={() => { setErrors({}); setRegStep(1) }} style={{ flex: 1 }}>
+                      ← Back
+                    </Button>
+                    <Button
+                      appearance="primary"
+                      onClick={() => { if (validateStep2()) setRegStep(3) }}
+                      style={{ flex: 1 }}
+                    >
+                      Continue →
+                    </Button>
+                  </div>
                 </div>
               </>
 
             ) : (
               /* ── Step 3 : Phone · Contact · Consent ───────────────────── */
               <>
-                {!embedded && (
-                  <>
-                    <div className={styles.stepHeading}>Almost done!</div>
-                    <div className={styles.stepSubHeading}>Add a phone number so agents can reach you faster</div>
-                  </>
-                )}
+                <div className={styles.stageCard}>
+                  <div className={styles.stageCardHeader}>
+                    <div className={styles.stageCardEyebrow}>Step 3 of 3</div>
+                    <div className={styles.stageCardTitle}>Almost done!</div>
+                    <div className={styles.stageCardBody}>This keeps the first trial responsive once your workspace goes live.</div>
+                  </div>
 
-                <div className="form-group">
-                  <label>Country *</label>
-                  <Select
-                    value={formData.phoneCountry}
-                    onChange={(_, data) => setFormData((p) => ({ ...p, phoneCountry: String(data.value || 'IN') }))}
-                  >
-                    {PHONE_COUNTRY_OPTIONS.map((opt) => (
-                      <option key={opt.code} value={opt.code}>{opt.label}</option>
-                    ))}
-                  </Select>
-                  {errors.phoneCountry && <div className="field-error">{errors.phoneCountry}</div>}
-                </div>
-
-                <div className="form-group">
-                  <label>Mobile number *</label>
-                  <Input
-                    className={styles.fullWidth}
-                    type="tel"
-                    value={formData.phoneNationalNumber}
-                    placeholder={formData.phoneCountry === 'IN' ? '9876543210' : 'Mobile number'}
-                    autoFocus
-                    onChange={(e) => setFormData((p) => ({ ...p, phoneNationalNumber: e.target.value }))}
-                  />
-                  {errors.phoneNationalNumber && <div className="field-error">{errors.phoneNationalNumber}</div>}
-                </div>
-
-                <div className="form-group">
-                  <label>Preferred contact *</label>
-                  <div className={styles.contactToggle}>
-                    {(['email', 'phone'] as const).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        className={[
-                          styles.contactBtn,
-                          formData.preferredContactMethod === m ? styles.contactBtnActive : ''
-                        ].join(' ')}
-                        onClick={() => setFormData((p) => ({ ...p, preferredContactMethod: m }))}
+                  <div className={styles.twoColGrid}>
+                    <div className="form-group">
+                      <label>Country *</label>
+                      <Select
+                        value={formData.phoneCountry}
+                        onChange={(_, data) => setFormData((p) => ({ ...p, phoneCountry: String(data.value || 'IN') }))}
                       >
-                        {m === 'email' ? '✉️ Email' : '📱 Phone'}
-                      </button>
-                    ))}
+                        {PHONE_COUNTRY_OPTIONS.map((opt) => (
+                          <option key={opt.code} value={opt.code}>{opt.label}</option>
+                        ))}
+                      </Select>
+                      {errors.phoneCountry && <div className="field-error">{errors.phoneCountry}</div>}
+                    </div>
+
+                    <div className="form-group">
+                      <label>Mobile number *</label>
+                      <Input
+                        className={styles.fullWidth}
+                        type="tel"
+                        value={formData.phoneNationalNumber}
+                        placeholder={formData.phoneCountry === 'IN' ? '9876543210' : 'Mobile number'}
+                        autoFocus
+                        onChange={(e) => setFormData((p) => ({ ...p, phoneNationalNumber: e.target.value }))}
+                      />
+                      {errors.phoneNationalNumber && <div className="field-error">{errors.phoneNationalNumber}</div>}
+                    </div>
+
+                    <div className={`form-group ${styles.spanTwo}`}>
+                      <label>Preferred contact *</label>
+                      <div className={styles.contactToggle}>
+                        {(['email', 'phone'] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            className={[
+                              styles.contactBtn,
+                              formData.preferredContactMethod === m ? styles.contactBtnActive : ''
+                            ].join(' ')}
+                            onClick={() => setFormData((p) => ({ ...p, preferredContactMethod: m }))}
+                          >
+                            {m === 'email' ? '✉️ Email' : '📱 Phone'}
+                          </button>
+                        ))}
+                      </div>
+                      {errors.preferredContactMethod && <div className="field-error">{errors.preferredContactMethod}</div>}
+                    </div>
+
+                    <div className={`form-group ${styles.spanTwo}`}>
+                      <Checkbox
+                        checked={formData.consent}
+                        onChange={(_, data) => setFormData((p) => ({ ...p, consent: Boolean(data.checked) }))}
+                        label="I agree to the Terms of Service and Privacy Policy"
+                      />
+                      {errors.consent && <div className="field-error">{errors.consent}</div>}
+                    </div>
                   </div>
-                  {errors.preferredContactMethod && <div className="field-error">{errors.preferredContactMethod}</div>}
-                </div>
 
-                <div className="form-group">
-                  <Checkbox
-                    checked={formData.consent}
-                    onChange={(_, data) => setFormData((p) => ({ ...p, consent: Boolean(data.checked) }))}
-                    label="I agree to the Terms of Service and Privacy Policy"
-                  />
-                  {errors.consent && <div className="field-error">{errors.consent}</div>}
-                </div>
+                  {registerError ? (
+                    <div className={styles.errorText} style={{ textAlign: 'center' }}>
+                      <p style={{ marginBottom: '8px' }}>{registerError}</p>
+                      {/re-verify/i.test(registerError) && (
+                        <Button appearance="secondary" size="small" onClick={() => { setRegisterError(null); setRegStep(1) }}>
+                          ← Re-verify email
+                        </Button>
+                      )}
+                    </div>
+                  ) : null}
 
-                {/* Registration error — OTP-expiry errors are detected in handleRegisterSubmit */}
-                {registerError ? (
-                  <div className={styles.errorText} style={{ textAlign: 'center' }}>
-                    <p style={{ marginBottom: '8px' }}>{registerError}</p>
-                    {/re-verify/i.test(registerError) && (
-                      <Button appearance="secondary" size="small" onClick={() => { setRegisterError(null); setRegStep(1) }}>
-                        ← Re-verify email
-                      </Button>
-                    )}
+                  <div className={styles.navRow}>
+                    <Button appearance="secondary" onClick={() => { setErrors({}); setRegStep(2) }} disabled={registerSubmitting} style={{ flex: 1 }}>
+                      ← Back
+                    </Button>
+                    <Button
+                      appearance="primary"
+                      onClick={() => { if (validateStep3()) handleRegisterSubmit() }}
+                      disabled={registerSubmitting || !formData.consent}
+                      style={{ flex: 1 }}
+                    >
+                      {registerSubmitting ? 'Creating account…' : 'Create account 🚀'}
+                    </Button>
                   </div>
-                ) : null}
-
-                <div className={styles.navRow}>
-                  <Button appearance="secondary" onClick={() => { setErrors({}); setRegStep(2) }} disabled={registerSubmitting} style={{ flex: 1 }}>
-                    ← Back
-                  </Button>
-                  <Button
-                    appearance="secondary"
-                    onClick={() => { if (validateStep3()) handleRegisterSubmit() }}
-                    disabled={registerSubmitting || !formData.consent}
-                    style={{ flex: 1 }}
-                  >
-                    {registerSubmitting ? 'Creating account…' : 'Create account 🚀'}
-                  </Button>
                 </div>
               </>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

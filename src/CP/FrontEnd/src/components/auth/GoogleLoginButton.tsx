@@ -6,7 +6,7 @@
  * Linear sign-in aesthetics. The SDK iframe handles all OAuth state safely.
  */
 
-import { makeStyles, tokens } from '@fluentui/react-components'
+import { makeStyles } from '@fluentui/react-components'
 import { GoogleLogin } from '@react-oauth/google'
 import { jwtDecode } from 'jwt-decode'
 import { useAuth } from '../../hooks/useAuth'
@@ -28,10 +28,6 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    selectors: {
-      '& > div': { width: '100% !important' },
-      '& iframe': { width: '100% !important' },
-    },
   },
 })
 
@@ -63,7 +59,7 @@ export default function GoogleLoginButton({ mode = 'signin', onSuccess, onError,
   }
 
   return (
-    <div className={styles.frame}>
+    <div className={`${styles.frame} auth-google-frame`}>
       <GoogleLogin
         onSuccess={handleSuccess}
         onError={handleError}
