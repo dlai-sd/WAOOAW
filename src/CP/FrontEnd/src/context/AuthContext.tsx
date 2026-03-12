@@ -9,6 +9,11 @@ import authService, { User } from '../services/auth.service'
 const AUTH_CHANGED_EVENT = 'waooaw:auth-changed'
 const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
 
+function shouldForceRefreshForCurrentPath(): boolean {
+  const path = window.location?.pathname || '/'
+  return !['/', '/signin', '/signup', '/auth/callback'].includes(path)
+}
+
 function setAuthExpiredFlag(): void {
   try {
     sessionStorage.setItem(AUTH_EXPIRED_FLAG, '1')
@@ -62,7 +67,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loadUser = useCallback(async () => {
     // First, try to restore the session via silent refresh (may already have a valid in-memory token)
     if (!authService.isAuthenticated()) {
-      await authService.silentRefresh()
+      await authService.silentRefresh(shouldForceRefreshForCurrentPath())
     }
 
     if (authService.isAuthenticated()) {

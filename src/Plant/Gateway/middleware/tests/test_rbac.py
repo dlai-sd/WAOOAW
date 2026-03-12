@@ -451,8 +451,9 @@ async def test_rbac_viewer_create_denied(viewer_jwt_claims):
 
 # Test Public Endpoints
 @pytest.mark.asyncio
-async def test_rbac_public_endpoint_bypassed():
-    """Public endpoints bypass RBAC"""
+@pytest.mark.parametrize("path", ["/health", "/api/health", "/api/docs", "/api/openapi.json"])
+async def test_rbac_public_endpoint_bypassed(path):
+    """Public endpoints bypass RBAC, including proxied docs paths."""
     test_app = FastAPI()
     test_app.add_middleware(
         RBACMiddleware,
@@ -467,13 +468,17 @@ async def test_rbac_public_endpoint_bypassed():
     @test_app.get("/api/health")
     async def api_health():
         return {"status": "healthy"}
+
+    @test_app.get("/api/docs")
+    async def api_docs():
+        return {"ok": True}
+
+    @test_app.get("/api/openapi.json")
+    async def api_openapi():
+        return {"openapi": "3.1.0"}
     
     client = TestClient(test_app)
-    response = client.get("/health")
-
-    assert response.status_code == 200
-
-    response = client.get("/api/health")
+    response = client.get(path)
     
     assert response.status_code == 200
 

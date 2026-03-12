@@ -2382,6 +2382,51 @@ When delegating a complex task to a zero-cost agent, include all of the followin
 | Route/data-flow statement | Prevents confusion across CP, PP, Gateway, Plant, Mobile, and Terraform |
 | Test command list | Forces completion to include verification, not just code edits |
 | Deployment or runtime constraints | Prevents image-promotion, secret, CORS, and port regressions |
+| Demo persona and account | Forces the plan to name who will actually use the feature on demo |
+| Demo runtime data to create | Forces the plan to name the exact DB/runtime state needed for the portal journey to exist |
+| Live walkthrough steps on deployed URLs | Forces the plan to prove value in CP/PP/mobile after deploy, not just in local tests |
+| Visible-value proof gate | Prevents long stories from being marked complete when the customer still cannot see or use anything |
+
+### Customer-Visible MVP Translation Rules
+
+Use these rules whenever the user asks for an MVP, sellable feature, portal journey, operator workflow, or any story that claims customer value.
+
+| Rule | Mandatory requirement |
+|---|---|
+| **No invisible MVPs** | If the customer or operator cannot see the journey on the deployed portal, the story is NOT complete even if the code, tests, and routes exist. |
+| **Demo actor must be named** | Every customer-visible story must name the exact demo persona, account, tenant/customer, and hired instance or runtime id that will be used to prove the journey. |
+| **Demo data must be explicit** | Every customer-visible story must list the exact runtime data to create or seed: hire/subscription, brief/config, draft/deliverable, approval state, channel/integration state, and final status labels expected in UI. |
+| **Walkthrough must be explicit** | Every customer-visible story must list the exact deployed URLs and the exact click path or API path to prove the journey after deploy. |
+| **Proof must be observable** | Story acceptance criteria must include what the user should literally see: page, cards, labels, statuses, or actions. Avoid abstract wording like “workflow exists” or “surface is wired.” |
+| **Release-closeout requires demo proof** | A release story cannot be marked complete until someone verifies the deployed journey end to end on demo/UAT and records pass/fail evidence. |
+| **Data creation is part of implementation** | If the portal needs runtime rows to show value, creation of those rows is part of the story, not an optional follow-up. |
+
+### Required Story Fields For Sellable Portal Work
+
+Any epic, plan, or story that claims customer-visible portal value MUST include all of the following fields. A story missing any field below is incomplete by definition.
+
+| Required field | What to write |
+|---|---|
+| `Demo actor` | Exact customer/operator identity used for validation |
+| `Demo runtime records` | Exact rows/state to create: subscription, hired agent, skill config/brief, deliverable, approval, channel connection, publish state |
+| `Portal proof path` | Exact deployed URL plus click-by-click validation path |
+| `Visible success state` | Exact UI text/cards/statuses expected on success |
+| `Failure/blocked state` | Exact UI text/cards/statuses expected when blocked |
+| `Proof artifact` | Screenshot, recording, or explicit walkthrough log reference |
+
+### Release Gate For Customer Value
+
+Before marking any customer-visible MVP story or release-closeout story as complete, answer all five questions below with `yes`:
+
+| Question | Required answer |
+|---|---|
+| Does demo/UAT have the runtime data required to render the promised journey? | yes |
+| Can a real user persona execute the journey on deployed CP/PP/mobile URLs? | yes |
+| Are the expected success labels/cards/actions visibly present? | yes |
+| Are the expected blocked/error states visibly present and truthful? | yes |
+| Is there proof recorded for the deployed walkthrough? | yes |
+
+If any answer is `no`, the story is `Dev Complete` at best, not `customer-complete` and not `release-complete`.
 
 ### Step 1: Create Epic & Story Document
 
@@ -2466,6 +2511,7 @@ git push origin <branch>
 | **Commit messages** | Follow conventional commits: `<type>(<scope>): <subject>` (see Section 7) |
 | **Branch discipline** | Work on the feature branch, never commit directly to `main` |
 | **Image promotion path** | **ONE Docker image per service, promoted unchanged demo → uat → prod.** Never bake env-specific values (DB URL, timeouts, tracing, log levels, feature flags) into images. All config comes from env vars, Secret Manager, or tfvars. See "Environment Configuration Rules" below. |
+| **Customer-visible proof** | For any sellable portal feature, do NOT mark the story complete unless the deployed CP/PP/mobile journey is visible with real demo/UAT runtime data and a recorded walkthrough. |
 
 ### Environment Configuration Rules (Image Promotion Path)
 

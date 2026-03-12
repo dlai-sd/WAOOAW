@@ -33,6 +33,11 @@ try:
 except ImportError:  # pragma: no cover
     from infrastructure.feature_flags.feature_flags import FeatureFlagService, FeatureFlagContext
 
+try:
+    from .auth import _is_public_path
+except ImportError:  # pragma: no cover
+    from middleware.auth import _is_public_path
+
 logger = logging.getLogger(__name__)
 
 # ── OPA Cloud Run identity-token helpers ─────────────────────────────────────
@@ -163,9 +168,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if (
-            path in ["/health", "/healthz", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"]
-            or path == "/api/health"
-            or path.startswith("/api/health/")
+            _is_public_path(path)
             or path.rstrip("/").startswith("/api/v1/customers")
             or path.rstrip("/").startswith("/api/v1/otp/sessions")
         ):
