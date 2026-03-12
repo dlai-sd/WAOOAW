@@ -36,6 +36,11 @@ const SIGNIN_PROOF = [
   { value: '24/7', label: 'Always-on workforce' },
 ]
 
+const SIGNIN_NOTES = [
+  'Zero passwords, no dead-end recovery loops.',
+  'Pick up draft reviews, deliverables, and active trials from one command centre.',
+]
+
 export default function SignIn({ theme, toggleTheme }: SignInProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -50,9 +55,9 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
   return (
     <>
       <Header theme={theme} toggleTheme={toggleTheme} />
-      <main className="auth-page" data-testid="cp-signin-page">
+      <main className="auth-page auth-page--signin" data-testid="cp-signin-page">
         <div className="auth-center">
-          <div className="auth-unified-card">
+          <div className="auth-unified-card auth-unified-card--wide auth-unified-card--signin">
 
             {/* Single card-level title + close */}
             <div className="auth-unified-header">
@@ -76,6 +81,9 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
                   <div className="auth-side-kicker">Customer Command Centre</div>
                   <h2 className="auth-left-heading">{p.heading}</h2>
                   <p className="auth-left-tagline">{p.tagline}</p>
+                  <div className="auth-startup-statement">
+                    Designed for founders who want a fast way back into active agent work, not another admin-heavy login ritual.
+                  </div>
                   <div className="auth-proof-grid">
                     {SIGNIN_PROOF.map((item) => (
                       <div key={item.label} className="auth-proof-card">
@@ -96,6 +104,11 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
                       Clear entry, low friction, and immediate confidence that WAOOAW will help them hire, approve,
                       monitor spend, and operate agents without getting lost.
                     </p>
+                  </div>
+                  <div className="auth-note-list">
+                    {SIGNIN_NOTES.map((item) => (
+                      <div key={item} className="auth-note-item">{item}</div>
+                    ))}
                   </div>
                 </div>
               </section>

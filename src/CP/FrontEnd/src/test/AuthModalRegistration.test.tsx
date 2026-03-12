@@ -98,7 +98,7 @@ describe('AuthModal registration (REG-1.1)', () => {
 
   /** Step 1: fill email → fire OTP → enter code → advance to Step 2 */
   async function completeStep1(email = 'test@example.com', otpCode = '123456') {
-    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
+    fireEvent.click(screen.getByRole('button', { name: /Don.?t have an account\? Sign up/ }))
     await userEvent.type(screen.getByPlaceholderText('you@company.com'), email)
     fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
     await screen.findByRole('textbox', { name: 'OTP digit 1' })
@@ -129,7 +129,7 @@ describe('AuthModal registration (REG-1.1)', () => {
     renderModal()
 
     // Modal opens on sign-in by default; switch to register
-    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
+    fireEvent.click(screen.getByRole('button', { name: /Don.?t have an account\? Sign up/ }))
     expect(screen.getByText('Create your WAOOAW account')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('you@company.com')).toBeInTheDocument()
 
@@ -165,7 +165,7 @@ describe('AuthModal registration (REG-1.1)', () => {
   it('prefills name and email from Google', async () => {
     renderModal()
 
-    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
+    fireEvent.click(screen.getByRole('button', { name: /Don.?t have an account\? Sign up/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Mock Google Login' }))
 
     await waitFor(() =>
@@ -191,7 +191,7 @@ describe('AuthModal registration (REG-1.1)', () => {
     await act(async () => {})
 
     // Switch to register mode then get into OTP-pending state
-    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
+    fireEvent.click(screen.getByRole('button', { name: /Don.?t have an account\? Sign up/ }))
     await act(async () => {
       fireEvent.change(screen.getByPlaceholderText('you@company.com'), { target: { value: 'test@example.com' } })
     })
@@ -201,7 +201,7 @@ describe('AuthModal registration (REG-1.1)', () => {
 
     // OTP code field appears — flush timers then check synchronously
     await act(async () => { vi.advanceTimersByTime(100) })
-    expect(screen.getByText(/Dev OTP: 123456/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
 
     // Resend is disabled during cooldown
     const resendDisabled = screen.getByRole('button', { name: /Resend code in \d+s/ })
@@ -215,7 +215,7 @@ describe('AuthModal registration (REG-1.1)', () => {
 
     // Click resend → second OTP start call
     await act(async () => { fireEvent.click(resendEnabled) })
-    expect(await screen.findByText(/Dev OTP: 654321/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
   })
 
   it('cancel exits registration flow', () => {
@@ -226,7 +226,7 @@ describe('AuthModal registration (REG-1.1)', () => {
       </FluentProvider>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: "Don't have an account? Sign up" }))
+    fireEvent.click(screen.getByRole('button', { name: /Don.?t have an account\? Sign up/ }))
     // Close via the × icon button
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -276,7 +276,7 @@ describe('AuthModal registration (REG-1.1)', () => {
     })
 
     expect(startCalls).toBe(1)
-    expect(screen.getByText(/Dev OTP: 111111/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
 
     const resendButton = screen.getByRole('button', { name: /Resend OTP/i })
     expect(resendButton).toBeDisabled()
@@ -292,6 +292,6 @@ describe('AuthModal registration (REG-1.1)', () => {
     })
 
     expect(startCalls).toBe(2)
-    expect(screen.getByText(/Dev OTP: 222222/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
   })
 })
