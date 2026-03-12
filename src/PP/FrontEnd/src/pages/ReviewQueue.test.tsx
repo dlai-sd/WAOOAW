@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => {
         {
           approval_id: 'APR-123',
           customer_id: 'CUST-001',
-          customer_label: 'CUST-001',
+          customer_label: 'owner@example.com',
           agent_id: 'AGT-MKT-HEALTH-001',
           agent_label: 'Healthcare Content Agent',
           action: 'publish',
@@ -99,6 +99,7 @@ test('ReviewQueue loads enriched approvals and can approve or deny a selected it
 
   expect(screen.getByText('Decision workspace')).toBeInTheDocument()
   expect(screen.getByText('Healthcare Content Agent')).toBeInTheDocument()
+  expect(screen.getAllByText(/owner@example\.com/).length).toBeGreaterThan(0)
   await waitFor(() => {
     expect(screen.getByTestId('pp-review-queue-publish-readiness')).toHaveTextContent('Blocked by channel connection')
   })
@@ -118,7 +119,7 @@ test('ReviewQueue loads enriched approvals and can approve or deny a selected it
       {
         approval_id: 'APR-456',
         customer_id: 'CUST-001',
-        customer_label: 'CUST-001',
+        customer_label: 'owner@example.com',
         agent_id: 'AGT-MKT-HEALTH-001',
         agent_label: 'Healthcare Content Agent',
         action: 'publish',
@@ -180,6 +181,8 @@ test('ReviewQueue preserves operator context for the next PP surface', async () 
   })
 
   expect(screen.getByText('Operator handoff context')).toBeInTheDocument()
+  expect(screen.getAllByText(/owner@example\.com/).length).toBeGreaterThan(0)
+  expect(screen.getByText(/Raw IDs: customer_id CUST-001 • agent_id AGT-MKT-HEALTH-001/)).toBeInTheDocument()
 
   await waitFor(() => {
     expect(screen.getByTestId('pp-review-queue-block-owner')).toHaveTextContent('Platform action required')

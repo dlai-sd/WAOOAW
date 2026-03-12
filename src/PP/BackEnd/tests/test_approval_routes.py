@@ -185,6 +185,22 @@ async def test_approvals_review_queue_returns_enriched_context(app, client, monk
                     200,
                     {
                         "customer_id": "CUST-1",
+                        "email": "owner@care.example.com",
+                        "phone": "+91 99999 99999",
+                        "full_name": "Care Owner",
+                        "business_name": "WAOOAW Care",
+                        "business_industry": "healthcare",
+                        "business_address": "Pune",
+                        "website": None,
+                        "gst_number": None,
+                        "preferred_contact_method": "email",
+                        "consent": True,
+                    },
+                ),
+                _make_plant(
+                    200,
+                    {
+                        "customer_id": "CUST-1",
                         "instances": [
                             {
                                 "hired_instance_id": "HAI-123",
@@ -237,7 +253,7 @@ async def test_approvals_review_queue_returns_enriched_context(app, client, monk
     body = resp.json()
     assert body["count"] == 1
     approval = body["approvals"][0]
-    assert approval["customer_label"] == "CUST-1"
+    assert approval["customer_label"] == "owner@care.example.com"
     assert approval["agent_label"] == "Healthcare Content Agent"
     assert approval["hired_instance_id"] == "HAI-123"
     assert approval["review_state"] == "pending_review"
@@ -276,6 +292,22 @@ async def test_approvals_review_queue_surfaces_credential_and_lineage_diagnostic
     plant = SimpleNamespace(
         _request=AsyncMock(
             side_effect=[
+                _make_plant(
+                    200,
+                    {
+                        "customer_id": "CUST-2",
+                        "email": "founder@studio.example.com",
+                        "phone": "+91 88888 88888",
+                        "full_name": "Studio Founder",
+                        "business_name": "WAOOAW Studio",
+                        "business_industry": "marketing",
+                        "business_address": "Mumbai",
+                        "website": None,
+                        "gst_number": None,
+                        "preferred_contact_method": "email",
+                        "consent": True,
+                    },
+                ),
                 _make_plant(
                     200,
                     {
@@ -330,6 +362,7 @@ async def test_approvals_review_queue_surfaces_credential_and_lineage_diagnostic
 
     assert resp.status_code == 200
     approval = resp.json()["approvals"][0]
+    assert approval["customer_label"] == "founder@studio.example.com"
     assert approval["publish_diagnostics"]["publish_block"] == "credential_missing"
     assert approval["publish_diagnostics"]["credential_state"] == "missing_youtube_credential_ref"
     assert approval["publish_diagnostics"]["approval_lineage"] == "Approval APR-LOCKED-99 is currently attached to post POST-99."

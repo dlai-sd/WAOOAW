@@ -6,8 +6,10 @@ import { expect, test, vi } from 'vitest'
 
 const mockGatewayApiClient = vi.hoisted(() => ({
   listOpsSubscriptions: vi.fn(async () => []),
+  listReferenceAgents: vi.fn(async () => [{ agent_id: 'AGT-MKT-DMA-001', display_name: 'Digital Marketing Agent' }]),
   listOpsHiredAgents: vi.fn(async () => []),
   lookupCustomerByEmail: vi.fn(),
+  getCustomerById: vi.fn(async () => ({ customer_id: 'CUST-9', email: 'owner@example.com' })),
   getOpsHiredAgent: vi.fn(async () => ({})),
   listOpsHiredAgentGoals: vi.fn(async () => ({ goals: [] })),
   listOpsHiredAgentDeliverables: vi.fn(async () => ({ deliverables: [] })),
@@ -149,6 +151,12 @@ test('I3-S1-T1: Hired agent ops shows digital marketing brief and truthful publi
     expect(screen.getByText('HIRE-1')).toBeInTheDocument()
   })
 
+  await waitFor(() => {
+    expect(mockGatewayApiClient.getCustomerById).toHaveBeenCalledWith('CUST-9')
+  })
+
+  expect(screen.getByText('Digital Marketing Agent')).toBeInTheDocument()
+
   await user.click(screen.getByText('HIRE-1'))
 
   await waitFor(() => {
@@ -156,6 +164,7 @@ test('I3-S1-T1: Hired agent ops shows digital marketing brief and truthful publi
   })
 
   expect(screen.getByText('WAOOAW Studio')).toBeInTheDocument()
+  expect(screen.getByText(/owner@example.com • Digital Marketing Agent • Runtime HIRE-1/)).toBeInTheDocument()
   expect(screen.getByTestId('pp-dma-publish-readiness')).toHaveTextContent('Blocked by channel connection')
   expect(screen.getByTestId('pp-dma-channel-status')).toHaveTextContent('Youtube not connected')
   expect(screen.getByTestId('pp-dma-block-owner')).toHaveTextContent('Platform action required')
