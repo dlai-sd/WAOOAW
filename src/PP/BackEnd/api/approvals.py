@@ -299,6 +299,24 @@ async def _fetch_hired_agents_by_customer(
     return []
 
 
+async def _fetch_customer_summary(
+    *,
+    customer_id: str,
+    auth_header: Optional[str],
+    client: PlantAPIClient,
+) -> Dict[str, Any]:
+    response = await client._request(
+        method="GET",
+        path=f"/api/v1/customers/{customer_id}",
+        headers={"Authorization": auth_header} if auth_header else None,
+    )
+    if response.status_code != 200:
+        return {}
+
+    body = response.json()
+    return body if isinstance(body, dict) else {}
+
+
 async def _fetch_draft_batches(
     *,
     customer_id: str,
@@ -342,9 +360,26 @@ def _match_draft_batch(agent_id: str, draft_batches: List[Dict[str, Any]]) -> Di
     return None
 
 
+def _customer_label(customer_summary: Optional[Dict[str, Any]], fallback_customer_id: str) -> str:
+    if customer_summary:
+        email = str(customer_summary.get("email") or "").strip()
+        if email:
+            return email
+    return fallback_customer_id
+
+
+def _agent_label(hired_instance: Optional[Dict[str, Any]], fallback_agent_id: str) -> str:
+    if hired_instance:
+        nickname = str(hired_instance.get("nickname") or "").strip()
+        if nickname:
+            return nickname
+    return fallback_agent_id
+
+
 def _to_review_queue_response(
     approval: ApprovalRecord,
     *,
+    customer_summary: Optional[Dict[str, Any]],
     hired_instance: Optional[Dict[str, Any]],
     draft_batch: Optional[Dict[str, Any]],
 ) -> ReviewQueueApprovalResponse:
@@ -355,9 +390,9 @@ def _to_review_queue_response(
     return ReviewQueueApprovalResponse(
         approval_id=approval.approval_id,
         customer_id=approval.customer_id,
-        customer_label=approval.customer_id,
+        customer_label=_customer_label(customer_summary, approval.customer_id),
         agent_id=approval.agent_id,
-        agent_label=str((hired_instance or {}).get("nickname") or approval.agent_id),
+        agent_label=_agent_label(hired_instance, approval.agent_id),
         action=approval.action,
         requested_by=approval.requested_by,
         correlation_id=approval.correlation_id,
@@ -418,10 +453,18 @@ async def list_review_queue_approvals(
         return ReviewQueueApprovalListResponse(count=0, approvals=[])
 
     hired_agents_by_customer: Dict[str, List[Dict[str, Any]]] = {}
+    customers_by_id: Dict[str, Dict[str, Any]] = {}
     draft_batches_by_context: Dict[tuple[str, str], List[Dict[str, Any]]] = {}
 
     try:
         for row in rows:
+            if row.customer_id not in customers_by_id:
+                customers_by_id[row.customer_id] = await _fetch_customer_summary(
+                    customer_id=row.customer_id,
+                    auth_header=auth_header,
+                    client=client,
+                )
+
             if row.customer_id not in hired_agents_by_customer:
                 hired_agents_by_customer[row.customer_id] = await _fetch_hired_agents_by_customer(
                     customer_id=row.customer_id,
@@ -444,6 +487,7 @@ async def list_review_queue_approvals(
     approvals = [
         _to_review_queue_response(
             row,
+            customer_summary=customers_by_id.get(row.customer_id),
             hired_instance=_match_hired_instance(row.agent_id, hired_agents_by_customer.get(row.customer_id, [])),
             draft_batch=_match_draft_batch(row.agent_id, draft_batches_by_context.get((row.customer_id, row.agent_id), [])),
         )
