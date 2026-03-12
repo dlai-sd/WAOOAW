@@ -64,8 +64,11 @@ async def list_hired_agents(
         )
         if resp.status_code == 200:
             body = resp.json()
-            # by-subscription returns a single object; normalize to list
-            if isinstance(body, dict):
+            # by-subscription returns a single object; by-customer returns
+            # { customer_id, instances: [...] }. Normalize both to a flat list.
+            if isinstance(body, dict) and isinstance(body.get("instances"), list):
+                body = body.get("instances") or []
+            elif isinstance(body, dict):
                 body = [body]
             await cache_set("hired", plant_path, body, params)
             await audit.log("pp_ops", "hired_agents_listed", "success")

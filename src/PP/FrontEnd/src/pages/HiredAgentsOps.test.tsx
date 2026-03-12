@@ -14,9 +14,6 @@ function LocationEcho() {
 
 const mocks = vi.hoisted(() => {
   return {
-    listOpsSubscriptions: vi.fn(async () => [
-      { subscription_id: 'SUB-1', agent_id: 'AGT-MKT-HEALTH-001', status: 'active', duration: 'monthly' }
-    ]),
     listOpsHiredAgents: vi.fn(async () => ([
       {
         hired_instance_id: 'HIRE-1',
@@ -94,7 +91,6 @@ vi.mock('../services/gatewayApiClient', () => {
       ...actual,
       gatewayApiClient: {
         ...(actual.gatewayApiClient || {}),
-        listOpsSubscriptions: mocks.listOpsSubscriptions,
         listOpsHiredAgents: mocks.listOpsHiredAgents,
         listOpsHiredAgentGoals: mocks.listOpsHiredAgentGoals,
         listOpsHiredAgentDeliverables: mocks.listOpsHiredAgentDeliverables,
@@ -125,7 +121,7 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
   await user.click(screen.getByRole('button', { name: 'Load' }))
 
   await waitFor(() => {
-    expect(mocks.listOpsSubscriptions).toHaveBeenCalledWith(
+    expect(mocks.listOpsHiredAgents).toHaveBeenCalledWith(
       expect.objectContaining({ customer_id: 'CUST-1' })
     )
   })
@@ -151,9 +147,6 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
 })
 
 test('HiredAgentsOps surfaces DMA publish state without pretending approval implies publish', async () => {
-  mocks.listOpsSubscriptions.mockResolvedValueOnce([
-    { subscription_id: 'SUB-9', agent_id: 'AGT-MKT-DMA-001', status: 'active', duration: 'monthly' }
-  ])
   mocks.listOpsHiredAgents.mockResolvedValueOnce([
     {
       hired_instance_id: 'HIRE-9',
@@ -234,7 +227,7 @@ test('HiredAgentsOps preserves handoff context and links to the next operator su
   )
 
   await waitFor(() => {
-    expect(mocks.listOpsSubscriptions).toHaveBeenCalledWith(
+    expect(mocks.listOpsHiredAgents).toHaveBeenCalledWith(
       expect.objectContaining({ customer_id: 'CUST-1' })
     )
   })
