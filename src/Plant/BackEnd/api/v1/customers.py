@@ -193,15 +193,8 @@ def get_read_customer_service(
     """CustomerService backed by read replica — for lookup/read endpoints."""
     return CustomerService(db)
 
-@router.get("/lookup", response_model=CustomerResponse)
-async def lookup_customer(
-    email: EmailStr,
-    service: CustomerService = Depends(get_read_customer_service),  # E1-S2: replica
-) -> CustomerResponse:
-    customer = await service.get_by_email(str(email).strip().lower())
-    if customer is None:
-        raise HTTPException(status_code=404, detail="Customer not found")
 
+def _to_customer_response(customer: Any) -> CustomerResponse:
     return CustomerResponse(
         customer_id=str(customer.id),
         email=customer.email,
@@ -215,6 +208,29 @@ async def lookup_customer(
         preferred_contact_method=customer.preferred_contact_method,
         consent=bool(customer.consent),
     )
+
+@router.get("/lookup", response_model=CustomerResponse)
+async def lookup_customer(
+    email: EmailStr,
+    service: CustomerService = Depends(get_read_customer_service),  # E1-S2: replica
+) -> CustomerResponse:
+    customer = await service.get_by_email(str(email).strip().lower())
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    return _to_customer_response(customer)
+
+
+@router.get("/{customer_id}", response_model=CustomerResponse)
+async def get_customer(
+    customer_id: str,
+    service: CustomerService = Depends(get_read_customer_service),  # E1-S2: replica
+) -> CustomerResponse:
+    customer = await service.get_by_id(customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    return _to_customer_response(customer)
 
 # ---------------------------------------------------------------------------
 # E2-S1 (Iteration 6): GDPR Right to Erasure

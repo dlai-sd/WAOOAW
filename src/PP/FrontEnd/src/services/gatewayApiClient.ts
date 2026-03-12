@@ -427,6 +427,14 @@ export const gatewayApiClient = {
       `/v1/customers/lookup?email=${encodeURIComponent(email)}`
     ),
 
+  getCustomerById: (customerId: string) =>
+    gatewayRequestJson<{
+      customer_id: string
+      email: string
+      full_name?: string | null
+      business_name?: string | null
+    }>(`/v1/customers/${encodeURIComponent(customerId)}`),
+
   pauseOpsScheduler: (hiredInstanceId: string) =>
     gatewayRequestJson<unknown>(
       `/pp/ops/hired-agents/${encodeURIComponent(hiredInstanceId)}/scheduler/pause`,

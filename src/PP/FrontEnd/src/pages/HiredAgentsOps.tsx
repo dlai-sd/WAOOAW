@@ -132,6 +132,18 @@ type HiredRow = {
   goals: GoalInstance[]
 }
 
+type CustomerSummary = {
+  customer_id: string
+  email: string
+  full_name?: string | null
+  business_name?: string | null
+}
+
+type PlantReferenceAgent = {
+  agent_id: string
+  display_name?: string | null
+}
+
 type PlatformConnectionSummary = {
   label: string
   message: string
@@ -357,6 +369,25 @@ function getDeliverablePublishReadiness(
   }
 }
 
+function buildAgentDisplayNameMap(referenceAgents: PlantReferenceAgent[]): Record<string, string> {
+  return referenceAgents.reduce<Record<string, string>>((accumulator, agent) => {
+    const agentId = String(agent.agent_id || '').trim()
+    const displayName = String(agent.display_name || '').trim()
+    if (agentId && displayName) {
+      accumulator[agentId] = displayName
+    }
+    return accumulator
+  }, {})
+}
+
+function preferredAgentLabel(hired: HiredAgentInstance, agentDisplayNames: Record<string, string>): string {
+  return String(hired.nickname || '').trim() || agentDisplayNames[hired.agent_id] || hired.agent_id
+}
+
+function preferredCustomerLabel(customer: CustomerSummary | null, fallbackEmail: string, fallbackCustomerId: string): string {
+  return String(customer?.email || '').trim() || fallbackEmail.trim() || fallbackCustomerId.trim() || 'not set'
+}
+
 function selectLatestDeliverable(deliverables: Deliverable[]): Deliverable | null {
   if (!deliverables.length) return null
   return [...deliverables].sort((left, right) => {
@@ -410,6 +441,8 @@ export default function HiredAgentsOps() {
 
   const [rows, setRows] = useState<HiredRow[]>([])
   const [selected, setSelected] = useState<HiredRow | null>(null)
+  const [customerSummary, setCustomerSummary] = useState<CustomerSummary | null>(null)
+  const [agentDisplayNames, setAgentDisplayNames] = useState<Record<string, string>>({})
 
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([])
@@ -453,8 +486,9 @@ export default function HiredAgentsOps() {
     if (!e) return
     setEmailError(null)
     try {
-      const result = await gatewayApiClient.lookupCustomerByEmail(e) as { customer_id: string }
+      const result = await gatewayApiClient.lookupCustomerByEmail(e) as CustomerSummary
       setCustomerId(result.customer_id)
+      setCustomerSummary(result)
       syncContext({ customerId: result.customer_id, email: e })
     } catch {
       setEmailError('Customer not found for this email address.')
@@ -472,6 +506,8 @@ export default function HiredAgentsOps() {
     setSelected(null)
     setSelectedDenial(null)
     setRows([])
+    setCustomerSummary(null)
+    setAgentDisplayNames({})
     setDeliverables([])
     setApprovals([])
     setDenials([])
@@ -479,10 +515,17 @@ export default function HiredAgentsOps() {
     setPlatformConnections([])
 
     try {
-      const hiredRows = (await gatewayApiClient.listOpsHiredAgents({
-        customer_id: cust,
-        as_of: normalizedAsOf,
-      })) as HiredAgentInstance[]
+      const [hiredRows, customerResult, referenceAgentsResult] = await Promise.all([
+        gatewayApiClient.listOpsHiredAgents({
+          customer_id: cust,
+          as_of: normalizedAsOf,
+        }) as Promise<HiredAgentInstance[]>,
+        gatewayApiClient.getCustomerById(cust).catch(() => null) as Promise<CustomerSummary | null>,
+        gatewayApiClient.listReferenceAgents().catch(() => []) as Promise<PlantReferenceAgent[]>,
+      ])
+
+      setCustomerSummary(customerResult)
+      setAgentDisplayNames(buildAgentDisplayNameMap(Array.isArray(referenceAgentsResult) ? referenceAgentsResult : []))
 
       const rowsWithGoals = await Promise.all(
         (hiredRows || []).map(async (hired) => {
@@ -645,6 +688,8 @@ export default function HiredAgentsOps() {
   const publishReadiness = getDeliverablePublishReadiness(latestDeliverable, connectionSummary, platformLabel)
   const readinessTone = toneStyles(publishReadiness.tone)
   const connectionTone = toneStyles(connectionSummary.tone)
+  const customerPrimaryLabel = preferredCustomerLabel(customerSummary, email, customerId)
+  const selectedAgentPrimaryLabel = selected ? preferredAgentLabel(selected.hired, agentDisplayNames) : ''
 
   return (
     <div className="page-container" data-testid="pp-hired-agents-page">
@@ -754,7 +799,12 @@ export default function HiredAgentsOps() {
                 style={{ cursor: 'pointer' }}
               >
                 <TableCell>{r.hired.hired_instance_id}</TableCell>
-                <TableCell>{r.hired.agent_id}</TableCell>
+                <TableCell>
+                  <Text weight="semibold">{preferredAgentLabel(r.hired, agentDisplayNames)}</Text>
+                  {preferredAgentLabel(r.hired, agentDisplayNames) !== r.hired.agent_id && (
+                    <Text size={200} style={{ display: 'block', opacity: 0.72 }}>ID {r.hired.agent_id}</Text>
+                  )}
+                </TableCell>
                 <TableCell>{r.subscription_id}</TableCell>
                 <TableCell>{r.hired.trial_status || '—'}</TableCell>
                 <TableCell>{r.hired.configured ? 'yes' : 'no'}</TableCell>
@@ -807,11 +857,12 @@ export default function HiredAgentsOps() {
           <Card style={{ marginTop: 16 }}>
             <CardHeader
               header={<Text weight="semibold">Operator handoff context</Text>}
-              description={<Text size={200}>Customer {customerId.trim()} • Agent {selected.hired.agent_id} • Runtime {selected.hired.hired_instance_id}</Text>}
+              description={<Text size={200}>{customerPrimaryLabel} • {selectedAgentPrimaryLabel} • Runtime {selected.hired.hired_instance_id}</Text>}
             />
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Text size={200}>What happened: the hired runtime, approvals, denials, and diagnostics are pinned to the selected customer storyline.</Text>
               <Text size={200}>What next: inspect deliverables here, jump to draft review to unblock content, or open policy denials with the same runtime context.</Text>
+              <Text size={200} style={{ opacity: 0.78 }}>Raw IDs: customer_id {customerId.trim() || 'not set'} • agent_id {selected.hired.agent_id} • hired_instance_id {selected.hired.hired_instance_id}</Text>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <Button
                   appearance="secondary"
@@ -837,7 +888,7 @@ export default function HiredAgentsOps() {
           <Card style={{ marginTop: 16 }}>
             <CardHeader
               header={<Text weight="semibold">Selected instance</Text>}
-              description={<Text size={200}>{selected.hired.hired_instance_id} • {selected.hired.agent_id}</Text>}
+              description={<Text size={200}>{customerPrimaryLabel} • {selectedAgentPrimaryLabel}</Text>}
               action={
                 <Button
                   appearance="subtle"
@@ -850,6 +901,11 @@ export default function HiredAgentsOps() {
             />
 
             <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Text size={200} style={{ display: 'block', opacity: 0.78 }}>
+                  Runtime {selected.hired.hired_instance_id} • customer_id {customerId.trim() || 'not set'} • agent_id {selected.hired.agent_id}
+                </Text>
+              </div>
               <div style={{ gridColumn: '1 / -1', display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
                 <Card className="pp-agent-setup-card">
                   <div className="pp-agent-setup-metric">{selected.goals.length}</div>
