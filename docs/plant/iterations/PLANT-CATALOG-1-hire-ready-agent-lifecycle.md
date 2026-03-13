@@ -135,7 +135,7 @@ Stop and report the exact blocker.
 | ID | Iteration | Epic | Story | Status |
 |---|---|---|---|---|
 | E1-S1 | 1 | Hire-ready Digital Marketing Agent lifecycle | Plant owns catalog lifecycle and release snapshots | 🟢 Completed |
-| E1-S2 | 1 | Hire-ready Digital Marketing Agent lifecycle | PP design board exposes recommended release fields and approval flow | 🔴 Not Started |
+| E1-S2 | 1 | Hire-ready Digital Marketing Agent lifecycle | PP design board exposes recommended release fields and approval flow | 🟢 Completed |
 | E1-S3 | 1 | Hire-ready Digital Marketing Agent lifecycle | CP discovery and hire setup consume approved lifecycle truth | 🔴 Not Started |
 | E1-S4 | 1 | Hire-ready Digital Marketing Agent lifecycle | Existing hires show lifecycle continuity and version truth | 🔴 Not Started |
 
@@ -280,6 +280,14 @@ Test command:
 ```bash
 cd src/PP/FrontEnd && npm run test -- --run src/pages/AgentManagement.test.tsx
 ```
+
+Execution notes:
+
+- Completed on 2026-03-13 on branch `feat/plant-catalog-1-it1-e1`.
+- PP now exposes thin-proxy catalog release routes for list, upsert, approve, and retire actions backed by Plant lifecycle truth.
+- `AgentManagement` now includes a Digital Marketing Agent release board with recommended hire-ready fields and explicit approve/retire controls.
+- Docker validation passed for the focused PP frontend story test and the focused PP backend route tests.
+- The PP backend focused route tests require `--cov-fail-under=0` when run alone because the repo-level coverage threshold is global and not meaningful for a four-test slice.
 
 ---
 

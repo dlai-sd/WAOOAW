@@ -11,6 +11,26 @@ export type ApiProblemDetails = {
   [key: string]: unknown
 }
 
+export type CatalogRelease = {
+  release_id: string
+  id: string
+  public_name: string
+  short_description: string
+  industry_name: string
+  job_role_label: string
+  monthly_price_inr: number
+  trial_days: number
+  allowed_durations: string[]
+  supported_channels: string[]
+  approval_mode: string
+  agent_type_id: string
+  internal_definition_version_id?: string | null
+  external_catalog_version: string
+  lifecycle_state: string
+  approved_for_new_hire: boolean
+  retired_from_catalog_at?: string | null
+}
+
 export class GatewayApiError extends Error {
   status?: number
   problem?: ApiProblemDetails
@@ -254,6 +274,29 @@ export const gatewayApiClient = {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
+    }),
+
+  listCatalogReleases: () => gatewayRequestJson<CatalogRelease[]>('/pp/agent-catalog'),
+
+  upsertCatalogRelease: (agentId: string, payload: Partial<CatalogRelease> & { agent_type_id?: string }) =>
+    gatewayRequestJson<CatalogRelease>(`/pp/agent-catalog/${encodeURIComponent(agentId)}/release`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  approveCatalogRelease: (agentId: string) =>
+    gatewayRequestJson<CatalogRelease>(`/pp/agent-catalog/${encodeURIComponent(agentId)}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    }),
+
+  retireCatalogRelease: (releaseId: string) =>
+    gatewayRequestJson<CatalogRelease>(`/pp/agent-catalog/releases/${encodeURIComponent(releaseId)}/retire`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
     }),
 
   seedDefaultAgentData: () =>
