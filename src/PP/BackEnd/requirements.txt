@@ -13,7 +13,7 @@ httpx==0.26.0
 PyJWT==2.10.1
 google-auth[requests]==2.37.0
 
-# Encrypted storage (AgentSetup)
+# Encryption support for exchange credential handling
 cryptography==46.0.5
 
 # Retry/backoff

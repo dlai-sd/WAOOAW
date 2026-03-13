@@ -93,17 +93,14 @@ tech_stack:
       version: "2.12.5"
       settings: "pydantic-settings@2.12.0"
     
-    database:
-      primary:
-        name: "PostgreSQL"
-        driver: "psycopg2-binary@2.9.9"
-        orm: "sqlalchemy@2.0.25"
-        migrations: "alembic@1.13.1"
+    plant_integration:
+      authoritative_store: "Plant GCP SQL / Plant APIs"
+      pp_role: "Thin proxy and admin surface only"
       
-      cache:
-        name: "Redis"
-        version: "5.0.1"
-        driver: "hiredis@2.3.2"
+    cache:
+      name: "Redis"
+      version: "5.0.1"
+      driver: "hiredis@2.3.2"
     
     authentication:
       jwt:
@@ -264,7 +261,8 @@ setup_instructions:
     step_5_create_env:
       file: ".env"
       variables:
-        DATABASE_URL: "postgresql://user:pass@localhost/waooaw_pp"
+        PLANT_API_URL: "http://localhost:8000"
+        PLANT_GATEWAY_URL: "http://localhost:8000"
         REDIS_URL: "redis://localhost:6379"
         JWT_SECRET: "generate with: openssl rand -base64 32"
         GOOGLE_CLIENT_ID: "from GCP Console (@waooaw.com only)"

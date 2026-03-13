@@ -1745,7 +1745,7 @@ PP BackEnd
 | Resource | Minimum Role | Route |
 |---|---|---|
 | Agent type publish/unpublish | `admin` | `PUT /pp/agent-types/{id}` |
-| Agent setup upsert | `admin`, `developer` | `PUT /pp/agent-setups` |
+| Agent type publish | `admin`, `developer` | `PUT /pp/agent-types/{id}` |
 | Mint approval token | `admin`, `developer` | `POST /pp/approvals` |
 | Metering debug | `admin`, `developer` | `POST /pp/metering-debug/envelope` |
 | Scheduler diagnostics (proposed) | `admin`, `developer` | `GET /pp/ops/hired-agents/{id}/scheduler-diagnostics` |
@@ -1753,17 +1753,16 @@ PP BackEnd
 | DLQ console (proposed) | `admin`, `developer` | `GET /pp/ops/dlq` |
 | DLQ requeue (proposed) | `admin` | `POST /pp/ops/dlq/{id}/requeue` |
 | Hook trace (proposed) | `admin`, `developer` | `GET /pp/ops/hired-agents/{id}/hook-trace` |
-| Constraint policy tune (proposed) | `admin` | `PATCH /pp/agent-setups/{id}/constraint-policy` |
 | View all hired agents | `manager`, `analyst`, `support`, `admin` | `GET /pp/ops/hired-agents` |
 | View deliverables / goals | `manager`, `analyst`, `admin` | `GET /pp/ops/hired-agents/{id}/deliverables` |
 
 ### 14.4 PP Route Surface (Current + Recommended)
 
-#### Agent Configuration
+#### Agent Type Authoring
 | Method | Route | Purpose |
 |---|---|---|
-| `PUT` | `/pp/agent-setups` | Define/update agent type's construct bindings + ConstraintPolicy defaults |
-| `GET` | `/pp/agent-setups` | List all configured agent types with current binding snapshots |
+| `PUT` | `/pp/agent-types/{id}` | Publish Plant-backed Base Agent Contract state for an agent type |
+| `GET` | `/pp/agent-types` | List Plant-backed agent type definitions |
 
 #### Ops Monitoring (existing)
 | Method | Route | Purpose |
@@ -1799,8 +1798,8 @@ PP BackEnd
 | `GET` | `/pp/ops/dlq` | developer | All DLQ entries across all hires, sortable by age / agent type | **P1** |
 | `POST` | `/pp/ops/dlq/{entry_id}/requeue` | admin | Requeue a failed execution from DLQ | **P1** |
 | `GET` | `/pp/ops/hired-agents/{id}/hook-trace` | developer | Last N hook events: stage, timestamp, hook_class, result | **P1** |
-| `GET` | `/pp/agent-setups/{agent_type_id}/construct-spec` | developer | Read current ConstructBindings for an agent type | **P1** |
-| `PATCH` | `/pp/agent-setups/{agent_type_id}/constraint-policy` | admin | Live-tune: toggle approval_mode, update max_tasks — no redeploy | **P1** |
+| `GET` | `/pp/agent-types/{agent_type_id}` | developer | Read the current Plant-backed authoring contract for an agent type | **P1** |
+| `PATCH` | `/pp/agent-authoring-drafts/{draft_id}/constraint-policy` | admin | Live-tune the Plant-backed contract draft before approval; PP must not persist durable state locally | **P1** |
 | `GET` | `/pp/ops/hired-agents/{id}/cost-breakdown` | manager | LLM call count + cost-per-run by date — ops cost control | **P2** |
 
 ### 14.5 Share Trader PP Diagnostic View
@@ -1971,7 +1970,7 @@ Opens as a right-side drawer when ops user clicks a hired agent row. Renders the
 | Scheduler | [View DLQ entries] | `GET /pp/ops/dlq?hired_agent_id={id}` |
 | Connector | [Trigger re-verify] | Plant re-checks credential validity |
 | Publisher | [Requeue N failed] | `POST /pp/ops/dlq/{entry_id}/requeue` (per entry) |
-| Policy | [Toggle approval_mode] | `PATCH /pp/agent-setups/{agent_type_id}/constraint-policy` |
+| Policy | [Toggle approval_mode] | `PATCH /pp/agent-authoring-drafts/{draft_id}/constraint-policy` |
 | Policy | [Edit max_tasks] | same PATCH route |
 
 ---
@@ -2026,7 +2025,7 @@ Third tab within the ConstructHealthPanel drawer (tab: "Hook Trace").
 ---
 
 #### NEW: AgentTypeSetupScreen
-`PUT /pp/agent-setups` (existing route) — needs dedicated UI form
+`POST /pp/agent-authoring-drafts` or `PUT /pp/agent-types/{id}` — Plant-backed authoring only; PP does not persist drafts locally
 
 Currently route exists but there is no defined UI form for PP users to configure agent types. Required form fields:
 
@@ -2047,7 +2046,7 @@ Currently route exists but there is no defined UI form for PP users to configure
 ---
 
 #### NEW: ConstraintPolicyLiveTuneDrawer
-`PATCH /pp/agent-setups/{agent_type_id}/constraint-policy` — **new screen/drawer**
+`PATCH /pp/agent-authoring-drafts/{draft_id}/constraint-policy` — **new screen/drawer**
 
 Accessible from: ConstructHealthPanel Policy card → [Edit max_tasks] or [Toggle approval_mode].
 
@@ -2157,7 +2156,7 @@ These are changes that materially alter the UX or architecture. None should be i
 |---|---|
 | **Root cause** | `approval_mode` is set at hire time in `agent_skills.goal_config` JSONB — ops cannot change it without a customer-facing re-hire or DB patch |
 | **Impact** | Content agents whose customers never come back to review are stuck in `pending_review` with no posts going out (G10 open) |
-| **Proposed fix** | `PATCH /pp/agent-setups/{agent_type_id}/constraint-policy` — ops toggles `approval_mode` from MANUAL → AUTO for a specific hire. Also enables ops to lower `max_tasks_per_day` during cost incident. |
+| **Proposed fix** | `PATCH /pp/agent-authoring-drafts/{draft_id}/constraint-policy` — ops adjusts the Plant-backed contract draft before approval. PP remains a thin surface; durable state stays in Plant. |
 | **What needs sign-off** | New PP route; audit log entry mandatory; `admin` role only; customer notification on mode change |
 
 ### 16.6 OAuth token expiry countdown in CP (CP — Medium impact)

@@ -401,10 +401,10 @@ class ConstraintPolicy(BaseModel):
 | **Frontend** | React/Vite on port 3001→8080 |
 | **Key paths** | `src/PP/BackEnd/`, `src/PP/FrontEnd/` |
 | **BE entry** | `src/PP/BackEnd/main.py` → `main_proxy.py` |
-| **BE routes** | `src/PP/BackEnd/api/` — genesis.py, agents.py, agent_types.py, agent_setups.py, approvals.py, audit.py, auth.py, db_updates.py, exchange_credentials.py, metering_debug.py, security.py, ops_hired_agents.py, ops_dlq.py |
-| **Diagnostic routes** | `GET /pp/ops/hired-agents/{id}/construct-health`, `GET /pp/ops/hired-agents/{id}/scheduler-diagnostics`, `GET /pp/ops/hired-agents/{id}/hook-trace`, `GET /pp/ops/dlq`, `POST /pp/ops/dlq/{id}/requeue`, `PATCH /pp/agent-setups/{id}/constraint-policy` — PP service-centre diagnostic toolkit (§14 of AGENT-CONSTRUCT-DESIGN.md) |
+| **BE routes** | `src/PP/BackEnd/api/` — genesis.py, agents.py, agent_types.py, agent_catalog.py, approvals.py, audit.py, auth.py, db_updates.py, exchange_credentials.py, metering_debug.py, security.py, ops_hired_agents.py, ops_dlq.py |
+| **Diagnostic routes** | `GET /pp/ops/hired-agents/{id}/construct-health`, `GET /pp/ops/hired-agents/{id}/scheduler-diagnostics`, `GET /pp/ops/hired-agents/{id}/hook-trace`, `GET /pp/ops/dlq`, `POST /pp/ops/dlq/{id}/requeue` — PP service-centre diagnostic toolkit (§14 of AGENT-CONSTRUCT-DESIGN.md) |
 | **RBAC** | 7-role hierarchy (`admin > customer_admin > developer > manager > analyst > support > viewer`) enforced via OPA. Diagnostic routes require `admin` or `developer`. DLQ requeue requires `admin`. |
-| **FE pages** | `src/PP/FrontEnd/src/pages/` — Dashboard, GovernorConsole, GenesisConsole, AgentManagement, CustomerManagement, ReviewQueue, AuditConsole, PolicyDenials, HiredAgentsOps, AgentSetup, ReferenceAgents, etc. |
+| **FE pages** | `src/PP/FrontEnd/src/pages/` — Dashboard, GovernorConsole, GenesisConsole, AgentManagement, CustomerManagement, ReviewQueue, AuditConsole, PolicyDenials, HiredAgentsOps, AgentTypeSetupScreen, ReferenceAgents, etc. |
 
 ---
 
@@ -2008,7 +2008,6 @@ Use this shortlist when the task is broader than runtime routes.
 | `BackEnd/api/genesis.py` | Genesis certification endpoints — audit wired |
 | `BackEnd/api/agents.py` | Agent management — audit wired |
 | `BackEnd/api/agent_types.py` | Agent type management endpoints |
-| `BackEnd/api/agent_setups.py` | Agent setup/configuration endpoints — `PUT /pp/agent-setups` defines ConstructBindings + ConstraintPolicy defaults |
 | `BackEnd/api/approvals.py` | Approval workflows — audit wired |
 | `BackEnd/api/audit.py` | Audit log access |
 | `BackEnd/api/auth.py` | PP authentication |
@@ -2146,7 +2145,7 @@ Use this shortlist when the task is broader than runtime routes.
 
 | Variable | Used by | Purpose |
 |----------|---------|---------|
-| `DATABASE_URL` | Plant, CP, PP | PostgreSQL connection string |
+| `DATABASE_URL` | Plant, CP | PostgreSQL connection string |
 | `REDIS_URL` | All services | Redis connection |
 | `JWT_SECRET` | All services | **MUST be identical** across CP, PP, Plant, Gateway |
 | `GOOGLE_CLIENT_ID` | CP, PP, Gateway | Google OAuth2 client ID |

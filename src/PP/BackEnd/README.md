@@ -8,8 +8,7 @@ FastAPI services for Platform Portal.
 - FastAPI + Uvicorn
 - Pydantic v2 (settings + validation)
 - Google OAuth (authlib, httpx, PyJWT)
-- PostgreSQL + Redis (future)
-- SQLAlchemy + Alembic (migrations)
+- Plant-backed proxy routes + Redis (optional response cache)
 
 ## Quick Start
 
@@ -74,6 +73,7 @@ Environment variables (see `.env.example`):
 - `APP_PORT` - Server port (default 8015)
 - `ENVIRONMENT` - codespace | demo | uat | prod
 - `CORS_ORIGINS` - Comma-separated allowed origins
+- `PLANT_API_URL` / `PLANT_GATEWAY_URL` - Plant endpoints PP proxies to
 
 ## Development Notes
 
@@ -81,6 +81,7 @@ Environment variables (see `.env.example`):
 - Auth routes are placeholders; wire real OAuth flow next
 - CORS allows `*` by default; restrict in production
 - Settings loaded from env vars via pydantic-settings
+- PP does not own a database; durable state stays in Plant-backed services
 
 ## Testing
 
