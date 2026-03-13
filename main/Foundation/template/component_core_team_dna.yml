@@ -1,5 +1,19 @@
 # Core Team DNA - Foundational Interface for All Teams
 
+source_of_truth_note:
+  status: "conceptual_only"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for team-governance philosophy and delegation boundaries."
+    - "Do not treat team inheritance from Core Agent DNA as the literal Plant runtime model."
+    - "In runtime design, teams should be expressed through hired-agent composition, role ownership, and construct-aware workflows."
+
+runtime_alignment:
+  conceptual_to_runtime_mapping:
+    core_team_dna: "Conceptual predecessor to manager-led multi-agent orchestration over hired agents"
+    team_methods: "Operationally realized through service workflows, approvals, and PP/Plant orchestration surfaces"
+    team_workspace: "Maps to engagement-scoped runtime state, diagnostics, and approved collaboration surfaces rather than a single inherited team object"
+
 component_id: "CORE-TEAM-DNA-001"
 component_name: "Core Team DNA"
 version: "1.0"
@@ -24,6 +38,9 @@ description: |
   Core Team DNA extends Core Agent DNA with team coordination capabilities. A Team is a special
   kind of agent that contains a Manager Agent and 2-4 specialist agents working together.
   
+  In the current Plant runtime this should be read as conceptual guidance, not as a strict inheritance model.
+  Runtime implementation should be expressed using the Plant construct vocabulary and hired-agent composition model.
+  
   Core Team DNA defines:
   - Team identity (extends Core Agent WhoAmI with team membership)
   - Team coordination methods (AddMember, RemoveMember, AssignTask, ReviewOutput)
@@ -39,6 +56,9 @@ purpose:
   - "Support Manager suspension and Helpdesk takeover (continuity during policy violations)"
 
 inheritance_model: |
+  LEGACY CONCEPTUAL VIEW ONLY. Current Plant runtime should model this through hired-agent composition,
+  manager-led workflows, approvals, and construct-aware orchestration instead of strict inheritance.
+
   Core Agent DNA → Core Team DNA → Manager Agent (coordinates team)
   Core Agent DNA → Core Team DNA → Team Member Agents (specialists)
   Core Team DNA inherits ALL Core Agent methods (WhoAmI, ConfigureMe, OperateMe, MyMessageRoom, QueryConstitution)

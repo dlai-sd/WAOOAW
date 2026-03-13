@@ -209,8 +209,8 @@ class NullLifecycleHooks(AgentLifecycleHooks):
 class ApprovalRequiredHook:
     """Enforce that external publish/send actions require an approval_id.
 
-    This corresponds to the design principle in Base Agent Anatomy:
-    - External communication without approval_granted flag → instant block
+    This corresponds to a historical design principle from Base Agent Anatomy:
+    - external communication without approval_granted flag -> instant block
 
     For Chunk B, we treat `approval_id` as the canonical signal.
     """

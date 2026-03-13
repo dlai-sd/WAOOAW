@@ -7,6 +7,13 @@ status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
 
+source_of_truth_note:
+  status: "active_contract_with_legacy_cross-references"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Job roles remain an active concept."
+    - "Legacy Core Agent DNA references here should be read as conceptual lineage, while runtime implementation should use AgentSpec, hired-agent state, and current Plant APIs."
+
 # Constitutional Alignment
 constitutional_alignment:
   l0_principles:
@@ -41,7 +48,7 @@ purpose:
 inheritance_model: |
   Job Role → Agent instantiates job → Agent inherits job's skills, tools, boundaries
   Genesis certifies Job Roles, assigns JOB-{INDUSTRY}-{NUMBER} IDs
-  Agents reference job_role_id in Core Agent DNA WhatIsMyJobRole() method
+  Agents reference job_role_id through current runtime metadata and Plant APIs; older Core Agent DNA wording is conceptual lineage only
 
 # Job Role Definition Schema
 job_role_definition_schema:

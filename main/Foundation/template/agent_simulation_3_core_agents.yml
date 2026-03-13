@@ -90,12 +90,10 @@ simulation_1_manager:
     stage_4_power_on:
       status: "⚠️ GAP DETECTED"
       process: |
-        Manager boots (60s discovery):
-        - Phase 1: Hardware check → 4 CPU cores detected
-        - Phase 2: Infrastructure discovery → PostgreSQL, Redis, Vector DB, Plant API reachable
-        - Phase 3: Context sensing → Environment: prod, timezone: UTC, constitutional v1.1
-        - Phase 4: Capability discovery → Needs access to Plant API /v1/agents/* endpoints
-        - Phase 5: Organ initialization → All 9 organs spawn, heartbeat validated
+        LEGACY conceptual simulation only.
+        Current Plant runtime should not be read as a literal boot pipeline with organs and local agent daemons.
+        The equivalent modern concern is startup validation of services, reference data, auth, scheduler readiness,
+        and construct wiring for agent types and hired-agent workflows.
       
       gap_3_capability_discovery_validation:
         issue: "Manager needs Plant API access but boot sequence doesn't validate API authentication/authorization"
@@ -117,17 +115,16 @@ simulation_1_manager:
           Industry practice: Kubernetes init containers validate dependencies before main container starts.
       
       gap_4_boot_time_60s_too_slow:
-        issue: "Manager boots in 60s but customers expect agents online instantly (modern expectation: <5s)"
-        evidence: "Cloud Run cold start <1s, AWS Lambda <3s, but our agent takes 60s"
-        impact: "Poor customer experience, Manager unavailable during critical incidents"
+        issue: "Legacy simulation assumes a slow agent-local boot model that does not match current Plant runtime design"
+        evidence: "Current runtime is service-based and construct-based rather than per-agent organ startup"
+        impact: "Readers may optimize the wrong layer and misunderstand where actual cold-start or readiness problems live"
         recommendation: |
-          Optimize boot sequence:
+          Replace this boot-sequence thinking with service-readiness and construct-readiness checks:
           
-          phase_1_hardware_check: 10s → 2s (cache hardware profile after first boot)
-          phase_2_infrastructure_discovery: 20s → 5s (parallel health checks, not sequential)
-          phase_3_context_sensing: 10s → 2s (cache constitutional version, check drift daily not every boot)
-          phase_4_capability_discovery: 10s → 3s (parallel API validation)
-          phase_5_organ_initialization: 10s → 3s (spawn organs in parallel, not serial)
+          - Validate service health, auth, and scheduler readiness.
+          - Validate AgentSpec registration and processor wiring.
+          - Validate hired-agent data and required configuration before runtime fire.
+          - Measure cold start and readiness at service and workflow layers, not organ layers.
           
           Target: 60s → 15s boot time (acceptable for complex agents)
           
@@ -154,45 +151,33 @@ simulation_1_manager:
         5. StateManager persists task assignment to audit_log.jsonl
       
       gap_5_inter_agent_communication:
-        issue: "Manager needs to communicate with agent-123 but base agent only has internal message bus (organ-to-organ)"
-        evidence: "MessageBus (Infrastructure Layer) has channels like 'domain.skill_execute' but no 'agent.*.task_assign' for inter-agent communication"
+        issue: "Legacy simulation assumes organ-level buses instead of current service and workflow orchestration"
+        evidence: "Current Plant runtime should model coordination through service APIs, persisted state, hooks, and orchestrated workflows"
         impact: "Manager cannot send task to agent-123, must use Plant API as proxy (inefficient, adds latency)"
         recommendation: |
-          Infrastructure Layer MessageBus must support two modes:
+          Reframe this gap around current runtime surfaces:
           
-          message_bus:
-            internal_bus:
-              technology: "Redis Pub/Sub (agent-local)"
-              channels: "presentation.*, application.*, domain.*, infrastructure.*, constitutional.*"
-              scope: "Intra-agent communication (organs within single agent)"
-            
-            external_bus:  # NEW
-              technology: "Redis Pub/Sub (Plant-wide)"
-              channels: "agent.*.task_assign, agent.*.status_update, agent.*.help_needed"
-              scope: "Inter-agent communication (Manager → Worker agents)"
-              security: "ConstitutionalGuardian validates sender authorization before publishing to external_bus"
+          - Use Plant service orchestration and persisted task state for manager-to-worker coordination.
+          - Expose explicit runtime APIs or workflow events where multi-agent coordination is required.
+          - Keep customer-visible state in hired-agent, skill, run, and deliverable records.
           
           Industry practice: Microservices have internal event bus + external message broker (Kafka, RabbitMQ).
       
       gap_6_task_context_propagation:
-        issue: "Manager assigns task to agent-123, but agent-123 needs context (engagement_id, customer_id, deadline) - where is this context stored?"
-        evidence: "EEPROM files (plan.md, errors.jsonl, etc.) are agent-local, no shared context store"
+        issue: "Legacy simulation stores context in local-agent concepts instead of Plant runtime records"
+        evidence: "Current runtime state belongs in persisted domain records and workflow state, not EEPROM-like local storage"
         impact: "Agent-123 receives task but lacks context to execute, must query Manager for context (circular dependency)"
         recommendation: |
-          Infrastructure Layer must support shared context store:
+          Use Plant-owned persisted runtime records:
           
           persistence_manager:
-            local_storage:
-              type: "EEPROM files (agent-local)"
-              files: [plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl]
-            
             shared_storage:  # NEW
-              type: "PostgreSQL or Redis (Plant-wide)"
+              type: "PostgreSQL and workflow state (Plant-owned)"
               tables:
                 - engagements: {engagement_id, customer_id, agent_ids[], status, start_date, end_date}
                 - tasks: {task_id, engagement_id, assigned_to_agent_id, description, deadline, context: {}}
                 - agent_state: {agent_id, current_task_id, status, last_heartbeat}
-              access_pattern: "Manager writes, Worker agents read (RBAC enforced by Constitutional Layer)"
+              access_pattern: "Managers and workers read or write through Plant-governed services and workflows"
           
           Industry practice: Microservices share state via database or distributed cache (not local files).
     
@@ -750,7 +735,7 @@ base_agent_v2_improvements:
       description: "Resume long-running skills on failure (Gap 9 fix)"
       enabled_for_skills: ["SKILL-CERTIFY-SKILL-001", "SKILL-DESIGN-SYSTEM-001"]
       checkpoint_frequency: "Every 15 minutes OR every sub-goal completion"
-      checkpoint_storage: "EEPROM/checkpoints/{task_id}.json"
+      checkpoint_storage: "Persisted workflow or database-backed checkpoint state, not EEPROM-style local files"
   
   application_layer_improvements:
     granular_progress_tracking:

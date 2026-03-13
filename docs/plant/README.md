@@ -1,5 +1,12 @@
 # Plant Phase - Genesis Agent Production Implementation
 
+## Runtime Authority Note
+
+This file predates the current Plant Agent Construct runtime model.
+
+Treat `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md` as the executable runtime source of truth.
+References below to `Agent DNA`, `5 required files`, and filesystem-memory initialization should be read as legacy constitutional design language unless they are explicitly remapped to the current construct runtime.
+
 **Status:** 🌱 Ready for Specification  
 **Phase:** Plant (Production Systems Implementation)  
 **Prerequisites:** Seed Phase Complete (PP v1.0 gap resolution)  
@@ -32,7 +39,7 @@ The **Plant Phase** implements the Genesis Agent production webhook system and c
 - Replace mock server (port 9000) with production webhook (authenticated, scalable, monitored)
 - Constitutional query API production endpoint (extends Port 8004)
 - Precedent seed lifecycle management (seeding, supersession, deprecation)
-- Agent DNA initialization (5 required files, hash chain, validation)
+- Runtime bootstrap and governance alignment for agent types and hired-agent workflows
 - Skill certification workflow (Think→Act→Observe cycle validation)
 
 ---
@@ -46,13 +53,13 @@ The **Plant Phase** implements the Genesis Agent production webhook system and c
 - Constitutional Embodiment: Constitution embedded via vector embeddings, semantic search, RAG
 
 **Foundational Governance Agents (3):**
-1. **Genesis** - Certifies Jobs/Skills, initializes agent DNA (5 files), validates precedent seeds
+1. **Genesis** - Certifies Jobs/Skills, validates runtime governance alignment, and validates precedent seeds
 2. **Systems Architect** - Designs production architecture, reviews infrastructure changes
 3. **Vision Guardian** - Enforces ethics gates, detects constitutional violations, break-glass override
 
 **Amendment AMENDMENT-001 (2026-01-07):**
 - AI Agent DNA & Job/Skills Lifecycle
-- Filesystem memory (agents/{agent_id}/state/ with 5 required files)
+- Historical filesystem-memory model from the early Agent DNA concept
 - Vector embeddings + semantic search + RAG for constitutional queries
 - Precedent seed lifecycle (active → superseded → deprecated → archived)
 
@@ -76,7 +83,7 @@ The **Plant Phase** implements the Genesis Agent production webhook system and c
 1. Deploy production Genesis webhook (replace mock, authenticated, monitored)
 2. Implement constitutional validation engine (bias detection, harmful content filtering)
 3. Deploy precedent seed storage (PostgreSQL + vector embeddings + query API)
-4. Implement agent DNA initialization (Genesis authority, 5 files, validation)
+4. Implement construct-aligned runtime bootstrap and governance validation
 5. Deploy health monitoring (Genesis-specific metrics, SLA tracking)
 6. Integrate constitutional query API (production endpoint, <100ms response)
 
@@ -84,7 +91,7 @@ The **Plant Phase** implements the Genesis Agent production webhook system and c
 - Genesis webhook handles 100 req/sec with <200ms latency
 - Constitutional validation detects 95%+ of policy violations in testing
 - Precedent seed query cache hit rate >80%
-- Agent DNA initialization success rate >99.5%
+- Runtime bootstrap and governance validation success rate >99.5%
 - Zero constitutional drift undetected (daily audits)
 - Full audit trail for all Genesis decisions (append-only logs)
 

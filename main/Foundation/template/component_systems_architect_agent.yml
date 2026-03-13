@@ -7,6 +7,13 @@ status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
 
+source_of_truth_note:
+  status: "active_governance_spec_with_legacy_runtime_terms"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for Systems Architect scope and platform responsibilities."
+    - "Any Core Agent DNA, filesystem-memory, or OperateMe wording here is historical conceptual language unless explicitly mapped to the current construct runtime."
+
 # Constitutional Alignment
 constitutional_alignment:
   inherits: "component_core_agent_dna.yml"

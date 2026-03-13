@@ -150,14 +150,16 @@ principle_4_single_governor_invariant:
   findings: "4/5 checks passed, 1 recommendation - single_governor_invariant enforced, circuit breaker needs Governor escalation"
 
 # ============================================================================
-# AMENDMENT-001: FILESYSTEM MEMORY + VECTOR EMBEDDINGS + HASH CHAIN
+# AMENDMENT-001: LEGACY FILESYSTEM-MEMORY MODEL REVIEW
+# Current Plant runtime should reinterpret these checks through persisted records,
+# service-level auditability, and the Agent Construct design.
 # ============================================================================
 amendment_001_compliance:
   requirement_1_filesystem_memory:
-    requirement: "5 persistent EEPROM files (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
-    location: "layer_4_infrastructure.persistence_manager.local_storage"
-    evidence: "All 5 files present with owners (Application Layer, Constitutional Layer)"
-    verdict: "✅ PASS"
+    requirement: "Legacy requirement from the Agent DNA model; current runtime should instead prove equivalent persisted auditability, governance metadata, and recoverable runtime state"
+    location: "Plant persistence, workflow state, and governed audit records"
+    evidence: "Must be re-audited against the Agent Construct runtime model"
+    verdict: "⚠️ SUPERSEDED - reinterpret using current runtime architecture"
   
   requirement_2_vector_embeddings:
     requirement: "Constitutional queries use Vector DB embeddings (Port 8004)"
@@ -167,9 +169,9 @@ amendment_001_compliance:
   
   requirement_3_hash_chain_audit:
     requirement: "audit_log.jsonl uses sha256 hash chain, tampering detection"
-    location: "layer_4_infrastructure.persistence_manager.immutable_audit_storage"
-    evidence: "Primary: Local audit_log.jsonl (hash-chained), Backup: Object storage with retention lock (Gap 12 fix)"
-    verdict: "✅ PASS"
+    location: "Plant audit storage and immutable audit controls"
+    evidence: "Must be validated against the real audit implementation, not a local file assumption"
+    verdict: "⚠️ NEEDS RUNTIME-SPECIFIC REVIEW"
   
   requirement_4_immutable_backup:
     requirement: "Audit logs backed up to immutable storage (compliance requirement)"
@@ -177,7 +179,7 @@ amendment_001_compliance:
     evidence: "Object storage with retention lock (cloud-agnostic), 7-year retention (HIPAA)"
     verdict: "✅ PASS"
   
-  findings: "All 4 Amendment-001 requirements passed"
+  findings: "Legacy amendment checks preserved for history, but they no longer prove compliance for the current Plant runtime model"
 
 # ============================================================================
 # GAP FIXES CONSTITUTIONAL REVIEW
@@ -226,8 +228,8 @@ gap_fixes_constitutional_audit:
   
   gap_9_checkpointing:
     constitutional_concern: "Checkpoint tampering could hide constitutional violations"
-    mitigation_present: "Checkpoints stored in EEPROM (same hash chain as audit_log.jsonl?)"
-    verdict: "⚠️ NEEDS CLARIFICATION - Are checkpoints hash-chained? If not, add to audit_log.jsonl"
+    mitigation_present: "Current runtime should use persisted workflow or database-backed checkpoints with audit linkage"
+    verdict: "⚠️ NEEDS RUNTIME-SPECIFIC REVIEW - legacy EEPROM assumption removed"
     recommendation: "Checkpoint creation/restoration should be logged to audit_log.jsonl"
   
   gap_10_fast_path_approvals:

@@ -7,6 +7,10 @@
 **Primary Reader:** Human Governors (Customers)  
 **Secondary Readers:** Governance Agents (Genesis, Manager, Vision Guardian)  
 
+> Runtime Authority Note
+> This charter governs approval authority, not low-level runtime implementation.
+> Any legacy Agent DNA terminology referenced below should be interpreted through the current Plant runtime model in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
 ---
 
 ## 1. Role Definition
@@ -307,7 +311,7 @@ approval_actions:
 - ❌ Platform-wide budget changes (affects all customers)
 
 **Governance Policy Changes:**
-- ❌ Changing Agent DNA initialization process
+- ❌ Changing runtime bootstrap and governance initialization policy (legacy Agent DNA initialization terminology)
 - ❌ Changing Precedent Seed approval workflow
 - ❌ Suspending governance agents (Genesis, Vision Guardian, Systems Architect)
 

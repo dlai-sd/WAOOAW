@@ -1,4 +1,4 @@
-# Core Agent DNA - Foundational Interface for All Agents
+# Core Agent DNA - Conceptual Precursor to Plant Agent Construct Runtime
 # INHERITS FROM: base_entity.yml (Universal root - identity, lifecycle, versioning, audit)
 
 inheritance:
@@ -21,13 +21,36 @@ inheritance:
 
 component_id: "CORE-AGENT-DNA-001"
 component_name: "Core Agent DNA"
-version: "1.1.0"  # Updated to 1.1.0 (BaseEntity inheritance)
+version: "1.2.0"
 status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
-updated_date: "2026-01-09"
+updated_date: "2026-03-13"
+
+source_of_truth_note:
+  status: "conceptual_only"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for constitutional intent and conceptual framing only."
+    - "Do not treat the methods in this file as the literal Plant runtime API."
+    - "For implementation, use Plant runtime vocabulary: AgentSpec, ConstructBindings, ConstraintPolicy, LifecycleHooks, HiredAgent, Skill, SkillRun, Deliverable."
+
+runtime_alignment:
+  conceptual_to_runtime_mapping:
+    core_agent_dna: "Conceptual predecessor to AgentSpec plus the runtime contracts declared in the Plant mould"
+    agent_identity: "Split across agent_type reference data, AgentSpec metadata, and hired-agent runtime state"
+    configureme: "Replaced by declarative mould configuration plus PP and Plant setup APIs"
+    operateme: "Replaced by scheduler, lifecycle hooks, and service-level control flows"
+    what_are_my_skills: "Represented by Skill dimension declarations on AgentSpec and customer-visible Skill APIs"
+    customer_facing_agent: "Represented at runtime as a HiredAgent instance, not as the mould itself"
 
 changelog:
+  - version: "1.2.0"
+    date: "2026-03-13"
+    author: "GitHub Copilot"
+    changes:
+      - "Reclassified this document as conceptual background rather than runtime source of truth"
+      - "Added explicit alignment to Plant Agent Construct runtime vocabulary"
   - version: "1.1.0"
     date: "2026-01-09"
     author: "Genesis"
@@ -65,21 +88,25 @@ constitutional_alignment:
 
 # Overview
 description: |
-  Core Agent DNA defines the foundational interface that ALL agents in the WAOOAW platform inherit.
-  This DNA ensures every agent—whether Genesis, Systems Architect, Vision Guardian, or customer-facing agents—
-  shares a common constitutional foundation, identity model, operational interface, and communication protocol.
+  Core Agent DNA defines the original conceptual interface that all WAOOAW agents were intended to inherit.
+  It remains useful for constitutional intent, identity questions, and governance philosophy.
   
-  Core Agent DNA is NOT a microservice—it is an interface specification that agents implement.
-  Think of it as the "abstract base class" in object-oriented design or the "trait" in Rust.
+  In the current Plant implementation, this document is not the executable runtime contract.
+  The executable runtime contract now lives in the Plant Agent Construct design, where agent types are expressed
+  as AgentSpec moulds with construct bindings, constraint policy, lifecycle hooks, and hired-agent runtime instances.
+  
+  Think of this file as historical conceptual architecture that influenced the Plant mould,
+  not as a one-to-one implementation interface.
 
 purpose:
-  - "Enforce uniform agent identity (who am i, what do i do, where i belong)"
-  - "Standardize operational methods (ConfigureMe, OperateMe, MyMessageRoom)"
-  - "Embed constitutional compliance (vector embeddings, precedent cache, audit logging)"
-  - "Enable agent introspection (agents can query their own capabilities and boundaries)"
-  - "Facilitate agent orchestration (all agents speak same operational language)"
+  - "Preserve the original constitutional intent behind a common agent contract"
+  - "Explain the identity and governance questions every agent type must still answer"
+  - "Provide conceptual background for the newer Plant mould and construct runtime"
+  - "Avoid losing the policy rationale behind the runtime model"
 
 inheritance_model: |
+  LEGACY CONCEPTUAL VIEW ONLY. Runtime implementation now uses Plant mould and construct vocabulary.
+
   Core Agent DNA → Genesis Agent (specializes with CertifyJob, CertifySkill skills)
   Core Agent DNA → Systems Architect (specializes with ReviewInfrastructure, DesignArchitecture skills)
   Core Agent DNA → Vision Guardian (specializes with EnforceEthicsGate, DetectBias skills)
@@ -211,7 +238,7 @@ identity_interface:
 
 # Core Agent Operating Methods (How I Work)
 operating_interface:
-  description: "Standardized lifecycle and operational methods all agents implement"
+  description: "Legacy conceptual lifecycle interface. Current Plant runtime uses service workflows, scheduler semantics, lifecycle hooks, and hired-agent state transitions instead of literal ConfigureMe/OperateMe methods."
   
   methods:
     - method: "ConfigureMe(config: AgentConfig)"

@@ -966,9 +966,9 @@ entity_inheritance_tree:
       specific_fields:
         - "job_role_id (which job this agent performs)"
         - "skills (certified skills agent possesses)"
-        - "eeprom (7 persistent files)"
-        - "organs (8 internal components: Brain, ConfigLoader, StateManager, SkillExecutor, MessageBus, MetabolicTracker, ImmuneSystem, HealthMonitor)"
-        - "boot_sequence (6 stages)"
+        - "legacy DNA/anatomy references retained for history only; current runtime should use AgentSpec, ConstructBindings, ConstraintPolicy, LifecycleHooks, and hired-agent runtime state"
+        - "persisted runtime state and audit records (Plant-owned)"
+        - "construct pipeline ownership rather than organ-based anatomy"
     
     - entity_type: "skill"
       inherits_from: "BaseEntity"

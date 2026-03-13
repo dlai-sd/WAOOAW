@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.6  
-**Date**: 2026-03-10  
+**Version**: 2.7  
+**Date**: 2026-03-13  
 **Purpose**: Single-source operating manual for handing WAOOAW work to AI agents, especially zero-cost and small-context agents, so they can navigate, understand, plan, and execute complex platform tasks with minimal drift.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
@@ -1490,6 +1490,12 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
+### Ready to PR — 2026-03-13
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **branch-only** | `feat/plant-catalog-1-it1-e1` | **Plant runtime vocabulary convergence + hire-ready catalog direction** — repo-wide documentation alignment now treats [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) as the executable runtime source of truth; active governance/spec surfaces were updated to reinterpret `Agent DNA`, `Base Agent Anatomy`, `ConfigureMe`, `OperateMe`, `EEPROM`, and filesystem-memory language as historical or conceptual only; the current PP/CP product direction is now explicit: PP is the internal design board and release gate for hire-ready agent supply, while CP should expose only approved catalog releases and preserve customer continuity for existing hired agents. | `docs/CONTEXT_AND_INDEX.md`, `docs/WAOOAW_agents.md`, `docs/PP/README.md`, `README.md`, `main/README.md`, `main/Foundation.md`, `main/Foundation/template/*.yml`, `main/Foundation/amendments/*.md`, `docs/plant/README.md` |
+
 ### Current branch: `feat/ui-ux-revamp` (PR #917 merged to `main`; release-readiness follow-ups committed on branch — 2026-03-11)
 
 ### Ready to PR — 2026-03-11
@@ -1649,7 +1655,8 @@ Use this shortlist first when the task is about Agent/Skill/Component runtime be
 
 | Need | First file | Then inspect | Why |
 |---|---|---|---|
-| Canonical runtime vocabulary | `main/Foundation/genesis_foundational_governance_agent.md` §3a–3c | `docs/CONTEXT_AND_INDEX.md` §4.7 | Source of truth for Agent, Skill, Component, Skill Run, and Goal vocabulary |
+| Canonical runtime vocabulary | `docs/PP/AGENT-CONSTRUCT-DESIGN.md` | `docs/CONTEXT_AND_INDEX.md` §4.6–§4.7 | Executable runtime source of truth for AgentSpec, hired-agent hierarchy, construct bindings, lifecycle hooks, skills, runs, and deliverables |
+| Current agent-management and catalog direction | `docs/WAOOAW_agents.md` | `docs/plant/iterations/PLANT-CATALOG-1-hire-ready-agent-lifecycle.md` | Fastest way to recover the latest PP design-board, hire-ready release, and CP listing rules |
 | CP hired-agent skills flow | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `src/CP/BackEnd/api/cp_skills.py` → `src/Plant/BackEnd/api/v1/agent_skills.py` | Full FE → proxy → Plant chain |
 | Customer skill config save | `src/CP/BackEnd/api/cp_skills.py` | `src/Plant/BackEnd/api/v1/skill_configs.py` | Canonical hired-agent skill config write path |
 | Skill/component run history | `src/CP/BackEnd/api/cp_flow_runs.py` | `src/Plant/BackEnd/api/v1/flow_runs.py` | CP proxy and Plant route registration meet here |

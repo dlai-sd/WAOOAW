@@ -1,6 +1,7 @@
 seed_id: "GEN-003"
 type: "constitutional_amendment"
 principle: "Agent DNA embeds constitution through specialization and learning"
+runtime_note: "Historical precedent seed. Runtime implementation details must be interpreted through /workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md rather than literal local-agent filesystem assumptions."
 rationale: |
   Constitutional Amendment AMENDMENT-001 establishes:
   

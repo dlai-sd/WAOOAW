@@ -7,6 +7,13 @@ status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
 
+source_of_truth_note:
+  status: "active_orchestration_spec_with_legacy_transition_terms"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for Plant orchestration intent and integration shape."
+    - "Interpret init-dna, ConfigureMe, and OperateMe language as transitional conceptual wording unless explicitly mapped to the current construct runtime."
+
 # Overview
 overview:
   purpose: "Unified Plant backend API layer exposing Genesis, Systems Architect, Vision Guardian services. Temporal orchestration for agent creation, certification workflows, precedent seed lifecycle, approval routing."
@@ -108,14 +115,14 @@ plant_api_endpoints:
       rate_limit: "50 req/hour"
     
     - endpoint: "POST /v1/genesis/agents/init-dna"
-      description: "Initialize Agent DNA (5 required files)"
+      description: "Legacy conceptual endpoint from the Agent DNA model. Current Plant runtime should interpret this as initializing or validating agent-type reference data, mould alignment, and governance metadata rather than creating a literal 5-file filesystem memory contract."
       auth: "Internal only (Agent Creation Service Port 8001)"
       request_body:
         agent_id: "uuid"
         job_role_id: "string (JOB-{INDUSTRY}-{NUMBER})"
       response:
         dna_initialized: "boolean"
-        files_created: "array (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+        files_created: "legacy conceptual response only; current Plant runtime should prefer persisted runtime metadata and hired-agent state, not local agent files"
       rate_limit: "No limit (internal)"
     
     - endpoint: "POST /v1/genesis/seeds/validate"
@@ -413,7 +420,7 @@ temporal_workflows:
       
       - stage: "3. Initialize DNA"
         activity: "InitializeDNAActivity"
-        description: "Call Genesis POST /v1/genesis/agents/init-dna (create 5 files)"
+        description: "Call Genesis runtime bootstrap validation flow using the legacy /v1/genesis/agents/init-dna naming"
         timeout: "1 minute"
       
       - stage: "4. Systems Architect Review"
@@ -428,7 +435,7 @@ temporal_workflows:
       
       - stage: "6. Configure Agent"
         activity: "ConfigureAgentActivity"
-        description: "Call agent's ConfigureMe(job_role_id, skills, config)"
+        description: "Apply mould-backed runtime configuration through Plant services"
         timeout: "5 minutes"
       
       - stage: "7. Mark Ready"
@@ -707,8 +714,8 @@ end_to_end_flows:
       
       - step: 5
         actor: "Genesis Agent"
-        action: "Initialize Agent DNA (5 files)"
-        api_call: "Genesis POST /v1/genesis/agents/init-dna"
+        action: "Validate runtime prerequisites for the agent type and governance model"
+        api_call: "Legacy v1 language: Genesis POST /v1/genesis/agents/init-dna. Current runtime should align the agent type with Plant mould expectations and reference data, not create local filesystem memory as a runtime requirement."
       
       - step: 6
         actor: "Systems Architect Agent"
@@ -722,13 +729,13 @@ end_to_end_flows:
       
       - step: 8
         actor: "Plant API Gateway"
-        action: "Configure agent (call ConfigureMe)"
-        api_call: "Plant calls agent's ConfigureMe(job_role_id, skills, config)"
+        action: "Cast runtime configuration through Plant services and the mould-backed orchestration flow"
+        api_call: "Current runtime uses service workflows, AgentSpec-backed behaviour, and persisted setup state instead of literal ConfigureMe() calls"
       
       - step: 9
         actor: "Plant API Gateway"
         action: "Mark agent ready, emit event"
-        api_call: "Update plant_agents status=ready, publish agent.created to GCP Pub/Sub"
+        api_call: "Update reference or runtime state through Plant services, then emit the appropriate event"
       
       - step: 10
         actor: "PP Agent Orchestration"
@@ -808,8 +815,8 @@ end_to_end_flows:
       
       - step: 6
         actor: "Genesis Agent"
-        action: "Call agent's OperateMe(stop, reason='Genesis suspension: constitutional breach')"
-        api_call: "Genesis calls agent MyMessageRoom"
+        action: "Pause or suspend the runtime instance through Plant control flows"
+        api_call: "Current runtime should use hired-agent state transitions, approvals, and lifecycle hooks rather than literal OperateMe()/MyMessageRoom calls"
       
       - step: 7
         actor: "Genesis Agent"
@@ -824,7 +831,7 @@ end_to_end_flows:
 # Related Components
 related_components:
   - component: "component_core_agent_dna.yml"
-    relationship: "Plant API calls agent ConfigureMe(), OperateMe() methods"
+    relationship: "Historical conceptual relationship only. Current runtime should be interpreted through the Plant Agent Construct model."
   - component: "component_genesis_agent.yml"
     relationship: "Plant /v1/genesis/* routes invoke Genesis skills"
   - component: "component_systems_architect_agent.yml"

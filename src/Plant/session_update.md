@@ -1,5 +1,9 @@
 # Plant Phase - Session Update
 
+> Historical session document.
+> Statements below about Agent DNA, EEPROM files, and base anatomy reflect an earlier design phase.
+> The current Plant runtime model is defined in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
 **Session Date:** January 16, 2026  
 **Branch:** feature/gateway-implementation (merged to main)  
 **Status:** ✅ Execution Complete - Deployment In Progress

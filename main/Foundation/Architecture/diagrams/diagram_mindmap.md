@@ -3,6 +3,9 @@
 **Updated:** 2026-01-07 - Post-Constitutional Amendment AMENDMENT-001 + Simulation Gap Fixes  
 **Reflects:** Concentric governance layers with Constitution at center, feedback loop L3→Constitution
 
+> Historical terminology note: this diagram preserves the amendment-era vocabulary.
+> Current Plant runtime semantics are defined in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
 ```mermaid
 graph TB
     subgraph L0["━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━<br/>L0: IMMUTABLE PRINCIPLES<br/>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]

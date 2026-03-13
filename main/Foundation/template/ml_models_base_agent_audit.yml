@@ -7,6 +7,7 @@
 
 metadata:
   version: "1.0"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
   related_files:
     - "agent_architecture_layered.yml"
     - "TOOLING_SELECTION_DECISION.md (GAPs 1-15)"
@@ -15,6 +16,12 @@ metadata:
     - "policy/tech_stack.yaml (ML models catalog)"
   audit_scope: "8 lightweight ML models vs base agent 5-layer architecture"
   constitutional_alignment: "L0 Principle 2 (constitutional embodiment), Amendment-001 (Vector DB embeddings)"
+
+source_of_truth_note:
+  status: "audit_context_only"
+  guidance:
+    - "This audit remains useful for ML fitment analysis."
+    - "Any EEPROM references below should be interpreted as persisted runtime metadata or storage concerns in the current Plant model."
 
 # ===========================
 # SECTION 1: MODEL INVENTORY

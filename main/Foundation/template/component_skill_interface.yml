@@ -7,6 +7,13 @@ status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
 
+source_of_truth_note:
+  status: "active_contract_with_legacy_cross-references"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Skills remain an active runtime concept."
+    - "Legacy Core Agent DNA references here should be read as conceptual ancestry, while runtime implementation should follow current Plant skill, skill-run, and deliverable semantics."
+
 # Constitutional Alignment
 constitutional_alignment:
   l0_principles:
@@ -40,7 +47,7 @@ purpose:
   - "Support skill evolution (versioning, deprecation, replacement)"
 
 inheritance_model: |
-  All agents inherit Core Agent DNA → implement WhatAreMySkills() → return Skill objects
+  Agents expose skills through current Plant runtime metadata and APIs; older Core Agent DNA wording is conceptual ancestry only
   Skills are registered in plant_skills table, referenced by agents via agent_skills junction table
   Genesis certifies skills, assigns SKILL-{CATEGORY}-{NUMBER} IDs
 

@@ -1,6 +1,10 @@
 # Constitutional Review: AMENDMENT-001
 ## AI Agent DNA & Job/Skills Model
 
+> Historical review artifact.
+> The gaps and solutions here were written against the earlier Agent DNA model.
+> For current runtime design, prefer `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md` and reinterpret legacy findings through the mould and construct model.
+
 **Review Date:** 2026-01-07  
 **Reviewers:** Genesis (Constitutional Compliance), Systems Architect (Operational Feasibility), Vision Guardian (Ethics & Coherence)  
 **Status:** 18 GAPS IDENTIFIED → SOLUTIONS PROVIDED
