@@ -100,6 +100,39 @@ Current branch at handoff: feat/plant-catalog-1-it1-e1
 - The near-term goal is not generic no-code agent creation. The near-term goal is to let a platform contributor make the Digital Marketing Agent hire ready with explicit platform-approved values.
 - Plant should own lifecycle truth, versioning, and customer continuity. PP should help a human review and publish that truth. CP should only show agents that are explicitly approved for new hire.
 
+## Base Agent Contract Ground Rule
+
+- Every new WAOOAW agent should begin from a static Base Agent Contract presented in PP, not from a blank page and not from ad hoc raw JSON.
+- This Base Agent Contract should be treated as a governed authoring skeleton, not as a single monolithic Python base class.
+- The purpose is to reduce drift in structure, make required interfaces explicit, and let PP tell the user what is mandatory, optional, incomplete, or unsafe before Plant implementation starts.
+
+### Base Agent Contract sections
+
+| Section | Status | Why it is part of the base |
+|---|---|---|
+| Identity | Mandatory | Every agent needs a stable platform identity and a clear public purpose |
+| Skill composition | Mandatory | The required capabilities must be explicit before authoring can continue |
+| Customer configuration schema | Mandatory | CP setup cannot be hand-built per agent forever |
+| Goal templates | Mandatory | The agent must declare what it is expected to do repeatedly |
+| Construct bindings | Mandatory | Plant needs an explicit runtime wiring contract |
+| Constraint policy | Mandatory | Approval mode, quotas, and guardrails are product decisions, not afterthoughts |
+| Lifecycle and approval behavior | Mandatory | PP and CP must know how the agent behaves through trial, approval, pause, cancel, and retirement |
+| Extensions | Optional | Agent-specific additions are allowed only after the base contract is satisfied |
+
+### PP to Plant lifecycle rule
+
+1. A platform user sketches a new agent in PP using the Base Agent Contract view.
+2. PP validates completeness and highlights mandatory versus optional sections.
+3. The design package moves into Plant for runtime build-out as `AgentSpec`, `AgentTypeDefinition`, and supporting code-defined components where needed.
+4. Once runtime validation is complete, the candidate comes back to PP for review and approval.
+5. Only after approval should Plant mark a catalog release as eligible for CP new hire.
+
+### Why this rule matters
+
+- Without a fixed base contract, each new agent risks inventing its own structure, lifecycle language, and approval assumptions.
+- Without the PP-first authoring step, Plant becomes the accidental place where product shape is decided through implementation details.
+- Without the PP return-for-approval step, CP risks exposing agents that are technically runnable but not operationally or commercially ready.
+
 ## Hire-Ready Digital Marketing Agent Contract
 
 The Digital Marketing Agent should not appear in CP just because an `Agent` row exists. It should appear only after a platform contributor approves a hire-ready release.

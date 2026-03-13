@@ -5,13 +5,21 @@
 | Field | Value |
 |---|---|
 | Document ID | `AGENT-CONSTRUCT-DESIGN` |
-| Version | **v2** (supersedes v1 dated 2026-03-06) |
+| Version | **v3** (supersedes v2 dated 2026-03-07) |
 | Area | Platform Architecture — Plant BackEnd |
 | Created | 2026-03-06 |
-| Last revised | 2026-03-07 |
+| Last revised | 2026-03-13 |
 | Status | Living document — updated as constructs evolve |
 | Parent | `docs/CONTEXT_AND_INDEX.md` §3 (Architecture), §4.3 (Plant BackEnd) |
 | Codebase root | `src/Plant/BackEnd/` |
+
+### What changed in v3
+
+| # | Change | Rationale |
+|---|---|---|
+| 1 | Base Agent Contract added as a platform ground rule | PP needs a fixed authoring skeleton so new agents do not drift in structure or approval readiness |
+| 2 | PP-to-Plant lifecycle clarified | New agents should start in PP as governed drafts, move into Plant for runtime build-out, then return to PP for release approval |
+| 3 | Base contract distinguished from Python inheritance | The safe standard is a versioned contract and validation checklist, not a monolithic base runtime class |
 
 ### What changed in v2
 
@@ -33,6 +41,30 @@
 Every AI agent on WAOOAW is **hired** by a customer. After hiring, the agent works
 **anonymously** — the customer sees deliverables and outcomes, not internal mechanics.
 
+### Ground rule: every new agent starts from the Base Agent Contract
+
+WAOOAW should not allow a new hireable agent to start from a blank shape. Every new
+agent must begin from a **Base Agent Contract** that PP presents as the default authoring
+view for platform users.
+
+The Base Agent Contract is a **governed product contract**, not a single Python base class.
+Its job is to standardize the minimum shape of a WAOOAW agent before Plant-specific runtime
+implementation begins.
+
+The Base Agent Contract must define these sections:
+
+- mandatory identity
+- mandatory skill composition
+- mandatory customer configuration schema
+- mandatory goal templates
+- mandatory construct bindings
+- mandatory constraint policy
+- mandatory lifecycle and approval expectations
+- optional extensions for agent-specific behavior
+
+This rule exists to reduce variance in agent structure, reduce hidden assumptions in PP,
+and make approval readiness inspectable before an agent is exposed to CP.
+
 The hierarchy that governs this:
 
 ```
@@ -46,6 +78,11 @@ Customer
 **Constructs** are the internal building blocks that make a GoalRun happen.
 A customer never interacts with constructs directly — they interact only with
 the Skill API surface (configure → run → approve → receive deliverable).
+
+**Authoring rule:** PP is the human-facing design board for the Base Agent Contract.
+Plant is the runtime compiler and execution system of record. A platform contributor should
+start a new agent in PP, complete the contract, send it into Plant for implementation and
+runtime validation, then bring it back to PP for approval and catalog release.
 
 **The mould is in-memory.** `AgentSpec` objects are created at process startup from
 `agent_mold/reference_agents.py` and held in a `DimensionRegistry` + `SkillRegistry`
@@ -88,6 +125,20 @@ AgentSpec (blueprint / mould — in-memory)
 **Invariant:** Constructs are stateless. State lives in the database.
 A construct reads from DB on entry, writes on exit.
 
+### Product boundary: Base Agent Contract vs runtime construct model
+
+The Base Agent Contract and the Plant construct model solve different problems:
+
+| Layer | Purpose | Owner |
+|---|---|---|
+| Base Agent Contract | Gives PP users a fixed, safe authoring skeleton for new agents | PP design board + governance |
+| AgentSpec | Declares the runtime blueprint Plant will execute | Plant runtime |
+| AgentTypeDefinition | Describes the publishable agent-type config and goal contract | PP authoring + Plant storage |
+| Catalog release | Decides whether a prepared agent is allowed into CP for new hire | PP approval + Plant lifecycle truth |
+
+The Base Agent Contract should compile into Plant artifacts. It should not be treated as a
+replacement for `AgentSpec`, `AgentTypeDefinition`, or catalog releases.
+
 ---
 
 ## 3. Mould Anatomy (AgentSpec and its contracts)
@@ -95,6 +146,19 @@ A construct reads from DB on entry, writes on exit.
 The mould is the *blueprint* for an agent type. It is not the agent itself — it is
 the mould from which a hired instance is cast. One mould can produce millions of
 hired instances.
+
+### 3.0 Authoring ground rule
+
+When PP creates a new agent, the user should not edit raw runtime details first.
+The sequence should be:
+
+1. Start from the Base Agent Contract in PP.
+2. Complete mandatory sections and optional extensions.
+3. Validate structural completeness and governance readiness in PP.
+4. Materialize the runtime shape in Plant as `AgentSpec` and related artifacts.
+5. Return the built candidate to PP for design review, approval, and catalog release.
+
+This keeps PP as the controlled authoring surface and Plant as the controlled runtime surface.
 
 ---
 
