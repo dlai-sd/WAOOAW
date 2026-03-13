@@ -35,6 +35,10 @@ class HiredAgentModel(Base):
     agent_id = Column(String, nullable=False, index=True)
     agent_type_id = Column(String, nullable=True, index=True)
     definition_version_id = Column(String, nullable=True)
+    catalog_release_id = Column(String, nullable=True, index=True)
+    internal_definition_version_id = Column(String, nullable=True)
+    external_catalog_version = Column(String, nullable=True)
+    catalog_status_at_hire = Column(String, nullable=True)
     customer_id = Column(String, nullable=True, index=True)  # Nullable during draft phase
     
     # Configuration
@@ -76,6 +80,10 @@ class HiredAgentModel(Base):
         agent_id: str,
         agent_type_id: str | None = None,
         definition_version_id: str | None = None,
+        catalog_release_id: str | None = None,
+        internal_definition_version_id: str | None = None,
+        external_catalog_version: str | None = None,
+        catalog_status_at_hire: str | None = None,
         customer_id: str | None = None,
         nickname: str | None = None,
         theme: str | None = None,
@@ -95,6 +103,10 @@ class HiredAgentModel(Base):
         self.agent_id = agent_id
         self.agent_type_id = agent_type_id
         self.definition_version_id = definition_version_id
+        self.catalog_release_id = catalog_release_id
+        self.internal_definition_version_id = internal_definition_version_id
+        self.external_catalog_version = external_catalog_version
+        self.catalog_status_at_hire = catalog_status_at_hire
         self.customer_id = customer_id
         self.nickname = nickname
         self.theme = theme

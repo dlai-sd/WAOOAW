@@ -4,7 +4,7 @@ API v1 router - mount all endpoints
 
 from core.routing import waooaw_router  # P-3
 
-from api.v1 import genesis, agents, audit, agent_mold, reference_agents, db_updates, usage_events, marketing_drafts, customers, customers_fcm, auth, payments_simple, hired_agents_simple, invoices_simple, receipts_simple, trial_status_simple, notifications, agent_types_simple, agent_types_db, deliverables_simple, otp, feature_flags, agent_skills, platform_connections, performance_stats, campaigns, skill_configs, flow_runs, approvals
+from api.v1 import genesis, agents, agent_catalog, audit, agent_mold, reference_agents, db_updates, usage_events, marketing_drafts, customers, customers_fcm, auth, payments_simple, hired_agents_simple, invoices_simple, receipts_simple, trial_status_simple, notifications, agent_types_simple, agent_types_db, deliverables_simple, otp, feature_flags, agent_skills, platform_connections, performance_stats, campaigns, skill_configs, flow_runs, approvals
 from api.v1.construct_diagnostics import router as construct_diagnostics_router, ops_router as construct_ops_router
 from api import trials
 
@@ -13,6 +13,7 @@ api_v1_router = waooaw_router(prefix="/api/v1")
 # Mount all routers
 api_v1_router.include_router(genesis.router)
 api_v1_router.include_router(agents.router)
+api_v1_router.include_router(agent_catalog.router)
 api_v1_router.include_router(audit.router)
 api_v1_router.include_router(agent_mold.router)
 api_v1_router.include_router(reference_agents.router)

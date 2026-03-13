@@ -152,6 +152,11 @@ def test_scheduler_diagnostics_reflects_paused_state():
         mock_model.subscription_id = "sub-003"
         mock_model.agent_id = "agent-003"
         mock_model.agent_type_id = "marketing.digital_marketing.v1"
+        mock_model.definition_version_id = None
+        mock_model.catalog_release_id = None
+        mock_model.internal_definition_version_id = None
+        mock_model.external_catalog_version = None
+        mock_model.catalog_status_at_hire = None
         mock_model.customer_id = "cust-003"
         mock_model.nickname = None
         mock_model.theme = None

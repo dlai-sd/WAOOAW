@@ -4,11 +4,16 @@ export type HireWizardDraft = {
   hired_instance_id: string
   subscription_id: string
   agent_id: string
+  agent_type_id: string
   nickname?: string | null
   theme?: string | null
   config: Record<string, unknown>
   configured: boolean
   goals_completed: boolean
+  catalog_release_id?: string | null
+  internal_definition_version_id?: string | null
+  external_catalog_version?: string | null
+  catalog_status_at_hire?: string | null
   subscription_status?: string | null
   trial_status: 'not_started' | 'active' | 'ended_converted' | 'ended_not_converted'
   trial_start_at?: string | null

@@ -7,6 +7,7 @@ from models.skill import Skill
 from models.job_role import JobRole
 from models.team import Team, Agent, Industry
 from models.agent_type import AgentTypeDefinitionModel
+from models.agent_catalog import AgentCatalogReleaseModel
 from models.hired_agent import HiredAgentModel, GoalInstanceModel
 from models.deliverable import DeliverableModel, ApprovalModel
 from models.subscription import SubscriptionModel
@@ -30,6 +31,7 @@ __all__ = [
     "Agent",
     "Industry",
     "AgentTypeDefinitionModel",
+    "AgentCatalogReleaseModel",
     "HiredAgentModel",
     "GoalInstanceModel",
     "DeliverableModel",

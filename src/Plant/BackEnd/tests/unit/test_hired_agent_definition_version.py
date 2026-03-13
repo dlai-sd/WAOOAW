@@ -24,6 +24,10 @@ def test_hired_agent_model_has_definition_version_id_column():
     """E2-S1-T1: HiredAgentModel declares definition_version_id column."""
     columns = {c.name for c in HiredAgentModel.__table__.columns}
     assert "definition_version_id" in columns
+    assert "catalog_release_id" in columns
+    assert "internal_definition_version_id" in columns
+    assert "external_catalog_version" in columns
+    assert "catalog_status_at_hire" in columns
 
 
 @pytest.mark.unit
@@ -103,7 +107,15 @@ async def test_draft_upsert_passes_definition_version_id():
         agent_type_id="trading.share_trader.v1",
         customer_id="CUST-001",
         definition_version_id="1.0.0",
+        catalog_release_id="CAR-001",
+        internal_definition_version_id="1.0.0",
+        external_catalog_version="v1",
+        catalog_status_at_hire="live_on_cp",
     )
 
     assert len(created_model) == 1
     assert created_model[0].definition_version_id == "1.0.0"
+    assert created_model[0].catalog_release_id == "CAR-001"
+    assert created_model[0].internal_definition_version_id == "1.0.0"
+    assert created_model[0].external_catalog_version == "v1"
+    assert created_model[0].catalog_status_at_hire == "live_on_cp"

@@ -1,23 +1,41 @@
 import { Button, Badge } from '@fluentui/react-components'
 import { Star20Filled, ArrowRight20Regular, Briefcase20Regular } from '@fluentui/react-icons'
-import type { Agent, AgentStatus } from '../types/plant.types'
+import type { Agent, AgentStatus, CatalogAgent, CatalogLifecycleState } from '../types/plant.types'
 
 interface AgentCardProps {
-  agent: Omit<Agent, 'status'> & {
+  agent: (Omit<Agent, 'status'> & {
     status: AgentStatus | 'available' | 'working' | 'offline'
     avatar?: string
     job_role?: { name: string }
     rating?: number
     price?: number
-  }
+  }) | (CatalogAgent & {
+    status?: AgentStatus | 'available' | 'working' | 'offline'
+    avatar?: string
+    rating?: number
+  })
   onTryAgent?: (agentId: string) => void
 }
 
 export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
-  const isTryEnabled = agent.status === 'active' || agent.status === 'available'
+  const isCatalogAgent = 'public_name' in agent
+  const resolvedStatus = isCatalogAgent
+    ? ((agent.lifecycle_state === 'live_on_cp' && agent.approved_for_new_hire) ? 'available' : 'offline')
+    : agent.status
+  const isTryEnabled = resolvedStatus === 'active' || resolvedStatus === 'available'
+
+  const displayName = isCatalogAgent ? agent.public_name : agent.name
+  const industryLabel = isCatalogAgent
+    ? agent.industry_name
+    : `${agent.industry.charAt(0).toUpperCase()}${agent.industry.slice(1)}`
+  const description = isCatalogAgent ? agent.short_description : agent.description
+  const jobRoleName = isCatalogAgent ? agent.job_role_label : agent.job_role?.name
+  const price = isCatalogAgent ? agent.monthly_price_inr : agent.price
+  const lifecycleState = isCatalogAgent ? agent.lifecycle_state : null
+  const catalogVersion = isCatalogAgent ? agent.external_catalog_version : null
 
   const getStatusBadge = () => {
-    switch (agent.status) {
+    switch (resolvedStatus) {
       // Legacy/mock status values
       case 'available':
         return <Badge appearance="filled" color="success" size="small">Available</Badge>
@@ -34,6 +52,14 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
       default:
         return <Badge appearance="ghost" size="small">Unknown</Badge>
     }
+  }
+
+  const getLifecycleBadge = (state: CatalogLifecycleState | null) => {
+    if (!state) return null
+    if (state === 'live_on_cp') return <Badge appearance="tint" color="success" size="small">Live on CP</Badge>
+    if (state === 'servicing_only') return <Badge appearance="tint" color="warning" size="small">Servicing only</Badge>
+    if (state === 'retired_from_catalog') return <Badge appearance="ghost" size="small">Retired</Badge>
+    return <Badge appearance="ghost" size="small">{state.replace(/_/g, ' ')}</Badge>
   }
 
   const getAvatar = () => {
@@ -54,27 +80,29 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
         {getAvatar()}
       </div>
       <div className="agent-info">
-        <h3>{agent.name}</h3>
+        <h3>{displayName}</h3>
         <div className="agent-meta">
-          {agent.rating && (
+          {'rating' in agent && agent.rating && (
             <span className="agent-rating">
               <Star20Filled className="agent-rating-icon" />
               {agent.rating.toFixed(1)}
             </span>
           )}
           {getStatusBadge()}
+          {getLifecycleBadge(lifecycleState)}
+          {catalogVersion ? <Badge appearance="outline" size="small">{catalogVersion}</Badge> : null}
         </div>
         <p className="agent-industry">
           <Briefcase20Regular className="agent-industry-icon" />
-          {agent.industry.charAt(0).toUpperCase() + agent.industry.slice(1)}
+          {industryLabel}
         </p>
-        {agent.job_role && (
-          <p className="agent-specialty">{agent.job_role.name}</p>
+        {jobRoleName && (
+          <p className="agent-specialty">{jobRoleName}</p>
         )}
-        <p className="agent-description">{agent.description}</p>
+        <p className="agent-description">{description}</p>
         <div className="agent-footer">
-          {agent.price ? (
-            <span className="agent-price">₹{agent.price.toLocaleString()}/mo</span>
+          {price ? (
+            <span className="agent-price">₹{price.toLocaleString()}/mo</span>
           ) : (
             <span className="agent-price">Contact for pricing</span>
           )}

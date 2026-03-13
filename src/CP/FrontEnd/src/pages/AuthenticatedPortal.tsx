@@ -51,6 +51,9 @@ type JourneySource = 'payment-confirmed' | 'trial-activated' | 'setup-incomplete
 type PortalJourneyContext = {
   source: JourneySource
   subscriptionId?: string
+  lifecycleState?: string
+  catalogVersion?: string
+  agentName?: string
 }
 
 type PortalLocationState = {
@@ -59,7 +62,19 @@ type PortalLocationState = {
     agentId?: string
     source?: JourneySource
     subscriptionId?: string
+    lifecycleState?: string
+    catalogVersion?: string
+    agentName?: string
   }
+}
+
+function formatLifecycleLabel(value?: string): string | null {
+  const normalized = String(value || '').trim()
+  if (!normalized) return null
+  if (normalized === 'live_on_cp') return 'Live on CP'
+  if (normalized === 'servicing_only') return 'Servicing only'
+  if (normalized === 'retired_from_catalog') return 'Retired from catalog'
+  return normalized.replace(/_/g, ' ')
 }
 
 function formatCount(count: number, singular: string, plural?: string): string {
@@ -140,6 +155,9 @@ export default function AuthenticatedPortal({
     ? {
         source: portalEntry.source,
         subscriptionId: portalEntry.subscriptionId,
+        lifecycleState: portalEntry.lifecycleState,
+        catalogVersion: portalEntry.catalogVersion,
+        agentName: portalEntry.agentName,
       }
     : initialJourneyContext
 
@@ -360,15 +378,24 @@ export default function AuthenticatedPortal({
   }), [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected])
 
   const currentMeta = pageMeta[activeNavPage]
+  const journeyAgentLabel = journeyContext?.agentName || selectedAgentId || ''
+  const journeyLifecycleLabel = formatLifecycleLabel(journeyContext?.lifecycleState)
 
   const journeyBanner = useMemo(() => {
     if (!journeyContext) return null
 
+    const lifecycleLabel = formatLifecycleLabel(journeyContext.lifecycleState)
+    const selectedLabel = journeyContext.agentName || selectedAgentId || 'your selected agent'
+    const continuityNote =
+      journeyContext.lifecycleState === 'servicing_only' || journeyContext.lifecycleState === 'retired_from_catalog'
+        ? ' This release is no longer open for new hire, but your active hire continues under the version you already purchased.'
+        : ''
+
     if (journeyContext.source === 'payment-confirmed') {
       return {
         eyebrow: 'Payment captured',
-        title: `Setup is still required for ${selectedAgentId || 'your selected agent'}`,
-        body: 'Payment is complete, but the agent is not ready to work until setup is finished. Resume setup to connect systems and activate the trial.',
+        title: `Setup is still required for ${selectedLabel}`,
+        body: `Payment is complete, but the agent is not ready to work until setup is finished. Resume setup to connect systems and activate the trial.${continuityNote}`,
         primaryLabel: 'Resume setup',
         onPrimary: () => {
           if (!journeyContext.subscriptionId || !selectedAgentId) return
@@ -380,8 +407,8 @@ export default function AuthenticatedPortal({
     if (journeyContext.source === 'trial-activated') {
       return {
         eyebrow: 'Trial activated',
-        title: `${selectedAgentId || 'Your selected agent'} is now in runtime setup`,
-        body: 'You landed in My Agents because that is the first truthful place to confirm the runtime, monitor hydration, and continue operating without guessing.',
+        title: `${selectedLabel} is now in runtime setup`,
+        body: `You landed in My Agents because that is the first truthful place to confirm the runtime, monitor hydration, and continue operating without guessing.${continuityNote}`,
         primaryLabel: 'Open Deliverables',
         onPrimary: () => openPage('deliverables'),
       }
@@ -565,8 +592,10 @@ export default function AuthenticatedPortal({
                 <h2 className="portal-entry-banner-title">{journeyBanner.title}</h2>
                 <p className="portal-entry-banner-body">{journeyBanner.body}</p>
                 <div className="portal-entry-banner-meta">
-                  {selectedAgentId ? <span>Agent: {selectedAgentId}</span> : null}
+                  {journeyAgentLabel ? <span>Agent: {journeyAgentLabel}</span> : null}
                   {journeyContext?.subscriptionId ? <span>Subscription: {journeyContext.subscriptionId}</span> : null}
+                  {journeyContext?.catalogVersion ? <span>Version: {journeyContext.catalogVersion}</span> : null}
+                  {journeyLifecycleLabel ? <span>Lifecycle: {journeyLifecycleLabel}</span> : null}
                 </div>
               </div>
               <div className="portal-entry-banner-actions">

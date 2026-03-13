@@ -32,6 +32,7 @@ from models.hired_agent import HiredAgentModel
 from models.agent import Agent
 from models.job_role import JobRole
 from models.skill import Skill
+from repositories.agent_catalog_repository import AgentCatalogRepository
 from repositories.hired_agent_repository import HiredAgentRepository
 from repositories.hired_agent_repository import GoalInstanceRepository
 from services.notification_events import NotificationEventRecord, get_notification_event_store
@@ -285,6 +286,10 @@ class HiredAgentInstanceResponse(BaseModel):
     subscription_status: str | None = None
     subscription_ended_at: datetime | None = None
     retention_expires_at: datetime | None = None
+    catalog_release_id: str | None = None
+    internal_definition_version_id: str | None = None
+    external_catalog_version: str | None = None
+    catalog_status_at_hire: str | None = None
     trial_status: TrialStatus = "not_started"
     trial_start_at: datetime | None = None
     trial_end_at: datetime | None = None
@@ -320,6 +325,10 @@ class _HiredAgentRecord(BaseModel):
     subscription_id: str
     agent_id: str
     agent_type_id: str
+    catalog_release_id: str | None = None
+    internal_definition_version_id: str | None = None
+    external_catalog_version: str | None = None
+    catalog_status_at_hire: str | None = None
     customer_id: str | None
     nickname: str | None
     theme: str | None
@@ -344,6 +353,13 @@ def _db_model_to_record(model: HiredAgentModel) -> _HiredAgentRecord:
         subscription_id=model.subscription_id,
         agent_id=model.agent_id,
         agent_type_id=agent_type_id,
+        catalog_release_id=getattr(model, "catalog_release_id", None),
+        internal_definition_version_id=(
+            getattr(model, "internal_definition_version_id", None)
+            or getattr(model, "definition_version_id", None)
+        ),
+        external_catalog_version=getattr(model, "external_catalog_version", None),
+        catalog_status_at_hire=getattr(model, "catalog_status_at_hire", None),
         customer_id=model.customer_id,
         nickname=model.nickname,
         theme=model.theme,
@@ -367,6 +383,69 @@ async def _get_record_by_id(*, hired_instance_id: str, db: AsyncSession | None) 
     if model is None:
         return None
     return _db_model_to_record(model)
+
+
+async def _resolve_canonical_agent_ref(*, agent_id: str, db: AsyncSession | None) -> str:
+    normalized_agent_id = (agent_id or "").strip()
+    if not normalized_agent_id or db is None:
+        return normalized_agent_id
+
+    maybe_uuid: UUID | None = None
+    try:
+        maybe_uuid = UUID(normalized_agent_id)
+    except Exception:
+        maybe_uuid = None
+
+    clauses = [Agent.external_id == normalized_agent_id]
+    if maybe_uuid is not None:
+        clauses.append(Agent.id == maybe_uuid)
+
+    stmt_agent = select(Agent).where(or_(*clauses))
+    agent_result = await db.execute(stmt_agent)
+    agent = agent_result.scalars().first()
+    if agent is None:
+        return normalized_agent_id
+
+    return str(getattr(agent, "external_id", None) or agent.id)
+
+
+async def _catalog_snapshot_for_agent(
+    *,
+    agent_id: str,
+    agent_type_id: str,
+    db: AsyncSession | None,
+) -> dict[str, str | None]:
+    definition = get_agent_type_definition(agent_type_id)
+    fallback_version = definition.version if definition else None
+    fallback = {
+        "catalog_release_id": None,
+        "definition_version_id": fallback_version,
+        "internal_definition_version_id": fallback_version,
+        "external_catalog_version": None,
+        "catalog_status_at_hire": "unreleased",
+    }
+    if db is None:
+        return fallback
+
+    canonical_agent_ref = await _resolve_canonical_agent_ref(agent_id=agent_id, db=db)
+    if not canonical_agent_ref:
+        return fallback
+
+    repo = AgentCatalogRepository(db)
+    release = await repo.get_live_release_for_agent_id(canonical_agent_ref)
+    if release is None:
+        return fallback
+
+    if str(release.agent_type_id or "").strip() and release.agent_type_id != agent_type_id:
+        return fallback
+
+    return {
+        "catalog_release_id": release.release_id,
+        "definition_version_id": release.internal_definition_version_id or fallback_version,
+        "internal_definition_version_id": release.internal_definition_version_id or fallback_version,
+        "external_catalog_version": release.external_catalog_version,
+        "catalog_status_at_hire": release.lifecycle_state,
+    }
 
 
 def _scheduler_paused(record: _HiredAgentRecord) -> bool:
@@ -782,6 +861,10 @@ def _to_response(
         subscription_status=resolved_status,
         subscription_ended_at=resolved_ended_at,
         retention_expires_at=retention_expires_at,
+        catalog_release_id=record.catalog_release_id,
+        internal_definition_version_id=record.internal_definition_version_id,
+        external_catalog_version=record.external_catalog_version,
+        catalog_status_at_hire=record.catalog_status_at_hire,
         trial_status=record.trial_status,
         trial_start_at=record.trial_start_at,
         trial_end_at=record.trial_end_at,
@@ -842,6 +925,17 @@ async def upsert_draft(
             )
 
             persisted = await repo.draft_upsert(
+                definition_version_id=(
+                    getattr(existing, "definition_version_id", None)
+                    or getattr(existing, "internal_definition_version_id", None)
+                ),
+                catalog_release_id=getattr(existing, "catalog_release_id", None),
+                internal_definition_version_id=(
+                    getattr(existing, "internal_definition_version_id", None)
+                    or getattr(existing, "definition_version_id", None)
+                ),
+                external_catalog_version=getattr(existing, "external_catalog_version", None),
+                catalog_status_at_hire=getattr(existing, "catalog_status_at_hire", None),
                 subscription_id=body.subscription_id,
                 agent_id=str(body.agent_id or existing.agent_id),
                 agent_type_id=canonical_agent_type_id,
@@ -858,8 +952,11 @@ async def upsert_draft(
         _assert_refs_only_config(body.config)
         await _validate_agent_job_role_skill_chain(agent_id=body.agent_id, db=db)
 
-        _defn = get_agent_type_definition(canonical_agent_type_id)
-        _def_version = _defn.version if _defn else None
+        snapshot = await _catalog_snapshot_for_agent(
+            agent_id=body.agent_id,
+            agent_type_id=canonical_agent_type_id,
+            db=db,
+        )
         configured = _compute_agent_configured(body.nickname, theme, agent_id=body.agent_id, config=(body.config or {}))
         persisted = await repo.draft_upsert(
             subscription_id=body.subscription_id,
@@ -870,7 +967,11 @@ async def upsert_draft(
             theme=theme,
             config=dict(body.config or {}),
             configured=configured,
-            definition_version_id=_def_version,
+            definition_version_id=snapshot["definition_version_id"],
+            catalog_release_id=snapshot["catalog_release_id"],
+            internal_definition_version_id=snapshot["internal_definition_version_id"],
+            external_catalog_version=snapshot["external_catalog_version"],
+            catalog_status_at_hire=snapshot["catalog_status_at_hire"],
         )
         await db.commit()
         record = _db_model_to_record(persisted)
@@ -928,6 +1029,10 @@ async def upsert_draft(
         subscription_id=body.subscription_id,
         agent_id=body.agent_id,
         agent_type_id=canonical_agent_type_id,
+        catalog_release_id=None,
+        internal_definition_version_id=None,
+        external_catalog_version=None,
+        catalog_status_at_hire=None,
         customer_id=customer_id,
         nickname=(body.nickname or None),
         theme=theme,
@@ -1061,6 +1166,13 @@ async def list_hired_agents_by_customer(
                     subscription_id=model.subscription_id,
                     agent_id=model.agent_id,
                     agent_type_id=raw_type_id,
+                    catalog_release_id=getattr(model, "catalog_release_id", None),
+                    internal_definition_version_id=(
+                        getattr(model, "internal_definition_version_id", None)
+                        or getattr(model, "definition_version_id", None)
+                    ),
+                    external_catalog_version=getattr(model, "external_catalog_version", None),
+                    catalog_status_at_hire=getattr(model, "catalog_status_at_hire", None),
                     customer_id=model.customer_id,
                     nickname=model.nickname,
                     theme=model.theme,
@@ -1428,6 +1540,11 @@ async def finalize(
     )
     if db is not None:
         repo = HiredAgentRepository(db)
+        snapshot = await _catalog_snapshot_for_agent(
+            agent_id=record.agent_id,
+            agent_type_id=canonical_agent_type_id,
+            db=db,
+        )
         try:
             persisted = await repo.finalize(
                 hired_instance_id=hired_instance_id,
@@ -1437,6 +1554,13 @@ async def finalize(
                 trial_status=trial_status,
                 trial_start=trial_start_at,
                 trial_end=trial_end_at,
+                definition_version_id=record.internal_definition_version_id or snapshot["definition_version_id"],
+                catalog_release_id=record.catalog_release_id or snapshot["catalog_release_id"],
+                internal_definition_version_id=(
+                    record.internal_definition_version_id or snapshot["internal_definition_version_id"]
+                ),
+                external_catalog_version=record.external_catalog_version or snapshot["external_catalog_version"],
+                catalog_status_at_hire=record.catalog_status_at_hire or snapshot["catalog_status_at_hire"],
             )
         except ValueError:
             raise HTTPException(status_code=404, detail="Hired agent instance not found.")

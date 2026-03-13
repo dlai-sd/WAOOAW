@@ -467,6 +467,80 @@ class PlantAPIClient:
         if response.status_code == 200:
             return response.json()
         raise self._parse_error(response)
+
+    # ========== AGENT CATALOG RELEASES (PLANT-CATALOG-1) ==========
+
+    async def list_catalog_releases(
+        self,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> list[dict]:
+        response = await self._request(
+            method="GET",
+            path="/api/v1/catalog/releases",
+            json_data=None,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def upsert_catalog_release(
+        self,
+        agent_id: str,
+        payload: dict,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="PUT",
+            path=f"/api/v1/catalog/agents/{agent_id}/release",
+            json_data=payload,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def approve_catalog_release(
+        self,
+        agent_id: str,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="POST",
+            path=f"/api/v1/catalog/agents/{agent_id}/approve",
+            json_data={},
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def retire_catalog_release(
+        self,
+        release_id: str,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="POST",
+            path=f"/api/v1/catalog/releases/{release_id}/retire",
+            json_data={},
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
     
     # ========== GENESIS ENDPOINTS (Skills) ==========
     

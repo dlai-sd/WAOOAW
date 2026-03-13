@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { 
   Button, 
   Spinner, 
@@ -30,6 +30,7 @@ interface AgentDetailProps {
 
 export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = {}) {
   const { agentId: agentIdParam } = useParams<{ agentId: string }>()
+  const [searchParams] = useSearchParams()
   const agentId = agentIdProp ?? agentIdParam
   const navigate = useNavigate()
   
@@ -80,8 +81,15 @@ export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = 
     setBookingModalOpen(false)
 
     if (result.subscription_id) {
+      const nextQuery = new URLSearchParams()
+      nextQuery.set('subscriptionId', result.subscription_id)
+      nextQuery.set('agentId', String(agent?.id || ''))
+      for (const key of ['agentTypeId', 'catalogReleaseId', 'catalogVersion', 'lifecycleState', 'agentName']) {
+        const value = searchParams.get(key)
+        if (value) nextQuery.set(key, value)
+      }
       navigate(
-        `/hire/receipt/${encodeURIComponent(result.order_id)}?subscriptionId=${encodeURIComponent(result.subscription_id)}&agentId=${encodeURIComponent(agent?.id || '')}`
+        `/hire/receipt/${encodeURIComponent(result.order_id)}?${nextQuery.toString()}`
       )
       return
     }

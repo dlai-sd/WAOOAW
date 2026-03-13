@@ -14,6 +14,10 @@ export type HiredAgentInstance = {
   configured?: boolean
   goals_completed?: boolean
   trial_status?: string | null
+  catalog_release_id?: string | null
+  internal_definition_version_id?: string | null
+  external_catalog_version?: string | null
+  catalog_status_at_hire?: string | null
 }
 
 export type UpsertHiredAgentDraftInput = {

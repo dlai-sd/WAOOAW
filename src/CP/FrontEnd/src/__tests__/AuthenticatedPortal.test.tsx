@@ -330,11 +330,17 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
       initialJourneyContext: {
         source: 'trial-activated',
         subscriptionId: 'SUB-456',
+        lifecycleState: 'servicing_only',
+        catalogVersion: 'v3',
+        agentName: 'Share Trader Agent',
       },
     })
 
     expect(screen.getByTestId('page-my-agents')).toBeTruthy()
-    expect(screen.getByText('AGT-TRD-001 is now in runtime setup')).toBeTruthy()
-    expect(screen.getByText('Agent: AGT-TRD-001')).toBeTruthy()
+    expect(screen.getByText('Share Trader Agent is now in runtime setup')).toBeTruthy()
+    expect(screen.getByText('Agent: Share Trader Agent')).toBeTruthy()
+    expect(screen.getByText('Version: v3')).toBeTruthy()
+    expect(screen.getByText('Lifecycle: Servicing only')).toBeTruthy()
+    expect(screen.getByText(/your active hire continues under the version you already purchased/i)).toBeTruthy()
   })
 })

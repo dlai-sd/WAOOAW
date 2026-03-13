@@ -81,3 +81,82 @@ Current branch at handoff: feat/plant-dma-1-it3-s4-regression-release
 - Never couple WAOOAW account login identity to external publishing identity.
 - Always show the customer exactly which external channel/account/page/organization is connected before enabling publish.
 - Approval-gated publishing and truthful runtime readiness must remain visible in both CP and PP.
+
+## Agent Design Board Direction (2026-03-13)
+
+- PP should be treated as a design board and release gate for hireable agent supply, even though Plant remains the canonical system of record.
+- The near-term goal is not generic no-code agent creation. The near-term goal is to let a platform contributor make the Digital Marketing Agent hire ready with explicit platform-approved values.
+- Plant should own lifecycle truth, versioning, and customer continuity. PP should help a human review and publish that truth. CP should only show agents that are explicitly approved for new hire.
+
+## Hire-Ready Digital Marketing Agent Contract
+
+The Digital Marketing Agent should not appear in CP just because an `Agent` row exists. It should appear only after a platform contributor approves a hire-ready release.
+
+### Minimum public fields required before CP can list the agent
+
+| Field group | Required fields | Why it matters |
+|---|---|---|
+| Marketplace identity | `public_name`, `short_description`, `industry_name`, `job_role_label` | CP discovery and detail pages need clear customer-facing copy |
+| Commercials | `monthly_price_inr`, `trial_days`, `allowed_durations` | CP card, detail, and booking flows already rely on pricing/trial metadata |
+| Runtime identity | `agent_id`, `agent_type_id`, `internal_definition_version_id`, `external_catalog_version` | Hire flow must carry explicit type/version instead of relying on ID prefixes |
+| Availability | `catalog_status`, `approved_for_new_hire`, `retired_from_catalog_at` | CP should show only approved supply and stop silently exposing every active agent |
+| Setup expectations | `required_setup_steps`, `supported_channels`, `approval_mode` | Customer should know what must be configured before work starts |
+
+### Recommended lifecycle states
+
+- `draft`: being designed in PP, not visible in CP
+- `design_review`: values are being reviewed by platform staff
+- `approved_for_catalog`: ready for new hires in CP
+- `live_on_cp`: currently visible in the ready-to-hire list
+- `retired_from_catalog`: hidden from new hires, but historical runtime remains valid
+- `servicing_only`: no new hires, but existing customer contracts continue normally
+
+## Customer Continuity Rule
+
+- Removing an agent from CP must mean catalog retirement, not runtime deletion.
+- Existing hired customers must keep service if their contract is active.
+- Every hired instance should keep the release snapshot it was sold against, including agent type and catalog version identifiers.
+- Future releases may replace older public versions for new sales without rewriting existing customer runtime history.
+
+## Current Implementation Baseline
+
+### What Plant already supports
+
+- Skill creation and certification through Genesis.
+- Job role creation tied to required skills.
+- Raw agent creation with `name`, `skill_id`, `job_role_id`, `industry_id`, and `governance_agent_id`.
+- Versioned agent type definitions stored in Plant.
+- Hired agent persistence already includes `agent_type_id` and `definition_version_id`.
+
+### What PP already supports
+
+- Agent type definition publishing/editing.
+- A guided authoring surface for construct bindings, constraint policy, and hooks.
+- Operator workflows for approvals, denials, and hired-agent diagnostics.
+
+### What is still missing
+
+- A first-class hire-readiness approval layer for agents.
+- An explicit Plant catalog-release record that gates CP visibility.
+- A PP design-board workflow that shows recommended values and approval status for a concrete agent release.
+- CP lifecycle rendering that shows whether an agent is live, retired, or servicing-only.
+- Generic component creation in PP. Today components are still code-defined and registry-backed.
+
+## Creation vs Packaging Model
+
+To keep design discussions clear, separate the layers:
+
+| Layer | Current source of truth | Required fields now | Notes |
+|---|---|---|---|
+| Skill | Genesis / Plant | `skill_key`, `name`, `description`, `category`, `governance_agent_id` | Add `goal_schema` when CP must render dynamic configuration |
+| Job Role | Genesis / Plant | `name`, `description`, `required_skills`, `seniority_level`, `governance_agent_id` | Defines the required skill chain |
+| Agent Type Definition | PP authoring + Plant storage | `agent_type_id`, `version`, `required_skill_keys`, `config_schema`, `goal_templates`, `enforcement_defaults` | This is the best current design-board surface |
+| Hireable Agent Release | PP review + Plant lifecycle | public identity, commercials, availability, explicit versions, setup requirements | This is the missing layer needed for safe CP listing |
+| Component | Plant code registry | Python class + `register_component()` | Out of scope for the near-term PP design-board release workflow |
+
+## Near-Term Product Direction
+
+- Treat the Digital Marketing Agent as the first fully governed hire-ready release.
+- Add a Plant-owned catalog lifecycle record and use PP to review/approve the release values.
+- Make CP discovery read only the approved catalog-release surface.
+- Show lifecycle and version truth to customers in discovery, hire setup, and hired-agent views.
