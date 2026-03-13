@@ -111,11 +111,51 @@ async def test_hired_agent_repository_finalize_updates_trial_fields(async_sessio
 
 
 @pytest.mark.asyncio
+async def test_hired_agent_repository_persists_catalog_snapshot(async_session: AsyncSession):
+    repo = HiredAgentRepository(async_session)
+
+    created = await repo.draft_upsert(
+        subscription_id="SUB-HAI-CATALOG-1",
+        agent_id="AGT-MKT-DMA-001",
+        agent_type_id="marketing.digital_marketing.v1",
+        customer_id="cust-catalog-1",
+        nickname="DMA",
+        theme="dark",
+        config={"brand_name": "WAOOAW"},
+        configured=True,
+        definition_version_id="1.0.0",
+        catalog_release_id="CAR-DMA-1",
+        internal_definition_version_id="1.0.0",
+        external_catalog_version="v1",
+        catalog_status_at_hire="live_on_cp",
+    )
+    await async_session.commit()
+
+    assert created.catalog_release_id == "CAR-DMA-1"
+    assert created.internal_definition_version_id == "1.0.0"
+    assert created.external_catalog_version == "v1"
+    assert created.catalog_status_at_hire == "live_on_cp"
+
+
+@pytest.mark.asyncio
 async def test_goal_instance_repository_upsert_list_delete(async_session: AsyncSession):
+    hired_repo = HiredAgentRepository(async_session)
     repo = GoalInstanceRepository(async_session)
 
+    created_hire = await hired_repo.draft_upsert(
+        subscription_id="SUB-HAI-GOAL-1",
+        agent_id="AGT-MKT-DMA-001",
+        agent_type_id="marketing.digital_marketing.v1",
+        customer_id="cust-goal-1",
+        nickname="DMA",
+        theme="dark",
+        config={"brand_name": "WAOOAW"},
+        configured=True,
+    )
+    await async_session.commit()
+
     created = await repo.upsert_goal(
-        hired_instance_id="HAI-1",
+        hired_instance_id=created_hire.hired_instance_id,
         goal_template_id="marketing.weekly_multichannel_batch.v1",
         frequency="weekly",
         settings={"platform": "instagram"},
@@ -123,7 +163,7 @@ async def test_goal_instance_repository_upsert_list_delete(async_session: AsyncS
     await async_session.commit()
 
     assert created.goal_instance_id.startswith("GOI-")
-    assert created.hired_instance_id == "HAI-1"
+    assert created.hired_instance_id == created_hire.hired_instance_id
     assert created.settings["platform"] == "instagram"
 
     fetched = await repo.get_by_id(created.goal_instance_id)
@@ -131,7 +171,7 @@ async def test_goal_instance_repository_upsert_list_delete(async_session: AsyncS
     assert fetched.goal_instance_id == created.goal_instance_id
 
     updated = await repo.upsert_goal(
-        hired_instance_id="HAI-1",
+        hired_instance_id=created_hire.hired_instance_id,
         goal_template_id="marketing.weekly_multichannel_batch.v1",
         frequency="monthly",
         settings={"platform": "linkedin"},
@@ -142,7 +182,7 @@ async def test_goal_instance_repository_upsert_list_delete(async_session: AsyncS
     assert updated.frequency == "monthly"
     assert updated.settings["platform"] == "linkedin"
 
-    goals = await repo.list_by_hired_instance("HAI-1")
+    goals = await repo.list_by_hired_instance(created_hire.hired_instance_id)
     assert len(goals) == 1
     assert goals[0].goal_instance_id == created.goal_instance_id
 

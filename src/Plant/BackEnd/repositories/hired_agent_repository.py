@@ -67,6 +67,10 @@ class HiredAgentRepository:
         config: dict[str, Any] | None = None,
         configured: bool | None = None,
         definition_version_id: str | None = None,
+        catalog_release_id: str | None = None,
+        internal_definition_version_id: str | None = None,
+        external_catalog_version: str | None = None,
+        catalog_status_at_hire: str | None = None,
     ) -> HiredAgentModel:
         """Create or update a hired agent instance draft.
         
@@ -95,6 +99,16 @@ class HiredAgentRepository:
             # Update existing record
             existing.agent_id = agent_id
             existing.agent_type_id = agent_type_id
+            if definition_version_id is not None:
+                existing.definition_version_id = definition_version_id
+            if catalog_release_id is not None:
+                existing.catalog_release_id = catalog_release_id
+            if internal_definition_version_id is not None:
+                existing.internal_definition_version_id = internal_definition_version_id
+            if external_catalog_version is not None:
+                existing.external_catalog_version = external_catalog_version
+            if catalog_status_at_hire is not None:
+                existing.catalog_status_at_hire = catalog_status_at_hire
             existing.customer_id = customer_id
             
             if nickname is not None:
@@ -124,6 +138,10 @@ class HiredAgentRepository:
             agent_id=agent_id,
             agent_type_id=agent_type_id,
             definition_version_id=definition_version_id,
+            catalog_release_id=catalog_release_id,
+            internal_definition_version_id=internal_definition_version_id,
+            external_catalog_version=external_catalog_version,
+            catalog_status_at_hire=catalog_status_at_hire,
             customer_id=customer_id,
             nickname=nickname,
             theme=theme,
@@ -152,6 +170,11 @@ class HiredAgentRepository:
         trial_status: str | None = None,
         trial_start: datetime | None = None,
         trial_end: datetime | None = None,
+        definition_version_id: str | None = None,
+        catalog_release_id: str | None = None,
+        internal_definition_version_id: str | None = None,
+        external_catalog_version: str | None = None,
+        catalog_status_at_hire: str | None = None,
     ) -> HiredAgentModel:
         """Finalize a hired agent instance (mark configured/goals_completed, start trial).
         
@@ -178,6 +201,16 @@ class HiredAgentRepository:
         existing.configured = configured
         existing.goals_completed = goals_completed
         existing.agent_type_id = agent_type_id
+        if definition_version_id is not None:
+            existing.definition_version_id = definition_version_id
+        if catalog_release_id is not None:
+            existing.catalog_release_id = catalog_release_id
+        if internal_definition_version_id is not None:
+            existing.internal_definition_version_id = internal_definition_version_id
+        if external_catalog_version is not None:
+            existing.external_catalog_version = external_catalog_version
+        if catalog_status_at_hire is not None:
+            existing.catalog_status_at_hire = catalog_status_at_hire
         
         if trial_status is not None:
             existing.trial_status = trial_status

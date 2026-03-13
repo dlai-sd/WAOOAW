@@ -547,3 +547,56 @@ async def test_migration_025_agent_skills_goal_config_nullable(async_engine):
             "goal_config must be nullable so existing agent_skills rows are unaffected by migration 025"
         )
 
+
+@pytest.mark.asyncio
+async def test_migration_033_agent_catalog_releases_table_exists(async_engine):
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_name = 'agent_catalog_releases'
+                )
+            """)
+        )
+        assert result.scalar() is True
+
+
+@pytest.mark.asyncio
+async def test_migration_033_agent_catalog_releases_columns(async_engine):
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'agent_catalog_releases'
+            """)
+        )
+        columns = {row[0] for row in result.fetchall()}
+        assert {"release_id", "agent_id", "agent_type_id", "external_catalog_version", "approved_for_new_hire"}.issubset(columns)
+
+
+@pytest.mark.asyncio
+async def test_migration_033_hired_agents_catalog_snapshot_columns(async_engine):
+    async with async_engine.connect() as conn:
+        result = await conn.execute(
+            text("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'hired_agents'
+                  AND column_name IN (
+                    'catalog_release_id',
+                    'internal_definition_version_id',
+                    'external_catalog_version',
+                    'catalog_status_at_hire'
+                  )
+            """)
+        )
+        columns = {row[0] for row in result.fetchall()}
+        assert columns == {
+            "catalog_release_id",
+            "internal_definition_version_id",
+            "external_catalog_version",
+            "catalog_status_at_hire",
+        }
+
