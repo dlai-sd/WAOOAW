@@ -252,6 +252,36 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByRole('button', { name: 'Hide help boxes' })).toBeTruthy()
   })
 
+  it('opens the mobile drawer and closes it from the overlay', async () => {
+    await renderPortal()
+
+    fireEvent.click(screen.getByTestId('cp-portal-mobile-menu-toggle'))
+
+    expect(screen.getByTestId('cp-portal-overlay')).toBeTruthy()
+    expect(document.querySelector('.portal-sidebar')?.className).toContain('open')
+
+    fireEvent.click(screen.getByTestId('cp-portal-overlay'))
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('cp-portal-overlay')).toBeNull()
+      expect(document.querySelector('.portal-sidebar')?.className).not.toContain('open')
+    })
+  })
+
+  it('closes the mobile drawer after a navigation selection', async () => {
+    await renderPortal()
+
+    fireEvent.click(screen.getByTestId('cp-portal-mobile-menu-toggle'))
+    fireEvent.click(screen.getByTestId('cp-nav-my-agents'))
+
+    expect(screen.getByTestId('page-my-agents')).toBeTruthy()
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('cp-portal-overlay')).toBeNull()
+      expect(document.querySelector('.portal-sidebar')?.className).not.toContain('open')
+    })
+  })
+
   it('keeps Discover highlighted while showing agent detail', async () => {
     await renderPortal()
 

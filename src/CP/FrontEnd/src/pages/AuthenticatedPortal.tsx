@@ -145,6 +145,7 @@ export default function AuthenticatedPortal({
 
   const [currentPage, setCurrentPage] = useState<Page>(derivedInitialPage)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(derivedInitialAgentId)
   const [journeyContext, setJourneyContext] = useState<PortalJourneyContext | undefined>(derivedJourneyContext)
   const [inboxItems, setInboxItems] = useState<CustomerInboxItem[]>([])
@@ -230,7 +231,21 @@ export default function AuthenticatedPortal({
     }
   }, [])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const handleResize = () => {
+      if (window.innerWidth > 1024) {
+        setMobileNavOpen(false)
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const openPage = (page: Page) => {
+    setMobileNavOpen(false)
     setJourneyContext(undefined)
     setCurrentPage(page)
   }
@@ -417,13 +432,25 @@ export default function AuthenticatedPortal({
       {/* Header */}
       <header className="portal-header">
         <div className="portal-header-content">
-          <div className="portal-brand-copy">
-            <div className="logo">
-              <img src={logoImage} alt="WAOOAW Logo" className="logo-image" />
-            </div>
-            <div>
-              <div className="portal-brand-title">WAOOAW Customer OS</div>
-              <div className="portal-brand-subtitle">Hire, approve, monitor, and scale your AI workforce</div>
+          <div className="portal-header-primary">
+            <Button
+              appearance="subtle"
+              className="mobile-menu-toggle"
+              onClick={() => setMobileNavOpen((open) => !open)}
+              aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileNavOpen}
+              data-testid="cp-portal-mobile-menu-toggle"
+            >
+              {mobileNavOpen ? 'Close' : 'Menu'}
+            </Button>
+            <div className="portal-brand-copy">
+              <div className="logo">
+                <img src={logoImage} alt="WAOOAW Logo" className="logo-image" />
+              </div>
+              <div>
+                <div className="portal-brand-title">WAOOAW Customer OS</div>
+                <div className="portal-brand-subtitle">Hire, approve, monitor, and scale your AI workforce</div>
+              </div>
             </div>
           </div>
           <div className="portal-header-actions">
@@ -455,8 +482,18 @@ export default function AuthenticatedPortal({
         </div>
       </header>
 
+      {mobileNavOpen ? (
+        <button
+          type="button"
+          className="portal-overlay"
+          aria-label="Close navigation menu"
+          onClick={() => setMobileNavOpen(false)}
+          data-testid="cp-portal-overlay"
+        />
+      ) : null}
+
       <div className="portal-layout">
-        <aside className={`portal-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <aside className={`portal-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileNavOpen ? 'open' : ''}`}>
           <div className="portal-sidebar-card" data-help-box="true">
             <div className="portal-sidebar-card-label">Workspace</div>
             {!sidebarCollapsed && (
