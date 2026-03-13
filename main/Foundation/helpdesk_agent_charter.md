@@ -208,26 +208,29 @@ genesis_coordination_workflow:
   audit_event: "HELPDESK-GENESIS-COORDINATION (hash-chained)"
 ```
 
-### 4.3 Agent DNA Filesystem Access (Constitutional Amendment AMENDMENT-001)
+### 4.3 Runtime State Access (Historical Agent DNA section, reinterpreted for current Plant runtime)
 
-Helpdesk reads Agent DNA filesystem memory to explain Manager suspension status to customer Governor with skill-level granularity.
+This section originally assumed Helpdesk would read Agent DNA filesystem memory directly.
+For the current Plant runtime, Helpdesk should use governed runtime state, persisted records, audit trails,
+deliverables, approvals, and hired-agent diagnostics instead of relying on a literal `agents/{id}/state/` filesystem contract.
 
 ```yaml
-agent_dna_filesystem_access:
-  directory_path: "agents/{suspended_manager_id}/state/"
-  access_mode: "read-only (Helpdesk CANNOT modify Agent DNA files)"
-  filesystem_structure:
-    - plan_md: "Goals + checkboxes (shows completed skills ✅, pending skills ⏳, failed skills ❌)"
-    - errors_jsonl: "Failure log (append-only, shows why skills failed)"
-    - precedents_json: "Cached Precedent Seeds (shows which seeds agent used)"
-    - constitution_snapshot: "Constitution version agent certified under (detect drift)"
-    - audit_log_jsonl: "Hash-chained decision log (full transparency, tamper-proof)"
+runtime_state_access:
+  source_of_truth: "Plant persisted runtime state and approved diagnostic surfaces"
+  access_mode: "read-only via governed support and ops surfaces"
+  preferred_sources:
+    - hired_agent_state: "Current hired-agent status, pause reason, trial or active lifecycle state"
+    - skill_runs: "Recent execution history and failure context"
+    - deliverables: "Outputs already produced and their review state"
+    - approvals: "Pending, approved, or rejected approval decisions"
+    - audit_records: "Immutable audit trail and policy decisions"
+    - diagnostics: "Construct or scheduler diagnostics where exposed by PP or Plant"
 
 skill_execution_status_query:
   trigger: "Customer Governor asks 'What was my team working on when Manager suspended?'"
   helpdesk_action:
-    - read_plan_md: "Parse plan.md for skill completion checkboxes"
-    - parse_checkboxes:
+    - inspect_skill_runs: "Review recent skill runs and their status"
+    - summarize_runtime_status:
         completed_skills:
           - "✅ SKILL-HC-001 (Research Healthcare Regulation): Completed at 10:30 AM"
           - "✅ SKILL-HC-002 (Draft SEO Blog Post): Completed at 10:42 AM"
@@ -258,7 +261,7 @@ root_cause_explanation:
         budget_limit: "$1.00/day"
         utilization_percentage: 100.0
         suspended: true
-    - read_audit_log_jsonl: "Parse last 10 entries to see query pattern"
+    - read_audit_records: "Inspect recent audit trail entries and policy decisions"
     - identify_high_query_skills:
         - "SKILL-HC-003 (Fact-Check Medical Claims): 8 constitutional queries (high query rate)"
         - "Queries: 'Can I access PubMed API?', 'Can I validate medical claims?', 'Can I cite research papers?', etc."
@@ -273,17 +276,17 @@ root_cause_explanation:
      3. Wait for daily budget reset (Manager resumes tomorrow) - 1 day"
 
 genesis_coordination:
-  helpdesk_action: "Share Agent DNA filesystem snapshot with Genesis during remediation"
+  helpdesk_action: "Share runtime state summary, audit evidence, and relevant diagnostics with Genesis during remediation"
   genesis_analysis:
-    - errors_jsonl: "Genesis reviews failure patterns (which skills failed repeatedly)"
-    - audit_log_jsonl: "Genesis reviews decision trail (which constitutional queries caused suspension)"
-    - precedents_json: "Genesis reviews which seeds agent used (cache hit rate analysis)"
+    - failure_history: "Genesis reviews failure patterns (which skills failed repeatedly)"
+    - audit_records: "Genesis reviews decision trail and policy context"
+    - precedent_usage: "Genesis reviews which seeds or policy precedents were used"
   optimization_recommendations:
     - increase_precedent_cache: "Add more Precedent Seeds for common queries (reduce vector DB queries)"
     - skill_redesign: "Merge SKILL-HC-002 and SKILL-HC-003 to reduce duplicate queries"
     - fine_tuning: "Train Manager on audit_log.jsonl (internalize constitution, fewer queries)"
 
-audit_event: "HELPDESK-AGENT-DNA-ACCESS (hash-chained, logs which files read)"
+audit_event: "HELPDESK-RUNTIME-STATE-ACCESS (hash-chained, logs which records or diagnostics were read)"
 ```
 
 ---

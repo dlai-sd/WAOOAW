@@ -1,4 +1,4 @@
-# Base Agent Anatomy - Foundational Template for All Agents
+# Base Agent Anatomy - Historical Metaphor, Not Literal Plant Runtime
 # INHERITS FROM: base_entity.yml (Universal root - identity, lifecycle, versioning, audit)
 
 inheritance:
@@ -20,21 +20,43 @@ inheritance:
     depends_on_type: "array of skill_ids (agent skills)"
   
   relationship_to_dna:
-    description: "Base Agent Anatomy is the PHYSICAL IMPLEMENTATION of Core Agent DNA (interface)"
-    analogy: "DNA = interface/contract, Anatomy = concrete implementation/blueprint"
-    dna_file: "component_core_agent_dna.yml (WhoAmI, WhatDoIDo, ConfigureMe, OperateMe methods)"
-    anatomy_file: "base_agent_anatomy.yml (8 organs, boot sequence, self-healing, PCB model)"
+    description: "Base Agent Anatomy is a historical metaphor for how Core Agent DNA might be embodied"
+    analogy: "DNA = conceptual contract, Anatomy = conceptual embodiment metaphor"
+    dna_file: "component_core_agent_dna.yml (conceptual contract, not literal runtime API)"
+    anatomy_file: "base_agent_anatomy.yml (historical metaphor, superseded for runtime design by the Agent Construct document)"
 
 component_id: "BASE-AGENT-ANATOMY-001"
 component_name: "Base Agent Anatomical Blueprint"
-version: "1.1.0"  # Updated to 1.1.0 (BaseEntity inheritance)
+version: "1.2.0"
 status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
-updated_date: "2026-01-09"
+updated_date: "2026-03-13"
 design_philosophy: "Smart as human, versatile as electronic device, self-sufficient as living organism"
 
+source_of_truth_note:
+  status: "conceptual_only"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "This anatomy document is a metaphorical design aid, not the literal Plant runtime architecture."
+    - "Plant does not currently implement a biological organ model as its executable contract."
+    - "Use Plant constructs and the hired-agent runtime hierarchy when designing APIs, UI, and lifecycle flows."
+
+runtime_alignment:
+  conceptual_to_runtime_mapping:
+    brain: "Service-layer orchestration plus Processor execution inside the Plant construct pipeline"
+    organs: "Not literal runtime modules; closest modern equivalent is the set of constructs and supporting services"
+    eeprom: "Persisted runtime artefacts and domain records, not a per-agent local file contract"
+    message_bus: "Gateway, service events, hooks, scheduler, and persistence flows"
+    operate_me_lifecycle: "Replaced by hire, trial, active, pause, cancel, deliverable review, and catalog release lifecycles"
+
 changelog:
+  - version: "1.2.0"
+    date: "2026-03-13"
+    author: "GitHub Copilot"
+    changes:
+      - "Marked the anatomy model as historical metaphor rather than current runtime source of truth"
+      - "Added mappings from anatomy terminology to Plant construct runtime terminology"
   - version: "1.1.0"
     date: "2026-01-09"
     author: "Genesis"
@@ -81,7 +103,7 @@ constitutional_compliance:
     precedent_cache: "precedents.json loaded into RAM on boot, checked before vector DB"
     hash_chained_audit: "StateManager validates audit_log.jsonl hash chain on every write"
 
-# Agent Architecture - PCB Model
+# Agent Architecture - PCB Model (Historical Conceptual Model)
 architecture:
   model: "PCB (Printed Circuit Board) - Hot-swappable organs, persistent memory, self-healing"
   

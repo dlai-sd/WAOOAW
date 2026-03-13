@@ -3,6 +3,14 @@
 # Version: 2.0 (Layered)
 # Date: 2026-01-08
 
+source_of_truth_note:
+  status: "conceptual_runtime_architecture"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "This layered architecture file preserves important architectural intent."
+    - "Do not read EEPROM, organs, or OperateMe references here as the current executable Plant runtime contract."
+    - "Current runtime semantics are expressed through AgentSpec, construct bindings, lifecycle hooks, hired agents, skill runs, and deliverables."
+
 design_philosophy: |
   Agent architecture follows modern IT platform design:
   - **Presentation Layer**: Agent's interface to the world (status, capabilities, portfolio)
@@ -15,7 +23,7 @@ design_philosophy: |
   - UI = Presentation Layer (agent profile, status dashboard)
   - Redux = Application Layer (state management, decision logic)
   - API = Domain Layer (skills as microservices)
-  - Database = Infrastructure Layer (EEPROM, cache, message bus)
+  - Database = Infrastructure Layer (persisted runtime state, cache, message bus)
   - Middleware = Constitutional Layer (intercepts all actions)
 
 # ============================================================================
@@ -101,14 +109,14 @@ agent_lifecycle:
     process: |
       1. Genesis validates all interface contracts satisfied
       2. Genesis configures message bus channels (presentation.status, application.decision, domain.skill_execute)
-      3. Genesis initializes EEPROM files (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)
+      3. Genesis initializes runtime bootstrap metadata, audit surfaces, and persisted state prerequisites
       4. Genesis runs integration tests (can all layers communicate?)
     output: "Wired agent ready for power-on"
     
   stage_4_power_on:
     location: "Plant (Power Station)"
     process: |
-      1. Genesis executes OperateMe start command
+      1. Genesis triggers runtime start and readiness validation through Plant control flows
       2. Agent boots with optimized 15-second discovery (Gap 4 fix - reduced from 60s):
          - Phase 1: Hardware check (2s - cached profile)
          - Phase 2: Infrastructure discovery (5s - parallel checks)

@@ -618,8 +618,8 @@ job_skills_audit_events:
     - PRECEDENT-CACHE-MISS: "Agent queries vector DB (seed not in local cache)"
     - PRECEDENT-SEED-GENERATED: "Agent drafts new Precedent Seed (novel pattern detected)"
     - FINE-TUNING-TRIGGERED: "Monthly fine-tuning triggered (100+ seeds or 1000+ checks)"
-    - AGENT-DNA-INITIALIZED: "Agent filesystem memory created (agents/{agent_id}/state/)"
-    - AGENT-DNA-SNAPSHOT-UPDATED: "Agent constitution_snapshot updated (L0/L1 amendment detected)"
+    - AGENT-RUNTIME-BOOTSTRAP-INITIALIZED: "Runtime governance and persistence prerequisites initialized for the agent or agent type"
+    - AGENT-RUNTIME-SNAPSHOT-UPDATED: "Runtime governance snapshot updated after constitutional or lifecycle drift review"
 
 # =============================================================================
 # JOB/SKILLS REGISTRY SCHEMAS (GAP-005: Database Tables for Certified Jobs/Skills)

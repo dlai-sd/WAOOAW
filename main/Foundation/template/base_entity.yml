@@ -8,6 +8,13 @@ status: "certified"
 certified_by: "Genesis"
 certified_at: "2026-01-09T00:00:00Z"
 
+source_of_truth_note:
+  status: "active_entity_foundation"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "This file is the shared entity root, not the full runtime contract."
+    - "Agent-specific lifecycle semantics must follow the Plant construct runtime rather than older DNA or anatomy metaphors."
+
 description: |
   BaseEntity is the universal root class that all WAOOAW platform entities inherit from.
   It provides common identity, lifecycle, audit, versioning, and constitutional alignment

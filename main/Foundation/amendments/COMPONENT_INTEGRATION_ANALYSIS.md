@@ -1,6 +1,10 @@
 # Component Integration Analysis
 ## AMENDMENT-001 Cross-Component Impact & Synergies
 
+> Historical integration analysis.
+> Use this for constitutional rationale and dependency history, not as a direct runtime implementation guide.
+> Current runtime semantics are defined by `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
 **Analysis Date:** 2026-01-07  
 **Scope:** Agent DNA & Job/Skills Model impact on all platform components  
 **Status:** 12 Component Impacts Identified → 8 Synergies + 4 Integration Requirements

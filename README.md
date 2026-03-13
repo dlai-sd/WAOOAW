@@ -239,8 +239,8 @@ Experience WAOOAW in action:
 **Agent DNA (AMENDMENT-001):**
 - **Specialization**: Agents are Jobs (specialized workforces), not generalized assistants
 - **Skill Atomicity**: Skills are atomic units with Think→Act→Observe cycles
-- **Memory Persistence**: Filesystem-persistent, append-only (agents/{id}/state/)
-- **Constitutional Embodiment**: Vector embeddings, semantic search, RAG-driven decisions
+- **Runtime Note**: The current Plant runtime uses the Agent Construct model in `docs/PP/AGENT-CONSTRUCT-DESIGN.md`, with in-memory moulds, hired agents, skills, runs, and deliverables. Older Agent DNA/filesystem-memory language should be read as historical constitutional context, not literal runtime implementation.
+- **Constitutional Embodiment**: Vector embeddings, semantic search, and governed reasoning remain active principles
 
 **Ethics is Structural:**
 - 4-level graduated escalation (auto-block, escalate to Vision Guardian, allow with disclaimer, log only)
@@ -283,7 +283,7 @@ Experience WAOOAW in action:
 
 ### 🔮 Future Phases
 
-**Phase 3-6:** Agent DNA Implementation, Job/Skills Certification, Manager/Helpdesk Re-certification, Learning System (Precedent Seeds)
+**Phase 3-6:** Runtime hardening, Job/Skills Certification, Manager/Helpdesk Re-certification, Learning System (Precedent Seeds)
 
 **🎯 Current Focus:** Get SYSTEM_AUDIT and Policy/OPA services running to unblock constitutional governance.
 

@@ -1,8 +1,20 @@
 # WAOOAW Agents Session Handoff
 
-Date: 2026-03-12
+Date: 2026-03-13
 Repo: WAOOAW
-Current branch at handoff: feat/plant-dma-1-it3-s4-regression-release
+Current branch at handoff: feat/plant-catalog-1-it1-e1
+
+## Runtime Authority Update
+
+- The executable Plant runtime source of truth is [docs/PP/AGENT-CONSTRUCT-DESIGN.md](docs/PP/AGENT-CONSTRUCT-DESIGN.md).
+- Repo-wide documentation alignment is now complete for active drift-risk surfaces: runtime-facing docs should use Plant construct vocabulary such as `AgentSpec`, `ConstructBindings`, `ConstraintPolicy`, `LifecycleHooks`, `HiredAgent`, `Skill`, `SkillRun`, and `Deliverable`.
+- Older terms such as `Agent DNA`, `Base Agent Anatomy`, `ConfigureMe`, `OperateMe`, `EEPROM`, `organs`, and filesystem-memory initialization may still appear in historical or conceptual files, but they should no longer be read as the literal current runtime contract.
+
+## Documentation Alignment Outcome
+
+- The top-level repo docs, `main/` foundational docs, active governance charters, active templates, and Plant README surfaces were updated to defer runtime semantics to [docs/PP/AGENT-CONSTRUCT-DESIGN.md](docs/PP/AGENT-CONSTRUCT-DESIGN.md).
+- Historical amendment, precedent, diagram, and session files now carry explicit notes when they preserve legacy vocabulary for constitutional or archival reasons.
+- The intended end state is not zero mentions of older words; it is zero unmarked surfaces that teach legacy runtime semantics as current implementation truth.
 
 ## CP Auth Outcome
 
@@ -160,3 +172,9 @@ To keep design discussions clear, separate the layers:
 - Add a Plant-owned catalog lifecycle record and use PP to review/approve the release values.
 - Make CP discovery read only the approved catalog-release surface.
 - Show lifecycle and version truth to customers in discovery, hire setup, and hired-agent views.
+
+## Immediate Product Framing For PP And CP
+
+- PP Agent Management should evolve toward an internal design board and release gate, not a generic no-code runtime builder.
+- Plant remains the system of record for lifecycle truth, versioning, hired-agent continuity, and construct execution.
+- CP should only surface agents that have an explicit approved-for-catalog or live-on-CP release state, while preserving service for existing hired customers when a catalog release is retired.

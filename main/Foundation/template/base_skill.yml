@@ -55,6 +55,13 @@ metadata:
     - "MiniLM: Semantic skill matching (task_description similarity)"
     - "LSTM: Execution time prediction (dynamic timeout adjustment)"
 
+source_of_truth_note:
+  status: "active_skill_contract_with_legacy_runtime_examples"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Skills remain an active runtime concept."
+    - "Legacy EEPROM examples in this file should be reinterpreted as persisted Plant runtime state, cache, or workflow checkpoints rather than local-agent filesystem contracts."
+
 # ===========================
 # SECTION 1: SKILL DESIGN PHILOSOPHY
 # ===========================
@@ -70,7 +77,7 @@ design_philosophy: |
   Key Principles:
   1. Single Responsibility: Each skill does ONE thing well
   2. Idempotent: Re-running same skill with same input produces same output
-  3. Stateless: Skill does not maintain state across invocations (state in EEPROM)
+  3. Stateless: Skill does not maintain state across invocations (state lives in persisted Plant runtime records or checkpoints)
   4. Composable: Skills can be chained (Skill A output → Skill B input)
   5. Certifiable: Genesis validates skill before deployment
   6. Versioned: Skills evolve (v1.0 → v1.1 → v2.0), backward compatible
@@ -157,7 +164,7 @@ skill_structure:
     checkpointing:
       enabled: "For long-running skills (>1 hour expected duration)"
       frequency: "Every 15 minutes"
-      storage: "EEPROM/checkpoints/{skill_id}_{timestamp}.json"
+      storage: "Persisted workflow or database-backed checkpoint state"
       resume: "On skill failure, resume from last checkpoint"
       audit_trail: "Log checkpoint.created, checkpoint.restored to audit_log.jsonl"
   

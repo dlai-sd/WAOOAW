@@ -1,8 +1,21 @@
 # Platform Portal (PP) Documentation
 
 **Version:** 1.0  
-**Status:** Specification Complete  
-**Last Updated:** January 8, 2026
+**Status:** Specification Complete with current runtime authority note  
+**Last Updated:** March 13, 2026
+
+---
+
+## Runtime Authority Note
+
+PP is the internal operations and release surface around Plant. The executable Plant runtime model is defined in [docs/PP/AGENT-CONSTRUCT-DESIGN.md](AGENT-CONSTRUCT-DESIGN.md).
+
+When PP documentation or older specs use terms like `Agent DNA`, `Base Agent Anatomy`, `ConfigureMe`, `OperateMe`, or `EEPROM`, read them as historical or conceptual language unless they are explicitly remapped to the current construct runtime.
+
+Current product direction:
+- PP should be treated as the design board and release gate for hire-ready agent supply.
+- Plant remains the system of record for agent type versions, hired-agent runtime state, and lifecycle truth.
+- CP should list only approved catalog releases for new hire, while existing hired customers continue against the release snapshot they bought.
 
 ---
 
@@ -18,6 +31,7 @@ The **Platform Portal (PP)** is WAOOAW's internal operations hub for monitoring,
 - **Roles**: 7 hierarchical roles (Admin → Manager → Operator → Viewer)
 - **Architecture**: Separate backend service (PP Gateway on port 8015)
 - **Constitutional**: All operations aligned with WAOOAW Constitution
+- **Current product role**: Internal design board and release gate for hire-ready agents, not a public-facing no-code agent builder
 
 ---
 
@@ -73,10 +87,11 @@ Located in `main/Foundation/template/`:
 
 ### For Agent Orchestrators
 
-1. **Create Agents**: 5-step workflow (Genesis validation → CI/CD → handoff)
+1. **Prepare Hire-Ready Releases**: Review runtime-backed agent definitions, release values, and catalog readiness
 2. **Monitor CI/CD**: Track GitHub Actions pipeline (25-35 min)
 3. **Complete Handoff**: Checklist (Docker image, runbook, monitoring)
 4. **Retune Agents**: Update with new industry knowledge (quarterly)
+5. **Control New-Hire Availability**: Ensure CP only exposes approved catalog releases
 
 ### For Infrastructure Engineers
 
@@ -159,6 +174,10 @@ For detailed API documentation, see [PP_USER_JOURNEY.md](user_journey/PP_USER_JO
 - ✅ All agent creations/retuning require Genesis approval
 - ❌ Admin **cannot** override Genesis rejection
 
+**2a. Runtime Authority**
+- ✅ PP release decisions should defer to the Plant construct runtime model
+- ❌ PP should not define a competing runtime contract separate from Plant
+
 **3. Transparency**
 - ✅ All agent actions auditable
 - ✅ All PP user actions logged
@@ -182,6 +201,12 @@ For detailed API documentation, see [PP_USER_JOURNEY.md](user_journey/PP_USER_JO
 - [x] Subscription Management
 - [x] Agent Orchestration
 
+### Current functional direction (2026-03-13)
+- [x] PP as operator console for approvals, diagnostics, and lifecycle visibility
+- [x] PP as authoring and review surface for agent type definitions
+- [ ] First-class hire-ready catalog release workflow gating CP visibility
+- [ ] Explicit catalog lifecycle states such as `draft`, `design_review`, `approved_for_catalog`, `live_on_cp`, `retired_from_catalog`, and `servicing_only`
+
 ### Phase 3: Advanced (Weeks 9-13) ✅
 - [x] SLA/OLA Management
 - [x] Industry Knowledge Management
@@ -191,7 +216,7 @@ For detailed API documentation, see [PP_USER_JOURNEY.md](user_journey/PP_USER_JO
 - [ ] Security audit
 - [ ] Production deployment
 
-**Current Status**: Specification Complete (v1.0) | Implementation: TBD
+**Current Status**: Specification Complete (v1.0) | Runtime authority aligned to Plant construct design | Implementation: evolving toward hire-ready release control
 
 ---
 
@@ -204,5 +229,5 @@ For detailed API documentation, see [PP_USER_JOURNEY.md](user_journey/PP_USER_JO
 ---
 
 **Document Version**: 1.0  
-**Last Updated**: January 8, 2026  
+**Last Updated**: March 13, 2026  
 **Maintained By**: WAOOAW Operations Team

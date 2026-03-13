@@ -3,6 +3,9 @@
 **Updated:** 2026-01-07 - Post-Constitutional Amendment AMENDMENT-001 + Simulation Gap Fixes  
 **Reflects:** L0→L1→L2→L3 governance layers, Industry Component, Vector DB routing, Agent DNA + Job/Skills model
 
+> Historical terminology note: this diagram reflects the constitutional design language of that period.
+> Current Plant runtime semantics are defined in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
 ```mermaid
 graph TD
     CONST[CONSTITUTION<br/>Foundation.md<br/>Constitutional Engine v1.2]

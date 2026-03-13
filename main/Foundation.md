@@ -5,6 +5,17 @@
 **Last Updated:** 2026-01-08  
 **Status:** Constitutional Amendment Complete + 4 ML Dimensions Complete + Phase 2 Infrastructure Ready + Manufacturing Templates Next
 
+## Runtime Authority Note
+
+This document remains the constitutional and conceptual foundation.
+
+The current executable Plant runtime model is defined in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
+Interpretation rules for this document:
+- Treat `Agent DNA`, `Base Agent Anatomy`, `ConfigureMe`, `OperateMe`, `EEPROM`, and `organs` as conceptual language from an earlier design phase.
+- Treat Plant runtime concepts such as `AgentSpec`, `ConstructBindings`, `ConstraintPolicy`, `LifecycleHooks`, `HiredAgent`, `Skill`, `SkillRun`, and `Deliverable` as the authoritative implementation model.
+- If any lifecycle or vocabulary in this file conflicts with the Plant construct design, the Plant construct design wins.
+
 ---
 
 ## � Related Documents (Traceability Chain)
@@ -41,11 +52,19 @@ Constitutional design maps to **13 microservices** + **8 reusable component libr
 
 **Core Agent Services (6):**
 - **Agent Creation (Port 8001)** - `agent_creation_orchestration.yml` - 7-stage Temporal pipeline (Genesis cert → Architect review → Ethics review → Governor approval → Deploy → Health check → Activate)
-- **Agent Execution (Port 8002)** - Think→Act→Observe cycles, Skill orchestration, ML inference (DistilBERT, BART, MiniLM), agent caches
+- **Agent Execution (Port 8002)** - Skill orchestration, construct execution, Processor runtime, and ML inference (DistilBERT, BART, MiniLM)
 - **Governance (Port 8003)** - `governance_protocols.yaml` - Approvals, precedent seeds, vetoes, business rules engine, mobile API for Governor
 - **Industry Knowledge (Port 8004)** - Vector DB queries (constitutional + industry), query routing, MiniLM embeddings, **NEW: Constitutional Query API** (GAP-9 resolved)
 - **Learning (Port 8005)** - Precedent seed generation, pattern detection, ML clustering
 - **Admin Gateway (Port 8006)** - Health checks, metrics, admin operations, JWT auth, rate limiting
+
+**Plant Runtime Vocabulary (Authoritative for implementation):**
+- `AgentSpec`: in-memory mould blueprint for an agent type
+- `ConstructBindings`: wiring for Scheduler, Pump, Processor, Connector, Publisher
+- `ConstraintPolicy`: mould-level guardrails such as approval mode, limits, and cost gates
+- `LifecycleHooks`: platform lifecycle events an agent type can respond to
+- `HiredAgent`: customer-specific runtime instance cast from an agent type
+- `Skill`, `SkillRun`, `Deliverable`: runtime value-production chain exposed to customers and operators
 
 **Platform Portal Services (4):**
 - **PP Gateway (Port 8015)** - `component_pp_gateway_service.yml` - **NEW (GAP-1)** - Google OAuth @waooaw.com, RBAC, rate limiting, audit logging, proxy routes
@@ -83,7 +102,7 @@ Constitutional design maps to **13 microservices** + **8 reusable component libr
   4. `component_pp_helpdesk_ticketing.yml` - Internal ticketing (support, incident, feature_request with SLA tracking)
   5. `component_pp_user_management.yml` - User CRUD, role assignment (Admin-only)
   6. `component_pp_subscription_management.yml` - Subscription audit, agent run forensics, health scores, incident management
-  7. `component_pp_agent_orchestration.yml` - Agent creation (5-step: Genesis validation → CI/CD → handoff), Base Agent Core interface
+  7. `component_pp_agent_orchestration.yml` - Agent creation and release orchestration; interpret its runtime behavior through the Plant mould and construct model
   8. `component_pp_sla_ola_management.yml` - SLA/OLA tracking, compliance monitoring, breach alerts, SLA credit workflow
   9. `component_pp_industry_knowledge.yml` - Knowledge scraping, embeddings, agent retuning (Genesis approval gate), rejection recovery
   10. `component_pp_cp_integration.yml` - Async PP→CP notifications via GCP Pub/Sub (8 event types)
@@ -211,7 +230,7 @@ Constitutional design maps to **13 microservices** + **8 reusable component libr
    * Location: Constitutional Layer, Industry (domain context)
 
 **Model Versioning (P0 Fix - agent_architecture_layered.yml):**
-- ml_models.yml (6th EEPROM file): Exact versions for reproducibility
+- ml_models.yml runtime metadata: Exact versions for reproducibility
 - Boot validation: Check ml_models.yml vs loaded models, emit agent.model.drift on mismatch
 - Governance: Escalate to Governor on version drift
 

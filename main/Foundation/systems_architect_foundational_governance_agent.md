@@ -7,6 +7,10 @@
 **Primary Reader:** Systems Architect Agent  
 **Secondary Readers:** Human Governors  
 
+> Runtime Authority Note
+> Architectural runtime semantics must follow `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+> Legacy Agent DNA and filesystem-memory wording in this charter should be read as historical background, not as the literal implementation contract.
+
 ---
 
 ## 1. Role Definition
@@ -888,7 +892,7 @@ platform_utilization:
       - vector_db_hosting: "$10/month (Qdrant managed tier)"
       - embeddings: "$5/month (OpenAI text-embedding-3-small)"
       - fine_tuning: "$10/month (monthly training runs)"
-      - cloud_storage: "$5/month (Agent DNA filesystem backups)"
+      - cloud_storage: "$5/month (runtime governance snapshots and audit backups)"
       - message_bus: "$5/month (GCP Pub/Sub)"
       - monitoring: "$5/month (Cloud Monitoring + Logging)"
       - estimate: "$40/month infrastructure"

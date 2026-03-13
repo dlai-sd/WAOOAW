@@ -7,6 +7,14 @@ status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
 
+source_of_truth_note:
+  status: "active_but_runtime_semantics_superseded"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for PP and CP integration history and transition planning."
+    - "Do not treat legacy Agent DNA or OperateMe wording here as the literal Plant runtime contract."
+    - "Interpret runtime flows through AgentSpec, construct bindings, lifecycle hooks, hired-agent state, and persisted runtime records."
+
 # Overview
 overview:
   purpose: "Document integration points between Plant backend and existing PP/CP components. Update existing component YMLs with Plant API references."
@@ -261,7 +269,7 @@ health_aggregation_service_integration:
 # Gaps Resolved Summary
 gaps_resolved:
   - gap_id: "GAP-2: Genesis Webhook API Stub"
-    resolution: "Genesis Agent spec (Chunk 3) provides production implementation. Mock server (port 9000) deprecated. Plant API endpoints /v1/genesis/jobs/certify, /v1/genesis/skills/certify, /v1/genesis/agents/init-dna replace webhook."
+    resolution: "Genesis Agent spec (Chunk 3) provides production implementation. Mock server (port 9000) deprecated. Legacy init-dna wording should now be interpreted as runtime bootstrap and governance-alignment handling rather than a literal local-filesystem contract."
     affected_components:
       - "component_genesis_webhook_api_stub.yml (DEPRECATED)"
       - "component_pp_agent_orchestration.yml (UPDATED with Plant API)"
@@ -291,7 +299,7 @@ integration_testing:
       
       - step: 3
         action: "Plant executes AgentCreationWorkflow (7 stages, ~15 minutes)"
-        expected: "Genesis validates job, initializes DNA, Systems Architect reviews, Vision Guardian checks compliance"
+        expected: "Genesis validates runtime prerequisites and governance alignment, Systems Architect reviews, Vision Guardian checks compliance"
       
       - step: 4
         action: "Plant publishes agent.created event to GCP Pub/Sub"
@@ -329,7 +337,7 @@ integration_testing:
       
       - step: 3
         action: "Genesis suspends agent via POST /v1/genesis/agents/suspend"
-        expected: "Plant calls agent OperateMe(stop), publishes agent.suspended event"
+        expected: "Plant pauses or suspends the runtime instance through service control flows, then publishes agent.suspended event"
       
       - step: 4
         action: "PP Agent Orchestration receives agent.suspended event"

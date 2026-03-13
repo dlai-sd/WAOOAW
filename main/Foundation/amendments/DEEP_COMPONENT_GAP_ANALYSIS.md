@@ -1,6 +1,10 @@
 # Deep Component Gap Analysis
 ## Constitutional Amendment AMENDMENT-001 Integration Review
 
+> Historical gap-analysis artifact.
+> This file analyzes drift against the earlier Agent DNA implementation concept.
+> Any runtime-facing action items here must be revalidated against `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md` before being used for implementation.
+
 **Analysis Date:** 2026-01-07  
 **Scope:** All platform components (Foundational Governance Agents + Operational Agents + Infrastructure)  
 **Method:** Line-by-line charter review + cross-reference with integration requirements  

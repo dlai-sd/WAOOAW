@@ -7,6 +7,13 @@ status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
 
+source_of_truth_note:
+  status: "active_governance_spec_with_legacy_runtime_terms"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for ethics and policy intent."
+    - "Legacy Core Agent DNA and OperateMe references here should be interpreted through current runtime suspension and lifecycle-hook behaviour."
+
 # Constitutional Alignment
 constitutional_alignment:
   inherits: "component_core_agent_dna.yml"
@@ -509,7 +516,7 @@ vision_guardian_skills:
           step_type: "computation"
         
         - step_number: 4
-          step_description: "Call agent's OperateMe(stop, reason='Vision Guardian suspension: {violation}')"
+          step_description: "Pause or suspend the runtime instance through Plant control flows"
           step_type: "api_call"
         
         - step_number: 5
@@ -524,7 +531,7 @@ vision_guardian_skills:
           step_description: "Emit agent.suspended event (notify PP, CP if customer-facing)"
           step_type: "external_communication"
       
-      external_interactions: ["Agent MyMessageRoom", "PostgreSQL (plant_agents, plant_audit_logs)", "GCP Pub/Sub"]
+      external_interactions: ["Plant runtime control surfaces", "PostgreSQL (plant_agents, plant_audit_logs)", "GCP Pub/Sub"]
       idempotency: true
       timeout_seconds: 300
       checkpoint_strategy: null
@@ -578,7 +585,7 @@ constitutional_audit:
   amendment_001_compliance:
     - requirement: "filesystem_memory"
       compliance: "✅ PASS"
-      evidence: "Vision Guardian inherits Core Agent DNA (5 required files)"
+      evidence: "Vision Guardian inherits governance expectations that now map to persisted runtime state rather than a literal 5-file contract"
     
     - requirement: "vector_embeddings"
       compliance: "✅ PASS"

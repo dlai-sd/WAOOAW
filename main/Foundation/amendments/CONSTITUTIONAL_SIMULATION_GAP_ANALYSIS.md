@@ -3,6 +3,10 @@
 **Purpose:** Stress-test constitutional design through realistic scenarios, identify gaps, propose solutions  
 **Status:** Pre-Implementation Validation
 
+> Historical validation artifact.
+> The scenarios and gap language here were written against the earlier Agent DNA-era design model.
+> For current runtime implementation, reinterpret any lifecycle or storage assumptions through `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
 ---
 
 ## Simulation Methodology

@@ -7,6 +7,10 @@
 **Primary Reader:** Genesis Agent  
 **Secondary Readers:** Human Governors  
 
+> Runtime Authority Note
+> This charter is active governance guidance, but the current executable Plant runtime model is defined in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+> References below to Agent DNA or filesystem initialization must be interpreted as runtime bootstrap, mould alignment, and persisted-governance readiness for the current construct model.
+
 ---
 
 ## 1. Role Definition
@@ -203,17 +207,17 @@ If any of the above are missing or proposal language falls back to deprecated Fl
 
 Only Genesis may certify Jobs and Skills. Manager and Governor may REQUEST certification but cannot approve.
 
-**Agent DNA Initialization:**
+**Runtime Bootstrap Initialization:**
 
-Genesis MUST initialize Agent DNA filesystem memory as part of Job certification:
+Genesis MUST treat the older Agent DNA filesystem model as historical design language.
+For the current Plant runtime, Genesis must validate runtime bootstrap readiness as part of Job certification:
 
-1. **Directory Creation:** Genesis creates `agents/{job_id}/state/` directory structure
-2. **File Initialization:**
-   - `plan.md`: Empty (agent populates on first execution)
-   - `errors.jsonl`: Empty (append-only log)
-   - `precedents.json`: Seeded with GEN-001, GEN-002, GEN-003 (all agents start with foundational seeds)
-   - `constitution_snapshot`: `constitution_version: 1.2, certified_date: {certification_date}, amendments: [AMENDMENT-001]`
-   - `audit_log.jsonl`: Genesis_hash as first entry (establishes hash chain root)
+1. **Reference Alignment:** Genesis validates the certified job, skill, and mould prerequisites for the runtime worker.
+2. **Governance Initialization:**
+  - constitutional and policy metadata are present
+  - precedent and governance references are seeded appropriately
+  - persisted audit and runtime state surfaces are ready
+  - any hired-agent bootstrap requirements are satisfied without assuming a literal local 5-file contract
 
 3. **Initialization Validation:**
    - Genesis MUST verify all files created successfully

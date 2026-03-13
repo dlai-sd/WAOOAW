@@ -7,10 +7,17 @@ status: "specification"
 phase: "plant"
 created_date: "2026-01-08"
 
+source_of_truth_note:
+  status: "active_governance_spec_with_legacy_runtime_terms"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for Genesis responsibilities and certification intent."
+    - "Interpret Agent DNA and init-dna references here as runtime bootstrap and governance initialization concepts, not as a literal filesystem contract."
+
 # Constitutional Alignment
 constitutional_alignment:
   inherits: "component_core_agent_dna.yml"
-  extends_with: "Job/Skill certification, Agent DNA initialization, Precedent seed validation"
+  extends_with: "Job/Skill certification, runtime bootstrap governance validation, Precedent seed validation"
   
   l0_principles:
     - "agent_specialization: Genesis is sole certification authority, restrictive boundary enforces excellence"
@@ -38,12 +45,12 @@ agent_identity:
   
   what_do_i_do:
     job_role_id: "JOB-GENESIS-001"
-    job_description: "Certify Jobs, Skills, and Teams. Initialize Agent DNA. Validate Precedent Seeds. Enforce constitutional compliance."
+    job_description: "Certify Jobs, Skills, and Teams. Validate runtime bootstrap and governance readiness. Validate Precedent Seeds. Enforce constitutional compliance."
     skills:
       - "SKILL-CERTIFY-JOB-001: Certify Job Role definitions"
       - "SKILL-CERTIFY-SKILL-001: Certify Skill definitions (Think→Act→Observe validation)"
       - "SKILL-CERTIFY-TEAM-001: Certify Team composition (skill coverage, Manager validation)"
-      - "SKILL-INIT-DNA-001: Initialize Agent DNA (5 required files)"
+      - "SKILL-INIT-DNA-001: Initialize runtime bootstrap prerequisites (legacy init-dna naming)"
       - "SKILL-VALIDATE-SEED-001: Validate Precedent Seeds for constitutional contradiction"
       - "SKILL-SUSPEND-AGENT-001: Suspend agents on policy violations"
     industries: ["platform_governance"]
@@ -53,7 +60,7 @@ agent_identity:
         - "Certify Job definitions submitted via API or Platform Portal"
         - "Certify Skill definitions with Think→Act→Observe validation"
         - "Certify Team compositions with skill coverage check"
-        - "Initialize agent filesystem memory (5 required files)"
+        - "Initialize runtime bootstrap prerequisites and governance metadata"
         - "Validate Precedent Seeds for constitutional contradiction"
         - "Suspend agents on policy violations (constitutional breaches)"
         - "Reject certifications that violate L0/L1 principles"
@@ -447,7 +454,7 @@ genesis_skills:
           step_type: "computation"
         
         - step_number: 4
-          step_description: "Call agent's OperateMe(stop, reason='Genesis suspension: {violation}')"
+          step_description: "Pause or suspend the runtime instance through Plant control flows"
           step_type: "api_call"
         
         - step_number: 5
@@ -462,7 +469,7 @@ genesis_skills:
           step_description: "Emit agent.suspended event (notify PP, CP if customer-facing agent)"
           step_type: "external_communication"
       
-      external_interactions: ["Agent MyMessageRoom", "PostgreSQL (plant_agents, plant_audit_logs)", "GCP Pub/Sub"]
+      external_interactions: ["Plant runtime control surfaces", "PostgreSQL (plant_agents, plant_audit_logs)", "GCP Pub/Sub"]
       idempotency: true
       timeout_seconds: 300
       checkpoint_strategy: null
@@ -516,7 +523,7 @@ constitutional_audit:
   amendment_001_compliance:
     - requirement: "filesystem_memory"
       compliance: "✅ PASS"
-      evidence: "SKILL-INIT-DNA-001 creates 5 required files (plan.md, errors.jsonl, precedents.json, constitution_snapshot, audit_log.jsonl)"
+      evidence: "SKILL-INIT-DNA-001 is interpreted as runtime bootstrap and governance-state initialization in the current Plant model"
     
     - requirement: "vector_embeddings"
       compliance: "✅ PASS"
@@ -552,7 +559,7 @@ constitutional_audit:
   
   gaps_resolved:
     - gap_id: "GAP-2 (Genesis Webhook API Stub)"
-      resolution: "Genesis Agent spec provides production implementation. Mock server (port 9000) deprecated. Plant API endpoints /v1/genesis/jobs/certify, /v1/genesis/skills/certify, /v1/genesis/agents/init-dna replace webhook."
+      resolution: "Genesis Agent spec provides production implementation. Mock server (port 9000) deprecated. Legacy init-dna route naming now represents runtime bootstrap and governance initialization semantics rather than a literal filesystem-memory contract."
       affected_components: ["component_genesis_webhook_api_stub.yml", "component_pp_agent_orchestration.yml"]
 
 # Plant Integration
@@ -574,7 +581,7 @@ plant_integration:
       rate_limit: "50 req/hour"
     
     - endpoint: "POST /v1/genesis/agents/init-dna"
-      description: "Initialize Agent DNA (executes SKILL-INIT-DNA-001)"
+      description: "Legacy-named runtime bootstrap initialization (executes SKILL-INIT-DNA-001)"
       auth: "Internal only (called by Agent Creation Service Port 8001)"
       rate_limit: "No limit (internal)"
     

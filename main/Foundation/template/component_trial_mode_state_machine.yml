@@ -11,6 +11,13 @@ component:
   created: "2026-01-09"
   owner: "Systems Architect Agent"
   constitutional_alignment: "L0 Single Governor + L1 Genesis Authority + Amendment-001"
+
+source_of_truth_note:
+  status: "active_state_machine_with_legacy_runtime_examples"
+  runtime_source_of_truth: "/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md"
+  guidance:
+    - "Use this file for trial-to-production governance flow."
+    - "EEPROM and Agent DNA references in this state machine are legacy examples and should map to current runtime bootstrap validation and persisted state readiness."
   
 metadata:
   purpose: "Govern agent/team lifecycle from trial→production with constitutional safety"
@@ -121,7 +128,7 @@ state_machine:
       constitutional_gates:
         gate_1_genesis_certification:
           validates:
-            - "Agent DNA complete (7 EEPROM files)"
+            - "Runtime bootstrap and persisted-governance prerequisites complete"
             - "Skills certified (all required skills exist)"
             - "Constitutional compliance (L0 principles + Amendment-001)"
             - "Setup wizard completed (business context, access, goals)"
@@ -186,7 +193,7 @@ state_machine:
         
         action_2_agent_execution:
           api: "POST /v1/agents/{agent_id}/reload-config"
-          effect: "Agent reloads EEPROM, recognizes production mode"
+          effect: "Agent reloads persisted runtime configuration and recognizes production mode"
         
         action_3_outside_world_connector:
           effect: "Routes API calls to production endpoints (WordPress live, Stripe live)"
@@ -430,8 +437,8 @@ constitutional_compliance:
     validation: "Policy Service PDP rejects unlisted actions in trial mode"
   
   amendment_001_agent_dna:
-    enforcement: "Genesis validates 7 EEPROM files before certification"
-    validation: "Agent Creation checks file presence + hash chain integrity"
+    enforcement: "Genesis validates runtime bootstrap, persisted-governance prerequisites, and required production readiness before certification"
+    validation: "Agent Creation checks the required persisted state, audit controls, and readiness invariants"
   
   financial_transparency:
     enforcement: "Customer sees trial cost ($0), production cost (₹12K/month) upfront"

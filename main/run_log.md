@@ -1,5 +1,9 @@
 # WaooaW Foundation Design - Run Log
 
+> Historical design log only.
+> Current Plant runtime authority lives in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+> References below to Agent DNA, filesystem memory, EEPROM, ConfigureMe, or OperateMe should be read as period design language, not current runtime contract.
+
 **Last Updated**: 2026-01-07 (Session 3 - Microservices Architecture & Gap Resolution Complete)
 **Status:** Constitutional Amendment AMENDMENT-001 Complete + 5 Critical Simulation Gaps Fixed + Architecture Visualizations Updated + Workflow Orchestration & Rules Engine Approved - Ready for Phase 2 Infrastructure
 

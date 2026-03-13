@@ -1,4 +1,9 @@
 # Session 2 Summary: Constitutional Amendment + Deep Gap Resolution
+
+> Historical session summary.
+> The Agent DNA and filesystem-memory language below reflects the design state at the time of the session.
+> For present-day Plant runtime behaviour, use `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
 **Date:** 2026-01-07  
 **Duration:** ~4 hours  
 **Focus:** Constitutional Amendment AMENDMENT-001 (AI Agent DNA & Job/Skills Model) + Deep Component Gap Analysis + Critical Gap Resolution

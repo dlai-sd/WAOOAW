@@ -3,6 +3,10 @@
 **Date:** 2026-01-07  
 **Status:** Constitutional Integration (L1 Addition)
 
+> Runtime Authority Note
+> This document remains useful for industry-knowledge architecture and business rationale.
+> Where it references agent-local caches or Agent DNA structure, interpret those details through `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md` and current Plant persistence patterns.
+
 ---
 
 ## 1. Executive Summary
@@ -11,7 +15,7 @@
 
 **Problem Solved:** Without industry context, agent productive Week 4 after expensive LLM learning. With industry context, agent productive Day 1 using pre-built domain embeddings.
 
-**Architecture:** Hybrid model—centralized industry repository (`main/Foundation/industries/`) with agent-level caching (`agents/{agent_id}/state/industry_context.json`) achieving 80% cache hit rate, 50% query cost reduction.
+**Architecture:** Hybrid model—centralized industry repository (`main/Foundation/industries/`) with Plant-managed runtime caching and persisted industry context achieving 80% cache hit rate, 50% query cost reduction.
 
 **Business Impact:**
 - **Pricing Power:** Generic agent ₹8K → Industry-specialized ₹12K → Custom-trained ₹18K
@@ -1194,7 +1198,7 @@ Month 6 Targets:
 - ⏳ Update AMENDMENT-001 with industry_context_model (L1 addition)
 - ⏳ Update Genesis charter with industry validation (Job certification)
 - ⏳ Update data_contracts.yml with industry schemas
-- ⏳ Update Agent DNA structure (add industry_context.json)
+- ⏳ Update current runtime persistence design with industry-context support
 
 ### 13.2 Phase 2 Implementation
 
@@ -1257,7 +1261,7 @@ Governance Readiness:
 - ✅ Revenue increase (+55% projected)
 
 **Technical Elegance:**
-- ✅ Aligns with existing architecture (Agent DNA, Job/Skills, Genesis certification)
+- ✅ Aligns with existing architecture (current runtime persistence, Job/Skills, Genesis certification)
 - ✅ Cost-efficient (hybrid caching reduces query costs 80%)
 - ✅ Scalable (add new industries incrementally)
 - ✅ Constitutional (L1 addition, no L0 changes)

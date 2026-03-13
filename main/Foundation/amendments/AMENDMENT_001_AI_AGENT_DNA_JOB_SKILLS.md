@@ -1,6 +1,10 @@
 # Constitutional Amendment AMENDMENT-001
 ## AI Agent DNA & Job/Skills Lifecycle Model
 
+> Historical constitutional amendment record.
+> It remains important for design intent, but the current executable Plant runtime model is defined in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+> Filesystem-memory and Agent DNA terminology in this file should not be treated as the live implementation contract.
+
 **Status:** ACTIVE  
 **Approved By:** Platform Governor  
 **Date:** 2026-01-07  

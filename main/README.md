@@ -6,6 +6,17 @@
 **Read Order:** This document → Foundation → Foundational Governance Agents  
 **Purpose:** Create shared understanding, empathy, and orientation before governance
 
+### Runtime Authority Update
+
+The current executable Plant runtime model is defined in `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`.
+
+Use the `main/` documents for constitutional intent, governance philosophy, and conceptual framing.
+Use the Plant construct design for runtime vocabulary, lifecycle, and agent implementation semantics.
+
+When terms conflict:
+- `AgentSpec`, `ConstructBindings`, `ConstraintPolicy`, `LifecycleHooks`, `HiredAgent`, `Skill`, `SkillRun`, and `Deliverable` are authoritative for runtime design.
+- Older terms such as `Agent DNA`, `Base Agent Anatomy`, `organs`, `EEPROM`, `ConfigureMe`, and `OperateMe` should be read as conceptual predecessors, not literal implementation contracts.
+
 ---
 
 ## Why This Document Exists
@@ -115,14 +126,20 @@ If a system cannot function with one human, it is not ready to scale.
 - Agent Specialization (Jobs not assistants), Skill Atomicity (Think→Act→Observe), Memory Persistence (filesystem append-only), Constitutional Embodiment (vector embeddings, RAG)
 - Ethics is structural (gates, routing, auditability, containment), graduated escalation (4 risk levels), precedent seeds (learning from Governor decisions)
 
+**Runtime Mental Model:**
+- Plant runs an in-memory mould made of `AgentSpec` blueprints and construct bindings, not a literal biological-style agent anatomy.
+- Customer-visible runtime hierarchy is `Customer -> HiredAgent -> Skill -> SkillRun -> Deliverable`.
+- PP and CP should use that runtime vocabulary in UI, API contracts, and operator workflows.
+
 **Try Before Hire:**
 - 7-day trial: synthetic data, sandbox routing (Stripe test mode, AI mock), customer keeps deliverables regardless
 - Platform cost: $5 cap per trial, $200-250/month operational (13 services on GCP Cloud Run)
 - Pricing: Single agent ₹8K-18K/month, Team ₹19K-30K/month (Manager + 2-4 specialists)
 
 **Implementation Status:**
-- Phase 1 Complete: Constitutional design + Amendment-001 (AI Agent DNA & Job/Skills) + Critical gap fixes
+- Phase 1 Complete: Constitutional design + Amendment-001 foundations + Critical gap fixes
 - Phase 2 Ready: Infrastructure deployment (13 services, Vector DBs, Temporal, PostgreSQL, Redis, Pub/Sub)
+- Current runtime source of truth: `/workspaces/WAOOAW/docs/PP/AGENT-CONSTRUCT-DESIGN.md`
 - See [ARCHITECTURE_PROPOSAL.md](../ARCHITECTURE_PROPOSAL.md) for technical specification, [ARCHITECTURE_COMPLIANCE_AUDIT.md](../ARCHITECTURE_COMPLIANCE_AUDIT.md) for gap analysis
 
 ---
