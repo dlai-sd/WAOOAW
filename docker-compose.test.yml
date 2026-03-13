@@ -98,6 +98,8 @@ services:
     build:
       context: ./src/Plant/Gateway
       dockerfile: Dockerfile
+      args:
+        INSTALL_DEV_DEPS: "true"
     environment:
       - ENVIRONMENT=test
       - TEST_MODE=true
