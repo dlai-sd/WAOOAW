@@ -388,7 +388,7 @@ export default function AgentManagement() {
                   >
                     <Text weight="medium">{agent.name || agent.id}</Text>
                     <Text size={200} style={{ display: 'block', opacity: 0.8, marginTop: 4 }}>
-                      {(release?.lifecycle_state || 'draft').replaceAll('_', ' ')}
+                      {(release?.lifecycle_state || 'draft').replace(/_/g, ' ')}
                       {' · '}
                       {release?.approved_for_new_hire ? 'approved for new hire' : 'not approved'}
                     </Text>
@@ -452,7 +452,7 @@ export default function AgentManagement() {
             </div>
 
             <Text size={200} style={{ opacity: 0.8 }}>
-              Current status: {(releaseIndex.get(selectedAgentId)?.lifecycle_state || 'draft').replaceAll('_', ' ')}
+              Current status: {(releaseIndex.get(selectedAgentId)?.lifecycle_state || 'draft').replace(/_/g, ' ')}
               {selectedReleaseId ? ` · ${selectedReleaseId}` : ''}
             </Text>
 
