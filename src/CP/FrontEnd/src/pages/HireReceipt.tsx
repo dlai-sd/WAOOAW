@@ -91,6 +91,9 @@ export default function HireReceipt() {
                     agentId,
                     source: 'payment-confirmed',
                     subscriptionId,
+                    lifecycleState,
+                    catalogVersion,
+                    agentName,
                   },
                 },
               })

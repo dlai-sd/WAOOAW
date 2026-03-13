@@ -433,6 +433,9 @@ export default function HireSetupWizard() {
           portalEntry: {
             page: 'my-agents',
             agentId,
+            agentName: resolvedAgentName || undefined,
+            catalogVersion: finalized.external_catalog_version || resolvedCatalogVersion || undefined,
+            lifecycleState: finalized.catalog_status_at_hire || resolvedLifecycleState || undefined,
             source: 'trial-activated',
             subscriptionId,
           },

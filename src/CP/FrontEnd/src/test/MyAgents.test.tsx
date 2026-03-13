@@ -29,7 +29,9 @@ vi.mock('../services/myAgentsSummary.service', () => ({
         current_period_end: '2026-03-01T00:00:00Z',
         cancel_at_period_end: false,
         hired_instance_id: 'HIRED-1',
-        agent_type_id: 'trading.share_trader.v1'
+        agent_type_id: 'trading.share_trader.v1',
+        external_catalog_version: 'v3',
+        catalog_status_at_hire: 'servicing_only'
       }
     ]
   })
@@ -171,6 +173,20 @@ describe('MyAgents Component', () => {
       expect(screen.getByText(/Scheduled to end on/i)).toBeInTheDocument()
     })
     expect(screen.getByText(/you keep read-only access to deliverables and configuration/i)).toBeInTheDocument()
+  })
+
+  it('shows lifecycle continuity for hires that are no longer open for new sale', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Servicing only')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Version: v3')).toBeInTheDocument()
+    expect(screen.getByText('Lifecycle: Servicing only')).toBeInTheDocument()
+    expect(
+      screen.getByText(/your active service continues on the release you already purchased/i)
+    ).toBeInTheDocument()
   })
 
   it('renders Goal Setting templates and can save a goal', async () => {

@@ -43,6 +43,24 @@ function agentTypeIdFromAgentId(agentId: string): string | null {
   return null
 }
 
+function formatLifecycleLabel(value: unknown): string | null {
+  const normalized = String(value || '').trim()
+  if (!normalized) return null
+  if (normalized === 'live_on_cp') return 'Live on CP'
+  if (normalized === 'servicing_only') return 'Servicing only'
+  if (normalized === 'retired_from_catalog') return 'Retired from catalog'
+  return normalized.replaceAll('_', ' ')
+}
+
+function getLifecycleBadge(value: unknown) {
+  const normalized = String(value || '').trim()
+  if (!normalized) return null
+  if (normalized === 'live_on_cp') return <Badge appearance="filled" color="success" size="small">Live on CP</Badge>
+  if (normalized === 'servicing_only') return <Badge appearance="tint" color="warning" size="small">Servicing only</Badge>
+  if (normalized === 'retired_from_catalog') return <Badge appearance="ghost" size="small">Retired from catalog</Badge>
+  return <Badge appearance="ghost" size="small">{formatLifecycleLabel(normalized)}</Badge>
+}
+
 function normalizeString(value: unknown): string {
   return String(value ?? '')
 }
@@ -1960,6 +1978,10 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                 <div className="agent-title">
                   <h2>{selectedInstance.nickname || selectedInstance.agent_id}</h2>
                   {getStatusBadge(selectedInstance.status)}
+                  {getLifecycleBadge(selectedInstance.catalog_status_at_hire)}
+                  {selectedInstance.external_catalog_version ? (
+                    <Badge appearance="outline" size="small">{selectedInstance.external_catalog_version}</Badge>
+                  ) : null}
                 </div>
                 <div className="agent-meta">
                   <span className="agent-rating">
@@ -1975,6 +1997,21 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                   <span style={{ opacity: 0.8 }}>ID: {selectedInstance.subscription_id}</span>
                 </div>
               </div>
+
+              {(selectedInstance.catalog_status_at_hire || selectedInstance.external_catalog_version) && (
+                <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
+                  <div style={{ fontWeight: 600 }}>Catalog lifecycle</div>
+                  <div style={{ marginTop: '0.25rem', opacity: 0.9 }}>
+                    {selectedInstance.catalog_status_at_hire === 'servicing_only' || selectedInstance.catalog_status_at_hire === 'retired_from_catalog'
+                      ? 'This agent is no longer available for new hire, but your active service continues on the release you already purchased.'
+                      : 'This hire is attached to the approved catalog release captured at activation time.'}
+                  </div>
+                  <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {selectedInstance.external_catalog_version ? <span>Version: {selectedInstance.external_catalog_version}</span> : null}
+                    {formatLifecycleLabel(selectedInstance.catalog_status_at_hire) ? <span>Lifecycle: {formatLifecycleLabel(selectedInstance.catalog_status_at_hire)}</span> : null}
+                  </div>
+                </div>
+              )}
 
               {selectedReadOnlyExpired && (
                 <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
@@ -2038,7 +2075,11 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                                   configured: updated.configured ?? x.configured,
                                   goals_completed: updated.goals_completed ?? x.goals_completed,
                                   hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
-                                  agent_type_id: updated.agent_type_id ?? x.agent_type_id
+                                  agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                                  catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
+                                  internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
+                                  external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
+                                  catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
                                 }
                               : x
                           )

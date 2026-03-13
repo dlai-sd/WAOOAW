@@ -137,7 +137,7 @@ Stop and report the exact blocker.
 | E1-S1 | 1 | Hire-ready Digital Marketing Agent lifecycle | Plant owns catalog lifecycle and release snapshots | 🟢 Completed |
 | E1-S2 | 1 | Hire-ready Digital Marketing Agent lifecycle | PP design board exposes recommended release fields and approval flow | 🟢 Completed |
 | E1-S3 | 1 | Hire-ready Digital Marketing Agent lifecycle | CP discovery and hire setup consume approved lifecycle truth | 🟢 Completed |
-| E1-S4 | 1 | Hire-ready Digital Marketing Agent lifecycle | Existing hires show lifecycle continuity and version truth | 🔴 Not Started |
+| E1-S4 | 1 | Hire-ready Digital Marketing Agent lifecycle | Existing hires show lifecycle continuity and version truth | 🟢 Completed |
 
 ---
 
@@ -394,3 +394,10 @@ Test command:
 ```bash
 cd src/CP/FrontEnd && npm run test -- --run src/test/MyAgents.test.tsx src/__tests__/AuthenticatedPortal.test.tsx
 ```
+
+Execution notes:
+
+- Completed on 2026-03-13 on branch `feat/plant-catalog-1-it1-e1`.
+- My Agents now renders lifecycle continuity and release-version truth for existing hires, including explicit messaging when a release is servicing-only or retired from new hire.
+- The portal journey banner now carries agent label, catalog version, and lifecycle state from payment/setup flow so customers do not confuse retirement from catalog with service shutdown.
+- Focused Docker validation passed with `docker run --rm -v /workspaces/WAOOAW/src/CP/FrontEnd:/app -w /app node:20 sh -lc "npm install --silent && npm run test -- --run src/test/MyAgents.test.tsx src/__tests__/AuthenticatedPortal.test.tsx"`.
