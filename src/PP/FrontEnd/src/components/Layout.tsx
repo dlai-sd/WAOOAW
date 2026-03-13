@@ -23,6 +23,8 @@ interface LayoutProps {
   children: ReactNode
   theme: 'light' | 'dark'
   onThemeToggle: () => void
+  showHelpBoxes: boolean
+  onHelpToggle: () => void
   onLogout: () => void
 }
 
@@ -53,7 +55,7 @@ const navItems: NavItem[] = [
   { path: '/reference-agents', label: 'Reference Data', icon: <Beaker24Regular /> },
 ]
 
-export default function Layout({ children, theme, onThemeToggle, onLogout }: LayoutProps) {
+export default function Layout({ children, theme, onThemeToggle, showHelpBoxes, onHelpToggle, onLogout }: LayoutProps) {
   const location = useLocation()
   const sectionTitle = navItems.find((item) => item.type !== 'section' && (item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)))
 
@@ -65,7 +67,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
           <Text size={200}>Platform Portal</Text>
         </div>
 
-        <div className="sidebar-workspace-card">
+        <div className="sidebar-workspace-card" data-help-box="true">
           <div className="sidebar-workspace-label">Contributor cockpit</div>
           <div className="sidebar-workspace-title">WAOOAW Control Plane</div>
           <div className="sidebar-workspace-body">Ops, compliance, agent design, and incident response in one surface.</div>
@@ -100,6 +102,15 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
         </div>
 
         <div className="sidebar-footer">
+          <Button
+            appearance="subtle"
+            onClick={onHelpToggle}
+            style={{ width: '100%', justifyContent: 'flex-start' }}
+            aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
+            data-testid="pp-help-toggle"
+          >
+            {showHelpBoxes ? 'Hide Help' : 'Show Help'}
+          </Button>
           <Button 
             appearance="subtle" 
             icon={theme === 'light' ? <WeatherMoon24Regular /> : <WeatherSunny24Regular />}
@@ -125,7 +136,7 @@ export default function Layout({ children, theme, onThemeToggle, onLogout }: Lay
           <div>
             <div className="pp-shell-eyebrow">Platform Mission</div>
             <h1 className="pp-shell-title">{sectionTitle && sectionTitle.type !== 'section' ? sectionTitle.label : 'Operations'}</h1>
-            <p className="pp-shell-description">Keep the marketplace healthy, the runtime controlled, and every contributor clear on what to do next.</p>
+            <p className="pp-shell-description" data-help-box="true">Keep the marketplace healthy, the runtime controlled, and every contributor clear on what to do next.</p>
           </div>
           <div className="pp-shell-chip-row">
             <div className="pp-shell-chip">Audit-first</div>

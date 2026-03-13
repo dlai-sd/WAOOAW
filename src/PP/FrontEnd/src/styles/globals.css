@@ -17,6 +17,10 @@ body {
     #0a0a0a;
 }
 
+[data-help-boxes='hidden'] [data-help-box='true'] {
+  display: none !important;
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;

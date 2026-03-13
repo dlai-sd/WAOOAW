@@ -67,6 +67,8 @@ The plan's `I3-S4` outcome says the first sellable Digital Marketing Agent shoul
 
 | Root cause | Impact | Best possible solution/fix |
 |---|---|---|
+| Demo has no real DMA runtime for CP and PP to render, inspect, approve, or operate. | This is the main objective miss. Customers cannot see a hireable DMA journey in CP, and operators cannot support or govern a real DMA instance in PP, so the Plant-backed workflow is not proven as sellable value. | Seed or create truthful demo runtime state end to end: hired DMA instance, Theme Discovery brief, campaign, draft batch, deliverable, approval state, and YouTube connection state tied to named demo personas. |
+| CP and PP still have customer-facing/operator-facing flow risks even where code exists. | The DMA may exist in code, but a broken first-login path in CP or a false missing-client-ID state in PP still blocks real usage and undermines trust in the promised experience. | Require live authenticated walkthrough proof for the core CP and PP journeys after deploy, not just local regression coverage. |
 | Public documentation paths were not exempted from auth and budget middleware expectations. | The demo APIs cannot self-describe in production, which weakens release-closeout, supportability, and smoke-verification confidence. | Exclude `/openapi.json`, `/docs`, and related schema assets from JWT-budget enforcement or fail with a clean `401/403/404` instead of `500`. |
 | PR 921 closed release hardening while accepting known noisy validation outside the narrow regression slice. | The release note is truthful about residual noise, but it means the plan's `ship confidently` outcome was only partially met. | Add a final demo deployment gate that validates the live CP and PP support surfaces after deploy, not just targeted local regression slices before merge. |
 
@@ -121,7 +123,9 @@ This section reflects branch-local remediation work completed after the defect r
 
 ## Bottom Line
 
-PR 921 did achieve the main DMA implementation and much of the intended portal behavior, and the deployed bundles show the new DMA customer and operator vocabulary. The main miss is release hardening on the live demo deployment: both CP and PP documentation/schema surfaces are broken by middleware, which means the demo is not fully closed out to the standard promised by `I3-S4`.
+PR 921 did achieve the main DMA implementation and much of the intended portal behavior, and the deployed bundles show the new DMA customer and operator vocabulary. But against the stated objective, the main miss was not docs or OpenAPI. The main miss was that CP and PP could not demonstrate a real Plant-backed DMA journey with truthful runtime state for a customer and operator to use end to end.
+
+In practical terms, the reviewed demo did not yet prove that a customer can hire and monitor a DMA through CP, or that an operator can inspect, support, and govern that same DMA through PP. Missing runtime data in Plant-backed tables, plus live CP and PP flow defects, meant the release was code-complete in many areas but not yet customer-complete or sellable on demo. The docs/openapi failures were real, but they were secondary release-hardening defects rather than the core objective failure.
 
 ## Database Check - DDL vs Data
 

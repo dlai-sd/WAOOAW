@@ -699,7 +699,7 @@ export default function HiredAgentsOps() {
       </div>
 
       <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
-        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent" data-help-box="true">
           <div className="pp-dashboard-kicker">Ops mission</div>
           <Text as="h2" size={700} weight="semibold">Find customer risk before it becomes a support incident.</Text>
           <p className="pp-dashboard-body-copy">
@@ -854,7 +854,7 @@ export default function HiredAgentsOps() {
 
       {selected && (
         <>
-          <Card style={{ marginTop: 16 }}>
+          <Card style={{ marginTop: 16 }} data-help-box="true">
             <CardHeader
               header={<Text weight="semibold">Operator handoff context</Text>}
               description={<Text size={200}>{customerPrimaryLabel} • {selectedAgentPrimaryLabel} • Runtime {selected.hired.hired_instance_id}</Text>}

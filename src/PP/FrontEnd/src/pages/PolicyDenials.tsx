@@ -148,14 +148,14 @@ export default function PolicyDenials() {
       </div>
 
       <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
-        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent" data-help-box="true">
           <div className="pp-dashboard-kicker">Governance signal</div>
           <Text as="h2" size={700} weight="semibold">Explain why the platform said no.</Text>
           <p className="pp-dashboard-body-copy">
             Policy denials should help ops, infra, and governance contributors diagnose intent, policy, and input mistakes fast enough to unblock the right action.
           </p>
         </Card>
-        <Card className="pp-dashboard-panel">
+        <Card className="pp-dashboard-panel" data-help-box="true">
           <Text as="h3" size={600} weight="semibold">Useful denial UX</Text>
           <p className="pp-dashboard-body-copy">
             Show the denial, the likely fix, and the correlation path clearly enough that a helpdesk person can route or explain it without escalation roulette.
@@ -200,7 +200,7 @@ export default function PolicyDenials() {
 
         {activeContext && (
           <div style={{ padding: 16, paddingTop: 0 }}>
-            <Card className="pp-agent-setup-card">
+            <Card className="pp-agent-setup-card" data-help-box="true">
               <Text weight="semibold">Operator handoff context</Text>
               <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
                 What happened: this denial search is scoped to correlation {activeContext.correlation_id || 'not set'}, customer {activeContext.customer_id || 'not set'}, and agent {activeContext.agent_id || 'not set'}.
@@ -230,7 +230,7 @@ export default function PolicyDenials() {
 
         {!error && !isLoading && !hasLoaded && (
           <div style={{ padding: 16 }}>
-            <Card className="pp-agent-setup-card">
+            <Card className="pp-agent-setup-card" data-help-box="true">
               <Text weight="semibold">Run a targeted denial search</Text>
               <Text size={200} style={{ display: 'block', marginTop: 8, opacity: 0.8 }}>
                 Start with a correlation id, customer, or agent when possible so the first result set is operationally useful instead of noisy.

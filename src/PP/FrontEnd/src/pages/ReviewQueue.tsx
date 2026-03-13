@@ -424,14 +424,14 @@ export default function ReviewQueue() {
       </div>
 
       <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
-        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent" data-help-box="true">
           <div className="pp-dashboard-kicker">Approval desk</div>
           <Text as="h2" size={700} weight="semibold">Help contributors make a decision with enough customer and runtime context to stand behind it.</Text>
           <p className="pp-dashboard-body-copy">
             The queue should make obvious what needs review, which runtime it belongs to, and which next surface the operator should open after approving or denying it.
           </p>
         </Card>
-        <Card className="pp-dashboard-panel">
+        <Card className="pp-dashboard-panel" data-help-box="true">
           <Text as="h3" size={600} weight="semibold">Best operator habit</Text>
           <p className="pp-dashboard-body-copy">
             Filter quickly, approve only what is safe, and leave the customer with a cleaner next state than when the ticket arrived.
@@ -461,7 +461,7 @@ export default function ReviewQueue() {
       </Card>
 
       {hasOperatorContext && (
-        <Card style={{ marginTop: 16 }}>
+        <Card style={{ marginTop: 16 }} data-help-box="true">
           <CardHeader
             header={<Text weight="semibold">Operator handoff context</Text>}
             description={<Text size={200}>{operatorCustomerLabel} • {operatorAgentLabel} • Correlation {correlationId.trim() || 'not set'}</Text>}

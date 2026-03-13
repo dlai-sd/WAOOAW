@@ -8,6 +8,8 @@ import { Dismiss24Regular } from '@fluentui/react-icons'
 type SignInProps = {
   theme: 'light' | 'dark'
   toggleTheme: () => void
+  showHelpBoxes: boolean
+  toggleHelpBoxes: () => void
 }
 
 function sanitizeNextPath(raw: string | null): string | null {
@@ -41,7 +43,7 @@ const SIGNIN_NOTES = [
   'Pick up draft reviews, deliverables, and active trials from one command centre.',
 ]
 
-export default function SignIn({ theme, toggleTheme }: SignInProps) {
+export default function SignIn({ theme, toggleTheme, showHelpBoxes, toggleHelpBoxes }: SignInProps) {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -54,7 +56,7 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
 
   return (
     <>
-      <Header theme={theme} toggleTheme={toggleTheme} />
+      <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
       <main className="auth-page auth-page--signin" data-testid="cp-signin-page">
         <div className="auth-center">
           <div className="auth-unified-card auth-unified-card--wide auth-unified-card--signin">
@@ -81,7 +83,7 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
                   <div className="auth-side-kicker">Customer Command Centre</div>
                   <h2 className="auth-left-heading">{p.heading}</h2>
                   <p className="auth-left-tagline">{p.tagline}</p>
-                  <div className="auth-startup-statement">
+                  <div className="auth-startup-statement" data-help-box="true">
                     Designed for founders who want a fast way back into active agent work, not another admin-heavy login ritual.
                   </div>
                   <div className="auth-proof-grid">
@@ -98,14 +100,14 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
                     ))}
                   </ul>
                   <p className="auth-left-footnote">{p.footnote}</p>
-                  <div className="auth-confidence-card">
+                  <div className="auth-confidence-card" data-help-box="true">
                     <div className="auth-confidence-title">What customers should feel here</div>
                     <p className="auth-confidence-body">
                       Clear entry, low friction, and immediate confidence that WAOOAW will help them hire, approve,
                       monitor spend, and operate agents without getting lost.
                     </p>
                   </div>
-                  <div className="auth-note-list">
+                  <div className="auth-note-list" data-help-box="true">
                     {SIGNIN_NOTES.map((item) => (
                       <div key={item} className="auth-note-item">{item}</div>
                     ))}

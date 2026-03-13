@@ -813,6 +813,9 @@ section[id] {
   font-size: 12.5px;
 }
 
+[data-help-boxes='hidden'] [data-help-box='true'] {
+  display: none !important;
+}
 .auth-unified-card--signin .auth-right-panel,
 .auth-unified-card--signup .auth-right-panel {
   position: relative;
