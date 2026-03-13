@@ -82,7 +82,7 @@ export default function Inbox(props: InboxProps) {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: '12px', marginBottom: '16px' }}>
         <Card style={{ padding: '16px' }}>
           <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground3)', marginBottom: '6px' }}>Awaiting your decision</div>
           <div style={{ fontSize: '28px', fontWeight: 700 }}>{counts.pending}</div>
@@ -132,7 +132,7 @@ export default function Inbox(props: InboxProps) {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '260px' }}>
+                <div style={{ flex: '1 1 220px', minWidth: 0, width: '100%' }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap' }}>
                     <span
                       style={{

@@ -217,7 +217,7 @@ export default function ProfileSettings() {
           aria-modal="true"
           aria-label="Edit Profile"
         >
-          <Card style={{ padding: '28px', minWidth: '340px', maxWidth: '480px', width: '100%' }}>
+          <Card style={{ padding: '28px', minWidth: 0, maxWidth: '480px', width: 'min(100%, 480px)', boxSizing: 'border-box' }}>
             <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>Edit Profile</h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {[
@@ -296,7 +296,7 @@ export default function ProfileSettings() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '16px' }}>
         {sections.map((section) => (
           <Card key={section.title} className="profile-settings-section-card" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>

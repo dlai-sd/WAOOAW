@@ -268,7 +268,7 @@ export default function TrialDashboard() {
               </div>
 
               {/* Info */}
-              <div style={{ flex: 1, minWidth: '300px' }}>
+              <div style={{ flex: '1 1 260px', minWidth: 0, width: '100%' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
                   <h3 style={{ fontSize: '1.5rem', fontWeight: 600, margin: 0 }}>
                     {trial.agent.name}
@@ -315,7 +315,7 @@ export default function TrialDashboard() {
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: '180px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minWidth: 0, width: '100%', maxWidth: '220px', flex: '1 1 180px' }}>
                 {trial.status === 'active' && (
                   <>
                     <Button 
