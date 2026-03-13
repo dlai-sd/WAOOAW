@@ -1,6 +1,12 @@
 import { useState, useCallback } from 'react'
 import { gatewayRequestJson } from './gatewayApiClient'
 
+const DEFAULT_AGENT_TYPE_VERSION = '1.0.0'
+
+const INDUSTRY_SKILL_KEYS: Record<string, string[]> = {
+  marketing: ['marketing.multichannel-post-v1'],
+}
+
 export interface ConstraintPolicy {
   approval_mode?: string
   max_tasks_per_day?: number
@@ -76,37 +82,53 @@ export function useAgentTypeSetup() {
     setError(null)
     setSavedAt(null)
     try {
-      const payload = {
-        agent_type: form.agent_type,
-        display_name: form.display_name,
-        description: form.description,
-        industry: form.industry,
-        construct_bindings: {
-          processor_class: form.processor_class,
-          pump_class: form.pump_class,
-          connector_class: form.connector_class || null,
-          publisher_class: form.publisher_class || null,
-        },
-        constraint_policy: {
-          approval_mode: form.approval_mode,
-          max_tasks_per_day: form.max_tasks_per_day,
-          max_position_size_inr: form.max_position_size_inr,
-          trial_task_limit: form.trial_task_limit,
-        },
-        hooks: form.hooks,
+      const agentTypeId = form.agent_type.trim() || agentSetupId?.trim()
+      if (!agentTypeId) {
+        throw new Error('agent_type is required to publish to Plant')
       }
 
-      const result = agentSetupId
-        ? await gatewayRequestJson<unknown>(`/pp/agent-setups/${encodeURIComponent(agentSetupId)}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-        : await gatewayRequestJson<unknown>('/pp/agent-setups', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
+      const payload = {
+        agent_type_id: agentTypeId,
+        version: DEFAULT_AGENT_TYPE_VERSION,
+        required_skill_keys: INDUSTRY_SKILL_KEYS[form.industry] ?? [],
+        config_schema: {
+          fields: [
+            {
+              key: 'display_name',
+              label: 'Display name',
+              type: 'text',
+              required: true,
+              description: form.display_name,
+            },
+            {
+              key: 'description',
+              label: 'Description',
+              type: 'text',
+              required: false,
+              description: form.description || 'Base agent contract draft authored in PP.',
+            },
+            {
+              key: 'industry',
+              label: 'Industry',
+              type: 'enum',
+              required: true,
+              description: `PP authoring default industry: ${form.industry}`,
+              options: ['marketing', 'education', 'sales'],
+            },
+          ],
+        },
+        goal_templates: [],
+        enforcement_defaults: {
+          approval_required: form.approval_mode !== 'auto',
+          deterministic: false,
+        },
+      }
+
+      const result = await gatewayRequestJson<unknown>(`/pp/agent-types/${encodeURIComponent(agentTypeId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
 
       setSavedAt(new Date().toISOString())
       return result

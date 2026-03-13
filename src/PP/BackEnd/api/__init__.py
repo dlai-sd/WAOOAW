@@ -2,7 +2,7 @@
 PP Backend API Modules
 """
 
-from . import auth, genesis, agents, audit, metering_debug, agent_setups, exchange_credentials, approvals, agent_types
+from . import auth, genesis, agents, audit, metering_debug, exchange_credentials, approvals, agent_types
 
 __all__ = [
 	"auth",
@@ -10,7 +10,6 @@ __all__ = [
 	"agents",
 	"audit",
 	"metering_debug",
-	"agent_setups",
 	"exchange_credentials",
 	"approvals",
 	"agent_types",

@@ -315,24 +315,6 @@ export const gatewayApiClient = {
       headers: opts?.bearerToken ? { Authorization: `Bearer ${opts.bearerToken}` } : undefined
     }),
 
-  // PP agent setup (post-hire configuration)
-  listAgentSetups: (query?: { customer_id?: string; agent_id?: string; limit?: number }) =>
-    gatewayRequestJson<{ count: number; setups: any[] }>(withQuery('/pp/agent-setups', query)),
-
-  upsertAgentSetup: (payload: {
-    customer_id: string
-    agent_id: string
-    channels?: string[]
-    correlation_id?: string
-    posting_identity?: string | null
-    credential_refs?: Record<string, string>
-  }) =>
-    gatewayRequestJson<any>('/pp/agent-setups', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }),
-
   // PP exchange credentials (admin-only)
   upsertExchangeCredential: (payload: {
     customer_id: string
@@ -511,24 +493,6 @@ export const gatewayApiClient = {
     gatewayRequestJson<unknown>(
       `/pp/ops/dlq/${encodeURIComponent(dlqId)}/requeue`,
       { method: 'POST' }
-    ),
-
-  patchConstraintPolicy: (
-    agentSetupId: string,
-    patch: {
-      approval_mode?: string
-      max_tasks_per_day?: number
-      max_position_size_inr?: number
-      trial_task_limit?: number
-    }
-  ) =>
-    gatewayRequestJson<{ agent_setup_id: string; constraint_policy: Record<string, unknown> }>(
-      `/pp/agent-setups/${encodeURIComponent(agentSetupId)}/constraint-policy`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      }
     ),
 
   // Marketing draft review (Plant proxied via PP)
