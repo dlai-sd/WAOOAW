@@ -454,30 +454,37 @@ export default function AuthenticatedPortal({
             </div>
           </div>
           <div className="portal-header-actions">
-            <div className="portal-header-chip">Customer shell</div>
-            <div className="portal-header-chip portal-header-chip--success">Truthful state first</div>
-            <Button
-              appearance="subtle"
-              onClick={toggleHelpBoxes}
-              aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
-              data-testid="cp-portal-help-toggle"
-            >
-              {showHelpBoxes ? 'Hide Help' : 'Show Help'}
-            </Button>
-            <Button 
-              appearance="subtle" 
-              icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-            />
-            <Button 
-              appearance="subtle" 
-              icon={<SignOut20Regular />}
-              onClick={onLogout}
-              data-testid="cp-signout-button"
-            >
-              Sign Out
-            </Button>
+            <div className="portal-header-status">
+              <div className="portal-header-chip">Customer shell</div>
+              <div className="portal-header-chip portal-header-chip--success">Truthful state first</div>
+            </div>
+            <div className="portal-header-controls">
+              <Button
+                appearance="subtle"
+                className="portal-help-toggle"
+                onClick={toggleHelpBoxes}
+                aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
+                data-testid="cp-portal-help-toggle"
+              >
+                {showHelpBoxes ? 'Hide Help' : 'Show Help'}
+              </Button>
+              <Button
+                appearance="subtle"
+                className="portal-theme-toggle"
+                icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+              />
+              <Button
+                appearance="subtle"
+                className="portal-signout-button"
+                icon={<SignOut20Regular />}
+                onClick={onLogout}
+                data-testid="cp-signout-button"
+              >
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
       </header>
