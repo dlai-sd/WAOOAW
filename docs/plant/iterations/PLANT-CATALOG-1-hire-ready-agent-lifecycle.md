@@ -51,6 +51,8 @@ This plan is structured for one autonomous implementation pass with minimal cros
 
 Estimate basis: Plant model plus route work 90 min per backend story, PP workflow 60 min, CP lifecycle UI 60 min, focused tests 30 min, Docker validation 15 min.
 
+Execution status: completed on branch `feat/plant-catalog-1-it1-e1`.
+
 ---
 
 ## How to Launch Iteration 1
@@ -401,3 +403,33 @@ Execution notes:
 - My Agents now renders lifecycle continuity and release-version truth for existing hires, including explicit messaging when a release is servicing-only or retired from new hire.
 - The portal journey banner now carries agent label, catalog version, and lifecycle state from payment/setup flow so customers do not confuse retirement from catalog with service shutdown.
 - Focused Docker validation passed with `docker run --rm -v /workspaces/WAOOAW/src/CP/FrontEnd:/app -w /app node:20 sh -lc "npm install --silent && npm run test -- --run src/test/MyAgents.test.tsx src/__tests__/AuthenticatedPortal.test.tsx"`.
+
+---
+
+## Iteration Completion
+
+Status: complete
+
+What shipped in this iteration:
+
+- Plant now owns a hire-ready catalog lifecycle surface and snapshots release/version metadata onto hired instances.
+- PP now exposes a Digital Marketing Agent design-board and approval flow as a thin Plant-backed surface.
+- CP discovery and hire setup now consume approved catalog releases and explicit type/version metadata.
+- CP hired-agent views now distinguish new-hire availability from ongoing service continuity.
+
+Final Docker validation result:
+
+- Focused Docker validations for E1-S1, E1-S2, E1-S3, and E1-S4 all passed.
+- The final full-stack `docker compose -f docker-compose.test.yml up --build --abort-on-container-exit` run did not complete cleanly because of unrelated repository-level test-stack issues outside this iteration.
+
+Observed repo-level blockers during the full-stack run:
+
+- `postgres-test` logged repeated `database "waooaw_test" does not exist` probes even while the CP and PP backend suites themselves completed successfully.
+- `zap` failed to resolve `http://plant-gateway-test:8000` and exited with `plant-gateway-test: Name or service not known`.
+- The aggregate stack shutdown stopped multiple services with code `137` after the failing infrastructure/test utilities exited, so the compose-level result is not a reliable signal for this feature slice.
+
+Iteration conclusion:
+
+- This plan is complete from an implementation perspective.
+- The remaining gap is repository test-stack stabilization, not missing feature work from `PLANT-CATALOG-1`.
+- Any PR created from this branch should mention that the Plant demo DB migration was applied through the Cloud SQL proxy flow and that the final full-stack Docker aggregate remains blocked by unrelated test infrastructure issues.
