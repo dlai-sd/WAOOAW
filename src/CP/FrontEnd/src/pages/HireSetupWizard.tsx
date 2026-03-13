@@ -131,7 +131,7 @@ export default function HireSetupWizard() {
     if (!agentId) return 'Agent not identified'
     const base = resolvedAgentName || agentId
     const versionLabel = resolvedCatalogVersion ? ` · ${resolvedCatalogVersion}` : ''
-    const lifecycleLabel = resolvedLifecycleState ? ` · ${resolvedLifecycleState.replaceAll('_', ' ')}` : ''
+    const lifecycleLabel = resolvedLifecycleState ? ` · ${resolvedLifecycleState.replace(/_/g, ' ')}` : ''
     return `${base}${versionLabel}${lifecycleLabel}`
   }, [agentId, resolvedAgentName, resolvedCatalogVersion, resolvedLifecycleState])
 

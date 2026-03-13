@@ -59,7 +59,7 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
     if (state === 'live_on_cp') return <Badge appearance="tint" color="success" size="small">Live on CP</Badge>
     if (state === 'servicing_only') return <Badge appearance="tint" color="warning" size="small">Servicing only</Badge>
     if (state === 'retired_from_catalog') return <Badge appearance="ghost" size="small">Retired</Badge>
-    return <Badge appearance="ghost" size="small">{state.replaceAll('_', ' ')}</Badge>
+    return <Badge appearance="ghost" size="small">{state.replace(/_/g, ' ')}</Badge>
   }
 
   const getAvatar = () => {

@@ -74,7 +74,7 @@ function formatLifecycleLabel(value?: string): string | null {
   if (normalized === 'live_on_cp') return 'Live on CP'
   if (normalized === 'servicing_only') return 'Servicing only'
   if (normalized === 'retired_from_catalog') return 'Retired from catalog'
-  return normalized.replaceAll('_', ' ')
+  return normalized.replace(/_/g, ' ')
 }
 
 function formatCount(count: number, singular: string, plural?: string): string {
