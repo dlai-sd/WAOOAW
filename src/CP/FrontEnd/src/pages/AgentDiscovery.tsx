@@ -15,7 +15,7 @@ import {
 import { Search20Regular } from '@fluentui/react-icons'
 import AgentCard from '../components/AgentCard'
 import { plantAPIService } from '../services/plant.service'
-import type { Agent, Industry, AgentStatus } from '../types/plant.types'
+import type { CatalogAgent, Industry, AgentStatus } from '../types/plant.types'
 
 interface AgentDiscoveryProps {
   onSelectAgent?: (agentId: string) => void
@@ -23,7 +23,7 @@ interface AgentDiscoveryProps {
 
 export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = {}) {
   const navigate = useNavigate()
-  const [agents, setAgents] = useState<Array<Agent & { job_role?: { name: string } }>>([])
+  const [agents, setAgents] = useState<CatalogAgent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -40,13 +40,13 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
     setError(null)
     
     try {
-      const params: any = { limit: 50 }
-      if (industryFilter) params.industry = industryFilter
-      if (statusFilter) params.status = statusFilter
-
-      // Fetch agents with job role details
-      const data = await plantAPIService.listAgentsWithJobRoles(params)
-      setAgents(data)
+      const data = await plantAPIService.listCatalogAgents()
+      const filtered = data.filter((agent) => {
+        const matchesIndustry = !industryFilter || agent.industry_name.toLowerCase() === industryFilter
+        const matchesStatus = !statusFilter || (statusFilter === 'active' ? agent.lifecycle_state === 'live_on_cp' : agent.lifecycle_state !== 'live_on_cp')
+        return matchesIndustry && matchesStatus
+      })
+      setAgents(filtered)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load agents')
       console.error('Failed to load agents:', err)
@@ -63,11 +63,15 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
 
     setLoading(true)
     try {
-      const params: any = { q: searchQuery.trim() }
-      if (industryFilter) params.industry = industryFilter
-      if (statusFilter) params.status = statusFilter
-
-      const results = await plantAPIService.listAgentsWithJobRoles(params)
+      const query = searchQuery.trim().toLowerCase()
+      const catalogAgents = await plantAPIService.listCatalogAgents()
+      const results = catalogAgents.filter((agent) => {
+        const haystack = [agent.public_name, agent.short_description, agent.job_role_label, agent.industry_name].join(' ').toLowerCase()
+        const matchesQuery = haystack.includes(query)
+        const matchesIndustry = !industryFilter || agent.industry_name.toLowerCase() === industryFilter
+        const matchesStatus = !statusFilter || (statusFilter === 'active' ? agent.lifecycle_state === 'live_on_cp' : agent.lifecycle_state !== 'live_on_cp')
+        return matchesQuery && matchesIndustry && matchesStatus
+      })
       setAgents(results)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed')
@@ -77,11 +81,19 @@ export default function AgentDiscovery({ onSelectAgent }: AgentDiscoveryProps = 
   }
 
   const handleTryAgent = (agentId: string) => {
+    const selectedAgent = agents.find((candidate) => candidate.id === agentId)
+    const query = new URLSearchParams()
+    if (selectedAgent?.agent_type_id) query.set('agentTypeId', selectedAgent.agent_type_id)
+    if (selectedAgent?.release_id) query.set('catalogReleaseId', selectedAgent.release_id)
+    if (selectedAgent?.external_catalog_version) query.set('catalogVersion', selectedAgent.external_catalog_version)
+    if (selectedAgent?.lifecycle_state) query.set('lifecycleState', selectedAgent.lifecycle_state)
+    if (selectedAgent?.public_name) query.set('agentName', selectedAgent.public_name)
+
     if (onSelectAgent) {
       onSelectAgent(agentId)
       return
     }
-    navigate(`/agent/${agentId}`)
+    navigate(`/agent/${agentId}${query.toString() ? `?${query.toString()}` : ''}`)
   }
 
   const filteredAgents = agents

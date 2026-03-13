@@ -7,6 +7,7 @@ import {
   upsertHireWizardDraft,
   type HireWizardDraft
 } from '../services/hireWizard.service'
+import { plantAPIService } from '../services/plant.service'
 import { upsertExchangeSetup } from '../services/exchangeSetup.service'
 import { upsertTradingStrategyConfig } from '../services/tradingStrategy.service'
 import { upsertPlatformCredential } from '../services/platformCredentials.service'
@@ -34,11 +35,28 @@ type MarketingPlatformConfig = {
   posting_identity?: string | null
 }
 
-function inferAgentTypeId(agentId: string): string {
+function resolveAgentTypeId(agentTypeId?: string | null, agentId?: string): string {
+  const explicit = String(agentTypeId || '').trim()
+  if (explicit) return explicit
+
   const normalized = String(agentId || '').trim().toUpperCase()
   if (normalized.startsWith('AGT-TRD-')) return 'trading.share_trader.v1'
   if (normalized.startsWith('AGT-MKT-')) return 'marketing.digital_marketing.v1'
+  return ''
+}
+
+function inferAgentTypeId(agentTypeId?: string | null, agentId?: string): string {
+  const resolved = resolveAgentTypeId(agentTypeId, agentId)
+  if (resolved) return resolved
   return 'marketing.digital_marketing.v1'
+}
+
+function isTradingAgentType(agentTypeId?: string | null): boolean {
+  return String(agentTypeId || '').trim().startsWith('trading.')
+}
+
+function isMarketingAgentType(agentTypeId?: string | null): boolean {
+  return String(agentTypeId || '').trim().startsWith('marketing.')
 }
 
 export default function HireSetupWizard() {
@@ -48,12 +66,20 @@ export default function HireSetupWizard() {
 
   const subscriptionId = params.subscriptionId
   const agentId = searchParams.get('agentId') || ''
+  const requestedAgentTypeId = searchParams.get('agentTypeId') || ''
+  const requestedCatalogVersion = searchParams.get('catalogVersion') || ''
+  const requestedLifecycleState = searchParams.get('lifecycleState') || ''
+  const requestedAgentName = searchParams.get('agentName') || ''
 
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<HireWizardDraft | null>(null)
+  const [resolvedAgentTypeId, setResolvedAgentTypeId] = useState(() => resolveAgentTypeId(requestedAgentTypeId, agentId))
+  const [resolvedCatalogVersion, setResolvedCatalogVersion] = useState(requestedCatalogVersion)
+  const [resolvedLifecycleState, setResolvedLifecycleState] = useState(requestedLifecycleState)
+  const [resolvedAgentName, setResolvedAgentName] = useState(requestedAgentName)
 
   const [nickname, setNickname] = useState('')
   const [theme, setTheme] = useState('default')
@@ -61,12 +87,12 @@ export default function HireSetupWizard() {
   const [goalsCompleted, setGoalsCompleted] = useState(false)
 
   const isTradingAgent = useMemo(() => {
-    return String(agentId || '').toUpperCase().startsWith('AGT-TRD-')
-  }, [agentId])
+    return isTradingAgentType(resolvedAgentTypeId)
+  }, [resolvedAgentTypeId])
 
   const isMarketingAgent = useMemo(() => {
-    return String(agentId || '').toUpperCase().startsWith('AGT-MKT-')
-  }, [agentId])
+    return isMarketingAgentType(resolvedAgentTypeId)
+  }, [resolvedAgentTypeId])
 
   const [exchangeProvider, setExchangeProvider] = useState('delta_exchange_india')
   const [coinsRaw, setCoinsRaw] = useState('')
@@ -103,8 +129,11 @@ export default function HireSetupWizard() {
 
   const selectedAgentSummary = useMemo(() => {
     if (!agentId) return 'Agent not identified'
-    return agentId
-  }, [agentId])
+    const base = resolvedAgentName || agentId
+    const versionLabel = resolvedCatalogVersion ? ` · ${resolvedCatalogVersion}` : ''
+    const lifecycleLabel = resolvedLifecycleState ? ` · ${resolvedLifecycleState.replaceAll('_', ' ')}` : ''
+    return `${base}${versionLabel}${lifecycleLabel}`
+  }, [agentId, resolvedAgentName, resolvedCatalogVersion, resolvedLifecycleState])
 
   const canNext = useMemo(() => {
     if (step === 1) return Boolean(nickname.trim())
@@ -166,16 +195,35 @@ export default function HireSetupWizard() {
         return
       }
       try {
+        if (!requestedAgentTypeId || !requestedCatalogVersion || !requestedLifecycleState || !requestedAgentName) {
+          const catalogAgent = await plantAPIService.getCatalogAgent(agentId)
+          if (!cancelled && catalogAgent) {
+            setResolvedAgentTypeId(resolveAgentTypeId(catalogAgent.agent_type_id, agentId))
+            setResolvedCatalogVersion(String(catalogAgent.external_catalog_version || ''))
+            setResolvedLifecycleState(String(catalogAgent.lifecycle_state || ''))
+            setResolvedAgentName(String(catalogAgent.public_name || ''))
+          }
+        }
+
         const existing = await getHireWizardDraftBySubscription(subscriptionId)
         if (cancelled) return
         setDraft(existing)
+        setResolvedAgentTypeId(resolveAgentTypeId(existing.agent_type_id || requestedAgentTypeId, existing.agent_id || agentId))
         setNickname(String(existing.nickname || ''))
         setTheme(String(existing.theme || 'default'))
         setGoalsCompleted(Boolean(existing.goals_completed))
         setConfigJson(JSON.stringify(existing.config || {}, null, 2))
 
+        if (!requestedCatalogVersion && existing.external_catalog_version) {
+          setResolvedCatalogVersion(String(existing.external_catalog_version))
+        }
+        if (!requestedLifecycleState && existing.catalog_status_at_hire) {
+          setResolvedLifecycleState(String(existing.catalog_status_at_hire))
+        }
+
         const cfg = (existing.config || {}) as Record<string, any>
-        if (String(existing.agent_id || '').toUpperCase().startsWith('AGT-TRD-')) {
+        const existingAgentTypeId = resolveAgentTypeId(existing.agent_type_id || requestedAgentTypeId, existing.agent_id || agentId)
+        if (isTradingAgentType(existingAgentTypeId)) {
           setExchangeProvider(String(cfg.exchange_provider || 'delta_exchange_india'))
           const allowed = Array.isArray(cfg.allowed_coins) ? cfg.allowed_coins : []
           setCoinsRaw(allowed.length ? allowed.join(', ') : '')
@@ -183,7 +231,7 @@ export default function HireSetupWizard() {
           setExchangeCredentialRef(cfg.exchange_credential_ref ? String(cfg.exchange_credential_ref) : null)
           setApiKey('')
           setApiSecret('')
-        } else if (String(existing.agent_id || '').toUpperCase().startsWith('AGT-MKT-')) {
+        } else if (isMarketingAgentType(existingAgentTypeId)) {
           const platformsRaw = cfg.platforms
           const platforms: MarketingPlatformConfig[] = []
           if (Array.isArray(platformsRaw)) {
@@ -224,7 +272,7 @@ export default function HireSetupWizard() {
     return () => {
       cancelled = true
     }
-  }, [subscriptionId, agentId])
+  }, [subscriptionId, agentId, requestedAgentTypeId, requestedCatalogVersion, requestedLifecycleState])
 
   const parseConfig = (): Record<string, unknown> => {
     if (isTradingAgent) {
@@ -339,7 +387,7 @@ export default function HireSetupWizard() {
       const next = await upsertHireWizardDraft({
         subscription_id: subscriptionId,
         agent_id: agentId,
-        agent_type_id: inferAgentTypeId(agentId),
+        agent_type_id: inferAgentTypeId(resolvedAgentTypeId, agentId),
         nickname: nickname.trim() || undefined,
         theme: theme.trim() || undefined,
         config: cfg
@@ -375,7 +423,7 @@ export default function HireSetupWizard() {
       const saved = await saveDraft()
       const finalized = await finalizeHireWizard({
         hired_instance_id: saved.hired_instance_id,
-        agent_type_id: inferAgentTypeId(agentId),
+        agent_type_id: inferAgentTypeId(resolvedAgentTypeId, agentId),
         goals_completed: Boolean(goalsCompleted)
       })
       setDraft(finalized)

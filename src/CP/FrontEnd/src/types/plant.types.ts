@@ -28,6 +28,14 @@ export type AgentStatus = 'active' | 'inactive' | 'suspended'
  */
 export type Industry = 'marketing' | 'education' | 'sales' | 'healthcare' | 'finance' | 'general'
 
+export type CatalogLifecycleState =
+  | 'draft'
+  | 'design_review'
+  | 'approved_for_catalog'
+  | 'live_on_cp'
+  | 'retired_from_catalog'
+  | 'servicing_only'
+
 /**
  * Agent type definition (Phase-1 catalog) from Plant.
  */
@@ -35,6 +43,26 @@ export interface AgentTypeDefinition {
   agent_type_id: string
   display_name?: string | null
   version: string
+}
+
+export interface CatalogAgent {
+  release_id: string
+  id: string
+  public_name: string
+  short_description: string
+  industry_name: string
+  job_role_label: string
+  monthly_price_inr: number
+  trial_days: number
+  allowed_durations: string[]
+  supported_channels: string[]
+  approval_mode: string
+  agent_type_id: string
+  internal_definition_version_id?: string | null
+  external_catalog_version: string
+  lifecycle_state: CatalogLifecycleState
+  approved_for_new_hire: boolean
+  retired_from_catalog_at?: string | null
 }
 
 /**

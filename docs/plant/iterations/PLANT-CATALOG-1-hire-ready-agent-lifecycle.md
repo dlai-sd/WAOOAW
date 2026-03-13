@@ -136,7 +136,7 @@ Stop and report the exact blocker.
 |---|---|---|---|---|
 | E1-S1 | 1 | Hire-ready Digital Marketing Agent lifecycle | Plant owns catalog lifecycle and release snapshots | 🟢 Completed |
 | E1-S2 | 1 | Hire-ready Digital Marketing Agent lifecycle | PP design board exposes recommended release fields and approval flow | 🟢 Completed |
-| E1-S3 | 1 | Hire-ready Digital Marketing Agent lifecycle | CP discovery and hire setup consume approved lifecycle truth | 🔴 Not Started |
+| E1-S3 | 1 | Hire-ready Digital Marketing Agent lifecycle | CP discovery and hire setup consume approved lifecycle truth | 🟢 Completed |
 | E1-S4 | 1 | Hire-ready Digital Marketing Agent lifecycle | Existing hires show lifecycle continuity and version truth | 🔴 Not Started |
 
 ---
@@ -336,6 +336,13 @@ Test command:
 ```bash
 cd src/CP/FrontEnd && npm run test -- --run src/test/App.test.tsx src/__tests__/AuthenticatedPortal.test.tsx
 ```
+
+Execution notes:
+
+- Completed on 2026-03-13 on branch `feat/plant-catalog-1-it1-e1`.
+- CP discovery now reads the Plant-approved `/v1/catalog/agents` surface and renders lifecycle/version truth on discovery cards.
+- The CP hire flow now carries explicit `agentTypeId`, `catalogVersion`, and lifecycle metadata from discovery through receipt into setup, with catalog lookup fallback in the wizard when query metadata is partial.
+- Focused Docker validation passed with `docker run --rm -v /workspaces/WAOOAW/src/CP/FrontEnd:/app -w /app node:20 sh -lc "npm install --silent && npm run test -- --run src/test/AgentDiscovery.test.tsx src/test/HireSetupWizard.test.tsx"`.
 
 ---
 

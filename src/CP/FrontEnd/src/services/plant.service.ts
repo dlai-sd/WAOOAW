@@ -8,6 +8,7 @@ import type {
   Agent,
   AgentListParams,
   AgentTypeDefinition,
+  CatalogAgent,
   Skill,
   SkillListParams,
   JobRole,
@@ -120,6 +121,15 @@ class PlantAPIService {
    */
   async listAgentTypes(): Promise<AgentTypeDefinition[]> {
     return this.request<AgentTypeDefinition[]>('/agent-types')
+  }
+
+  async listCatalogAgents(): Promise<CatalogAgent[]> {
+    return this.request<CatalogAgent[]>('/catalog/agents')
+  }
+
+  async getCatalogAgent(agentId: string): Promise<CatalogAgent | null> {
+    const agents = await this.listCatalogAgents()
+    return agents.find((agent) => agent.id === agentId) || null
   }
 
   /**

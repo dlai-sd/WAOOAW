@@ -10,9 +10,17 @@ export default function HireReceipt() {
   const orderId = params.orderId || ''
   const subscriptionId = searchParams.get('subscriptionId') || ''
   const agentId = searchParams.get('agentId') || ''
+  const agentTypeId = searchParams.get('agentTypeId') || ''
+  const catalogReleaseId = searchParams.get('catalogReleaseId') || ''
+  const catalogVersion = searchParams.get('catalogVersion') || ''
+  const lifecycleState = searchParams.get('lifecycleState') || ''
+  const agentName = searchParams.get('agentName') || ''
 
   const canContinue = useMemo(() => Boolean(subscriptionId && agentId), [subscriptionId, agentId])
-  const selectedAgentSummary = useMemo(() => agentId || 'Agent reference unavailable', [agentId])
+  const selectedAgentSummary = useMemo(() => {
+    const base = agentName || agentId || 'Agent reference unavailable'
+    return catalogVersion ? `${base} · ${catalogVersion}` : base
+  }, [agentId, agentName, catalogVersion])
 
   return (
     <div className="hire-receipt-page" style={{ maxWidth: '920px', margin: '0 auto', padding: '2rem 1rem' }} data-testid="cp-hire-receipt-page">
@@ -92,7 +100,15 @@ export default function HireReceipt() {
           </Button>
           <Button
             appearance="primary"
-            onClick={() => navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?agentId=${encodeURIComponent(agentId)}`)}
+            onClick={() => {
+              const nextQuery = new URLSearchParams({ agentId })
+              if (agentTypeId) nextQuery.set('agentTypeId', agentTypeId)
+              if (catalogReleaseId) nextQuery.set('catalogReleaseId', catalogReleaseId)
+              if (catalogVersion) nextQuery.set('catalogVersion', catalogVersion)
+              if (lifecycleState) nextQuery.set('lifecycleState', lifecycleState)
+              if (agentName) nextQuery.set('agentName', agentName)
+              navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?${nextQuery.toString()}`)
+            }}
             disabled={!canContinue}
             data-testid="cp-hire-receipt-continue"
           >
