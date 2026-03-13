@@ -1911,7 +1911,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
       {instances.length > 0 ? (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <div style={{ minWidth: '300px', maxWidth: '500px', flex: '1' }}>
+            <div style={{ minWidth: 0, width: '100%', maxWidth: '500px', flex: '1 1 260px' }}>
               <AgentSelector
                 agents={instances}
                 selectedId={selectedSubscriptionId}

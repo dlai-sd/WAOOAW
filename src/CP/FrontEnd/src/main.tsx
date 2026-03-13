@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import App from './App'
 import './styles/globals.css'
+import './styles/responsive.css'
 import config from './config/oauth.config'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

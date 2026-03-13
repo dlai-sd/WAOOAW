@@ -76,6 +76,16 @@
 /* AUTHENTICATED PORTAL RESPONSIVE */
 /* ============================================ */
 
+.portal-header-primary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-menu-toggle {
+  display: none !important;
+}
+
 /* Portal Header - Mobile */
 @media (max-width: 768px) {
   .portal-header {
@@ -107,11 +117,11 @@
 @media (max-width: 1024px) {
   .portal-sidebar {
     position: fixed;
-    top: 0;
+    top: 72px;
     left: -280px;
-    height: 100vh;
+    height: calc(100vh - 72px);
     width: 280px;
-    z-index: 1000;
+    z-index: 96;
     transition: left 0.3s ease;
     background: var(--colorNeutralBackground1);
     border-right: 1px solid var(--colorNeutralStroke2);
@@ -130,28 +140,36 @@
   /* Mobile menu toggle button */
   .mobile-menu-toggle {
     display: flex !important;
-    position: fixed;
-    bottom: 24px;
-    left: 24px;
-    z-index: 999;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 999px;
   }
   
   /* Overlay when sidebar is open */
   .portal-overlay {
     display: block !important;
     position: fixed;
-    top: 0;
+    top: 72px;
     left: 0;
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    z-index: 95;
+    cursor: pointer;
+  }
+
+  .portal-layout {
+    position: relative;
+  }
+
+  .sidebar-footer {
+    display: none;
   }
 }
 

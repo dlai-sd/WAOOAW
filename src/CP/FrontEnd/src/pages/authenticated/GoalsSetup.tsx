@@ -298,7 +298,7 @@ export default function GoalsSetup() {
                 </div>
               </div>
               {instances.length > 1 ? (
-                <div style={{ minWidth: '260px' }}>
+                <div style={{ minWidth: 0, width: '100%', maxWidth: '320px', flex: '1 1 220px' }}>
                   <label htmlFor="digital-marketing-agent-select" style={{ display: 'block', marginBottom: '0.35rem' }}>
                     Choose hired agent
                   </label>
@@ -328,7 +328,7 @@ export default function GoalsSetup() {
               style={{
                 display: 'grid',
                 gap: '1rem',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
                 alignItems: 'start',
               }}
             >

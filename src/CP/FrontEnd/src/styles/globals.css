@@ -1683,6 +1683,22 @@ section[id] {
   align-items: center;
 }
 
+.portal-header-status,
+.portal-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.portal-header-status {
+  justify-content: flex-start;
+}
+
+.portal-header-controls {
+  justify-content: flex-end;
+}
+
 /* Portal Layout */
 .portal-layout {
   display: flex;
@@ -2318,6 +2334,39 @@ section[id] {
   background: rgba(16, 185, 129, 0.12);
   border-color: rgba(16, 185, 129, 0.35);
   color: #10b981;
+}
+
+@media (max-width: 1024px) {
+  .portal-header-content {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .portal-header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .portal-header-status,
+  .portal-header-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .portal-header-controls > * {
+    flex: 1 1 148px;
+  }
+
+  .portal-theme-toggle {
+    flex: 0 0 auto;
+  }
+
+  .portal-signout-button,
+  .portal-help-toggle {
+    justify-content: center;
+  }
 }
 
 .portal-sidebar-card {
