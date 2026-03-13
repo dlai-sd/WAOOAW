@@ -36,6 +36,8 @@ import { getPlatformConnectionSummary, listPlatformConnections, type PlatformCon
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
   toggleTheme: () => void
+  showHelpBoxes: boolean
+  toggleHelpBoxes: () => void
   onLogout: () => void
   initialPage?: Page
   initialAgentId?: string
@@ -119,7 +121,16 @@ function toInboxItem(
   }
 }
 
-export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, initialPage, initialAgentId, initialJourneyContext }: AuthenticatedPortalProps) {
+export default function AuthenticatedPortal({
+  theme,
+  toggleTheme,
+  showHelpBoxes,
+  toggleHelpBoxes,
+  onLogout,
+  initialPage,
+  initialAgentId,
+  initialJourneyContext,
+}: AuthenticatedPortalProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const portalEntry = (location.state as PortalLocationState | null)?.portalEntry
@@ -418,6 +429,14 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
           <div className="portal-header-actions">
             <div className="portal-header-chip">Customer shell</div>
             <div className="portal-header-chip portal-header-chip--success">Truthful state first</div>
+            <Button
+              appearance="subtle"
+              onClick={toggleHelpBoxes}
+              aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
+              data-testid="cp-portal-help-toggle"
+            >
+              {showHelpBoxes ? 'Hide Help' : 'Show Help'}
+            </Button>
             <Button 
               appearance="subtle" 
               icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
@@ -438,7 +457,7 @@ export default function AuthenticatedPortal({ theme, toggleTheme, onLogout, init
 
       <div className="portal-layout">
         <aside className={`portal-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-          <div className="portal-sidebar-card">
+          <div className="portal-sidebar-card" data-help-box="true">
             <div className="portal-sidebar-card-label">Workspace</div>
             {!sidebarCollapsed && (
               <>

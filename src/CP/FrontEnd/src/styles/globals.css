@@ -630,15 +630,16 @@ section[id] {
   z-index: 1;
 }
 
-/* Narrower centered card — Bloom structure: 520px, deep radius, floating shadow */
+/* Wide startup-style auth shell on desktop */
 .auth-unified-card {
-  max-width: 520px;
+  width: min(1180px, calc(100vw - 48px));
+  max-width: 1180px;
   border: none;
-  border-radius: 28px;
+  border-radius: 32px;
   box-shadow:
     0 2px 4px   rgba(0,0,0,0.04),
     0 8px 24px  rgba(0,0,0,0.08),
-    0 32px 80px rgba(0,0,0,0.12),
+    0 24px 72px rgba(0,0,0,0.14),
     0 0 0 1px   var(--colorNeutralStroke2);
   background: var(--colorNeutralBackground1);
 }
@@ -700,17 +701,19 @@ section[id] {
   background: rgba(255,255,255,0.24) !important;
 }
 
-/* Body: column stack — left panel below header, form below that */
+/* Body: desktop split layout */
 .auth-unified-body {
-  flex-direction: column;
+  flex-direction: row;
 }
 
-/* Left panel: subtle brand tint fading to card background */
+/* Left panel: startup story pane */
 .auth-left-panel {
-  flex: 0 0 auto;
-  padding: 16px 32px 20px;
-  background: linear-gradient(180deg, var(--colorBrandBackground2) 0%, var(--colorNeutralBackground1) 100%);
-  gap: 8px;
+  flex: 0 0 43%;
+  padding: 34px 36px 36px;
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,0.18) 0, rgba(255,255,255,0) 38%),
+    linear-gradient(180deg, var(--colorBrandBackground2) 0%, var(--colorNeutralBackground2) 100%);
+  gap: 12px;
   justify-content: flex-start;
 }
 
@@ -718,19 +721,24 @@ section[id] {
 .auth-left-illustration { display: none; }
 
 .auth-left-heading {
-  font-size: 20px;
+  font-size: 30px;
+  line-height: 1.14;
   color: var(--colorNeutralForeground1);
   margin-top: 0;
 }
 
 .auth-left-tagline {
   color: var(--colorBrandForeground1);
+  font-size: 15px;
+  font-weight: 700;
 }
 
-.auth-left-bullets { min-height: unset; }
+.auth-left-bullets {
+  min-height: unset;
+}
 
 .auth-left-bullets li {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--colorNeutralForeground1);
 }
 
@@ -766,17 +774,64 @@ section[id] {
 /* Divider: thin horizontal brand-tinted line between panels */
 .auth-panel-divider {
   flex:      0 0 1px;
-  width:     100%;
-  height:    1px;
+  width:     1px;
+  height:    auto;
   background: var(--colorNeutralStroke2);
 }
 
 /* Right panel: clean card background, vertically centred */
 .auth-right-panel {
   background: var(--colorNeutralBackground1);
-  padding: 28px 32px 36px;
+  padding: 34px 36px 40px;
+  flex: 1 1 57%;
   align-items:     flex-start;
   justify-content: center;
+}
+
+.auth-startup-statement {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.5);
+  border: 1px solid rgba(255,255,255,0.45);
+  color: var(--colorNeutralForeground1);
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.auth-note-list {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-note-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: rgba(255,255,255,0.42);
+  color: var(--colorNeutralForeground2);
+  line-height: 1.55;
+  font-size: 12.5px;
+}
+
+[data-help-boxes='hidden'] [data-help-box='true'] {
+  display: none !important;
+}
+
+.auth-unified-card--signin .auth-right-panel,
+.auth-unified-card--signup .auth-right-panel {
+  position: relative;
+}
+
+.auth-unified-card--signin .auth-right-panel::before,
+.auth-unified-card--signup .auth-right-panel::before {
+  content: '';
+  position: absolute;
+  inset: 16px 16px auto auto;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 120, 212, 0.12) 0%, rgba(0, 120, 212, 0) 72%);
+  pointer-events: none;
 }
 
 /* CTA buttons: brand primary styling with rounded corners */
@@ -797,6 +852,11 @@ section[id] {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+.auth-google-frame > div,
+.auth-google-frame iframe {
   width: 100% !important;
 }
 
@@ -840,9 +900,14 @@ section[id] {
 
 /* Responsive: shrink padding on small screens */
 @media (max-width: 720px) {
-  .auth-unified-card { max-width: 100%; }
+  .auth-unified-card {
+    width: min(100%, calc(100vw - 12px));
+    max-width: 100%;
+  }
   .auth-unified-header { padding: 20px 20px 18px; }
-  .auth-left-panel    { padding: 20px 20px 22px; }
+  .auth-unified-body { flex-direction: column; }
+  .auth-left-panel    { padding: 20px 20px 22px; flex-basis: auto; }
+  .auth-panel-divider { width: 100%; height: 1px; }
   .auth-right-panel   { padding: 22px 20px 30px; }
 }
 

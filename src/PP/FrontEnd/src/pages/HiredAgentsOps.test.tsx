@@ -14,9 +14,8 @@ function LocationEcho() {
 
 const mocks = vi.hoisted(() => {
   return {
-    listOpsSubscriptions: vi.fn(async () => [
-      { subscription_id: 'SUB-1', agent_id: 'AGT-MKT-HEALTH-001', status: 'active', duration: 'monthly' }
-    ]),
+    listReferenceAgents: vi.fn(async () => ([])),
+    getCustomerById: vi.fn(async () => ({ customer_id: 'CUST-1', email: 'owner@example.com' })),
     listOpsHiredAgents: vi.fn(async () => ([
       {
         hired_instance_id: 'HIRE-1',
@@ -94,7 +93,8 @@ vi.mock('../services/gatewayApiClient', () => {
       ...actual,
       gatewayApiClient: {
         ...(actual.gatewayApiClient || {}),
-        listOpsSubscriptions: mocks.listOpsSubscriptions,
+        listReferenceAgents: mocks.listReferenceAgents,
+        getCustomerById: mocks.getCustomerById,
         listOpsHiredAgents: mocks.listOpsHiredAgents,
         listOpsHiredAgentGoals: mocks.listOpsHiredAgentGoals,
         listOpsHiredAgentDeliverables: mocks.listOpsHiredAgentDeliverables,
@@ -125,7 +125,7 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
   await user.click(screen.getByRole('button', { name: 'Load' }))
 
   await waitFor(() => {
-    expect(mocks.listOpsSubscriptions).toHaveBeenCalledWith(
+    expect(mocks.listOpsHiredAgents).toHaveBeenCalledWith(
       expect.objectContaining({ customer_id: 'CUST-1' })
     )
   })
@@ -151,9 +151,6 @@ test('HiredAgentsOps loads instances and renders drilldown sections', async () =
 })
 
 test('HiredAgentsOps surfaces DMA publish state without pretending approval implies publish', async () => {
-  mocks.listOpsSubscriptions.mockResolvedValueOnce([
-    { subscription_id: 'SUB-9', agent_id: 'AGT-MKT-DMA-001', status: 'active', duration: 'monthly' }
-  ])
   mocks.listOpsHiredAgents.mockResolvedValueOnce([
     {
       hired_instance_id: 'HIRE-9',
@@ -234,16 +231,21 @@ test('HiredAgentsOps preserves handoff context and links to the next operator su
   )
 
   await waitFor(() => {
-    expect(mocks.listOpsSubscriptions).toHaveBeenCalledWith(
+    expect(mocks.listOpsHiredAgents).toHaveBeenCalledWith(
       expect.objectContaining({ customer_id: 'CUST-1' })
     )
+  })
+
+  await waitFor(() => {
+    expect(mocks.getCustomerById).toHaveBeenCalledWith('CUST-1')
   })
 
   await waitFor(() => {
     expect(screen.getByText('Operator handoff context')).toBeInTheDocument()
   })
 
-  expect(screen.getByText(/Customer CUST-1 • Agent AGT-MKT-HEALTH-001 • Runtime HIRE-1/)).toBeInTheDocument()
+  expect(screen.getByText(/owner@example.com • AGT-MKT-HEALTH-001 • Runtime HIRE-1/)).toBeInTheDocument()
+  expect(screen.getByText(/Raw IDs: customer_id CUST-1 • agent_id AGT-MKT-HEALTH-001 • hired_instance_id HIRE-1/)).toBeInTheDocument()
   expect(screen.getByDisplayValue('corr-1')).toBeInTheDocument()
 
   await user.click(screen.getByRole('button', { name: 'Open Review Queue' }))

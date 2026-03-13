@@ -77,11 +77,13 @@ async def test_list_hired_agents_returns_400_without_ids(app, client):
 async def test_list_hired_agents_by_customer_id(app, client):
     from clients.plant_client import get_plant_client
 
-    plant = _make_plant(200, [{"hired_instance_id": "inst-2"}])
+    plant = _make_plant(200, {"customer_id": "C1", "instances": [{"hired_instance_id": "inst-2"}]})
     app.dependency_overrides[get_plant_client] = lambda: plant
     try:
-        await client.get("/api/pp/ops/hired-agents?customer_id=C1")
+        resp = await client.get("/api/pp/ops/hired-agents?customer_id=C1")
         call_kwargs = plant._request.call_args
+        assert resp.status_code == 200
+        assert resp.json() == [{"hired_instance_id": "inst-2"}]
         assert call_kwargs.kwargs.get("path") == "/api/v1/hired-agents/by-customer/C1"
     finally:
         app.dependency_overrides.clear()

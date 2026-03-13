@@ -18,11 +18,24 @@ import Layout from '../components/Layout'
 
 function renderLayout() {
   return render(
-    <Layout theme="dark" onThemeToggle={() => {}} onLogout={() => {}}>
+    <Layout theme="dark" onThemeToggle={() => {}} showHelpBoxes={true} onHelpToggle={() => {}} onLogout={() => {}}>
       <div>content</div>
     </Layout>
   )
 }
+
+test('help toggle is rendered in the sidebar footer', () => {
+  const onHelpToggle = vi.fn()
+
+  render(
+    <Layout theme="dark" onThemeToggle={() => {}} showHelpBoxes={true} onHelpToggle={onHelpToggle} onLogout={() => {}}>
+      <div>content</div>
+    </Layout>
+  )
+
+  expect(screen.getByTestId('pp-help-toggle')).toBeInTheDocument()
+  expect(screen.getByText('Hide Help')).toBeInTheDocument()
+})
 
 test('E7-S1-T1: Nav shows "Usage Events" for /customers route', () => {
   renderLayout()

@@ -137,6 +137,8 @@ async function renderPortal(props?: Partial<React.ComponentProps<typeof Authenti
       <AuthenticatedPortal
         theme="light"
         toggleTheme={() => {}}
+        showHelpBoxes={true}
+        toggleHelpBoxes={() => {}}
         onLogout={() => {}}
         {...props}
       />
@@ -238,6 +240,16 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByRole('heading', { name: 'Understand What You Are Paying For' })).toBeTruthy()
     expect(screen.getByText('Live subscription view')).toBeTruthy()
     expect(screen.getByTestId('page-billing')).toBeTruthy()
+  })
+
+  it('calls the help toggle from the portal header', async () => {
+    const toggleHelpBoxes = vi.fn()
+    await renderPortal({ showHelpBoxes: true, toggleHelpBoxes })
+
+    fireEvent.click(screen.getByTestId('cp-portal-help-toggle'))
+
+    expect(toggleHelpBoxes).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'Hide help boxes' })).toBeTruthy()
   })
 
   it('keeps Discover highlighted while showing agent detail', async () => {

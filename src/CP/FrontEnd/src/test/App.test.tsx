@@ -62,10 +62,10 @@ describe('App Component', () => {
     })
   })
 
-  it('shows a session expired notice when auth-expired flag is set', () => {
+  it('shows a session expired notice when auth-expired flag is set', async () => {
     sessionStorage.setItem('waooaw:auth-expired', '1')
     renderWithProvider(<App />)
-    expect(screen.getByText(/session expired/i)).toBeInTheDocument()
+    expect(await screen.findByText(/session expired/i)).toBeInTheDocument()
   })
 
   it('renders landing page when not authenticated', () => {
@@ -118,19 +118,23 @@ describe('App Component', () => {
   })
 
   it('restores session from stored token on refresh', async () => {
-    // JWT with far-future exp; payload is not verified client-side.
-    localStorage.setItem(
-      'cp_access_token',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMSIsImVtYWlsIjoidUBleGFtcGxlLmNvbSIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJleHAiOjQxMDAwMDAwMDAsImlhdCI6MTcwMDAwMDAwMH0.dummy'
-    )
-    // Backward compatibility: some sessions rely on token_expires_at.
-    localStorage.setItem('token_expires_at', String(Date.now() + 24 * 60 * 60 * 1000))
+    localStorage.setItem('waooaw:session-restorable', '1')
 
     // Simulate refreshing directly onto a protected route.
     window.history.pushState({}, '', '/portal')
 
     fetchSpy.mockImplementation(async (url: any) => {
       const u = String(url)
+      if (u.endsWith('/auth/refresh')) {
+        return new Response(
+          JSON.stringify({
+            access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMSIsImVtYWlsIjoidUBleGFtcGxlLmNvbSIsInRva2VuX3R5cGUiOiJhY2Nlc3MiLCJleHAiOjQxMDAwMDAwMDAsImlhdCI6MTcwMDAwMDAwMH0.dummy',
+            token_type: 'bearer',
+            expires_in: 3600
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
       if (u.endsWith('/auth/me')) {
         return new Response(
           JSON.stringify({
@@ -153,6 +157,6 @@ describe('App Component', () => {
 
     renderWithProvider(<App />)
 
-    expect(await screen.findByText('Sign Out')).toBeInTheDocument()
+    expect(await screen.findByTestId('cp-signout-button')).toBeInTheDocument()
   })
 })

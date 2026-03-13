@@ -226,6 +226,14 @@ type ReviewQueueApproval = {
   deliverable_preview: DeliverablePreview
 }
 
+function preferredCustomerLabel(item: ReviewQueueApproval | null, fallbackCustomerId: string): string {
+  return String(item?.customer_label || '').trim() || fallbackCustomerId.trim() || 'not set'
+}
+
+function preferredAgentLabel(item: ReviewQueueApproval | null, fallbackAgentId: string): string {
+  return String(item?.agent_label || '').trim() || fallbackAgentId.trim() || 'not set'
+}
+
 function buildReviewQueueSearch(customerId: string, agentId: string, correlationId: string): URLSearchParams {
   const params = new URLSearchParams()
   const normalizedCustomerId = customerId.trim()
@@ -341,6 +349,8 @@ export default function ReviewQueue() {
     () => approvals.find(item => item.approval_id === selectedApprovalId) || approvals[0] || null,
     [approvals, selectedApprovalId]
   )
+  const operatorCustomerLabel = preferredCustomerLabel(selectedApproval, customerId)
+  const operatorAgentLabel = preferredAgentLabel(selectedApproval, agentId)
 
   useEffect(() => {
     if (selectedApproval || approvals.length === 0) return
@@ -414,14 +424,14 @@ export default function ReviewQueue() {
       </div>
 
       <div className="pp-dashboard-grid" style={{ marginBottom: 20 }}>
-        <Card className="pp-dashboard-panel pp-dashboard-panel--accent">
+        <Card className="pp-dashboard-panel pp-dashboard-panel--accent" data-help-box="true">
           <div className="pp-dashboard-kicker">Approval desk</div>
           <Text as="h2" size={700} weight="semibold">Help contributors make a decision with enough customer and runtime context to stand behind it.</Text>
           <p className="pp-dashboard-body-copy">
             The queue should make obvious what needs review, which runtime it belongs to, and which next surface the operator should open after approving or denying it.
           </p>
         </Card>
-        <Card className="pp-dashboard-panel">
+        <Card className="pp-dashboard-panel" data-help-box="true">
           <Text as="h3" size={600} weight="semibold">Best operator habit</Text>
           <p className="pp-dashboard-body-copy">
             Filter quickly, approve only what is safe, and leave the customer with a cleaner next state than when the ticket arrived.
@@ -451,14 +461,15 @@ export default function ReviewQueue() {
       </Card>
 
       {hasOperatorContext && (
-        <Card style={{ marginTop: 16 }}>
+        <Card style={{ marginTop: 16 }} data-help-box="true">
           <CardHeader
             header={<Text weight="semibold">Operator handoff context</Text>}
-            description={<Text size={200}>Customer {customerId.trim() || 'not set'} • Agent {agentId.trim() || 'not set'} • Correlation {correlationId.trim() || 'not set'}</Text>}
+            description={<Text size={200}>{operatorCustomerLabel} • {operatorAgentLabel} • Correlation {correlationId.trim() || 'not set'}</Text>}
           />
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <Text size={200}>What happened: this queue is already narrowed to the customer or agent the operator came in with.</Text>
             <Text size={200}>What next: decide here, then jump to hired runtime or policy denials without re-entering filters.</Text>
+            <Text size={200} style={{ opacity: 0.78 }}>Raw IDs: customer_id {customerId.trim() || 'not set'} • agent_id {agentId.trim() || 'not set'}</Text>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <Button
                 appearance="secondary"
@@ -551,6 +562,8 @@ export default function ReviewQueue() {
                     {selectedApproval.review_state}
                   </span>
                   <Text size={200}>approval_id: {selectedApproval.approval_id}</Text>
+                  <Text size={200}>customer_id: {selectedApproval.customer_id}</Text>
+                  <Text size={200}>agent_id: {selectedApproval.agent_id}</Text>
                   {selectedApproval.correlation_id && <Text size={200}>correlation_id: {selectedApproval.correlation_id}</Text>}
                 </div>
 
@@ -561,6 +574,9 @@ export default function ReviewQueue() {
                   />
                   <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <Text size={300}>{selectedApproval.deliverable_preview?.text_preview || selectedApproval.notes || selectedApproval.purpose || 'No preview available.'}</Text>
+                    <Text size={200} style={{ opacity: 0.82 }}>
+                      Customer {selectedApproval.customer_label} • Agent {selectedApproval.agent_label}
+                    </Text>
                     <Text size={200} style={{ opacity: 0.82 }}>
                       Channel {selectedApproval.deliverable_preview?.channel || 'unknown'} • Post {selectedApproval.deliverable_preview?.post_id || 'missing'} • Batch {selectedApproval.deliverable_preview?.batch_id || 'missing'}
                     </Text>

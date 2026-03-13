@@ -29,8 +29,17 @@ import { API_ENDPOINTS } from './config/oauth.config'
 import waooawLogo from './Waooaw-Logo.png'
 import './styles/globals.css'
 
+const HELP_BOXES_STORAGE_KEY = 'waooaw.pp.helpBoxesVisible'
+
+function loadHelpBoxesPreference(): boolean {
+  if (typeof window === 'undefined') return true
+  const stored = window.localStorage.getItem(HELP_BOXES_STORAGE_KEY)
+  return stored === null ? true : stored !== 'false'
+}
+
 function AppShell() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+  const [showHelpBoxes, setShowHelpBoxes] = useState<boolean>(() => loadHelpBoxesPreference())
   const [showLoginDialog, setShowLoginDialog] = useState(false)
   const { isAuthenticated, isLoading, login, logout } = useAuth()
 
@@ -67,6 +76,14 @@ function AppShell() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
   }
 
+  const toggleHelpBoxes = () => {
+    setShowHelpBoxes(prev => !prev)
+  }
+
+  useEffect(() => {
+    window.localStorage.setItem(HELP_BOXES_STORAGE_KEY, String(showHelpBoxes))
+  }, [showHelpBoxes])
+
   const handleLoginClick = () => {
     setShowLoginDialog(true)
   }
@@ -87,7 +104,7 @@ function AppShell() {
 
   return (
     <FluentProvider theme={theme === 'light' ? waooawLightTheme : waooawDarkTheme}>
-      <div data-theme={theme}>
+      <div data-theme={theme} data-help-boxes={showHelpBoxes ? 'visible' : 'hidden'}>
         {isLoading ? (
         <div className="app-shell">
           <main className="app-main">
@@ -104,6 +121,14 @@ function AppShell() {
                 </div>
                 <div className="header-actions">
                   <div className="pp-public-chip">For platform contributors</div>
+                  <Button
+                    appearance="subtle"
+                    onClick={toggleHelpBoxes}
+                    aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
+                    data-testid="pp-public-help-toggle"
+                  >
+                    {showHelpBoxes ? 'Hide Help' : 'Show Help'}
+                  </Button>
                   <Button 
                     appearance="subtle" 
                     icon={theme === 'light' ? <WeatherMoon24Regular /> : <WeatherSunny24Regular />}
@@ -126,7 +151,7 @@ function AppShell() {
               <DialogBody data-testid="pp-login-dialog">
                 <DialogTitle>Sign in to Platform Portal</DialogTitle>
                 <DialogContent>
-                  <Text size={300} style={{ display: 'block', marginTop: '8px', opacity: 0.85 }}>
+                  <Text size={300} style={{ display: 'block', marginTop: '8px', opacity: 0.85 }} data-help-box="true">
                     Designed for WAOOAW tech staff, ops, infra, helpdesk, and governance contributors.
                   </Text>
                   <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -184,7 +209,7 @@ function AppShell() {
         </div>
       ) : (
         <BrowserRouter>
-          <Layout theme={theme} onThemeToggle={toggleTheme} onLogout={logout}>
+          <Layout theme={theme} onThemeToggle={toggleTheme} showHelpBoxes={showHelpBoxes} onHelpToggle={toggleHelpBoxes} onLogout={logout}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/agents" element={<AgentManagement />} />

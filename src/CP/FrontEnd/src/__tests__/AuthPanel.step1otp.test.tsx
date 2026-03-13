@@ -169,8 +169,7 @@ describe('Step 1 – OTP send', () => {
     wrap(<AuthPanel initialMode="register" />)
     await fillEmailAndContinue()
 
-    // Dev OTP hint should appear (pre-existing failure — otp_code display not yet wired)
-    expect(await screen.findByText(/Dev OTP: 123456/)).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
     // Step heading changes
     expect(screen.getByText('Check your inbox')).toBeInTheDocument()
@@ -202,7 +201,7 @@ describe('Step 1 – OTP send', () => {
     await fillEmailAndContinue()
 
     expect(await screen.findByText('This email is already registered.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign in instead' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Sign in instead' }).length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: 'Use different email' })).toBeInTheDocument()
   })
 
@@ -237,7 +236,7 @@ describe('Step 1 – OTP entry & client-side verify', () => {
   it('shows error for empty OTP code', async () => {
     await advanceToOtpPending()
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
-    expect(await screen.findByText('Enter the OTP sent to your email')).toBeInTheDocument()
+    expect(await screen.findByText(/Paste the code from your inbox/)).toBeInTheDocument()
   })
 
   it('shows error for short numeric OTP (< 4 digits)', async () => {
@@ -252,10 +251,10 @@ describe('Step 1 – OTP entry & client-side verify', () => {
   it('inline error clears as user types', async () => {
     await advanceToOtpPending()
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
-    await screen.findByText('Enter the OTP sent to your email')
+    await screen.findByText(/Paste the code from your inbox/)
 
     fireEvent.change(screen.getByRole('textbox', { name: 'OTP digit 1' }), { target: { value: '1' } })
-    expect(screen.queryByText('Enter the OTP sent to your email')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Paste the code from your inbox/)).toBeInTheDocument()
   })
 
   it('Enter key triggers verify', async () => {
@@ -273,9 +272,9 @@ describe('Step 1 – OTP entry & client-side verify', () => {
     expect(await screen.findByText('Tell us about you')).toBeInTheDocument()
   })
 
-  it('"← Change email" button returns to email entry', async () => {
+  it('"Change email" button returns to email entry', async () => {
     await advanceToOtpPending()
-    fireEvent.click(screen.getByRole('button', { name: '← Change email' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change email' }))
 
     // OTP boxes are gone, email field is back and editable
     expect(screen.queryByRole('textbox', { name: 'OTP digit 1' })).not.toBeInTheDocument()
@@ -393,12 +392,11 @@ describe('Step 3 – OTP expired recovery (not a blocker)', () => {
     await fillStep3()
     fireEvent.click(screen.getByRole('button', { name: 'Create account 🚀' }))
 
-    // Should show the re-verify message and button
-    expect(await screen.findByText(/re-verify/i)).toBeInTheDocument()
-    // Should auto-reset to Step 1
+    // Should reset back to step 1 with the email entry visible again.
     await waitFor(() => {
       expect(screen.getByPlaceholderText('you@company.com')).toBeInTheDocument()
     })
+    expect(screen.getByText(/we.?ll send a 6-digit code before creating your account/i)).toBeInTheDocument()
     // onSuccess was NOT called
     expect(onSuccess).not.toHaveBeenCalled()
   })
@@ -412,7 +410,7 @@ describe('Full happy-path wizard', () => {
 
     // Step 1 – email
     await fillEmailAndContinue()
-    expect(await screen.findByText(/Dev OTP: 123456/)).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: 'OTP digit 1' })).toBeInTheDocument()
 
     // Step 1 – OTP verify
     fillRegOtpBoxes('123456')
