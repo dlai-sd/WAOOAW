@@ -234,9 +234,11 @@ All containers exited 0 ✅"
 | E1-S2 | 1 | Customer can use the portal naturally on a phone | Phone customer can use header controls without crowding | 🟢 Done | — |
 | E1-S3 | 1 | Customer can use the portal naturally on a phone | Phone customer can use My Agents and Goals Setup without overflow | 🟢 Done | — |
 | E1-S4 | 1 | Customer can use the portal naturally on a phone | Phone customer can use Trial Dashboard, Inbox, and Profile Settings without overflow | 🟢 Done | — |
-| E1-S5 | 1 | Customer can use the portal naturally on a phone | Responsive regressions are covered and iteration is docker-validated | 🔴 Not Started | — |
+| E1-S5 | 1 | Customer can use the portal naturally on a phone | Responsive regressions are covered and iteration is docker-validated | 🚫 Blocked | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
+
+**Current blocker note:** Focused CP frontend regressions passed for the mobile-native work. The full `docker compose -f docker-compose.test.yml up --build --abort-on-container-exit` run is still blocked by pre-existing repo-wide test stack issues outside this CP story: `optic` exits with usage, `playwright` cannot resolve `@playwright/test` from the mounted test volume, and multiple services probe a missing `waooaw_test` database. This branch also fixes one existing compose issue by enabling Gateway dev dependencies so `plant-gateway-test` can run `pytest`.
 
 ---
 
