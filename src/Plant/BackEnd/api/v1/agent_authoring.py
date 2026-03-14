@@ -90,7 +90,8 @@ def _to_response(draft: AgentAuthoringDraftModel) -> AgentAuthoringDraftResponse
         section_states=dict(draft.section_states or {}),
         constraint_policy=dict(draft.constraint_policy or {}),
         reviewer_comments=[
-            ReviewerComment(**comment) for comment in list(draft.reviewer_comments or [])
+            comment if isinstance(comment, ReviewerComment) else ReviewerComment.model_validate(comment)
+            for comment in list(draft.reviewer_comments or [])
         ],
         status=draft.status,
         reviewer_id=draft.reviewer_id,

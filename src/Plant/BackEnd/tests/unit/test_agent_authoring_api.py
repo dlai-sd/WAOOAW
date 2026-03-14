@@ -21,23 +21,24 @@ from api.v1.agent_authoring import (
 
 def _draft_response(**overrides) -> AgentAuthoringDraftResponse:
     now = datetime.now(timezone.utc)
-    return AgentAuthoringDraftResponse(
-        draft_id="AAD-1",
-        candidate_agent_type_id="marketing.digital_marketing_agent",
-        candidate_agent_label="Digital Marketing Agent",
-        contract_payload={"identity": {"name": "DMA"}},
-        section_states={"identity": "ready", "deliverables": "missing"},
-        constraint_policy={"approval_required": True},
-        reviewer_comments=[],
-        status="draft",
-        reviewer_id=None,
-        reviewer_name=None,
-        submitted_at=None,
-        reviewed_at=None,
-        created_at=now,
-        updated_at=now,
-        **overrides,
-    )
+    payload = {
+        "draft_id": "AAD-1",
+        "candidate_agent_type_id": "marketing.digital_marketing_agent",
+        "candidate_agent_label": "Digital Marketing Agent",
+        "contract_payload": {"identity": {"name": "DMA"}},
+        "section_states": {"identity": "ready", "deliverables": "missing"},
+        "constraint_policy": {"approval_required": True},
+        "reviewer_comments": [],
+        "status": "draft",
+        "reviewer_id": None,
+        "reviewer_name": None,
+        "submitted_at": None,
+        "reviewed_at": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    payload.update(overrides)
+    return AgentAuthoringDraftResponse(**payload)
 
 
 @pytest.fixture
