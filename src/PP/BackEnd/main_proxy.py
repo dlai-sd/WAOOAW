@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response
 import httpx
 
-from api import agents, audit, auth, genesis, db_updates, metering_debug, exchange_credentials, approvals, agent_types, agent_catalog, ops_subscriptions, ops_hired_agents
+from api import agents, audit, auth, genesis, db_updates, metering_debug, exchange_credentials, approvals, agent_authoring, agent_types, agent_catalog, ops_subscriptions, ops_hired_agents
 from api.ops_dlq import router as ops_dlq_router
 from clients import close_plant_client
 from core.config import get_settings as _get_settings, get_settings, Settings  # E6: single config source
@@ -151,6 +151,7 @@ app.include_router(agents.router, prefix="/api/pp")
 app.include_router(audit.router, prefix="/api/pp")
 app.include_router(exchange_credentials.router, prefix="/api/pp")
 app.include_router(approvals.router, prefix="/api/pp")
+app.include_router(agent_authoring.router, prefix="/api/pp")
 app.include_router(agent_types.router, prefix="/api/pp")
 app.include_router(agent_catalog.router, prefix="/api/pp")
 app.include_router(metering_debug.router, prefix="/api/pp")

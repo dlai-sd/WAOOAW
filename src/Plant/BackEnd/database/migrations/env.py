@@ -22,6 +22,7 @@ import models.team  # noqa: F401
 import models.customer  # noqa: F401
 import models.campaign  # noqa: F401
 import models.marketing_draft  # noqa: F401
+import models.agent_authoring_draft  # noqa: F401
 import models.flow_run  # noqa: F401  EXEC-ENGINE-001 E1-S1
 import models.component_run  # noqa: F401  EXEC-ENGINE-001 E1-S2
 import models.skill_config  # noqa: F401  EXEC-ENGINE-001 E1-S3

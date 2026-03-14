@@ -468,6 +468,137 @@ class PlantAPIClient:
             return response.json()
         raise self._parse_error(response)
 
+    # ========== AGENT AUTHORING DRAFTS (PP-AGENT-LIFECYCLE-1) ==========
+
+    async def list_agent_authoring_drafts(
+        self,
+        status: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> list[dict]:
+        params = {"status": status} if status else None
+        response = await self._request(
+            method="GET",
+            path="/api/v1/agent-authoring/drafts",
+            params=params,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def get_agent_authoring_draft(
+        self,
+        draft_id: str,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="GET",
+            path=f"/api/v1/agent-authoring/drafts/{draft_id}",
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def save_agent_authoring_draft(
+        self,
+        payload: dict,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="POST",
+            path="/api/v1/agent-authoring/drafts",
+            json_data=payload,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def submit_agent_authoring_draft(
+        self,
+        draft_id: str,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="POST",
+            path=f"/api/v1/agent-authoring/drafts/{draft_id}/submit",
+            json_data={},
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def request_agent_authoring_changes(
+        self,
+        draft_id: str,
+        payload: dict,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="POST",
+            path=f"/api/v1/agent-authoring/drafts/{draft_id}/changes-requested",
+            json_data=payload,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def approve_agent_authoring_draft(
+        self,
+        draft_id: str,
+        payload: dict,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="POST",
+            path=f"/api/v1/agent-authoring/drafts/{draft_id}/approve",
+            json_data=payload,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
+    async def patch_agent_authoring_constraint_policy(
+        self,
+        draft_id: str,
+        payload: dict,
+        correlation_id: Optional[str] = None,
+        auth_header: Optional[str] = None,
+    ) -> dict:
+        response = await self._request(
+            method="PATCH",
+            path=f"/api/v1/agent-authoring/drafts/{draft_id}/constraint-policy",
+            json_data=payload,
+            headers={"Authorization": auth_header} if auth_header else None,
+            correlation_id=correlation_id,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        raise self._parse_error(response)
+
     # ========== AGENT CATALOG RELEASES (PLANT-CATALOG-1) ==========
 
     async def list_catalog_releases(
