@@ -148,14 +148,16 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
   useEffect(() => {
     if (!activeDraftId) return
 
+    const draftIdToLoad = activeDraftId
+
     let cancelled = false
 
     async function hydrateDraft() {
       try {
-        const loadedForm = await loadDraft(activeDraftId)
+        const loadedForm = await loadDraft(draftIdToLoad)
         if (cancelled) return
         setForm(loadedForm)
-        setDraftId(activeDraftId)
+        setDraftId(draftIdToLoad)
         setIsDirty(false)
         setSaveState('saved')
       } catch {
