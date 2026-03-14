@@ -31,6 +31,32 @@ export type CatalogRelease = {
   retired_from_catalog_at?: string | null
 }
 
+export type ReviewerComment = {
+  section_key: string
+  comment: string
+  severity: 'info' | 'changes_requested'
+  reviewer_id?: string | null
+  reviewer_name?: string | null
+  created_at?: string | null
+}
+
+export type AgentAuthoringDraft = {
+  draft_id: string
+  candidate_agent_type_id: string
+  candidate_agent_label: string
+  contract_payload: Record<string, unknown>
+  section_states: Record<string, 'missing' | 'ready' | 'needs_review'>
+  constraint_policy: Record<string, unknown>
+  reviewer_comments: ReviewerComment[]
+  status: 'draft' | 'in_review' | 'changes_requested' | 'approved'
+  reviewer_id?: string | null
+  reviewer_name?: string | null
+  submitted_at?: string | null
+  reviewed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export class GatewayApiError extends Error {
   status?: number
   problem?: ApiProblemDetails
@@ -272,6 +298,50 @@ export const gatewayApiClient = {
   publishAgentTypeDefinition: (agentTypeId: string, payload: any) =>
     gatewayRequestJson<any>(`/pp/agent-types/${encodeURIComponent(agentTypeId)}`, {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  listAgentAuthoringDrafts: (query?: { status?: string }) =>
+    gatewayRequestJson<AgentAuthoringDraft[]>(withQuery('/pp/agent-authoring/drafts', query)),
+
+  getAgentAuthoringDraft: (draftId: string) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}`),
+
+  saveAgentAuthoringDraft: (payload: Record<string, unknown>) =>
+    gatewayRequestJson<AgentAuthoringDraft>('/pp/agent-authoring/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  submitAgentAuthoringDraft: (draftId: string) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    }),
+
+  requestAgentAuthoringChanges: (
+    draftId: string,
+    payload: { reviewer_id?: string; reviewer_name?: string; reviewer_comments: ReviewerComment[] }
+  ) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/changes-requested`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  approveAgentAuthoringDraft: (draftId: string, payload: { reviewer_id?: string; reviewer_name?: string }) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  patchAgentAuthoringConstraintPolicy: (draftId: string, payload: Record<string, unknown>) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/constraint-policy`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     }),
