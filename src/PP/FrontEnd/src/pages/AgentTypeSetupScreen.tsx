@@ -103,9 +103,14 @@ interface AgentTypeSetupScreenProps {
 }
 
 export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScreenProps) {
+  const draftIdFromQuery = useMemo(() => {
+    if (typeof window === 'undefined') return undefined
+    return new URLSearchParams(window.location.search).get('draft_id') || undefined
+  }, [])
+  const activeDraftId = agentSetupId || draftIdFromQuery
   const [form, setForm] = useState<AgentTypeSetupFormData>({ ...DEFAULT_AGENT_TYPE_SETUP_FORM })
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
-  const [draftId, setDraftId] = useState<string | undefined>(agentSetupId)
+  const [draftId, setDraftId] = useState<string | undefined>(activeDraftId)
   const [isDirty, setIsDirty] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'unsaved' | 'saving' | 'saved' | 'error' | 'submitted'>('idle')
 
@@ -141,16 +146,16 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
   }, [loadClassOptions])
 
   useEffect(() => {
-    if (!agentSetupId) return
+    if (!activeDraftId) return
 
     let cancelled = false
 
     async function hydrateDraft() {
       try {
-        const loadedForm = await loadDraft(agentSetupId)
+        const loadedForm = await loadDraft(activeDraftId)
         if (cancelled) return
         setForm(loadedForm)
-        setDraftId(agentSetupId)
+        setDraftId(activeDraftId)
         setIsDirty(false)
         setSaveState('saved')
       } catch {
@@ -162,7 +167,7 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
     return () => {
       cancelled = true
     }
-  }, [agentSetupId, loadDraft])
+  }, [activeDraftId, loadDraft])
 
   useEffect(() => {
     if (!isDirty) return undefined
@@ -245,7 +250,7 @@ export default function AgentTypeSetupScreen({ agentSetupId }: AgentTypeSetupScr
     <div className="page-container">
       <div className="page-header">
         <Text as="h1" size={900} weight="semibold">
-          {agentSetupId ? 'Edit Base Agent Contract' : 'Base Agent Contract Workflow'}
+          {activeDraftId ? 'Edit Base Agent Contract' : 'Base Agent Contract Workflow'}
         </Text>
         <Body1>Guide the Digital Marketing Agent from draft to review-ready without losing clarity, context, or PP theme consistency.</Body1>
       </div>
