@@ -546,6 +546,298 @@ body {
   gap: 12px;
 }
 
+.pp-agent-studio-page {
+  padding-bottom: 32px;
+}
+
+.pp-agent-studio-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(24, 24, 27, 0.98) 0%, rgba(24, 24, 27, 0.92) 82%, rgba(24, 24, 27, 0.78) 100%),
+    radial-gradient(circle at top right, rgba(0, 242, 254, 0.16), transparent 35%),
+    linear-gradient(150deg, rgba(24, 24, 27, 0.95), rgba(14, 14, 17, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.pp-agent-studio-hero-copy,
+.pp-agent-studio-hero-meta,
+.pp-agent-studio-step-copy,
+.pp-agent-studio-template-card,
+.pp-agent-studio-choice-card,
+.pp-agent-studio-preview-card,
+.pp-agent-studio-action-bar-left,
+.pp-agent-studio-action-bar-right,
+.pp-agent-studio-unresolved-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pp-agent-studio-hero-meta {
+  justify-items: end;
+  align-content: start;
+  min-width: 220px;
+}
+
+.pp-agent-studio-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pp-agent-studio-status-chip--ready {
+  background: rgba(16, 185, 129, 0.14);
+  color: #10b981;
+}
+
+.pp-agent-studio-status-chip--needs_review {
+  background: rgba(245, 158, 11, 0.14);
+  color: #f59e0b;
+}
+
+.pp-agent-studio-status-chip--missing {
+  background: rgba(239, 68, 68, 0.14);
+  color: #ef4444;
+}
+
+.pp-agent-studio-shell {
+  --pp-agent-studio-pane-height: min(76vh, 860px);
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.pp-agent-studio-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 24px;
+  height: var(--pp-agent-studio-pane-height);
+  min-height: var(--pp-agent-studio-pane-height);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.pp-agent-studio-rail-card,
+.pp-agent-studio-canvas-card {
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.pp-agent-studio-rail > .pp-agent-studio-rail-card:first-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-agent-studio-step-list,
+.pp-agent-studio-starter-layout,
+.pp-agent-studio-starter-mode-grid,
+.pp-agent-studio-existing-list,
+.pp-agent-studio-template-grid,
+.pp-agent-studio-form-grid,
+.pp-agent-studio-hook-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.pp-agent-studio-step-list {
+  min-height: 0;
+}
+
+.pp-agent-studio-canvas {
+  min-height: 0;
+}
+
+.pp-agent-studio-canvas-card {
+  height: var(--pp-agent-studio-pane-height);
+  min-height: var(--pp-agent-studio-pane-height);
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-agent-studio-canvas-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: -4px -4px 0;
+  padding: 0 4px 14px;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  background: linear-gradient(180deg, rgba(24, 24, 27, 0.98) 0%, rgba(24, 24, 27, 0.94) 74%, rgba(24, 24, 27, 0) 100%);
+}
+
+.pp-agent-studio-canvas-header-card {
+  padding: 0;
+}
+
+.pp-agent-studio-canvas-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  padding-bottom: 8px;
+}
+
+.pp-agent-studio-step-button,
+.pp-agent-studio-template-card,
+.pp-agent-studio-choice-card,
+.pp-agent-studio-existing-card {
+  width: 100%;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  border-radius: 18px;
+  text-align: left;
+}
+
+.pp-agent-studio-step-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+}
+
+.pp-agent-studio-step-button.is-active,
+.pp-agent-studio-template-card.is-selected,
+.pp-agent-studio-choice-card.is-selected,
+.pp-agent-studio-existing-card.is-selected {
+  border-color: rgba(0, 242, 254, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.25);
+  background: rgba(0, 242, 254, 0.08);
+}
+
+.pp-agent-studio-step-index {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 700;
+}
+
+.pp-agent-studio-step-title {
+  display: block;
+  font-weight: 600;
+}
+
+.pp-agent-studio-step-description,
+.pp-agent-studio-template-subtitle {
+  display: block;
+  color: var(--colorNeutralForeground2);
+}
+
+.pp-agent-studio-step-state {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.pp-agent-studio-step-state--ready {
+  color: #10b981;
+}
+
+.pp-agent-studio-step-state--needs_review {
+  color: #f59e0b;
+}
+
+.pp-agent-studio-step-state--missing {
+  color: #ef4444;
+}
+
+.pp-agent-studio-starter-mode-grid,
+.pp-agent-studio-template-grid,
+.pp-agent-studio-choice-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pp-agent-studio-starter-layout {
+  gap: 20px;
+}
+
+.pp-agent-studio-starter-mode-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pp-agent-studio-existing-card {
+  padding: 16px;
+  text-align: left;
+}
+
+.pp-agent-studio-existing-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pp-agent-studio-preview-card {
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--colorNeutralStroke2);
+}
+
+.pp-agent-studio-template-card,
+.pp-agent-studio-choice-card {
+  padding: 16px;
+}
+
+.pp-agent-studio-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pp-agent-studio-form-grid > .fui-Field,
+.pp-agent-studio-preview-card,
+.pp-agent-studio-hook-grid,
+.pp-agent-studio-form-grid--nested {
+  grid-column: 1 / -1;
+}
+
+.pp-agent-studio-form-grid--nested {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pp-agent-studio-hook-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pp-agent-studio-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 20px;
+  padding-bottom: 4px;
+  border-top: 1px solid var(--colorNeutralStroke2);
+  flex: 0 0 auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(24, 24, 27, 0), rgba(24, 24, 27, 0.92) 22%, rgba(24, 24, 27, 0.98) 100%);
+}
+
+.pp-agent-studio-action-bar-left,
+.pp-agent-studio-action-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 @media (max-width: 980px) {
   .pp-shell-hero,
   .pp-agent-setup-hero,
@@ -573,5 +865,57 @@ body {
   .pp-agent-save-banner {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .pp-agent-studio-hero,
+  .pp-agent-studio-shell {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .pp-agent-studio-hero-meta,
+  .pp-agent-studio-rail {
+    position: static;
+    justify-items: start;
+    height: auto;
+    min-height: 0;
+  }
+
+  .pp-agent-studio-canvas-card {
+    height: auto;
+    min-height: 0;
+  }
+
+  .pp-agent-studio-canvas-body,
+  .pp-agent-studio-step-list,
+  .pp-agent-studio-rail {
+    overflow: visible;
+    min-height: 0;
+    padding-right: 0;
+  }
+
+  .pp-agent-studio-summary-grid,
+  .pp-agent-studio-starter-mode-grid,
+  .pp-agent-studio-template-grid,
+  .pp-agent-studio-choice-grid,
+  .pp-agent-studio-form-grid,
+  .pp-agent-studio-form-grid--nested,
+  .pp-agent-studio-hook-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pp-agent-studio-step-button {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pp-agent-studio-step-state {
+    grid-column: 2;
+  }
+
+  .pp-agent-studio-action-bar,
+  .pp-agent-studio-action-bar-left,
+  .pp-agent-studio-action-bar-right {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

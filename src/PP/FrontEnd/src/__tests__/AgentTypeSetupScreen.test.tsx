@@ -101,60 +101,46 @@ function installDefaultGatewayMock() {
   })
 }
 
-test('AgentTypeSetupScreen renders workflow framing and readiness summary', async () => {
+test('AgentTypeSetupScreen renders the new studio shell and template choices', () => {
   installDefaultGatewayMock()
   render(<AgentTypeSetupScreen />)
 
-  expect(screen.getByText('Workflow stages')).toBeInTheDocument()
-  expect(screen.getByText('Define agent')).toBeInTheDocument()
-  expect(screen.getByText('Readiness summary')).toBeInTheDocument()
-  expect(screen.getByDisplayValue('Digital Marketing Agent')).toBeInTheDocument()
+  expect(screen.getByText('Agent Setup Studio')).toBeInTheDocument()
+  expect(screen.getAllByText('Choose a starting point').length).toBeGreaterThan(0)
+  expect(screen.getByRole('button', { name: /Digital Marketing Agent/i })).toBeInTheDocument()
 })
 
-test('AgentTypeSetupScreen renders approval_mode toggle with Manual and Auto labels', () => {
-  installDefaultGatewayMock()
-  render(<AgentTypeSetupScreen />)
-
-  expect(screen.getByRole('button', { name: 'Manual approval mode' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Auto approval mode' })).toBeInTheDocument()
-})
-
-test('AgentTypeSetupScreen hides max_position_size_inr when connector_class is not trading', () => {
-  installDefaultGatewayMock()
-  render(<AgentTypeSetupScreen />)
-
-  expect(screen.queryByLabelText(/max position size/i)).not.toBeInTheDocument()
-})
-
-test('AgentTypeSetupScreen shows max_position_size_inr when connector_class includes trading', async () => {
+test('AgentTypeSetupScreen moves into identity authoring after continue', async () => {
   installDefaultGatewayMock()
   const user = userEvent.setup()
   render(<AgentTypeSetupScreen />)
 
-  // connector_class and publisher_class both have placeholder "None"
-  // connector_class input is the first one (index 0)
-  const noneInputs = screen.getAllByPlaceholderText('None')
-  const connectorInput = noneInputs[0]
-  await user.clear(connectorInput)
-  await user.type(connectorInput, 'TradingConnector')
+  await user.click(screen.getByRole('button', { name: 'Continue' }))
 
-  await waitFor(() => {
-    expect(screen.getByLabelText(/max position size/i)).toBeInTheDocument()
-  })
+  expect(screen.getByLabelText(/Agent display name/i)).toBeInTheDocument()
+  expect(screen.getByDisplayValue('Digital Marketing Agent')).toBeInTheDocument()
+  expect(screen.getByText('Primary industry')).toBeInTheDocument()
 })
 
-test('AgentTypeSetupScreen AuditHook checkbox is disabled and checked', () => {
+test('AgentTypeSetupScreen hides advanced runtime mapping until requested', async () => {
   installDefaultGatewayMock()
+  const user = userEvent.setup()
   render(<AgentTypeSetupScreen />)
 
-  const auditHookCheckbox = screen.getByRole('checkbox', { name: /audit hook/i })
-  expect(auditHookCheckbox).toBeChecked()
-  expect(auditHookCheckbox).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: /Set operating rules/i }))
+
+  expect(screen.queryByLabelText(/Processor class/i)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('checkbox', { name: /Show processor, pump, and integration classes/i }))
+  expect(screen.getByLabelText(/Processor class/i)).toBeInTheDocument()
+  expect(screen.getByLabelText(/Pump class/i)).toBeInTheDocument()
 })
 
 test('AgentTypeSetupScreen keeps submit disabled until mandatory sections are complete', async () => {
   installDefaultGatewayMock()
+  const user = userEvent.setup()
   render(<AgentTypeSetupScreen />)
+
+  await user.click(screen.getByRole('button', { name: /Prepare for review/i }))
 
   expect(screen.getByRole('button', { name: 'Submit for review' })).toBeDisabled()
 })
@@ -164,13 +150,14 @@ test('AgentTypeSetupScreen shows unsaved changes then saved message after saving
   const user = userEvent.setup()
   render(<AgentTypeSetupScreen />)
 
-  await user.type(screen.getByLabelText(/primary outcomes/i), 'Publish channel-ready content.')
-  expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /Shape customer value/i }))
+  await user.type(screen.getByLabelText(/Primary customer outcomes/i), 'Publish channel-ready content.')
+  expect(screen.getAllByText('Unsaved changes').length).toBeGreaterThan(0)
 
   await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
   await waitFor(() => {
-    expect(screen.getByText(/Draft saved at/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Draft saved at/i).length).toBeGreaterThan(0)
   })
 })
 
@@ -186,12 +173,13 @@ test('AgentTypeSetupScreen shows recovery messaging and preserves inputs on save
   const user = userEvent.setup()
   render(<AgentTypeSetupScreen />)
 
-  const outcomes = screen.getByLabelText(/primary outcomes/i)
+  await user.click(screen.getByRole('button', { name: /Shape customer value/i }))
+  const outcomes = screen.getByLabelText(/Primary customer outcomes/i)
   await user.type(outcomes, 'Keep this text on screen.')
   await user.click(screen.getByRole('button', { name: 'Save draft' }))
 
   await waitFor(() => {
-    expect(screen.getByText('Save failed. Your draft stays on screen. Check the connection and try again.')).toBeInTheDocument()
+    expect(screen.getAllByText('Save failed. Your draft stays on screen. Check the connection and try again.').length).toBeGreaterThan(0)
   })
   expect(screen.getByDisplayValue('Keep this text on screen.')).toBeInTheDocument()
 })
@@ -201,7 +189,8 @@ test('AgentTypeSetupScreen warns on beforeunload when there are unsaved changes'
   const user = userEvent.setup()
   render(<AgentTypeSetupScreen />)
 
-  await user.type(screen.getByLabelText(/primary outcomes/i), 'Unsaved contract state.')
+  await user.click(screen.getByRole('button', { name: /Shape customer value/i }))
+  await user.type(screen.getByLabelText(/Primary customer outcomes/i), 'Unsaved contract state.')
 
   const event = new Event('beforeunload', { cancelable: true })
   Object.defineProperty(event, 'returnValue', { writable: true, value: '' })
@@ -215,7 +204,7 @@ test('AgentTypeSetupScreen loads an existing draft in edit mode', async () => {
   render(<AgentTypeSetupScreen agentSetupId="setup-123" />)
 
   await waitFor(() => {
-    expect(screen.getByText('Edit Base Agent Contract')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Digital Marketing Agent')).toBeInTheDocument()
   })
 })
 

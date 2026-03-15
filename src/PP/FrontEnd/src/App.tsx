@@ -29,6 +29,7 @@ import waooawLogo from './Waooaw-Logo.png'
 import './styles/globals.css'
 
 const HELP_BOXES_STORAGE_KEY = 'waooaw.pp.helpBoxesVisible'
+const DEV_PREVIEW_AUTO_LOGIN_KEY = 'waooaw.pp.devPreviewAutoLogin'
 
 function loadHelpBoxesPreference(): boolean {
   if (typeof window === 'undefined') return true
@@ -100,6 +101,22 @@ function AppShell() {
 
   // PP-FIX-1 DEF-011: demo env also shows the Dev Token login button
   const allowDemoLogin = config.name === 'codespace' || config.name === 'development' || config.name === 'demo'
+  const devBypassAuth = allowDemoLogin
+    && typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('pp_demo') === '1'
+  const canAccessApp = isAuthenticated || devBypassAuth
+
+  useEffect(() => {
+    if (!devBypassAuth || isAuthenticated || isLoading) return
+
+    const alreadyAttempted = window.sessionStorage.getItem(DEV_PREVIEW_AUTO_LOGIN_KEY) === '1'
+    if (alreadyAttempted) return
+
+    window.sessionStorage.setItem(DEV_PREVIEW_AUTO_LOGIN_KEY, '1')
+    void handleDemoLogin().catch(() => {
+      // Keep the UI preview reachable even when the dev token route is unavailable.
+    })
+  }, [devBypassAuth, isAuthenticated, isLoading])
 
   return (
     <FluentProvider theme={theme === 'light' ? waooawLightTheme : waooawDarkTheme}>
@@ -110,7 +127,7 @@ function AppShell() {
             <Spinner label="Loading..." />
           </main>
         </div>
-      ) : !isAuthenticated ? (
+      ) : !canAccessApp ? (
         <div className="app-shell-landing" data-testid="pp-public-shell">
           <header className="header">
             <div className="container">
@@ -201,6 +218,11 @@ function AppShell() {
                       ? 'Use your WAOOAW Google account to access the platform console, or use demo login to preview.'
                       : 'Use your WAOOAW Google account to access the platform console.'}
                   </Text>
+                  {allowDemoLogin && (
+                    <Text size={200} style={{ display: 'block', marginTop: '8px', opacity: 0.8 }}>
+                      Direct preview: append <strong>?pp_demo=1</strong> to a PP route URL to review the UI without OAuth.
+                    </Text>
+                  )}
                 </DialogContent>
               </DialogBody>
             </DialogSurface>
@@ -208,7 +230,7 @@ function AppShell() {
         </div>
       ) : (
         <BrowserRouter>
-          <Layout theme={theme} onThemeToggle={toggleTheme} showHelpBoxes={showHelpBoxes} onHelpToggle={toggleHelpBoxes} onLogout={logout}>
+          <Layout theme={theme} onThemeToggle={toggleTheme} onLogout={logout}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/agents" element={<AgentManagement />} />
