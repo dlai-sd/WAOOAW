@@ -20,6 +20,7 @@ import {
   type AgentTypeSetupFormData,
   type SectionState,
 } from '../services/useAgentTypeSetup'
+import { gatewayApiClient, type AgentAuthoringDraft as GatewayAgentAuthoringDraft } from '../services/gatewayApiClient'
 
 const INDUSTRY_OPTIONS = [
   { value: 'marketing', label: 'Marketing' },
@@ -126,14 +127,6 @@ function mapStepToSection(stepId: string): string | null {
   return null
 }
 
-function firstMissingMessage(sectionStates: Record<string, SectionState>): string {
-  if (sectionStates.define_agent !== 'ready') return 'Clarify the blueprint identity and target customer.'
-  if (sectionStates.deliverables !== 'ready') return 'Spell out the customer outcomes and deliverables.'
-  if (sectionStates.operating_contract !== 'ready') return 'Finish the operating rules and limits.'
-  if (sectionStates.governance !== 'ready') return 'Add review handoff notes and confirm safety defaults.'
-  return 'Everything needed for review is ready.'
-}
-
 interface AgentSetupStudioProps {
   agentSetupId?: string
 }
@@ -153,13 +146,15 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
   const [selectedTemplateId, setSelectedTemplateId] = useState(activeDraftId ? 'blank' : 'digital-marketing')
   const [activeStepIndex, setActiveStepIndex] = useState(activeDraftId ? 1 : 0)
   const [showAdvancedRuntime, setShowAdvancedRuntime] = useState(false)
+  const [starterMode, setStarterMode] = useState<'existing' | 'new'>(activeDraftId ? 'existing' : 'new')
+  const [recentDrafts, setRecentDrafts] = useState<GatewayAgentAuthoringDraft[]>([])
+  const [isLoadingDraftList, setIsLoadingDraftList] = useState(false)
 
   const {
     isSubmitting,
     isLoadingDraft,
     error,
     savedAt,
-    currentDraft,
     processorOptions,
     pumpOptions,
     isLoadingOptions,
@@ -171,15 +166,7 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
   } = useAgentTypeSetup()
 
   const sectionStates = useMemo(() => getSectionStates(form), [form])
-  const readinessSummary = useMemo(() => {
-    const values = Object.values(sectionStates)
-    return {
-      ready: values.filter(value => value === 'ready').length,
-      needsReview: values.filter(value => value === 'needs_review').length,
-      missing: values.filter(value => value === 'missing').length,
-    }
-  }, [sectionStates])
-  const submitBlocked = readinessSummary.missing > 0
+  const submitBlocked = Object.values(sectionStates).some(value => value === 'missing')
   const unresolvedItems = useMemo(() => {
     const items: string[] = []
     if (sectionStates.define_agent !== 'ready') items.push('Define the agent clearly for reviewers.')
@@ -192,6 +179,25 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
   useEffect(() => {
     void loadClassOptions()
   }, [loadClassOptions])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadRecentDrafts() {
+      setIsLoadingDraftList(true)
+      try {
+        const drafts = await gatewayApiClient.listAgentAuthoringDrafts()
+        if (cancelled) return
+        setRecentDrafts(drafts)
+      } catch {
+        if (cancelled) return
+        setRecentDrafts([])
+      } finally {
+        if (!cancelled) setIsLoadingDraftList(false)
+      }
+    }
+    void loadRecentDrafts()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!activeDraftId) return
@@ -240,6 +246,25 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
     setIsDirty(true)
     setSaveState('unsaved')
     setActiveStepIndex(1)
+    setStarterMode('new')
+  }
+
+  async function handleSelectExistingDraft(selectedDraft: GatewayAgentAuthoringDraft) {
+    clearError()
+    setSaveState('saving')
+    try {
+      const loadedForm = await loadDraft(selectedDraft.draft_id)
+      setForm(cloneForm(loadedForm))
+      setDraftId(selectedDraft.draft_id)
+      setValidationErrors({})
+      setIsDirty(false)
+      setSaveState('saved')
+      setStarterMode('existing')
+      setSelectedTemplateId('blank')
+      setActiveStepIndex(1)
+    } catch {
+      setSaveState('error')
+    }
   }
 
   async function handleSave() {
@@ -301,26 +326,6 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
         </div>
       </div>
 
-      <Card className="pp-agent-studio-hero">
-        <div className="pp-agent-studio-hero-copy">
-          <Text as="p" size={400} weight="semibold">
-            This page is for authoring one agent blueprint.
-          </Text>
-          <Body1>
-            Define who the agent serves, the outcomes it owns, and the operating rules reviewers must approve before it goes live.
-          </Body1>
-        </div>
-
-        <div className="pp-agent-studio-hero-meta">
-          <div className={`pp-agent-studio-status-chip pp-agent-studio-status-chip--${saveState === 'submitted' ? 'ready' : stateTone(sectionStates.governance)}`}>
-            {saveState === 'submitted' ? 'In review' : humanizeStatus(currentDraft?.status)}
-          </div>
-          <Text as="span" size={200}>
-            {saveBannerText}
-          </Text>
-        </div>
-      </Card>
-
       {error ? <ApiErrorPanel title="Agent setup error" error={error} /> : null}
 
       {(isLoadingDraft || isLoadingOptions) ? (
@@ -360,39 +365,13 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
               })}
             </div>
           </Card>
-
-          <Card className="pp-agent-studio-rail-card pp-agent-studio-summary">
-            <Text as="h2" size={500} weight="semibold">
-              Review snapshot
-            </Text>
-            <div className="pp-agent-studio-summary-grid">
-              <div>
-                <Text as="span" size={700} weight="semibold">{readinessSummary.ready}</Text>
-                <Text as="p" size={200}>Ready</Text>
-              </div>
-              <div>
-                <Text as="span" size={700} weight="semibold">{readinessSummary.needsReview}</Text>
-                <Text as="p" size={200}>Needs review</Text>
-              </div>
-              <div>
-                <Text as="span" size={700} weight="semibold">{readinessSummary.missing}</Text>
-                <Text as="p" size={200}>Missing</Text>
-              </div>
-            </div>
-            <Body1>{firstMissingMessage(sectionStates)}</Body1>
-            {unresolvedItems.length > 0 ? (
-              <div className="pp-agent-studio-unresolved-list">
-                {unresolvedItems.map(item => (
-                  <Text as="p" size={200} key={item}>{item}</Text>
-                ))}
-              </div>
-            ) : null}
-          </Card>
         </aside>
 
         <section className="pp-agent-studio-canvas">
           <Card className="pp-agent-studio-canvas-card">
+            <div className="pp-agent-studio-canvas-header">
             <CardHeader
+              className="pp-agent-studio-canvas-header-card"
               header={
                 <div>
                   <Text as="h2" size={600} weight="semibold">{currentStep.title}</Text>
@@ -400,21 +379,80 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
                 </div>
               }
             />
+            </div>
+
+            <div className="pp-agent-studio-canvas-body">
 
             {currentStep.id === 'starter' ? (
-              <div className="pp-agent-studio-template-grid">
-                {TEMPLATES.map(template => (
+              <div className="pp-agent-studio-starter-layout">
+                <div className="pp-agent-studio-starter-mode-grid">
                   <button
-                    key={template.id}
                     type="button"
-                    className={`pp-agent-studio-template-card${selectedTemplateId === template.id ? ' is-selected' : ''}`}
-                    onClick={() => applyTemplate(template.id)}
+                    className={`pp-agent-studio-template-card${starterMode === 'existing' ? ' is-selected' : ''}`}
+                    onClick={() => setStarterMode('existing')}
                   >
-                    <Text as="span" size={500} weight="semibold">{template.title}</Text>
-                    <Text as="span" size={200} className="pp-agent-studio-template-subtitle">{template.subtitle}</Text>
-                    <Body1>{template.description}</Body1>
+                    <Text as="span" size={500} weight="semibold">Open existing blueprint</Text>
+                    <Text as="span" size={200} className="pp-agent-studio-template-subtitle">Resume a saved draft and continue the wizard.</Text>
+                    <Body1>Use this when an agent blueprint already exists and needs further authoring or review prep.</Body1>
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    className={`pp-agent-studio-template-card${starterMode === 'new' ? ' is-selected' : ''}`}
+                    onClick={() => setStarterMode('new')}
+                  >
+                    <Text as="span" size={500} weight="semibold">Create new blueprint</Text>
+                    <Text as="span" size={200} className="pp-agent-studio-template-subtitle">Start a new reusable agent definition from a template or blank canvas.</Text>
+                    <Body1>Use this when you are designing a fresh agent type for the marketplace or internal catalog.</Body1>
+                  </button>
+                </div>
+
+                {starterMode === 'existing' ? (
+                  <div className="pp-agent-studio-existing-list">
+                    <Text as="h3" size={500} weight="semibold">Existing blueprints</Text>
+                    {isLoadingDraftList ? (
+                      <Card className="pp-agent-studio-preview-card">
+                        <Spinner label="Loading blueprints..." />
+                      </Card>
+                    ) : recentDrafts.length > 0 ? (
+                      recentDrafts.map(existingDraft => (
+                        <button
+                          key={existingDraft.draft_id}
+                          type="button"
+                          className={`pp-agent-studio-existing-card${draftId === existingDraft.draft_id ? ' is-selected' : ''}`}
+                          onClick={() => void handleSelectExistingDraft(existingDraft)}
+                        >
+                          <div className="pp-agent-studio-existing-card-header">
+                            <Text as="span" size={400} weight="semibold">{existingDraft.candidate_agent_label || existingDraft.candidate_agent_type_id}</Text>
+                            <span className={`pp-agent-studio-step-state pp-agent-studio-step-state--${stateTone(existingDraft.section_states.governance || 'missing')}`}>
+                              {humanizeStatus(existingDraft.status)}
+                            </span>
+                          </div>
+                          <Text as="p" size={200}>Draft ID: {existingDraft.draft_id}</Text>
+                          <Text as="p" size={200}>Updated: {new Date(existingDraft.updated_at).toLocaleString()}</Text>
+                        </button>
+                      ))
+                    ) : (
+                      <Card className="pp-agent-studio-preview-card">
+                        <Text as="p" size={300}>No saved blueprints are available in this session. Start a new one.</Text>
+                      </Card>
+                    )}
+                  </div>
+                ) : (
+                  <div className="pp-agent-studio-template-grid">
+                    {TEMPLATES.map(template => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        className={`pp-agent-studio-template-card${selectedTemplateId === template.id ? ' is-selected' : ''}`}
+                        onClick={() => applyTemplate(template.id)}
+                      >
+                        <Text as="span" size={500} weight="semibold">{template.title}</Text>
+                        <Text as="span" size={200} className="pp-agent-studio-template-subtitle">{template.subtitle}</Text>
+                        <Body1>{template.description}</Body1>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : null}
 
@@ -583,6 +621,7 @@ export default function AgentSetupStudio({ agentSetupId }: AgentSetupStudioProps
                 </Card>
               </div>
             ) : null}
+            </div>
 
             <div className="pp-agent-studio-action-bar">
               <div className="pp-agent-studio-action-bar-left">

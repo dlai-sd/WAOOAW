@@ -103,8 +103,31 @@ async def test_dev_token_disabled_when_enable_dev_token_false(client, monkeypatc
 
 
 @pytest.mark.auth
+async def test_dev_token_enabled_in_development_mints_jwt(client, monkeypatch):
+    monkeypatch.setattr(settings, "ENABLE_DEV_TOKEN", True, raising=False)
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development", raising=False)
+    monkeypatch.setattr(settings, "JWT_SECRET", "test-secret", raising=False)
+    monkeypatch.setattr(settings, "JWT_ALGORITHM", "HS256", raising=False)
+    monkeypatch.setattr(settings, "JWT_ISSUER", "waooaw.com", raising=False)
+
+    resp = await client.post("/api/auth/dev-token")
+    assert resp.status_code == 200
+
+    body = resp.json()
+    claims = jwt.decode(
+        body["access_token"],
+        "test-secret",
+        algorithms=["HS256"],
+        issuer="waooaw.com",
+        options={"require": ["exp", "iat", "iss", "sub"]},
+    )
+    assert claims["sub"] == "demo-user"
+    assert claims["email"] == "demo@waooaw.com"
+
+
+@pytest.mark.auth
 async def test_dev_token_disabled_in_prod(client, monkeypatch):
-    monkeypatch.setattr(settings, "ENABLE_DEV_TOKEN", False, raising=False)
+    monkeypatch.setattr(settings, "ENABLE_DEV_TOKEN", True, raising=False)
     monkeypatch.setattr(settings, "ENVIRONMENT", "prod", raising=False)
     resp = await client.post("/api/auth/dev-token")
     assert resp.status_code == 404

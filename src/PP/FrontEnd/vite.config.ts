@@ -45,7 +45,13 @@ export default defineConfig({
     strictPort: true,
     hmr: {
       clientPort: 8080
-    }
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8015',
+        changeOrigin: true,
+      },
+    },
   },
   test: {
     globals: true,
