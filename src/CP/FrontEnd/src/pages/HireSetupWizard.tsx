@@ -11,6 +11,13 @@ import { plantAPIService } from '../services/plant.service'
 import { upsertExchangeSetup } from '../services/exchangeSetup.service'
 import { upsertTradingStrategyConfig } from '../services/tradingStrategy.service'
 import { upsertPlatformCredential } from '../services/platformCredentials.service'
+import {
+  attachYouTubeConnection,
+  finalizeYouTubeConnection,
+  listYouTubeConnections,
+  startYouTubeConnection,
+  type YouTubeConnection,
+} from '../services/youtubeConnections.service'
 
 type Step = 1 | 2 | 3 | 4
 
@@ -31,8 +38,25 @@ const MARKETING_PLATFORM_OPTIONS = [
 
 type MarketingPlatformConfig = {
   platform: string
-  credential_ref: string
+  credential_ref?: string
+  customer_platform_credential_id?: string
+  display_name?: string | null
   posting_identity?: string | null
+}
+
+function buildRedirectUri(searchParams: URLSearchParams): string {
+  if (typeof window === 'undefined') return ''
+  const nextParams = new URLSearchParams(searchParams)
+  nextParams.delete('code')
+  nextParams.delete('state')
+  nextParams.delete('scope')
+  nextParams.delete('error')
+  const query = nextParams.toString()
+  return `${window.location.origin}${window.location.pathname}${query ? `?${query}` : ''}`
+}
+
+function getMarketingSkillId(): string {
+  return 'default'
 }
 
 function resolveAgentTypeId(agentTypeId?: string | null, agentId?: string): string {
@@ -103,10 +127,14 @@ export default function HireSetupWizard() {
   const [exchangeCredentialRef, setExchangeCredentialRef] = useState<string | null>(null)
 
   const [marketingPlatforms, setMarketingPlatforms] = useState<MarketingPlatformConfig[]>([])
-  const [marketingPlatform, setMarketingPlatform] = useState('instagram')
+  const [marketingPlatform, setMarketingPlatform] = useState('youtube')
   const [marketingPostingIdentity, setMarketingPostingIdentity] = useState('')
   const [marketingAccessToken, setMarketingAccessToken] = useState('')
   const [marketingRefreshToken, setMarketingRefreshToken] = useState('')
+  const [youtubeConnections, setYouTubeConnections] = useState<YouTubeConnection[]>([])
+  const [selectedYouTubeConnectionId, setSelectedYouTubeConnectionId] = useState('')
+  const [youtubeConnectBusy, setYouTubeConnectBusy] = useState(false)
+  const [youtubeConnectStatus, setYouTubeConnectStatus] = useState<string | null>(null)
 
   const stepCopy: Record<Step, { title: string; body: string }> = {
     1: {
@@ -148,7 +176,9 @@ export default function HireSetupWizard() {
     }
     if (step === 3 && isMarketingAgent) {
       const hasExisting = marketingPlatforms.length > 0
-      const hasPending = Boolean(marketingAccessToken.trim())
+      const hasSelectedYouTube = Boolean(selectedYouTubeConnectionId.trim())
+      const hasPending = marketingPlatform !== 'youtube' && Boolean(marketingAccessToken.trim())
+      if (marketingPlatform === 'youtube') return hasExisting || hasSelectedYouTube
       return hasExisting || hasPending
     }
     return true
@@ -165,7 +195,9 @@ export default function HireSetupWizard() {
     exchangeCredentialRef,
     isMarketingAgent,
     marketingPlatforms,
-    marketingAccessToken
+    marketingAccessToken,
+    marketingPlatform,
+    selectedYouTubeConnectionId
   ])
 
   const inferInitialStep = (existing: HireWizardDraft): Step => {
@@ -239,11 +271,14 @@ export default function HireSetupWizard() {
               if (p && typeof p === 'object') {
                 const platform = String((p as any).platform || '').trim()
                 const credentialRef = String((p as any).credential_ref || '').trim()
+                const customerPlatformCredentialId = String((p as any).customer_platform_credential_id || '').trim()
                 const postingIdentity = String((p as any).posting_identity || '').trim()
-                if (platform && credentialRef) {
+                if (platform && (credentialRef || customerPlatformCredentialId)) {
                   platforms.push({
                     platform,
-                    credential_ref: credentialRef,
+                    ...(credentialRef ? { credential_ref: credentialRef } : {}),
+                    ...(customerPlatformCredentialId ? { customer_platform_credential_id: customerPlatformCredentialId } : {}),
+                    ...((p as any).display_name ? { display_name: String((p as any).display_name) } : {}),
                     ...(postingIdentity ? { posting_identity: postingIdentity } : {})
                   })
                 }
@@ -251,6 +286,8 @@ export default function HireSetupWizard() {
             }
           }
           setMarketingPlatforms(platforms)
+          const existingYouTube = platforms.find((p) => p.platform === 'youtube' && p.customer_platform_credential_id)
+          setSelectedYouTubeConnectionId(existingYouTube?.customer_platform_credential_id || '')
           setMarketingAccessToken('')
           setMarketingRefreshToken('')
           setMarketingPostingIdentity('')
@@ -273,6 +310,96 @@ export default function HireSetupWizard() {
       cancelled = true
     }
   }, [subscriptionId, agentId, requestedAgentTypeId, requestedCatalogVersion, requestedLifecycleState])
+
+  useEffect(() => {
+    if (!isMarketingAgent) return
+    let cancelled = false
+
+    const loadConnections = async () => {
+      try {
+        const rows = await listYouTubeConnections()
+        if (cancelled) return
+        setYouTubeConnections(rows)
+        if (!selectedYouTubeConnectionId) {
+          const connected = rows.find((row) => row.connection_status === 'connected')
+          if (connected) setSelectedYouTubeConnectionId(connected.id)
+        }
+      } catch {
+        if (!cancelled) setYouTubeConnections([])
+      }
+    }
+
+    loadConnections()
+    return () => {
+      cancelled = true
+    }
+  }, [isMarketingAgent, selectedYouTubeConnectionId])
+
+  useEffect(() => {
+    if (!isMarketingAgent) return
+    const code = searchParams.get('code') || ''
+    const stateParam = searchParams.get('state') || ''
+    if (!code || !stateParam) return
+
+    let cancelled = false
+
+    const finalizeConnection = async () => {
+      setYouTubeConnectBusy(true)
+      setYouTubeConnectStatus('Finalizing YouTube connection…')
+      setError(null)
+      try {
+        const redirectUri = buildRedirectUri(searchParams)
+        const credential = await finalizeYouTubeConnection({
+          state: stateParam,
+          code,
+          redirect_uri: redirectUri,
+        })
+        if (cancelled) return
+        const nextConnections = await listYouTubeConnections()
+        if (cancelled) return
+        setYouTubeConnections(nextConnections)
+        setSelectedYouTubeConnectionId(credential.id)
+        setMarketingPlatform('youtube')
+        setMarketingPlatforms((prev) => {
+          const remaining = prev.filter((item) => item.platform !== 'youtube')
+          return [
+            ...remaining,
+            {
+              platform: 'youtube',
+              customer_platform_credential_id: credential.id,
+              display_name: credential.display_name || 'YouTube Channel',
+              posting_identity: credential.display_name || null,
+            },
+          ]
+        })
+        setYouTubeConnectStatus(`Connected ${credential.display_name || 'YouTube channel'}`)
+        const nextSearch = new URLSearchParams(searchParams)
+        nextSearch.delete('code')
+        nextSearch.delete('state')
+        nextSearch.delete('scope')
+        nextSearch.delete('error')
+        navigate(
+          {
+            pathname: `/hire/setup/${encodeURIComponent(subscriptionId || '')}`,
+            search: nextSearch.toString() ? `?${nextSearch.toString()}` : '',
+          },
+          { replace: true }
+        )
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || 'Failed to finalize YouTube connection')
+          setYouTubeConnectStatus(null)
+        }
+      } finally {
+        if (!cancelled) setYouTubeConnectBusy(false)
+      }
+    }
+
+    finalizeConnection()
+    return () => {
+      cancelled = true
+    }
+  }, [isMarketingAgent, navigate, searchParams, subscriptionId])
 
   const parseConfig = (): Record<string, unknown> => {
     if (isTradingAgent) {
@@ -299,9 +426,13 @@ export default function HireSetupWizard() {
     if (isMarketingAgent) {
       const platforms = (marketingPlatforms || []).map((p) => ({
         platform: String(p.platform || '').trim(),
-        credential_ref: String(p.credential_ref || '').trim(),
+        ...(p.credential_ref ? { credential_ref: String(p.credential_ref).trim() } : {}),
+        ...(p.customer_platform_credential_id
+          ? { customer_platform_credential_id: String(p.customer_platform_credential_id).trim() }
+          : {}),
+        ...(p.display_name ? { display_name: p.display_name } : {}),
         ...(p.posting_identity ? { posting_identity: p.posting_identity } : {})
-      }))
+      })).filter((p) => Boolean(p.platform) && Boolean((p as any).credential_ref || (p as any).customer_platform_credential_id))
       return { platforms }
     }
 
@@ -357,7 +488,25 @@ export default function HireSetupWizard() {
 
       if (isMarketingAgent) {
         const hasPending = Boolean(marketingAccessToken.trim())
-        if (hasPending) {
+        const isYouTubeFlow = marketingPlatform === 'youtube'
+        if (isYouTubeFlow) {
+          if (!selectedYouTubeConnectionId.trim()) {
+            throw new Error('Connect YouTube before continuing')
+          }
+
+          const selectedConnection = youtubeConnections.find((row) => row.id === selectedYouTubeConnectionId)
+          const nextPlatforms = [
+            ...marketingPlatforms.filter((p) => p.platform !== 'youtube'),
+            {
+              platform: 'youtube',
+              customer_platform_credential_id: selectedYouTubeConnectionId,
+              display_name: selectedConnection?.display_name || 'YouTube Channel',
+              posting_identity: selectedConnection?.display_name || undefined,
+            },
+          ]
+          setMarketingPlatforms(nextPlatforms)
+          cfg = { platforms: nextPlatforms }
+        } else if (hasPending) {
           const saved = await upsertPlatformCredential({
             platform: marketingPlatform,
             posting_identity: marketingPostingIdentity.trim() || undefined,
@@ -393,6 +542,15 @@ export default function HireSetupWizard() {
         config: cfg
       })
       setDraft(next)
+
+      if (isMarketingAgent && selectedYouTubeConnectionId.trim()) {
+        await attachYouTubeConnection(selectedYouTubeConnectionId, {
+          hired_instance_id: next.hired_instance_id,
+          skill_id: getMarketingSkillId(),
+          platform_key: 'youtube',
+        })
+      }
+
       return next
     } finally {
       setSaving(false)
@@ -464,10 +622,14 @@ export default function HireSetupWizard() {
         ? `${exchangeProvider || 'Exchange not selected'}${exchangeCredentialRef ? ' · credential ready' : apiKey.trim() ? ' · credential staged' : ''}`
         : isMarketingAgent
           ? marketingPlatforms.length
-            ? `${marketingPlatforms.length} platform${marketingPlatforms.length === 1 ? '' : 's'} connected`
-            : marketingAccessToken.trim()
-              ? `${marketingPlatform} token staged`
-              : 'No platform connected yet'
+            ? marketingPlatforms
+                .map((platform) => platform.display_name || platform.posting_identity || platform.platform)
+                .join(', ')
+            : marketingPlatform === 'youtube'
+              ? 'No YouTube channel connected yet'
+              : marketingAccessToken.trim()
+                ? `${marketingPlatform} token staged`
+                : 'No platform connected yet'
           : 'Custom config provided',
     },
     { label: 'Activation readiness', value: goalsCompleted ? 'Goals confirmed' : 'Waiting for goal confirmation' },
@@ -589,7 +751,7 @@ export default function HireSetupWizard() {
 
                 <div className="form-group">
                   <label>Platform *</label>
-                  <Select value={marketingPlatform} onChange={(_, data) => setMarketingPlatform(String(data.value || 'instagram'))} data-testid="cp-hire-setup-platform">
+                  <Select value={marketingPlatform} onChange={(_, data) => setMarketingPlatform(String(data.value || 'youtube'))} data-testid="cp-hire-setup-platform">
                     {MARKETING_PLATFORM_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
@@ -608,36 +770,140 @@ export default function HireSetupWizard() {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Access token *</label>
-                  <Input
-                    type="password"
-                    value={marketingAccessToken}
-                    onChange={(_, data) => setMarketingAccessToken(data.value)}
-                    placeholder="Paste token (stored server-side)"
-                    data-testid="cp-hire-setup-access-token"
-                  />
-                </div>
+                {marketingPlatform === 'youtube' ? (
+                  <div className="hire-wizard-youtube-connect" data-testid="cp-hire-setup-youtube-connect">
+                    <div className="hire-wizard-inline-note" style={{ marginBottom: '0.75rem' }}>
+                      Connect YouTube once with Google, then choose the verified channel you want this agent to use.
+                    </div>
 
-                <div className="form-group">
-                  <label>Refresh token (optional)</label>
-                  <Input
-                    type="password"
-                    value={marketingRefreshToken}
-                    onChange={(_, data) => setMarketingRefreshToken(data.value)}
-                    placeholder="Optional"
-                    data-testid="cp-hire-setup-refresh-token"
-                  />
-                </div>
+                    {youtubeConnectStatus && (
+                      <div style={{ marginBottom: '0.75rem', color: 'var(--colorBrandForeground1)' }}>{youtubeConnectStatus}</div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                      <Button
+                        appearance="primary"
+                        disabled={youtubeConnectBusy}
+                        data-testid="cp-hire-setup-youtube-connect-button"
+                        onClick={async () => {
+                          setError(null)
+                          setYouTubeConnectBusy(true)
+                          setYouTubeConnectStatus(null)
+                          try {
+                            const redirectUri = buildRedirectUri(searchParams)
+                            const start = await startYouTubeConnection(redirectUri)
+                            if (typeof window !== 'undefined') {
+                              window.location.assign(start.authorization_url)
+                            }
+                          } catch (e: any) {
+                            setError(e?.message || 'Failed to start YouTube connection')
+                            setYouTubeConnectBusy(false)
+                          }
+                        }}
+                      >
+                        {youtubeConnections.length > 0 ? 'Reconnect YouTube' : 'Connect YouTube'}
+                      </Button>
+
+                      {selectedYouTubeConnectionId && (
+                        <Button
+                          appearance="outline"
+                          disabled={youtubeConnectBusy}
+                          onClick={() => setSelectedYouTubeConnectionId('')}
+                          data-testid="cp-hire-setup-youtube-clear-selection"
+                        >
+                          Clear selection
+                        </Button>
+                      )}
+                    </div>
+
+                    {youtubeConnections.length > 0 ? (
+                      <div style={{ display: 'grid', gap: '0.75rem' }}>
+                        <div style={{ fontWeight: 600 }}>Available YouTube channels</div>
+                        {youtubeConnections.map((connection) => {
+                          const selected = selectedYouTubeConnectionId === connection.id
+                          return (
+                            <button
+                              key={connection.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedYouTubeConnectionId(connection.id)
+                                setMarketingPlatforms((prev) => {
+                                  const rest = prev.filter((item) => item.platform !== 'youtube')
+                                  return [
+                                    ...rest,
+                                    {
+                                      platform: 'youtube',
+                                      customer_platform_credential_id: connection.id,
+                                      display_name: connection.display_name || 'YouTube Channel',
+                                      posting_identity: connection.display_name || undefined,
+                                    },
+                                  ]
+                                })
+                              }}
+                              data-testid={`cp-hire-setup-youtube-option-${connection.id}`}
+                              style={{
+                                textAlign: 'left',
+                                padding: '0.9rem 1rem',
+                                borderRadius: 12,
+                                border: selected ? '2px solid var(--colorBrandStroke1)' : '1px solid var(--colorNeutralStroke2)',
+                                background: selected ? 'var(--colorNeutralBackground1Selected)' : 'var(--colorNeutralBackground1)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <div style={{ fontWeight: 600 }}>{connection.display_name || 'YouTube Channel'}</div>
+                              <div style={{ fontSize: '0.9rem', color: 'var(--colorNeutralForeground2)' }}>
+                                {connection.connection_status} · {connection.verification_status}
+                                {connection.last_verified_at ? ` · verified ${new Date(connection.last_verified_at).toLocaleString()}` : ''}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ color: 'var(--colorNeutralForeground2)' }}>
+                        No YouTube channel connected yet.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="form-group">
+                      <label>Access token *</label>
+                      <Input
+                        type="password"
+                        value={marketingAccessToken}
+                        onChange={(_, data) => setMarketingAccessToken(data.value)}
+                        placeholder="Paste token (stored server-side)"
+                        data-testid="cp-hire-setup-access-token"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label>Refresh token (optional)</label>
+                      <Input
+                        type="password"
+                        value={marketingRefreshToken}
+                        onChange={(_, data) => setMarketingRefreshToken(data.value)}
+                        placeholder="Optional"
+                        data-testid="cp-hire-setup-refresh-token"
+                      />
+                    </div>
+                  </>
+                )}
 
                 {marketingPlatforms.length > 0 && (
                   <div style={{ marginTop: '0.75rem' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Connected platforms</div>
                     <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
                       {marketingPlatforms.map((p) => (
-                        <li key={`${p.platform}:${p.credential_ref}`}>
-                          {p.platform}
-                          {p.posting_identity ? ` — ${p.posting_identity}` : ''} (ref: {p.credential_ref})
+                        <li key={`${p.platform}:${p.customer_platform_credential_id || p.credential_ref || 'pending'}`}>
+                          {p.display_name || p.platform}
+                          {p.posting_identity ? ` — ${p.posting_identity}` : ''}
+                          {p.customer_platform_credential_id
+                            ? ` (connection: ${p.customer_platform_credential_id})`
+                            : p.credential_ref
+                              ? ` (ref: ${p.credential_ref})`
+                              : ''}
                         </li>
                       ))}
                     </ul>
