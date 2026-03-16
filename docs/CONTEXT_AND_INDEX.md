@@ -975,33 +975,30 @@ Static IP (waooaw-lb-ip)
 - **Binary**: `/usr/local/bin/cloud-sql-proxy` (v2.14.2, auto-downloaded by `gcp-auth.sh` if missing)
 - **Instance**: `waooaw-oauth:asia-south1:plant-sql-demo`
 - **Port**: `127.0.0.1:15432`
-- **Auth**: `--gcloud-auth` (uses active gcloud SA credentials)
-- **Starts automatically** via `gcp-auth.sh` on Codespace boot
+- **Auth**: `--credentials-file=/root/.gcp/waooaw-sa.json` (written by `gcp-auth.sh` from Codespaces secret `GCP_SA_KEY`)
+- **Starts automatically** via `gcp-auth.sh` on Codespace boot, but for any DB work the safe path is to re-run the script once in the current shell
 - **Log**: `/tmp/cloud-sql-proxy.log`
 - **pgpass**: `/root/.pgpass` — enables passwordless `psql` (written by `gcp-auth.sh` from Secret Manager `demo-plant-database-url`)
-- **DB env file**: `/root/.env.db` — `source /root/.env.db && psql` is all you need
+- **DB env file**: `/root/.env.db` — exports host/port/user/db only; passwordless `psql` works because `gcp-auth.sh` also writes `/root/.pgpass`
 
-**Quick connect:**
+**First-attempt path:**
 ```bash
-# Step 0 — if gcloud is missing (run ONCE per Codespace; takes ~60s)
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
-apt-get update -qq && apt-get install -y -qq google-cloud-cli
+# 0. Preconditions — verify these before spending time debugging
+which gcloud
+printenv GCP_SA_KEY >/dev/null && echo "GCP_SA_KEY present"
 
-# Step 1 — run auth script (activates SA, downloads proxy binary, writes /root/.env.db)
+# 1. Run the auth/bootstrap script once per Codespace shell when you need DB access
 bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 
-# Step 2 — if proxy says "instance does not have IP of type PUBLIC":
-#   The Cloud SQL instance needs public IP enabled (SA has cloudsql.admin):
-gcloud sql instances patch plant-sql-demo --project=waooaw-oauth --assign-ip
-#   Then re-run the auth script:
-bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
+# 2. Confirm success before querying
+gcloud auth list
+test -f /root/.env.db && echo ".env.db ready"
+pgrep -fa cloud-sql-proxy
 
-# Step 3 — connect
-source /root/.env.db && psql          # recommended
-psql -h 127.0.0.1 -p 15432 -U plant_app plant  # direct
+# 3. Connect
+source /root/.env.db && psql -c "SELECT current_database(), current_user;"
 
-# Verify
+# 4. Optional direct form if you need to avoid sourcing shell state
 psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembic_version;"
 ```
 
@@ -1059,6 +1056,8 @@ Agent rule: schema changes, persisted-behavior stories, and DB smoke validation 
 Cloud SQL `plant-sql-demo` must be reached through the Cloud SQL Auth Proxy for IAM-based authentication — do not connect directly on port 5432.
 The normal Codespaces path is the public-IP-backed proxy listener on `127.0.0.1:15432`; if the instance drifts to private-IP-only, first re-enable public IP with `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, then rerun `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh`.
 
+**Non-negotiable first-attempt rule:** do not start with ad-hoc `psql`, manual proxy commands, or package installs. Start with `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh`, confirm the three success signals below, then run the query.
+
 | Property | Value |
 |----------|-------|
 | Instance | `waooaw-oauth:asia-south1:plant-sql-demo` |
@@ -1072,44 +1071,58 @@ The normal Codespaces path is the public-IP-backed proxy listener on `127.0.0.1:
 > **demo@waooaw.com test customer** (inserted 8 Mar 2026): `id = ce8cf044-b378-4d3d-b11d-4817074b08f6`.
 > Required for dev-token auth — Plant `/api/v1/auth/validate` looks up this email on every request.
 
-#### Precise steps (follow in order, every step matters)
+#### First-attempt checklist (follow exactly in order)
 
-> **gcloud is pre-installed** in every Codespace via `setup-slim.sh` (added 8 Mar 2026).
-> Step 1 below is only needed if you rebuilt the container without running `postCreateCommand`.
+> `gcloud` is pre-installed in every normal WAOOAW Codespace. Do not install it unless `which gcloud` returns nothing.
+> `gcp-auth.sh` is the only supported bootstrap path because it does four things in one go: activates the service account, starts the proxy, writes `/root/.pgpass`, and writes `/root/.env.db`.
 
 ```bash
-# 1. Install gcloud if missing (verify first: which gcloud)
-#    Skip if 'gcloud version' already prints SDK 559+
-curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
-apt-get update -qq && apt-get install -y -qq google-cloud-cli
-gcloud version   # should print SDK 559+
+# 1. Verify prerequisites
+which gcloud
+printenv GCP_SA_KEY >/dev/null && echo "GCP_SA_KEY present"
 
 # 2. Run auth script — activates SA, starts proxy, writes /root/.env.db + /root/.pgpass
 bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
-# Expected last line: "✅ DB ready — connect: source /root/.env.db && psql"
 
-# 3. Connect and verify
-source /root/.env.db && psql -c "SELECT version_num FROM alembic_version;"
+# Expected success signals
+#   a) output contains: "✅ GCP auth active: waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com"
+#   b) output contains: "✅ Cloud SQL Proxy listening on 127.0.0.1:15432"
+#   c) output contains: "✅ DB ready — connect: source /root/.env.db && psql"
 
-# 4. Check number of customers (quick sanity check)
+# 3. Validate the bootstrap state before running real queries
+gcloud auth list
+test -f /root/.env.db && echo ".env.db ready"
+test -f /root/.pgpass && echo ".pgpass ready"
+pgrep -fa cloud-sql-proxy
+
+# 4. Connect and verify
+source /root/.env.db && psql -c "SELECT current_database(), current_user;"
+psql -c "SELECT version_num FROM alembic_version;"
+
+# 5. Optional sanity check against seeded data
 psql -c "SELECT COUNT(*) AS customers FROM customer_entity;"
 # Expected: 4 (yogeshkhandge@gmail.com, rupalikhandge@gmail.com, yogeshk7377@gmail.com, demo@waooaw.com)
 
-# --- Recovery steps (only needed if step 2 fails) ---
+# --- Only use recovery steps if the checklist above fails ---
 
-# If proxy log says "instance does not have IP of type PUBLIC" (public IP was disabled)
-cat /tmp/cloud-sql-proxy.log   # check exact error
+# If the script printed "GCP_SA_KEY not set" then Codespaces secrets were not injected.
+# Fix the secret first; re-running the script will not help until GCP_SA_KEY exists.
+
+# If the proxy log says "instance does not have IP of type PUBLIC" then public IP drifted off.
+tail -n 50 /tmp/cloud-sql-proxy.log
 gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth
 # Wait ~30s for the patch, then re-run step 2
 
-# If proxy died between sessions, restart it:
-kill $(pgrep cloud-sql-proxy) 2>/dev/null; bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
+# If the proxy is missing or stale, restart it cleanly:
+pkill -f cloud-sql-proxy 2>/dev/null || true
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 
 # Proxy diagnostics
-cat /tmp/cloud-sql-proxy.log        # full proxy log
-pgrep -fa cloud-sql-proxy           # check PID — empty means proxy not running
+tail -n 100 /tmp/cloud-sql-proxy.log  # full enough for failures
+pgrep -fa cloud-sql-proxy             # empty means proxy not running
 ```
+
+**Interpretation guide:** if `/root/.env.db` exists but `pgrep -fa cloud-sql-proxy` is empty, the script got credentials but the proxy is not alive. If both `/root/.env.db` and the proxy are present, query failures are almost always SQL-level issues, not connection bootstrap issues.
 
 ### How to test database locally
 
