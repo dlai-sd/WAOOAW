@@ -870,6 +870,7 @@ function ConfigureAgentPanel(props: {
 
 function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: boolean }) {
   const { instance, readOnly } = props
+  const navigate = useNavigate()
 
   const hiredInstanceId = String(instance.hired_instance_id || '').trim()
   const [loading, setLoading] = useState(false)

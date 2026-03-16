@@ -65,6 +65,7 @@ async def test_start_youtube_connect_maps_service_result(mock_db):
 async def test_finalize_youtube_connect_returns_customer_credential(mock_db):
     from api.v1.platform_connections import FinalizeYouTubeConnectRequest, finalize_youtube_connect
 
+    now = datetime.now(timezone.utc)
     credential = CustomerPlatformCredentialModel(
         id="cred-1",
         customer_id="cust-1",
@@ -75,7 +76,9 @@ async def test_finalize_youtube_connect_returns_customer_credential(mock_db):
         verification_status="verified",
         connection_status="connected",
         secret_ref="projects/waooaw-oauth/secrets/customer-platform-youtube-cust-1/versions/latest",
-        last_verified_at=datetime.now(timezone.utc),
+        last_verified_at=now,
+        created_at=now,
+        updated_at=now,
     )
     service_result = MagicMock(credential=credential)
 
@@ -101,6 +104,7 @@ async def test_finalize_youtube_connect_returns_customer_credential(mock_db):
 async def test_list_customer_platform_credentials_maps_service_rows(mock_db):
     from api.v1.platform_connections import list_customer_platform_credentials
 
+    now = datetime.now(timezone.utc)
     credential = CustomerPlatformCredentialModel(
         id="cred-1",
         customer_id="cust-1",
@@ -111,7 +115,9 @@ async def test_list_customer_platform_credentials_maps_service_rows(mock_db):
         verification_status="verified",
         connection_status="connected",
         secret_ref="projects/waooaw-oauth/secrets/customer-platform-youtube-cust-1/versions/latest",
-        last_verified_at=datetime.now(timezone.utc),
+        last_verified_at=now,
+        created_at=now,
+        updated_at=now,
     )
 
     with patch(

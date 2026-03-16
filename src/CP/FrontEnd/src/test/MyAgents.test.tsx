@@ -480,7 +480,7 @@ describe('MyAgents Component', () => {
       ]
     })
 
-    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValueOnce([
+    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValue([
       {
         id: 'CONN-3',
         hired_instance_id: 'HIRED-MKT-3',
@@ -495,7 +495,7 @@ describe('MyAgents Component', () => {
       }
     ])
 
-    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([
+    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValue([
       {
         id: 'cred-yt-3',
         customer_id: 'CUST-3',

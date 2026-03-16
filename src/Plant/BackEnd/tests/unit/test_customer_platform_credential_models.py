@@ -15,16 +15,10 @@ def test_customer_platform_credential_tablename():
 
 @pytest.mark.unit
 def test_customer_platform_credential_defaults():
-    credential = CustomerPlatformCredentialModel(
-        customer_id="cust-1",
-        platform_key="youtube",
-        provider_account_id="channel-1",
-        display_name="Channel One",
-        secret_ref="projects/waooaw-oauth/secrets/customer-platform-youtube-cust-1/versions/latest",
-    )
-    assert credential.verification_status == "pending"
-    assert credential.connection_status == "pending"
-    assert credential.granted_scopes == []
+    assert CustomerPlatformCredentialModel.__table__.c.verification_status.default.arg == "pending"
+    assert CustomerPlatformCredentialModel.__table__.c.connection_status.default.arg == "pending"
+    assert callable(CustomerPlatformCredentialModel.__table__.c.granted_scopes.default.arg)
+    assert CustomerPlatformCredentialModel.__table__.c.granted_scopes.default.arg.__name__ == "list"
 
 
 @pytest.mark.unit
@@ -55,15 +49,4 @@ def test_oauth_connection_session_tablename():
 
 @pytest.mark.unit
 def test_oauth_connection_session_defaults():
-    expires_at = datetime(2026, 3, 16, 11, 0, 0, tzinfo=timezone.utc)
-    session = OAuthConnectionSessionModel(
-        customer_id="cust-1",
-        platform_key="youtube",
-        state="state-123",
-        nonce="nonce-123",
-        redirect_uri="https://cp.demo.waooaw.com/oauth/youtube/callback",
-        expires_at=expires_at,
-    )
-    assert session.status == "pending"
-    assert session.consumed_at is None
-    assert session.expires_at == expires_at
+    assert OAuthConnectionSessionModel.__table__.c.status.default.arg == "pending"
