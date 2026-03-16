@@ -17,6 +17,8 @@ import {
 import logoImage from '../Waooaw-Logo.png'
 import AgentDiscovery from './AgentDiscovery'
 import AgentDetail from './AgentDetail'
+import HireReceipt from './HireReceipt'
+import HireSetupWizard from './HireSetupWizard'
 import CommandCentre from './authenticated/CommandCentre'
 import MyAgents from './authenticated/MyAgents'
 import GoalsSetup from './authenticated/GoalsSetup'
@@ -44,7 +46,7 @@ interface AuthenticatedPortalProps {
   initialJourneyContext?: PortalJourneyContext
 }
 
-type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail'
+type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail' | 'hire-setup' | 'hire-receipt'
 
 type JourneySource = 'payment-confirmed' | 'trial-activated' | 'setup-incomplete'
 
@@ -279,8 +281,12 @@ export default function AuthenticatedPortal({
     setCurrentPage('discover')
   }
 
-  // agent-detail is a sub-page of discover — keep Discover highlighted in sidebar
-  const activeNavPage: Page = currentPage === 'agent-detail' ? 'discover' : currentPage
+  // agent-detail is a sub-page of discover; hire setup/receipt are sub-pages of My Agents.
+  const activeNavPage: Page = currentPage === 'agent-detail'
+    ? 'discover'
+    : currentPage === 'hire-setup' || currentPage === 'hire-receipt'
+      ? 'my-agents'
+      : currentPage
 
   const inboxCounts = useMemo(
     () =>
@@ -439,6 +445,10 @@ export default function AuthenticatedPortal({
         return <AgentDiscovery onSelectAgent={handleSelectAgent} />
       case 'agent-detail':
         return <AgentDetail agentIdProp={selectedAgentId} onBack={handleBackToDiscovery} />
+      case 'hire-setup':
+        return <HireSetupWizard />
+      case 'hire-receipt':
+        return <HireReceipt />
       case 'goals':
         return <GoalsSetup />
       case 'deliverables':

@@ -6,8 +6,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { AuthProvider } from '../context/AuthContext'
 import App from '../App'
+
+const authContextMocks = vi.hoisted(() => ({
+  useAuth: vi.fn(),
+}))
+
+vi.mock('../context/AuthContext', async () => {
+  const actual = await vi.importActual<any>('../context/AuthContext')
+  return {
+    ...actual,
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+    useAuth: authContextMocks.useAuth,
+  }
+})
 
 // Mock child components
 vi.mock('../pages/LandingPage', () => ({
@@ -51,13 +63,20 @@ vi.mock('../components/Header', () => ({
 }))
 
 describe('React Router Integration', () => {
+  beforeEach(() => {
+    authContextMocks.useAuth.mockReset()
+    authContextMocks.useAuth.mockReturnValue({
+      isAuthenticated: false,
+      isLoading: false,
+      logout: vi.fn(),
+    })
+  })
+
   describe('Public Routes', () => {
     it('should render landing page at root path', () => {
       render(
         <MemoryRouter initialEntries={['/']}>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <App />
         </MemoryRouter>
       )
 
@@ -67,9 +86,7 @@ describe('React Router Integration', () => {
     it('should render auth callback at /auth/callback', () => {
       render(
         <MemoryRouter initialEntries={['/auth/callback']}>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <App />
         </MemoryRouter>
       )
 
@@ -79,37 +96,23 @@ describe('React Router Integration', () => {
 
   describe('Protected Routes', () => {
     beforeEach(() => {
-      // Mock authenticated state
-      vi.mock('../context/AuthContext', async () => {
-        const actual = await vi.importActual('../context/AuthContext')
-        return {
-          ...actual,
-          useAuth: () => ({
-            isAuthenticated: true,
-            logout: vi.fn(),
-          }),
-        }
+      authContextMocks.useAuth.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        logout: vi.fn(),
       })
     })
 
     it('should redirect to / when accessing protected route unauthenticated', async () => {
-      // Mock unauthenticated state
-      vi.mock('../context/AuthContext', async () => {
-        const actual = await vi.importActual('../context/AuthContext')
-        return {
-          ...actual,
-          useAuth: () => ({
-            isAuthenticated: false,
-            logout: vi.fn(),
-          }),
-        }
+      authContextMocks.useAuth.mockReturnValue({
+        isAuthenticated: false,
+        isLoading: false,
+        logout: vi.fn(),
       })
 
       render(
         <MemoryRouter initialEntries={['/portal']}>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <App />
         </MemoryRouter>
       )
 
@@ -117,6 +120,38 @@ describe('React Router Integration', () => {
       await waitFor(() => {
         expect(screen.getByTestId('sign-in')).toBeInTheDocument()
       })
+    })
+
+    it('should render authenticated portal for hire receipt routes', () => {
+      authContextMocks.useAuth.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        logout: vi.fn(),
+      })
+
+      render(
+        <MemoryRouter initialEntries={['/hire/receipt/ORDER-1?subscriptionId=SUB-1&agentId=AGT-1']}>
+          <App />
+        </MemoryRouter>
+      )
+
+      expect(screen.getByTestId('authenticated-portal')).toBeInTheDocument()
+    })
+
+    it('should render authenticated portal for hire setup routes', () => {
+      authContextMocks.useAuth.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        logout: vi.fn(),
+      })
+
+      render(
+        <MemoryRouter initialEntries={['/hire/setup/SUB-1?agentId=AGT-1']}>
+          <App />
+        </MemoryRouter>
+      )
+
+      expect(screen.getByTestId('authenticated-portal')).toBeInTheDocument()
     })
   })
 
@@ -171,11 +206,15 @@ describe('React Router Integration', () => {
     })
 
     it('should redirect unknown routes to root', () => {
+      authContextMocks.useAuth.mockReturnValue({
+        isAuthenticated: false,
+        isLoading: false,
+        logout: vi.fn(),
+      })
+
       render(
         <MemoryRouter initialEntries={['/unknown-route']}>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <App />
         </MemoryRouter>
       )
 

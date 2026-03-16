@@ -54,6 +54,56 @@ function AgentDetailInPortal({
   )
 }
 
+function HireSetupInPortal({
+  theme,
+  toggleTheme,
+  showHelpBoxes,
+  toggleHelpBoxes,
+  handleLogout,
+}: {
+  theme: 'light' | 'dark'
+  toggleTheme: () => void
+  showHelpBoxes: boolean
+  toggleHelpBoxes: () => void
+  handleLogout: () => void
+}) {
+  return (
+    <AuthenticatedPortal
+      theme={theme}
+      toggleTheme={toggleTheme}
+      showHelpBoxes={showHelpBoxes}
+      toggleHelpBoxes={toggleHelpBoxes}
+      onLogout={handleLogout}
+      initialPage="hire-setup"
+    />
+  )
+}
+
+function HireReceiptInPortal({
+  theme,
+  toggleTheme,
+  showHelpBoxes,
+  toggleHelpBoxes,
+  handleLogout,
+}: {
+  theme: 'light' | 'dark'
+  toggleTheme: () => void
+  showHelpBoxes: boolean
+  toggleHelpBoxes: () => void
+  handleLogout: () => void
+}) {
+  return (
+    <AuthenticatedPortal
+      theme={theme}
+      toggleTheme={toggleTheme}
+      showHelpBoxes={showHelpBoxes}
+      toggleHelpBoxes={toggleHelpBoxes}
+      onLogout={handleLogout}
+      initialPage="hire-receipt"
+    />
+  )
+}
+
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const [showHelpBoxes, setShowHelpBoxes] = useState<boolean>(() => loadHelpBoxesPreference())
@@ -217,10 +267,13 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <>
-                <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
-                <HireSetupWizard />
-              </>
+              <HireSetupInPortal
+                theme={theme}
+                toggleTheme={toggleTheme}
+                showHelpBoxes={showHelpBoxes}
+                toggleHelpBoxes={toggleHelpBoxes}
+                handleLogout={handleLogout}
+              />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -235,10 +288,13 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <>
-                <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
-                <HireReceipt />
-              </>
+              <HireReceiptInPortal
+                theme={theme}
+                toggleTheme={toggleTheme}
+                showHelpBoxes={showHelpBoxes}
+                toggleHelpBoxes={toggleHelpBoxes}
+                handleLogout={handleLogout}
+              />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
