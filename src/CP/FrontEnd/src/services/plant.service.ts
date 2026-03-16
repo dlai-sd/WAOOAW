@@ -124,7 +124,7 @@ class PlantAPIService {
   }
 
   async listCatalogAgents(): Promise<CatalogAgent[]> {
-    return this.request<CatalogAgent[]>('/catalog/agents')
+    return gatewayRequestJson<CatalogAgent[]>('/cp/catalog/agents', {}, { timeoutMs: this.config.timeout })
   }
 
   async getCatalogAgent(agentId: string): Promise<CatalogAgent | null> {
