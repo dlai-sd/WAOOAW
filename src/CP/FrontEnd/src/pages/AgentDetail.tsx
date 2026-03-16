@@ -18,8 +18,65 @@ import {
   CheckmarkCircle20Filled,
 } from '@fluentui/react-icons'
 import { plantAPIService } from '../services/plant.service'
-import type { Agent, JobRole, Skill } from '../types/plant.types'
+import { PlantAPIError, type Agent, type CatalogAgent, type JobRole, type Skill } from '../types/plant.types'
 import BookingModal from '../components/BookingModal'
+
+function normalizeIndustry(industryName: string): Agent['industry'] {
+  const normalized = industryName.trim().toLowerCase()
+
+  switch (normalized) {
+    case 'marketing':
+    case 'education':
+    case 'sales':
+    case 'healthcare':
+    case 'finance':
+    case 'general':
+      return normalized
+    default:
+      return 'general'
+  }
+}
+
+function getCatalogStatus(catalogAgent: CatalogAgent): Agent['status'] {
+  if (catalogAgent.lifecycle_state === 'live_on_cp' && catalogAgent.approved_for_new_hire) {
+    return 'active'
+  }
+
+  if (catalogAgent.lifecycle_state === 'approved_for_catalog' || catalogAgent.lifecycle_state === 'servicing_only') {
+    return 'inactive'
+  }
+
+  return 'suspended'
+}
+
+function mapCatalogAgentToDetail(catalogAgent: CatalogAgent): { agent: Agent; jobRole: JobRole } {
+  return {
+    agent: {
+      id: catalogAgent.id,
+      name: catalogAgent.public_name,
+      description: catalogAgent.short_description,
+      job_role_id: `catalog:${catalogAgent.agent_type_id}`,
+      industry: normalizeIndustry(catalogAgent.industry_name),
+      entity_type: 'catalog_agent',
+      status: getCatalogStatus(catalogAgent),
+      created_at: catalogAgent.retired_from_catalog_at || new Date(0).toISOString(),
+      trial_days: catalogAgent.trial_days,
+      allowed_durations: catalogAgent.allowed_durations,
+      price: catalogAgent.monthly_price_inr,
+      specialization: catalogAgent.job_role_label,
+    },
+    jobRole: {
+      id: `catalog:${catalogAgent.agent_type_id}`,
+      name: catalogAgent.job_role_label,
+      description: catalogAgent.short_description,
+      required_skills: [],
+      seniority_level: 'mid',
+      entity_type: 'catalog_job_role',
+      status: 'certified',
+      created_at: catalogAgent.retired_from_catalog_at || new Date(0).toISOString(),
+    }
+  }
+}
 
 interface AgentDetailProps {
   /** When rendered inside the portal frame, pass agentId directly instead of reading from URL params. */
@@ -53,17 +110,32 @@ export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = 
   const loadAgentDetails = async (id: string) => {
     setLoading(true)
     setError(null)
+    setSkills([])
 
     try {
-      // Fetch agent with job role
-      const agentData = await plantAPIService.getAgentWithJobRole(id)
-      setAgent(agentData)
-      setJobRole(agentData.job_role)
+      try {
+        const agentData = await plantAPIService.getAgentWithJobRole(id)
+        setAgent(agentData)
+        setJobRole(agentData.job_role)
 
-      // Fetch skills for the job role
-      if (agentData.job_role) {
-        const skillsData = await plantAPIService.getJobRoleSkills(agentData.job_role.id)
-        setSkills(skillsData)
+        if (agentData.job_role) {
+          const skillsData = await plantAPIService.getJobRoleSkills(agentData.job_role.id)
+          setSkills(skillsData)
+        }
+        return
+      } catch (err) {
+        if (!(err instanceof PlantAPIError) || err.status !== 422) {
+          throw err
+        }
+
+        const catalogAgent = await plantAPIService.getCatalogAgent(id)
+        if (!catalogAgent) {
+          throw err
+        }
+
+        const catalogDetail = mapCatalogAgentToDetail(catalogAgent)
+        setAgent(catalogDetail.agent)
+        setJobRole(catalogDetail.jobRole)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load agent details')
