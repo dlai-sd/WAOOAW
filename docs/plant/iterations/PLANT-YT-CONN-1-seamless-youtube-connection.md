@@ -128,7 +128,7 @@ All provider client IDs, secrets, callback origins, and secret-store settings mu
 | E1-S2 | Customer can complete a secure YouTube connect flow and Plant validates the chosen channel | Completed | `feat/PLANT-YT-CONN-1-it1-e1` |
 | E1-S3 | CP can proxy the new YouTube connection flow without owning any business logic | Completed | `feat/PLANT-YT-CONN-1-it1-e2` |
 | E2-S1 | Hire setup uses Connect YouTube instead of manual token entry | Completed | `feat/PLANT-YT-CONN-1-it1-e2` |
-| E2-S2 | Runtime screens show real YouTube connection readiness and reconnect states | Planned | `feat/PLANT-YT-CONN-1-it1-e2` |
+| E2-S2 | Runtime screens show real YouTube connection readiness and reconnect states | Completed | `feat/PLANT-YT-CONN-1-it1-e2` |
 
 ---
 
@@ -214,7 +214,7 @@ git add -A && git commit -m "feat(PLANT-YT-CONN-1): [epic-id] — [epic title]" 
 | E1-S2 | Customer can complete a secure YouTube connect flow and Plant validates the chosen channel | Plant BackEnd + Infra | Completed | E1-S1 |
 | E1-S3 | CP can proxy the new YouTube connection flow without owning any business logic | CP BackEnd | Completed | E1-S2 |
 | E2-S1 | Hire setup uses Connect YouTube instead of manual token entry | CP FrontEnd | Completed | E1-S3 |
-| E2-S2 | Runtime screens show real YouTube connection readiness and reconnect states | CP FrontEnd | Planned | E2-S1 |
+| E2-S2 | Runtime screens show real YouTube connection readiness and reconnect states | CP FrontEnd | Completed | E2-S1 |
 
 ### E1 — Customer authorizes once and Plant owns the connection lifecycle
 
