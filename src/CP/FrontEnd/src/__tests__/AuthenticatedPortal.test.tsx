@@ -121,6 +121,12 @@ vi.mock('../pages/AgentDiscovery', () => ({
 vi.mock('../pages/AgentDetail', () => ({
   default: ({ agentIdProp }: { agentIdProp?: string }) => <div data-testid="page-agent-detail">Agent Detail {agentIdProp}</div>,
 }))
+vi.mock('../pages/HireSetupWizard', () => ({
+  default: () => <div data-testid="page-hire-setup">Hire Setup Wizard</div>,
+}))
+vi.mock('../pages/HireReceipt', () => ({
+  default: () => <div data-testid="page-hire-receipt">Hire Receipt</div>,
+}))
 
 const navigateMock = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -291,6 +297,22 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('page-agent-detail')).toBeTruthy()
     expect(screen.getByText('Agent Detail AGT-42')).toBeTruthy()
     expect(screen.getByTestId('cp-nav-discover').className).toContain('active')
+  })
+
+  it('renders hire receipt inside the portal shell and keeps My Agents highlighted', async () => {
+    await renderPortal({ initialPage: 'hire-receipt' as any })
+
+    expect(screen.getByTestId('cp-portal-root')).toBeTruthy()
+    expect(screen.getByTestId('page-hire-receipt')).toBeTruthy()
+    expect(screen.getByTestId('cp-nav-my-agents').className).toContain('active')
+  })
+
+  it('renders hire setup inside the portal shell and keeps My Agents highlighted', async () => {
+    await renderPortal({ initialPage: 'hire-setup' as any })
+
+    expect(screen.getByTestId('cp-portal-root')).toBeTruthy()
+    expect(screen.getByTestId('page-hire-setup')).toBeTruthy()
+    expect(screen.getByTestId('cp-nav-my-agents').className).toContain('active')
   })
 
   it('uses truthful shell copy instead of fake runtime counters', async () => {
