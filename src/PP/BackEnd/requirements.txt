@@ -10,10 +10,10 @@ pydantic-settings==2.12.0
 httpx==0.26.0
 
 # Auth
-PyJWT==2.10.1
+PyJWT==2.12.0
 google-auth[requests]==2.37.0
 
-# Encrypted storage (AgentSetup)
+# Encryption support for exchange credential handling
 cryptography==46.0.5
 
 # Retry/backoff

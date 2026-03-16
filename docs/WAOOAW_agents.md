@@ -178,3 +178,9 @@ To keep design discussions clear, separate the layers:
 - PP Agent Management should evolve toward an internal design board and release gate, not a generic no-code runtime builder.
 - Plant remains the system of record for lifecycle truth, versioning, hired-agent continuity, and construct execution.
 - CP should only surface agents that have an explicit approved-for-catalog or live-on-CP release state, while preserving service for existing hired customers when a catalog release is retired.
+
+## Persistence Rule
+
+- PP must never own a separate durable database for agent authoring, draft state, or approval state.
+- Any durable platform state created from PP must be persisted through Plant-owned APIs into Plant's GCP SQL database.
+- PP may cache or proxy, but it must not become a second system of record.

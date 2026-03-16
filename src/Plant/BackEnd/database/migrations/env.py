@@ -8,6 +8,7 @@ from typing import Optional
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -22,6 +23,7 @@ import models.team  # noqa: F401
 import models.customer  # noqa: F401
 import models.campaign  # noqa: F401
 import models.marketing_draft  # noqa: F401
+import models.agent_authoring_draft  # noqa: F401
 import models.flow_run  # noqa: F401  EXEC-ENGINE-001 E1-S1
 import models.component_run  # noqa: F401  EXEC-ENGINE-001 E1-S2
 import models.skill_config  # noqa: F401  EXEC-ENGINE-001 E1-S3
@@ -37,6 +39,37 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
+
+def ensure_version_table_capacity(connection: Connection) -> None:
+    """Create or widen alembic_version.version_num for long revision identifiers."""
+
+    inspector = inspect(connection)
+    table_names = set(inspector.get_table_names())
+
+    if "alembic_version" not in table_names:
+        connection.execute(
+            text(
+                """
+                CREATE TABLE alembic_version (
+                    version_num VARCHAR(128) NOT NULL,
+                    CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
+                )
+                """
+            )
+        )
+        return
+
+    version_column = next(
+        (column for column in inspector.get_columns("alembic_version") if column["name"] == "version_num"),
+        None,
+    )
+    version_length = getattr(version_column.get("type"), "length", None) if version_column else None
+
+    if version_length is not None and version_length < 128:
+        connection.execute(
+            text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)")
+        )
 
 
 def run_migrations_offline() -> None:
@@ -56,6 +89,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    ensure_version_table_capacity(connection)
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

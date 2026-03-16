@@ -31,6 +31,32 @@ export type CatalogRelease = {
   retired_from_catalog_at?: string | null
 }
 
+export type ReviewerComment = {
+  section_key: string
+  comment: string
+  severity: 'info' | 'changes_requested'
+  reviewer_id?: string | null
+  reviewer_name?: string | null
+  created_at?: string | null
+}
+
+export type AgentAuthoringDraft = {
+  draft_id: string
+  candidate_agent_type_id: string
+  candidate_agent_label: string
+  contract_payload: Record<string, unknown>
+  section_states: Record<string, 'missing' | 'ready' | 'needs_review'>
+  constraint_policy: Record<string, unknown>
+  reviewer_comments: ReviewerComment[]
+  status: 'draft' | 'in_review' | 'changes_requested' | 'approved'
+  reviewer_id?: string | null
+  reviewer_name?: string | null
+  submitted_at?: string | null
+  reviewed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export class GatewayApiError extends Error {
   status?: number
   problem?: ApiProblemDetails
@@ -276,6 +302,50 @@ export const gatewayApiClient = {
       body: JSON.stringify(payload)
     }),
 
+  listAgentAuthoringDrafts: (query?: { status?: string }) =>
+    gatewayRequestJson<AgentAuthoringDraft[]>(withQuery('/pp/agent-authoring/drafts', query)),
+
+  getAgentAuthoringDraft: (draftId: string) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}`),
+
+  saveAgentAuthoringDraft: (payload: Record<string, unknown>) =>
+    gatewayRequestJson<AgentAuthoringDraft>('/pp/agent-authoring/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  submitAgentAuthoringDraft: (draftId: string) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    }),
+
+  requestAgentAuthoringChanges: (
+    draftId: string,
+    payload: { reviewer_id?: string; reviewer_name?: string; reviewer_comments: ReviewerComment[] }
+  ) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/changes-requested`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  approveAgentAuthoringDraft: (draftId: string, payload: { reviewer_id?: string; reviewer_name?: string }) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
+  patchAgentAuthoringConstraintPolicy: (draftId: string, payload: Record<string, unknown>) =>
+    gatewayRequestJson<AgentAuthoringDraft>(`/pp/agent-authoring/drafts/${encodeURIComponent(draftId)}/constraint-policy`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }),
+
   listCatalogReleases: () => gatewayRequestJson<CatalogRelease[]>('/pp/agent-catalog'),
 
   upsertCatalogRelease: (agentId: string, payload: Partial<CatalogRelease> & { agent_type_id?: string }) =>
@@ -313,24 +383,6 @@ export const gatewayApiClient = {
   getDbConnectionInfo: (opts?: { bearerToken?: string }) =>
     gatewayRequestJson<{ environment: string; database_url: string }>('/pp/db/connection-info', {}, {
       headers: opts?.bearerToken ? { Authorization: `Bearer ${opts.bearerToken}` } : undefined
-    }),
-
-  // PP agent setup (post-hire configuration)
-  listAgentSetups: (query?: { customer_id?: string; agent_id?: string; limit?: number }) =>
-    gatewayRequestJson<{ count: number; setups: any[] }>(withQuery('/pp/agent-setups', query)),
-
-  upsertAgentSetup: (payload: {
-    customer_id: string
-    agent_id: string
-    channels?: string[]
-    correlation_id?: string
-    posting_identity?: string | null
-    credential_refs?: Record<string, string>
-  }) =>
-    gatewayRequestJson<any>('/pp/agent-setups', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
     }),
 
   // PP exchange credentials (admin-only)
@@ -511,24 +563,6 @@ export const gatewayApiClient = {
     gatewayRequestJson<unknown>(
       `/pp/ops/dlq/${encodeURIComponent(dlqId)}/requeue`,
       { method: 'POST' }
-    ),
-
-  patchConstraintPolicy: (
-    agentSetupId: string,
-    patch: {
-      approval_mode?: string
-      max_tasks_per_day?: number
-      max_position_size_inr?: number
-      trial_task_limit?: number
-    }
-  ) =>
-    gatewayRequestJson<{ agent_setup_id: string; constraint_policy: Record<string, unknown> }>(
-      `/pp/agent-setups/${encodeURIComponent(agentSetupId)}/constraint-policy`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      }
     ),
 
   // Marketing draft review (Plant proxied via PP)

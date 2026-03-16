@@ -23,8 +23,6 @@ interface LayoutProps {
   children: ReactNode
   theme: 'light' | 'dark'
   onThemeToggle: () => void
-  showHelpBoxes: boolean
-  onHelpToggle: () => void
   onLogout: () => void
 }
 
@@ -40,7 +38,6 @@ const navItems: NavItem[] = [
   { path: '/billing', label: 'Subscriptions', icon: <Money24Regular /> },
   { type: 'section', label: 'Management' },
   { path: '/agents', label: 'Agent Management', icon: <Bot24Regular /> },
-  { path: '/agent-setup', label: 'Agent Setup', icon: <Bot24Regular /> },
   { path: '/agent-type-setup', label: 'Agent Type Setup', icon: <Certificate24Regular /> },
   { path: '/governor', label: 'Governor Console', icon: <Beaker24Regular /> },
   { path: '/genesis', label: 'Genesis', icon: <Certificate24Regular /> },
@@ -55,7 +52,7 @@ const navItems: NavItem[] = [
   { path: '/reference-agents', label: 'Reference Data', icon: <Beaker24Regular /> },
 ]
 
-export default function Layout({ children, theme, onThemeToggle, showHelpBoxes, onHelpToggle, onLogout }: LayoutProps) {
+export default function Layout({ children, theme, onThemeToggle, onLogout }: LayoutProps) {
   const location = useLocation()
   const sectionTitle = navItems.find((item) => item.type !== 'section' && (item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)))
 
@@ -102,15 +99,6 @@ export default function Layout({ children, theme, onThemeToggle, showHelpBoxes, 
         </div>
 
         <div className="sidebar-footer">
-          <Button
-            appearance="subtle"
-            onClick={onHelpToggle}
-            style={{ width: '100%', justifyContent: 'flex-start' }}
-            aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
-            data-testid="pp-help-toggle"
-          >
-            {showHelpBoxes ? 'Hide Help' : 'Show Help'}
-          </Button>
           <Button 
             appearance="subtle" 
             icon={theme === 'light' ? <WeatherMoon24Regular /> : <WeatherSunny24Regular />}

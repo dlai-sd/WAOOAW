@@ -46,3 +46,40 @@ Practical mitigation size for this debt is roughly `1.3-2.3 GB` without Playwrig
 ## Recommended Follow-up
 
 The next time we cut a clean PR from a larger branch, we should budget dependency setup as part of the PR-prep workflow, not as an afterthought. That converts this from a review-confidence risk into a routine packaging step.
+
+---
+
+# Tech Debt: Alembic Migration Reliability Across Demo, UAT, and Prod
+
+## Story
+
+PP agent authoring drafts now persist correctly in Cloud SQL, but the migration path exposed a real release-engineering gap: Alembic migration runs against demo did not provide a trustworthy promotion signal for the latest revision. The work reached a state where the feature schema had to be verified and completed directly on Cloud SQL rather than being confidently advanced through the normal migration flow.
+
+The debt is not about whether migrations exist. The debt is that we still need to prove that Alembic migration to demo, UAT, and prod migration works as a repeatable platform path, without manual DDL intervention or ambiguous success reporting.
+
+## Why This Matters
+
+- Schema-backed features are not production-ready if migration behavior is only trustworthy in local Docker.
+- Demo is the required proving ground before promoting the same migration shape into UAT and prod.
+- A migration runner that logs success but does not give a reliable persisted outcome creates release risk and rollback uncertainty.
+
+## Debt Item
+
+**Name:** Alembic promotion reliability for demo, UAT, and prod
+
+**Problem:** The platform does not yet have a fully trusted, end-to-end verified Alembic promotion path for demo, UAT, and prod environments.
+
+**Impact:** Future schema stories can appear complete in development while still carrying deployment risk at the environment-promotion layer.
+
+**Root cause:** The migration execution path and environment-specific connectivity behavior are not yet sufficiently validated as one repeatable release process.
+
+## What Is Needed To Pay This Debt Down
+
+1. Reproduce the Alembic promotion flow against demo with full exit-code and post-migration state verification.
+2. Verify the same migration runner path works unchanged for UAT and prod promotion rules.
+3. Add a deployment smoke check that confirms both `alembic_version` and the expected schema objects after each environment migration.
+4. Treat "alembic migration to demo/uat and prod migration works" as a release gate for schema-backed stories.
+
+## Recommended Follow-up
+
+Close this debt by hardening the migration runner and promotion checklist, then validating one full schema change through demo, UAT, and prod using the same release path. Until that is done, schema delivery still has platform-level operational risk even when feature code is correct.

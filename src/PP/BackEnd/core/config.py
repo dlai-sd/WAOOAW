@@ -47,9 +47,6 @@ class Settings(BaseSettings):
     PLANT_API_URL: str = "http://localhost:8000"  # Plant backend API
     PLANT_GATEWAY_URL: str = ""  # Preferred when routing through the Plant Gateway
 
-    # Database (optional for now)
-    DATABASE_URL: str = ""        # Must be injected at runtime; no SQLite default
-
     # Redis cache (optional — ops proxy responses cached with TTL)
     REDIS_URL: str = ""
     OPS_CACHE_TTL_SECONDS: int = 60

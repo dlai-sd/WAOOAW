@@ -44,7 +44,6 @@ vi.mock('../pages/AuditConsole', () => ({ default: () => <div>AuditConsole</div>
 vi.mock('../pages/PolicyDenials', () => ({ default: () => <div>PolicyDenials</div> }))
 vi.mock('../pages/AgentSpecTools', () => ({ default: () => <div>AgentSpecTools</div> }))
 vi.mock('../pages/DbUpdates', () => ({ default: () => <div>DbUpdates</div> }))
-vi.mock('../pages/AgentSetup', () => ({ default: () => <div>AgentSetup</div> }))
 vi.mock('../pages/AgentTypeSetupScreen', () => ({ default: () => <div>AgentTypeSetupScreen</div> }))
 vi.mock('../pages/ApprovalsQueueScreen', () => ({ default: () => <div>ApprovalsQueueScreen</div> }))
 vi.mock('../pages/ReviewQueue', () => ({ default: () => <div>ReviewQueue</div> }))

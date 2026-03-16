@@ -233,7 +233,7 @@ async def google_verify(
 @router.post("/dev-token", response_model=TokenResponse)
 async def dev_token(app_settings: settings.__class__ = Depends(get_settings)) -> TokenResponse:
     """Mint a token for local/demo smoke tests. Disabled unless ENABLE_DEV_TOKEN is on."""
-    if not app_settings.ENABLE_DEV_TOKEN:
+    if not app_settings.ENABLE_DEV_TOKEN or app_settings.is_prod_like:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return _issue_waooaw_access_token(app_settings, user_id="demo-user", email="demo@waooaw.com")
 
