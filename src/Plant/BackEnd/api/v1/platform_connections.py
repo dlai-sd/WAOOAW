@@ -24,9 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db_session, get_read_db_session
 from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
+from models.customer_platform_credential import CustomerPlatformCredentialModel
+from models.oauth_connection_session import OAuthConnectionSessionModel
 from models.platform_connection import PlatformConnectionModel
+from services.youtube_connection_service import YouTubeConnectionError, YouTubeConnectionService
 
 router = waooaw_router(prefix="/hired-agents", tags=["platform-connections"])
+customer_router = waooaw_router(prefix="/customer-platform-connections", tags=["customer-platform-connections"])
 
 logger = logging.getLogger(__name__)
 logger.addFilter(PiiMaskingFilter())
@@ -37,9 +41,10 @@ logger.addFilter(PiiMaskingFilter())
 class CreateConnectionRequest(BaseModel):
     skill_id: str
     platform_key: str
+    customer_platform_credential_id: Optional[str] = None
     # GCP Secret Manager resource path ONLY — never the raw secret value
     # e.g. "projects/waooaw-oauth/secrets/hired-abc123-delta-exchange/versions/latest"
-    secret_ref: str
+    secret_ref: Optional[str] = None
 
 
 class ConnectionResponse(BaseModel):
@@ -47,6 +52,7 @@ class ConnectionResponse(BaseModel):
     id: str
     hired_instance_id: str
     skill_id: str
+    customer_platform_credential_id: Optional[str] = None
     platform_key: str
     status: str
     connected_at: Optional[datetime] = None
@@ -55,18 +61,90 @@ class ConnectionResponse(BaseModel):
     updated_at: datetime
 
 
+class StartYouTubeConnectRequest(BaseModel):
+    customer_id: str
+    redirect_uri: str
+
+
+class StartYouTubeConnectResponse(BaseModel):
+    state: str
+    authorization_url: str
+    expires_at: datetime
+
+
+class FinalizeYouTubeConnectRequest(BaseModel):
+    customer_id: str
+    state: str
+    code: str
+    redirect_uri: str
+
+
+class CustomerPlatformCredentialResponse(BaseModel):
+    id: str
+    customer_id: str
+    platform_key: str
+    provider_account_id: Optional[str] = None
+    display_name: Optional[str] = None
+    granted_scopes: list[str]
+    verification_status: str
+    connection_status: str
+    token_expires_at: Optional[datetime] = None
+    last_verified_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AttachCustomerCredentialRequest(BaseModel):
+    customer_id: str
+    hired_instance_id: str
+    skill_id: str
+    platform_key: str = "youtube"
+
+
+def _optional_string(value: object) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return None
+
+
 def _to_response(conn: PlatformConnectionModel) -> ConnectionResponse:
     """Map model → response, intentionally omitting secret_ref."""
     return ConnectionResponse(
         id=conn.id,
         hired_instance_id=conn.hired_instance_id,
         skill_id=conn.skill_id,
+        customer_platform_credential_id=_optional_string(
+            getattr(conn, "customer_platform_credential_id", None)
+        ),
         platform_key=conn.platform_key,
         status=conn.status,
         connected_at=conn.connected_at,
         last_verified_at=conn.last_verified_at,
         created_at=conn.created_at,
         updated_at=conn.updated_at,
+    )
+
+
+def _to_customer_credential_response(
+    credential: CustomerPlatformCredentialModel,
+) -> CustomerPlatformCredentialResponse:
+    return CustomerPlatformCredentialResponse(
+        id=credential.id,
+        customer_id=credential.customer_id,
+        platform_key=credential.platform_key,
+        provider_account_id=credential.provider_account_id,
+        display_name=credential.display_name,
+        granted_scopes=list(credential.granted_scopes or []),
+        verification_status=credential.verification_status,
+        connection_status=credential.connection_status,
+        token_expires_at=credential.token_expires_at,
+        last_verified_at=credential.last_verified_at,
+        created_at=credential.created_at,
+        updated_at=credential.updated_at,
     )
 
 
@@ -125,10 +203,17 @@ async def create_connection(
     Returns 409 on duplicate (hired_instance_id, skill_id, platform_key).
     DO NOT log body.secret_ref — it is a credential reference.
     """
+    if not body.secret_ref and not body.customer_platform_credential_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Either secret_ref or customer_platform_credential_id is required",
+        )
+
     conn = PlatformConnectionModel(
         id=str(uuid.uuid4()),
         hired_instance_id=hired_instance_id,
         skill_id=body.skill_id,
+        customer_platform_credential_id=body.customer_platform_credential_id,
         platform_key=body.platform_key,
         secret_ref=body.secret_ref,  # stored, never returned
         status="pending",
@@ -152,6 +237,98 @@ async def create_connection(
         # DO NOT log body.secret_ref
     )
     return _to_response(conn)
+
+
+@customer_router.post(
+    "/youtube/connect/start",
+    response_model=StartYouTubeConnectResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def start_youtube_connect(
+    body: StartYouTubeConnectRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> StartYouTubeConnectResponse:
+    service = YouTubeConnectionService(db=db)
+    result = await service.start_connect(customer_id=body.customer_id, redirect_uri=body.redirect_uri)
+    return StartYouTubeConnectResponse(
+        state=result.state,
+        authorization_url=result.authorization_url,
+        expires_at=result.expires_at,
+    )
+
+
+@customer_router.post(
+    "/youtube/connect/finalize",
+    response_model=CustomerPlatformCredentialResponse,
+)
+async def finalize_youtube_connect(
+    body: FinalizeYouTubeConnectRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> CustomerPlatformCredentialResponse:
+    service = YouTubeConnectionService(db=db)
+    try:
+        result = await service.finalize_connect(
+            customer_id=body.customer_id,
+            state=body.state,
+            code=body.code,
+            redirect_uri=body.redirect_uri,
+        )
+    except YouTubeConnectionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return _to_customer_credential_response(result.credential)
+
+
+@customer_router.get(
+    "/{customer_id}",
+    response_model=List[CustomerPlatformCredentialResponse],
+)
+async def list_customer_platform_credentials(
+    customer_id: str,
+    platform_key: str = "youtube",
+    db: AsyncSession = Depends(get_read_db_session),
+) -> List[CustomerPlatformCredentialResponse]:
+    service = YouTubeConnectionService(db=db)
+    credentials = await service.list_credentials(customer_id=customer_id, platform_key=platform_key)
+    return [_to_customer_credential_response(item) for item in credentials]
+
+
+@customer_router.get(
+    "/{customer_id}/{credential_id}",
+    response_model=CustomerPlatformCredentialResponse,
+)
+async def get_customer_platform_credential(
+    customer_id: str,
+    credential_id: str,
+    db: AsyncSession = Depends(get_read_db_session),
+) -> CustomerPlatformCredentialResponse:
+    service = YouTubeConnectionService(db=db)
+    credential = await service.get_credential(customer_id=customer_id, credential_id=credential_id)
+    if credential is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer platform credential not found")
+    return _to_customer_credential_response(credential)
+
+
+@customer_router.post(
+    "/{credential_id}/attach",
+    response_model=ConnectionResponse,
+)
+async def attach_customer_platform_credential(
+    credential_id: str,
+    body: AttachCustomerCredentialRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> ConnectionResponse:
+    service = YouTubeConnectionService(db=db)
+    try:
+        connection = await service.attach_connection_to_hired_agent(
+            customer_id=body.customer_id,
+            credential_id=credential_id,
+            hired_instance_id=body.hired_instance_id,
+            skill_id=body.skill_id,
+            platform_key=body.platform_key,
+        )
+    except YouTubeConnectionError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return _to_response(connection)
 
 
 @router.delete(

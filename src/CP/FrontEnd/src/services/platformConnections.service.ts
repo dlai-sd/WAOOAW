@@ -14,6 +14,7 @@ export interface PlatformConnection {
   id: string
   hired_instance_id: string
   skill_id: string
+  customer_platform_credential_id?: string | null
   /** Matches Plant BackEnd ConnectionResponse.platform_key */
   platform_key: string
   status?: string

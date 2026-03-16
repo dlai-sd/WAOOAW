@@ -20,6 +20,14 @@ vi.mock('../services/plant.service', () => ({
   }
 }))
 
+vi.mock('../services/youtubeConnections.service', () => ({
+  startYouTubeConnection: vi.fn(),
+  finalizeYouTubeConnection: vi.fn(),
+  listYouTubeConnections: vi.fn(async () => []),
+  getYouTubeConnection: vi.fn(),
+  attachYouTubeConnection: vi.fn(),
+}))
+
 const renderWizard = (initialEntry: string) => {
   return render(
     <FluentProvider theme={waooawLightTheme}>
@@ -112,6 +120,7 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
   it('shows marketing platform connection UI at step 3 for marketing agents', async () => {
     const svc = await import('../services/hireWizard.service')
     const plantSvc = await import('../services/plant.service')
+    const youtubeSvc = await import('../services/youtubeConnections.service')
     vi.mocked(plantSvc.plantAPIService.getCatalogAgent).mockResolvedValueOnce({
       release_id: 'CAR-1',
       id: 'AGENT-CATALOG-123',
@@ -145,6 +154,19 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
       trial_start_at: null,
       trial_end_at: null
     } as any)
+    vi.mocked(youtubeSvc.listYouTubeConnections).mockResolvedValueOnce([
+      {
+        id: 'cred-yt-1',
+        customer_id: 'CUST-1',
+        platform_key: 'youtube',
+        display_name: 'WAOOAW Channel',
+        granted_scopes: ['youtube.readonly'],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        created_at: '2026-03-16T10:00:00Z',
+        updated_at: '2026-03-16T10:00:00Z',
+      } as any,
+    ])
 
     renderWizard('/hire/setup/SUB-4?agentId=AGENT-CATALOG-123&agentTypeId=marketing.digital_marketing.v1&catalogVersion=v1')
 
@@ -152,6 +174,8 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
       expect(screen.getByText('Step 3 of 4')).toBeInTheDocument()
     })
     expect(screen.getByText(/Connect your marketing platforms/i)).toBeInTheDocument()
-    expect(screen.getByTestId('cp-hire-setup-access-token')).toBeInTheDocument()
+    expect(screen.getByTestId('cp-hire-setup-youtube-connect-button')).toBeInTheDocument()
+    expect(screen.queryByTestId('cp-hire-setup-access-token')).not.toBeInTheDocument()
+    expect(screen.getByText(/WAOOAW Channel/i)).toBeInTheDocument()
   })
 })

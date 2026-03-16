@@ -15,6 +15,9 @@ from models.campaign import CampaignModel, DailyThemeItemModel, ContentPostModel
 from models.flow_run import FlowRunModel
 from models.component_run import ComponentRunModel
 from models.skill_config import SkillConfigModel
+from models.platform_connection import PlatformConnectionModel
+from models.customer_platform_credential import CustomerPlatformCredentialModel
+from models.oauth_connection_session import OAuthConnectionSessionModel
 from models.schemas import (
     BaseEntitySchema,
     SkillCreate,
@@ -43,6 +46,9 @@ __all__ = [
     "FlowRunModel",
     "ComponentRunModel",
     "SkillConfigModel",
+    "PlatformConnectionModel",
+    "CustomerPlatformCredentialModel",
+    "OAuthConnectionSessionModel",
     "BaseEntitySchema",
     "SkillCreate",
     "SkillResponse",

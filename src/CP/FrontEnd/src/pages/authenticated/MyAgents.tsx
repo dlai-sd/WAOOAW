@@ -31,8 +31,9 @@ import { DigitalMarketingChannelStatusCard } from '../../components/DigitalMarke
 import { DigitalMarketingPublishReadinessCard } from '../../components/DigitalMarketingPublishReadinessCard'
 import { SkillsPanel } from '../../components/SkillsPanel'
 import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
-import { getPlatformConnectionSummary, listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
+import { listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
+import { listYouTubeConnections, type YouTubeConnection } from '../../services/youtubeConnections.service'
 
 type JsonObject = Record<string, unknown>
 
@@ -869,6 +870,7 @@ function ConfigureAgentPanel(props: {
 
 function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: boolean }) {
   const { instance, readOnly } = props
+  const navigate = useNavigate()
 
   const hiredInstanceId = String(instance.hired_instance_id || '').trim()
   const [loading, setLoading] = useState(false)
@@ -914,6 +916,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   const [connectionsLoading, setConnectionsLoading] = useState(false)
   const [connectionsError, setConnectionsError] = useState<string | null>(null)
   const [connections, setConnections] = useState<PlatformConnection[]>([])
+  const [youtubeCredentials, setYouTubeCredentials] = useState<YouTubeConnection[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -1019,11 +1022,18 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
       setConnectionsLoading(true)
       setConnectionsError(null)
       try {
-        const next = await listPlatformConnections(hiredInstanceId)
-        if (!cancelled) setConnections(next)
+        const [nextConnections, nextYouTubeCredentials] = await Promise.all([
+          listPlatformConnections(hiredInstanceId),
+          listYouTubeConnections(),
+        ])
+        if (!cancelled) {
+          setConnections(nextConnections)
+          setYouTubeCredentials(nextYouTubeCredentials)
+        }
       } catch (e: any) {
         if (!cancelled) {
           setConnections([])
+          setYouTubeCredentials([])
           setConnectionsError(e?.message || 'Failed to load YouTube connection state')
         }
       } finally {
@@ -1044,8 +1054,100 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
   const youtubeConnectionSummary = useMemo(() => {
     if (!isDigitalMarketingInstance) return null
-    return getPlatformConnectionSummary(connections, 'youtube')
-  }, [connections, isDigitalMarketingInstance])
+    const attached = connections.find((connection) => String(connection.platform_key || '').trim().toLowerCase() === 'youtube') || null
+    const attachedCredential = attached?.customer_platform_credential_id
+      ? youtubeCredentials.find((connection) => connection.id === attached.customer_platform_credential_id) || null
+      : youtubeCredentials.find((connection) => connection.connection_status === 'connected') || null
+
+    const labelPrefix = attachedCredential?.display_name || 'YouTube'
+    const lastVerified = attachedCredential?.last_verified_at
+      ? new Date(attachedCredential.last_verified_at).toLocaleString()
+      : null
+
+    if (!attached && attachedCredential) {
+      return {
+        platformKey: 'youtube',
+        label: `${labelPrefix} ready to attach`,
+        message: `${labelPrefix} is connected in your account, but this hire is not currently attached to it. Reconnect from setup to restore publish readiness.`,
+        tone: 'warning' as const,
+        isReady: false,
+        connection: null,
+      }
+    }
+
+    if (!attached) {
+      return {
+        platformKey: 'youtube',
+        label: 'YouTube not connected',
+        message: 'Connect YouTube before the agent can upload anything externally.',
+        tone: 'danger' as const,
+        isReady: false,
+        connection: null,
+      }
+    }
+
+    const attachmentStatus = String(attached.status || '').trim().toLowerCase()
+    const credentialStatus = String(attachedCredential?.connection_status || '').trim().toLowerCase()
+    const verificationStatus = String(attachedCredential?.verification_status || '').trim().toLowerCase()
+
+    if (credentialStatus === 'reconnect_required' || credentialStatus === 'needs_attention' || verificationStatus === 'failed') {
+      return {
+        platformKey: 'youtube',
+        label: `${labelPrefix} reconnect required`,
+        message: lastVerified
+          ? `${labelPrefix} last verified on ${lastVerified} and now needs attention before uploads can resume.`
+          : `${labelPrefix} needs to be reconnected before uploads can resume.`,
+        tone: 'danger' as const,
+        isReady: false,
+        connection: attached,
+      }
+    }
+
+    if (attachmentStatus === 'connected' && (credentialStatus === 'connected' || !credentialStatus)) {
+      return {
+        platformKey: 'youtube',
+        label: `${labelPrefix} connected`,
+        message: lastVerified
+          ? `${labelPrefix} was last verified on ${lastVerified}.`
+          : `${labelPrefix} is connected and available for upload gating.`,
+        tone: 'success' as const,
+        isReady: true,
+        connection: attached,
+      }
+    }
+
+    if (attachmentStatus === 'pending' || verificationStatus === 'pending') {
+      return {
+        platformKey: 'youtube',
+        label: `${labelPrefix} pending verification`,
+        message: `${labelPrefix} is connected but still needs verification before uploads should proceed.`,
+        tone: 'warning' as const,
+        isReady: false,
+        connection: attached,
+      }
+    }
+
+    return {
+      platformKey: 'youtube',
+      label: `${labelPrefix} needs attention`,
+      message: `${labelPrefix} has a connection record, but its current state is ${attachmentStatus || credentialStatus || 'unknown'}. Review it before upload.`,
+      tone: 'warning' as const,
+      isReady: false,
+      connection: attached,
+    }
+  }, [connections, isDigitalMarketingInstance, youtubeCredentials])
+
+  const youtubeConnectionAction = useMemo(() => {
+    if (!isDigitalMarketingInstance || !youtubeConnectionSummary || youtubeConnectionSummary.isReady) return null
+    return {
+      label: youtubeConnectionSummary.label.toLowerCase().includes('ready to attach') ? 'Reconnect in setup' : 'Reconnect YouTube',
+      onAction: () => {
+        navigate(
+          `/hire/setup/${encodeURIComponent(instance.subscription_id)}?agentId=${encodeURIComponent(instance.agent_id)}&agentTypeId=${encodeURIComponent(String(instance.agent_type_id || ''))}`
+        )
+      },
+    }
+  }, [instance.agent_id, instance.agent_type_id, instance.subscription_id, isDigitalMarketingInstance, navigate, youtubeConnectionSummary])
 
   const activeDeliverableReadiness = useMemo(() => {
     if (!activeDeliverable || !isDigitalMarketingInstance) return null
@@ -1559,6 +1661,8 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                               summary={youtubeConnectionSummary}
                               loading={connectionsLoading}
                               error={connectionsError}
+                              actionLabel={youtubeConnectionAction?.label || null}
+                              onAction={youtubeConnectionAction?.onAction || null}
                             />
                           ) : null}
 

@@ -1,4 +1,4 @@
-import { Card, Spinner } from '@fluentui/react-components'
+import { Button, Card, Spinner } from '@fluentui/react-components'
 
 import { type PlatformConnectionSummary } from '../services/platformConnections.service'
 
@@ -6,6 +6,8 @@ type DigitalMarketingChannelStatusCardProps = {
   summary: PlatformConnectionSummary | null
   loading?: boolean
   error?: string | null
+  actionLabel?: string | null
+  onAction?: (() => void) | null
 }
 
 function accentColor(tone: PlatformConnectionSummary['tone'] | 'danger'): string {
@@ -41,6 +43,13 @@ export function DigitalMarketingChannelStatusCard(props: DigitalMarketingChannel
       <div style={{ fontWeight: 700, marginBottom: '4px' }}>YouTube channel status</div>
       <div style={{ fontWeight: 600, color: accentColor(summary.tone), marginBottom: '6px' }}>{summary.label}</div>
       <div style={{ fontSize: '13px', color: 'var(--colorNeutralForeground2)' }}>{summary.message}</div>
+      {props.actionLabel && props.onAction ? (
+        <div style={{ marginTop: '12px' }}>
+          <Button appearance="outline" size="small" onClick={props.onAction}>
+            {props.actionLabel}
+          </Button>
+        </div>
+      ) : null}
     </Card>
   )
 }

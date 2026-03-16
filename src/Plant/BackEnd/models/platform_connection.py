@@ -26,10 +26,15 @@ class PlatformConnectionModel(Base):
         nullable=False,
     )
     skill_id = Column(String, nullable=False)
+    customer_platform_credential_id = Column(
+        String,
+        ForeignKey("customer_platform_credentials.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     # e.g. "delta_exchange", "instagram", "facebook"
     platform_key = Column(String(100), nullable=False)
     # GCP Secret Manager resource path ONLY — NEVER the actual secret value
-    secret_ref = Column(Text, nullable=False)
+    secret_ref = Column(Text, nullable=True)
     # pending | connected | error
     status = Column(String(50), nullable=False, default="pending")
     connected_at = Column(DateTime(timezone=True), nullable=True)
@@ -51,4 +56,8 @@ class PlatformConnectionModel(Base):
             name="uq_platform_conn_hired_skill_platform",
         ),
         Index("ix_platform_connections_hired_instance_id", "hired_instance_id"),
+        Index(
+            "ix_platform_connections_customer_platform_credential_id",
+            "customer_platform_credential_id",
+        ),
     )
