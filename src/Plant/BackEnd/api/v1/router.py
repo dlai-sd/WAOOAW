@@ -42,6 +42,7 @@ api_v1_router.include_router(agent_skills.router)               # PLANT-SKILLS-1
 api_v1_router.include_router(agent_skills.skills_router)        # PLANT-SKILLS-1 E1-S2
 api_v1_router.include_router(agent_skills.hired_agent_skills_router)  # PLANT-RUNTIME-1 It1 E1-S1
 api_v1_router.include_router(platform_connections.router)       # PLANT-SKILLS-1 E4-S1
+api_v1_router.include_router(platform_connections.customer_router)
 api_v1_router.include_router(performance_stats.router)          # PLANT-SKILLS-1 E4-S2
 api_v1_router.include_router(campaigns.router)                  # PLANT-CONTENT-1 Iteration 2
 api_v1_router.include_router(construct_diagnostics_router)      # PLANT-MOULD-1 E4: per-construct health

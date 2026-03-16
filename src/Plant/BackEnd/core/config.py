@@ -107,6 +107,12 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("GOOGLE_CLIENT_ID", "GOOGLE_WEB_CLIENT_ID"),
     )
+    youtube_client_id: str = Field(default="", validation_alias=AliasChoices("YOUTUBE_CLIENT_ID", "youtube_client_id"))
+    youtube_client_secret: str = Field(default="", validation_alias=AliasChoices("YOUTUBE_CLIENT_SECRET", "youtube_client_secret"))
+    youtube_token_secret_prefix: str = Field(
+        default="customer-platform",
+        validation_alias=AliasChoices("YOUTUBE_TOKEN_SECRET_PREFIX", "youtube_token_secret_prefix"),
+    )
     
     # Cryptography
     rsa_key_size: int = 4096
