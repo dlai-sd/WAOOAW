@@ -101,13 +101,25 @@ class AttachCustomerCredentialRequest(BaseModel):
     platform_key: str = "youtube"
 
 
+def _optional_string(value: object) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return None
+
+
 def _to_response(conn: PlatformConnectionModel) -> ConnectionResponse:
     """Map model → response, intentionally omitting secret_ref."""
     return ConnectionResponse(
         id=conn.id,
         hired_instance_id=conn.hired_instance_id,
         skill_id=conn.skill_id,
-        customer_platform_credential_id=conn.customer_platform_credential_id,
+        customer_platform_credential_id=_optional_string(
+            getattr(conn, "customer_platform_credential_id", None)
+        ),
         platform_key=conn.platform_key,
         status=conn.status,
         connected_at=conn.connected_at,
