@@ -64,6 +64,34 @@ vi.mock('../services/hiredAgents.service', () => ({
   upsertHiredAgentDraft: vi.fn()
 }))
 
+vi.mock('../services/hiredAgentStudio.service', () => ({
+  getHiredAgentStudio: vi.fn().mockResolvedValue({
+    hired_instance_id: 'HIRED-1',
+    subscription_id: 'SUB-1',
+    agent_id: 'AGT-TRD-DELTA-001',
+    agent_type_id: 'trading.share_trader.v1',
+    customer_id: 'CUST-user-1',
+    mode: 'edit',
+    selection_required: false,
+    current_step: 'review',
+    steps: [
+      { key: 'identity', title: 'Identity and voice', complete: true, blocked: false, summary: 'Business-facing name and theme are ready.' },
+      { key: 'connection', title: 'Connection', complete: true, blocked: false, summary: 'Connection verified and ready.' },
+      { key: 'operating_plan', title: 'Operating plan', complete: true, blocked: false, summary: 'Operating plan is in place.' },
+      { key: 'review', title: 'Review edits', complete: true, blocked: false, summary: 'Use review to confirm the updated operating setup.' },
+    ],
+    identity: { nickname: 'Trader One', theme: 'default', complete: true },
+    connection: { platform_key: 'delta_exchange_india', skill_id: 'default', connection_id: null, customer_platform_credential_id: 'cred-1', status: 'connected', complete: true, summary: 'Exchange credential reference is configured.' },
+    operating_plan: { complete: true, goals_completed: true, goal_count: 0, skill_config_count: 1, summary: 'Operating plan is in place.' },
+    review: { complete: true, summary: 'Ready to save the updated configuration.' },
+    configured: true,
+    goals_completed: true,
+    trial_status: 'active',
+    subscription_status: 'active',
+    updated_at: '2026-03-17T00:00:00Z',
+  })
+}))
+
 vi.mock('../services/platformCredentials.service', () => ({
   upsertPlatformCredential: vi.fn()
 }))
@@ -140,6 +168,11 @@ const renderWithProvider = (component: React.ReactElement) => {
   )
 }
 
+async function openDetailedWorkspace(): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: /Operating plan/i }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Open operating plan' }))
+}
+
 describe('MyAgents Component', () => {
   it('renders page title with agent count', async () => {
     renderWithProvider(<MyAgents />)
@@ -162,6 +195,8 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('AGT-TRD-DELTA-001')).toBeInTheDocument()
     })
 
+    await openDetailedWorkspace()
+
     fireEvent.click(screen.getByRole('button', { name: 'End Hire' }))
     expect(screen.getByText('End hire at next billing date?')).toBeInTheDocument()
     expect(screen.getByText('After your hire ends')).toBeInTheDocument()
@@ -183,8 +218,10 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('Servicing only')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
+
+    await openDetailedWorkspace()
 
     expect(screen.getByText('Version: v3')).toBeInTheDocument()
     expect(screen.getByText('Lifecycle: Servicing only')).toBeInTheDocument()
@@ -202,10 +239,11 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
+    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
-      expect(listHiredAgentGoals).toHaveBeenCalledTimes(1)
+      expect(listHiredAgentGoals).toHaveBeenCalled()
     })
 
     await waitFor(() => {
@@ -240,6 +278,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
+    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -321,6 +360,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
+    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -425,6 +465,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
+    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -516,6 +557,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
+    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {

@@ -2,17 +2,22 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, Card, Checkbox, Input, Select, Spinner, Textarea } from '@fluentui/react-components'
 import {
-  finalizeHireWizard,
   getHireWizardDraftBySubscription,
   upsertHireWizardDraft,
   type HireWizardDraft
 } from '../services/hireWizard.service'
+import {
+  getHiredAgentStudio,
+  updateHiredAgentStudio,
+  type HiredAgentStudio,
+  type HiredAgentStudioStepKey,
+  type HiredAgentStudioUpdate,
+} from '../services/hiredAgentStudio.service'
 import { plantAPIService } from '../services/plant.service'
 import { upsertExchangeSetup } from '../services/exchangeSetup.service'
 import { upsertTradingStrategyConfig } from '../services/tradingStrategy.service'
 import { upsertPlatformCredential } from '../services/platformCredentials.service'
 import {
-  attachYouTubeConnection,
   finalizeYouTubeConnection,
   listYouTubeConnections,
   startYouTubeConnection,
@@ -95,6 +100,13 @@ function isMarketingAgentType(agentTypeId?: string | null): boolean {
   return String(agentTypeId || '').trim().startsWith('marketing.')
 }
 
+function mapStudioStepToWizardStep(stepKey?: HiredAgentStudioStepKey | null): Step {
+  if (stepKey === 'identity') return 1
+  if (stepKey === 'connection') return 3
+  if (stepKey === 'operating_plan') return 3
+  return 4
+}
+
 export default function HireSetupWizard() {
   const navigate = useNavigate()
   const params = useParams()
@@ -113,6 +125,7 @@ export default function HireSetupWizard() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<HireWizardDraft | null>(null)
+  const [studio, setStudio] = useState<HiredAgentStudio | null>(null)
   const [resolvedAgentTypeId, setResolvedAgentTypeId] = useState(() => resolveAgentTypeId(requestedAgentTypeId, agentId))
   const [resolvedCatalogVersion, setResolvedCatalogVersion] = useState(requestedCatalogVersion)
   const [resolvedLifecycleState, setResolvedLifecycleState] = useState(requestedLifecycleState)
@@ -253,10 +266,16 @@ export default function HireSetupWizard() {
         const existing = await getHireWizardDraftBySubscription(subscriptionId)
         if (cancelled) return
         setDraft(existing)
+        const existingStudio = existing.hired_instance_id
+          ? await getHiredAgentStudio(existing.hired_instance_id).catch(() => null)
+          : null
+        if (cancelled) return
+        setStudio(existingStudio)
+
         setResolvedAgentTypeId(resolveAgentTypeId(existing.agent_type_id || requestedAgentTypeId, existing.agent_id || agentId))
-        setNickname(String(existing.nickname || ''))
-        setTheme(String(existing.theme || 'default'))
-        setGoalsCompleted(Boolean(existing.goals_completed))
+        setNickname(String(existingStudio?.identity.nickname ?? existing.nickname ?? ''))
+        setTheme(String(existingStudio?.identity.theme ?? existing.theme ?? 'default'))
+        setGoalsCompleted(Boolean(existingStudio?.goals_completed ?? existing.goals_completed))
         setConfigJson(JSON.stringify(existing.config || {}, null, 2))
 
         if (!requestedCatalogVersion && existing.external_catalog_version) {
@@ -305,7 +324,7 @@ export default function HireSetupWizard() {
           setMarketingRefreshToken('')
           setMarketingPostingIdentity('')
         }
-        setStep(requestedStep ?? inferInitialStep(existing))
+        setStep(requestedStep ?? (existingStudio ? mapStudioStepToWizardStep(existingStudio.current_step) : inferInitialStep(existing)))
       } catch (e: any) {
         // 404 is fine: user hasn't saved draft yet.
         if (e?.status && Number(e.status) === 404) {
@@ -555,15 +574,46 @@ export default function HireSetupWizard() {
         theme: theme.trim() || undefined,
         config: cfg
       })
-      setDraft(next)
+      const studioUpdate: HiredAgentStudioUpdate = {
+        identity: {
+          ...(nickname.trim() ? { nickname: nickname.trim() } : {}),
+          ...(theme.trim() ? { theme: theme.trim() } : {}),
+        },
+        operating_plan: {
+          config_patch: cfg,
+          ...(goalsCompleted ? { goals_completed: true } : {}),
+        },
+      }
+
+      if (isTradingAgent) {
+        const credentialRef = String((cfg as any).exchange_credential_ref || exchangeCredentialRef || '').trim()
+        if (credentialRef) {
+          studioUpdate.connection = {
+            platform_key: 'delta_exchange_india',
+            skill_id: 'default',
+            secret_ref: credentialRef,
+            mark_connected: false,
+          }
+        }
+      }
 
       if (isMarketingAgent && selectedYouTubeConnectionId.trim()) {
-        await attachYouTubeConnection(selectedYouTubeConnectionId, {
-          hired_instance_id: next.hired_instance_id,
-          skill_id: getMarketingSkillId(),
+        studioUpdate.connection = {
           platform_key: 'youtube',
-        })
+          skill_id: getMarketingSkillId(),
+          customer_platform_credential_id: selectedYouTubeConnectionId,
+          mark_connected: true,
+        }
       }
+
+      const refreshedStudio = await updateHiredAgentStudio(next.hired_instance_id, studioUpdate)
+      setStudio(refreshedStudio)
+      setDraft({
+        ...next,
+        goals_completed: refreshedStudio.goals_completed,
+        trial_status: refreshedStudio.trial_status as HireWizardDraft['trial_status'],
+        subscription_status: refreshedStudio.subscription_status ?? next.subscription_status,
+      })
 
       return next
     } finally {
@@ -593,12 +643,19 @@ export default function HireSetupWizard() {
     setError(null)
     try {
       const saved = await saveDraft()
-      const finalized = await finalizeHireWizard({
-        hired_instance_id: saved.hired_instance_id,
-        agent_type_id: inferAgentTypeId(resolvedAgentTypeId, agentId),
-        goals_completed: Boolean(goalsCompleted)
+      const finalizedStudio = await updateHiredAgentStudio(saved.hired_instance_id, {
+        review: {
+          goals_completed: Boolean(goalsCompleted),
+          finalize: true,
+        },
       })
-      setDraft(finalized)
+      setStudio(finalizedStudio)
+      setDraft({
+        ...saved,
+        goals_completed: finalizedStudio.goals_completed,
+        trial_status: finalizedStudio.trial_status as HireWizardDraft['trial_status'],
+        subscription_status: finalizedStudio.subscription_status ?? saved.subscription_status,
+      })
 
       navigate('/portal', {
         state: {
@@ -606,8 +663,8 @@ export default function HireSetupWizard() {
             page: 'my-agents',
             agentId,
             agentName: resolvedAgentName || undefined,
-            catalogVersion: finalized.external_catalog_version || resolvedCatalogVersion || undefined,
-            lifecycleState: finalized.catalog_status_at_hire || resolvedLifecycleState || undefined,
+            catalogVersion: saved.external_catalog_version || resolvedCatalogVersion || undefined,
+            lifecycleState: saved.catalog_status_at_hire || resolvedLifecycleState || undefined,
             source: 'trial-activated',
             subscriptionId,
           },
@@ -957,9 +1014,9 @@ export default function HireSetupWizard() {
               data-testid="cp-hire-setup-goals-completed"
             />
 
-            {draft?.trial_status === 'active' && (
+            {(studio?.trial_status === 'active' || draft?.trial_status === 'active') && (
               <div style={{ marginTop: '1rem' }}>
-                Trial is active{draft.trial_end_at ? ` until ${draft.trial_end_at}` : ''}.
+                Trial is active{draft?.trial_end_at ? ` until ${draft.trial_end_at}` : ''}.
               </div>
             )}
           </>

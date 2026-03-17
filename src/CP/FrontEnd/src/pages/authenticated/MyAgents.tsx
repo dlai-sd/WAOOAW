@@ -8,9 +8,9 @@ import { LoadingIndicator, SaveIndicator, FeedbackMessage, ValidationFeedback } 
 import { ListItemSkeleton, PageSkeleton } from '../../components/SkeletonLoaders'
 import { cancelSubscription } from '../../services/subscriptions.service'
 import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../../services/myAgentsSummary.service'
-import { getHireWizardDraftBySubscription, type HireWizardDraft } from '../../services/hireWizard.service'
 import { getAgentTypeDefinition, type AgentTypeDefinition, type GoalTemplateDefinition, type SchemaFieldDefinition } from '../../services/agentTypes.service'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../../services/hiredAgents.service'
+import { getHiredAgentStudio, type HiredAgentStudio, type HiredAgentStudioStepKey } from '../../services/hiredAgentStudio.service'
 import { upsertPlatformCredential } from '../../services/platformCredentials.service'
 import { upsertExchangeSetup } from '../../services/exchangeSetup.service'
 import { deleteHiredAgentGoal, listHiredAgentGoals, upsertHiredAgentGoal, type GoalInstance } from '../../services/hiredAgentGoals.service'
@@ -1801,125 +1801,74 @@ function ActivationStudioPanel(props: {
     () => instances.find((item) => item.subscription_id === selectedSubscriptionId) || instances[0] || null,
     [instances, selectedSubscriptionId]
   )
-  const [draft, setDraft] = useState<HireWizardDraft | null>(null)
-  const [draftLoading, setDraftLoading] = useState(true)
-  const [draftError, setDraftError] = useState<string | null>(null)
+  const [studio, setStudio] = useState<HiredAgentStudio | null>(null)
+  const [studioLoading, setStudioLoading] = useState(true)
+  const [studioError, setStudioError] = useState<string | null>(null)
   const [activeStage, setActiveStage] = useState<ActivationStageKey>('select-agent')
   const isMarketingInstance = useMemo(
     () => isDigitalMarketingAgent(instance?.agent_id || '', instance?.agent_type_id),
     [instance?.agent_id, instance?.agent_type_id]
   )
 
-  const [connectionsLoading, setConnectionsLoading] = useState(false)
-  const [connectionsError, setConnectionsError] = useState<string | null>(null)
-  const [connections, setConnections] = useState<PlatformConnection[]>([])
-  const [youtubeCredentials, setYouTubeCredentials] = useState<YouTubeConnection[]>([])
-
-  useEffect(() => {
-    if (!instance?.subscription_id) {
-      setDraft(null)
-      setDraftError(null)
-      setDraftLoading(false)
-      return () => undefined
+  const studioStepMap = useMemo(() => {
+    const mapped = new Map<HiredAgentStudioStepKey, HiredAgentStudio['steps'][number]>()
+    for (const step of studio?.steps || []) {
+      mapped.set(step.key, step)
     }
-
-    let cancelled = false
-
-    const loadDraft = async () => {
-      setDraftLoading(true)
-      setDraftError(null)
-      try {
-        const next = await getHireWizardDraftBySubscription(instance.subscription_id)
-        if (!cancelled) setDraft(next)
-      } catch (e: any) {
-        if (!cancelled) {
-          if (Number(e?.status || e?.problem?.status) !== 404) {
-            setDraftError(e?.message || 'Failed to load activation draft')
-          }
-          setDraft(null)
-        }
-      } finally {
-        if (!cancelled) setDraftLoading(false)
-      }
-    }
-
-    void loadDraft()
-    return () => {
-      cancelled = true
-    }
-  }, [instance?.subscription_id])
+    return mapped
+  }, [studio])
 
   useEffect(() => {
     if (!instance?.hired_instance_id) {
-      setConnections([])
-      setYouTubeCredentials([])
-      setConnectionsError(null)
-      setConnectionsLoading(false)
+      setStudio(null)
+      setStudioError(null)
+      setStudioLoading(false)
       return () => undefined
     }
 
     let cancelled = false
 
-    const loadConnections = async () => {
-      if (!isMarketingInstance || !instance.hired_instance_id) {
-        setConnections([])
-        setYouTubeCredentials([])
-        setConnectionsError(null)
-        return
-      }
-
-      setConnectionsLoading(true)
-      setConnectionsError(null)
+    const loadStudio = async () => {
+      setStudioLoading(true)
+      setStudioError(null)
       try {
-        const [nextConnections, nextYouTubeCredentials] = await Promise.all([
-          listPlatformConnections(String(instance.hired_instance_id)),
-          listYouTubeConnections(),
-        ])
-        if (!cancelled) {
-          setConnections(nextConnections)
-          setYouTubeCredentials(nextYouTubeCredentials)
-        }
+        const next = await getHiredAgentStudio(String(instance.hired_instance_id))
+        if (!cancelled) setStudio(next)
       } catch (e: any) {
         if (!cancelled) {
-          setConnections([])
-          setYouTubeCredentials([])
-          setConnectionsError(e?.message || 'Failed to load connection status')
+          setStudio(null)
+          setStudioError(e?.message || 'Failed to load wizard progress')
         }
       } finally {
-        if (!cancelled) setConnectionsLoading(false)
+        if (!cancelled) setStudioLoading(false)
       }
     }
 
-    void loadConnections()
+    void loadStudio()
     return () => {
       cancelled = true
     }
-  }, [instance?.hired_instance_id, isMarketingInstance])
+  }, [instance?.hired_instance_id])
 
   const youtubeConnectionSummary = useMemo(() => {
     if (!isMarketingInstance) return null
-    const attached = connections.find((connection) => String(connection.platform_key || '').trim().toLowerCase() === 'youtube') || null
-    const attachedCredential = attached?.customer_platform_credential_id
-      ? youtubeCredentials.find((connection) => connection.id === attached.customer_platform_credential_id) || null
-      : youtubeCredentials.find((connection) => connection.connection_status === 'connected') || null
+    if (!studio?.connection) return null
 
-    const labelPrefix = attachedCredential?.display_name || 'YouTube'
-    const lastVerified = attachedCredential?.last_verified_at
-      ? new Date(attachedCredential.last_verified_at).toLocaleString()
-      : null
+    const status = String(studio.connection.status || '').trim().toLowerCase()
+    const labelPrefix = studio.connection.platform_key === 'youtube' ? 'YouTube' : 'Channel'
 
-    if (!attached && attachedCredential) {
+    if (status === 'reference_saved') {
       return {
         platformKey: 'youtube',
-        label: `${labelPrefix} ready to attach`,
-        message: `${labelPrefix} is connected in your account, but this hire is not attached yet. Resume activation to connect it cleanly.`,
+        label: `${labelPrefix} ready to verify`,
+        message: 'A credential reference is already stored, but the activation flow still needs the connection verified before publishing can start.',
         tone: 'warning' as const,
         isReady: false,
         connection: null,
       }
     }
 
-    if (!attached) {
+    if (status === 'missing') {
       return {
         platformKey: 'youtube',
         label: 'YouTube not connected',
@@ -1930,50 +1879,42 @@ function ActivationStudioPanel(props: {
       }
     }
 
-    const attachmentStatus = String(attached.status || '').trim().toLowerCase()
-    const credentialStatus = String(attachedCredential?.connection_status || '').trim().toLowerCase()
-    const verificationStatus = String(attachedCredential?.verification_status || '').trim().toLowerCase()
-
-    if (credentialStatus === 'reconnect_required' || credentialStatus === 'needs_attention' || verificationStatus === 'failed') {
+    if (status === 'pending') {
       return {
         platformKey: 'youtube',
-        label: `${labelPrefix} needs attention`,
-        message: lastVerified
-          ? `${labelPrefix} was last verified on ${lastVerified} and now needs reconnection before publishing can resume.`
-          : `${labelPrefix} needs reconnection before publishing can resume.`,
-        tone: 'danger' as const,
+        label: `${labelPrefix} pending verification`,
+        message: studio.connection.summary,
+        tone: 'warning' as const,
         isReady: false,
-        connection: attached,
+        connection: null,
       }
     }
 
-    if (attachmentStatus === 'connected' && (credentialStatus === 'connected' || !credentialStatus)) {
+    if (status === 'connected') {
       return {
         platformKey: 'youtube',
         label: `${labelPrefix} connected`,
-        message: lastVerified
-          ? `${labelPrefix} was last verified on ${lastVerified}.`
-          : `${labelPrefix} is connected and ready for governed publishing.`,
+        message: studio.connection.summary,
         tone: 'success' as const,
         isReady: true,
-        connection: attached,
+        connection: null,
       }
     }
 
     return {
       platformKey: 'youtube',
-      label: `${labelPrefix} pending verification`,
-      message: `${labelPrefix} still needs verification before activation should be treated as complete.`,
+      label: `${labelPrefix} needs attention`,
+      message: studio.connection.summary,
       tone: 'warning' as const,
       isReady: false,
-      connection: attached,
+      connection: null,
     }
-  }, [connections, isMarketingInstance, youtubeCredentials])
+  }, [isMarketingInstance, studio])
 
-  const identityComplete = Boolean(String(draft?.nickname || instance?.nickname || '').trim() && String(draft?.theme || '').trim())
-  const connectionComplete = isMarketingInstance ? Boolean(youtubeConnectionSummary?.isReady) : Boolean(instance.configured)
-  const strategyComplete = Boolean(instance?.goals_completed)
-  const reviewComplete = Boolean(instance) && identityComplete && connectionComplete && strategyComplete
+  const identityComplete = Boolean(studio?.identity.complete)
+  const connectionComplete = Boolean(studio?.connection.complete)
+  const strategyComplete = Boolean(studio?.operating_plan.complete)
+  const reviewComplete = Boolean(studio?.review.complete)
 
   const stages = [
     {
@@ -1990,36 +1931,40 @@ function ActivationStudioPanel(props: {
       title: 'Identity and voice',
       eyebrow: 'Step 2',
       complete: identityComplete,
-      summary: identityComplete
-        ? `${String(draft?.nickname || instance?.nickname || 'Agent').trim()} · ${String(draft?.theme || 'default')} theme chosen`
-        : 'Name the agent and choose how it should show up for your business.',
+      summary: studioStepMap.get('identity')?.summary
+        || (identityComplete
+          ? `${String(studio?.identity.nickname || instance?.nickname || 'Agent').trim()} · ${String(studio?.identity.theme || 'default')} theme chosen`
+          : 'Name the agent and choose how it should show up for your business.'),
     },
     {
       key: 'connection' as const,
       title: isMarketingInstance ? 'YouTube connection' : 'Platform connection',
       eyebrow: 'Step 3',
       complete: connectionComplete,
-      summary: isMarketingInstance
-        ? (youtubeConnectionSummary?.label || 'Connect and verify YouTube before launch.')
-        : 'Connect the systems this hire depends on before launch.',
+      summary: studioStepMap.get('connection')?.summary
+        || (isMarketingInstance
+          ? (youtubeConnectionSummary?.label || 'Connect and verify YouTube before launch.')
+          : 'Connect the systems this hire depends on before launch.'),
     },
     {
       key: 'strategy' as const,
       title: 'Operating plan',
       eyebrow: 'Step 4',
       complete: strategyComplete,
-      summary: strategyComplete
-        ? 'Posting rhythm and activation readiness have been confirmed.'
-        : 'Set publishing rhythm, themes, and approval expectations before launch.',
+      summary: studioStepMap.get('operating_plan')?.summary
+        || (strategyComplete
+          ? 'Posting rhythm and activation readiness have been confirmed.'
+          : 'Set publishing rhythm, themes, and approval expectations before launch.'),
     },
     {
       key: 'review' as const,
-      title: 'Review and activate',
+      title: studio?.mode === 'edit' ? 'Review edits' : 'Review and activate',
       eyebrow: 'Step 5',
       complete: reviewComplete,
-      summary: reviewComplete
-        ? 'Everything needed for trial activation is in place.'
-        : 'Use the final review only after identity, connection, and plan are complete.',
+      summary: studioStepMap.get('review')?.summary
+        || (reviewComplete
+          ? 'Everything needed for trial activation is in place.'
+          : 'Use the final review only after identity, connection, and plan are complete.'),
     },
   ]
 
@@ -2030,7 +1975,7 @@ function ActivationStudioPanel(props: {
   const completedStages = stages.filter((stage) => stage.complete).length
   const activeStageIndex = Math.max(stages.findIndex((stage) => stage.key === activeStage), 0)
   const activeStageDetail = stages[activeStageIndex] || stages[0]
-  const activationSummarySource = instance ? String(instance.nickname || instance.agent_id || 'Selected hire') : 'Selected hire'
+  const activationSummarySource = instance ? String(studio?.identity.nickname || instance.nickname || instance.agent_id || 'Selected hire') : 'Selected hire'
   const selectionHelperText = instances.length > 1
     ? 'Choose which hired agent you want to bring live first.'
     : 'This is the only hired agent still waiting for activation.'
@@ -2117,7 +2062,9 @@ function ActivationStudioPanel(props: {
         : 'Activation is still blocked until the operating plan is defined.'
     }
     return reviewComplete
-      ? 'Open the review step to activate the trial with full context.'
+      ? (studio?.mode === 'edit'
+        ? 'Open the review step to confirm the updated setup with full context.'
+        : 'Open the review step to activate the trial with full context.')
       : 'Finish the earlier steps before the activation review is unlocked.'
   })()
 
@@ -2126,7 +2073,7 @@ function ActivationStudioPanel(props: {
       <div className="my-agents-activation-hero">
         <div>
           <div className="my-agents-activation-kicker">Activation studio</div>
-          <h3 className="my-agents-activation-title">Activate one hired agent at a time without dropping the customer into a long management screen</h3>
+          <h3 className="my-agents-activation-title">Guide one hired agent at a time through activation or edits without dropping the customer into a long management screen</h3>
           <p className="my-agents-activation-body">
             Start with agent selection, then move through identity, connection, operating plan, and final review in the same PP-style frame.
           </p>
@@ -2163,11 +2110,6 @@ function ActivationStudioPanel(props: {
             </button>
           ))}
 
-          <div className="my-agents-activation-rail-note">
-            <div className="my-agents-activation-rail-note-title">Need more control?</div>
-            <p>Open the advanced workspace only when you need direct control over detailed configuration, goals, and runtime management.</p>
-            <Button appearance="outline" onClick={() => onOpenAdvanced('configure')} disabled={readOnly}>Open advanced workspace</Button>
-          </div>
         </aside>
 
         <Card className="my-agents-activation-stage-card">
@@ -2181,8 +2123,8 @@ function ActivationStudioPanel(props: {
             </Badge>
           </div>
 
-          {draftLoading ? <LoadingIndicator message="Loading activation progress..." size="small" /> : null}
-          {draftError ? <FeedbackMessage intent="error" message={draftError} /> : null}
+          {studioLoading ? <LoadingIndicator message="Loading wizard progress..." size="small" /> : null}
+          {studioError ? <FeedbackMessage intent="error" message={studioError} /> : null}
 
           {activeStage === 'select-agent' ? (
             <div className="my-agents-activation-stage-content">
@@ -2208,7 +2150,7 @@ function ActivationStudioPanel(props: {
                   </div>
                   <div className="my-agents-activation-summary-card">
                     <div className="my-agents-activation-summary-label">Activation status</div>
-                    <div className="my-agents-activation-summary-value">{String(instance.trial_status || 'pending').replace(/_/g, ' ')}</div>
+                    <div className="my-agents-activation-summary-value">{String(studio?.mode === 'edit' ? 'edit mode' : (instance.trial_status || 'pending')).replace(/_/g, ' ')}</div>
                   </div>
                   <div className="my-agents-activation-summary-card">
                     <div className="my-agents-activation-summary-label">Catalog lifecycle</div>
@@ -2233,11 +2175,11 @@ function ActivationStudioPanel(props: {
               <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
                 <div className="my-agents-activation-summary-card">
                   <div className="my-agents-activation-summary-label">Agent name</div>
-                  <div className="my-agents-activation-summary-value">{String(draft?.nickname || instance?.nickname || 'Not chosen yet')}</div>
+                  <div className="my-agents-activation-summary-value">{String(studio?.identity.nickname || instance?.nickname || 'Not chosen yet')}</div>
                 </div>
                 <div className="my-agents-activation-summary-card">
                   <div className="my-agents-activation-summary-label">Avatar / theme</div>
-                  <div className="my-agents-activation-summary-value">{String(draft?.theme || 'Not chosen yet')}</div>
+                  <div className="my-agents-activation-summary-value">{String(studio?.identity.theme || 'Not chosen yet')}</div>
                 </div>
               </div>
             </div>
@@ -2253,13 +2195,13 @@ function ActivationStudioPanel(props: {
               {isMarketingInstance ? (
                 <DigitalMarketingChannelStatusCard
                   summary={youtubeConnectionSummary}
-                  loading={connectionsLoading}
-                  error={connectionsError}
+                  loading={studioLoading}
+                  error={studioError}
                   actionLabel={connectionComplete ? null : 'Resume connection setup'}
                   onAction={connectionComplete || !instance ? null : () => navigate(buildHireSetupUrl(instance, 'connection'))}
                 />
               ) : (
-                <div className="my-agents-activation-inline-note">Connection details for this hire are managed during guided setup.</div>
+                <div className="my-agents-activation-inline-note">{studio?.connection.summary || 'Connection details for this hire are managed during guided setup.'}</div>
               )}
             </div>
           ) : null}
@@ -2609,11 +2551,6 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
     return isInReadOnlyRetention(selectedInstance, nowMs, RETENTION_DAYS_AFTER_END)
   }, [selectedInstance, selectedReadOnlyExpired, nowMs])
 
-  const selectedNeedsActivation = useMemo(
-    () => isPendingActivation(selectedInstance) && !selectedReadOnlyExpired && !selectedInReadOnlyRetention,
-    [selectedInstance, selectedReadOnlyExpired, selectedInReadOnlyRetention]
-  )
-
   return (
     <div className="my-agents-page">
       <div className="page-header">
@@ -2647,10 +2584,10 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
       )}
 
       {instances.length > 0 ? (
-        selectedNeedsActivation && !showAdvancedWorkspace ? (
+        !showAdvancedWorkspace ? (
           <Card className="agent-detail-card" style={{ marginTop: '1rem', padding: '0.75rem' }}>
             <ActivationStudioPanel
-              instances={activationCandidates.length > 0 ? activationCandidates : [selectedInstance].filter(Boolean) as MyAgentInstanceSummary[]}
+              instances={instances}
               selectedSubscriptionId={selectedSubscriptionId}
               onSelectSubscriptionId={setSelectedSubscriptionId}
               readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
@@ -2674,14 +2611,13 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                 helperText={selectedReadOnlyExpired ? "This agent's trial has ended" : "View and manage your hired agents"}
               />
             </div>
-            {selectedNeedsActivation ? (
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                <Badge appearance="tint" color="warning">Activation in progress</Badge>
-                <Button appearance={showAdvancedWorkspace ? 'primary' : 'outline'} onClick={() => setShowAdvancedWorkspace((prev) => !prev)}>
-                  {showAdvancedWorkspace ? 'Back to activation guide' : 'Open advanced workspace'}
-                </Button>
-              </div>
-            ) : (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {isPendingActivation(selectedInstance) ? <Badge appearance="tint" color="warning">Activation in progress</Badge> : null}
+              <Button appearance={showAdvancedWorkspace ? 'primary' : 'outline'} onClick={() => setShowAdvancedWorkspace((prev) => !prev)}>
+                {showAdvancedWorkspace ? 'Back to wizard' : 'Open detailed workspace'}
+              </Button>
+            </div>
+            {showAdvancedWorkspace ? (
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <Button
                   appearance={activeSection === 'configure' ? 'primary' : 'outline'}
@@ -2712,7 +2648,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                   Performance
                 </Button>
               </div>
-            )}
+            ) : null}
           </div>
 
           {selectedInstance ? (

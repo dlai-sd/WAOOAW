@@ -40,6 +40,36 @@ vi.mock('../services/hireWizard.service', () => {
   }
 })
 
+vi.mock('../services/hiredAgentStudio.service', () => {
+  return {
+    getHiredAgentStudio: vi.fn(async () => ({
+      hired_instance_id: 'hire_1',
+      subscription_id: 'sub_1',
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      customer_id: 'CUST-user-1',
+      mode: 'activation',
+      selection_required: false,
+      current_step: 'connection',
+      steps: [
+        { key: 'identity', title: 'Identity and voice', complete: true, blocked: false, summary: 'Identity is ready.' },
+        { key: 'connection', title: 'Connection', complete: false, blocked: false, summary: 'Connection still needs attention.' },
+        { key: 'operating_plan', title: 'Operating plan', complete: false, blocked: false, summary: 'Operating plan still needs customer input.' },
+        { key: 'review', title: 'Review and activate', complete: false, blocked: true, summary: 'Finish earlier steps first.' },
+      ],
+      identity: { nickname: 'Growth Copilot', theme: 'default', complete: true },
+      connection: { platform_key: 'youtube', skill_id: 'default', connection_id: null, customer_platform_credential_id: null, status: 'missing', complete: false, summary: 'No verified publishing connection is attached yet.' },
+      operating_plan: { complete: false, goals_completed: false, goal_count: 0, skill_config_count: 0, summary: 'Operating plan still needs customer input before review.' },
+      review: { complete: false, summary: 'This agent still has incomplete steps before review.' },
+      configured: false,
+      goals_completed: false,
+      trial_status: 'not_started',
+      subscription_status: 'active',
+      updated_at: '2026-03-17T00:00:00Z',
+    })),
+  }
+})
+
 vi.mock('../services/platformConnections.service', async () => {
   const actual = await vi.importActual<any>('../services/platformConnections.service')
   return {
@@ -60,6 +90,11 @@ describe('MyAgents', () => {
   afterEach(() => {
     vi.useRealTimers()
   })
+
+  async function openDetailedWorkspace(): Promise<void> {
+    fireEvent.click(await screen.findByRole('button', { name: /Operating plan/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Open operating plan' }))
+  }
 
   it('routes a not-configured hire into the activation wizard', async () => {
     const summaryModule = await import('../services/myAgentsSummary.service')
@@ -118,7 +153,7 @@ describe('MyAgents', () => {
     render(<MyAgents />)
 
     expect(await screen.findByTestId('cp-my-agents-activation-studio')).toBeTruthy()
-    expect(screen.getByText(/Activate one hired agent at a time/i)).toBeTruthy()
+    expect(screen.getByText(/Guide one hired agent at a time through activation or edits/i)).toBeTruthy()
     expect(screen.getAllByText('Select agent').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Identity and voice').length).toBeGreaterThan(0)
     expect(screen.getAllByText('YouTube connection').length).toBeGreaterThan(0)
@@ -153,6 +188,8 @@ describe('MyAgents', () => {
 
     render(<MyAgents />)
 
+    await openDetailedWorkspace()
+
     await waitFor(() => {
       expect(screen.getByText(/Trial ends in/i)).toBeTruthy()
     })
@@ -180,6 +217,8 @@ describe('MyAgents', () => {
     })
 
     render(<MyAgents />)
+
+    await openDetailedWorkspace()
 
     await waitFor(() => {
       expect(screen.getByText(/Scheduled to end on/i)).toBeTruthy()
@@ -211,6 +250,8 @@ describe('MyAgents', () => {
     await waitFor(() => {
       expect(screen.getByText('My Agents (1)')).toBeTruthy()
     })
+
+    await openDetailedWorkspace()
 
     fireEvent.click(screen.getByText('End Hire'))
 
