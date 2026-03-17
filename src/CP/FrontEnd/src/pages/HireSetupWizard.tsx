@@ -1,23 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button, Card, Checkbox, Input, Select, Spinner, Textarea } from '@fluentui/react-components'
 import {
+  finalizeHireWizard,
   getHireWizardDraftBySubscription,
   upsertHireWizardDraft,
   type HireWizardDraft
 } from '../services/hireWizard.service'
-import {
-  getHiredAgentStudio,
-  updateHiredAgentStudio,
-  type HiredAgentStudio,
-  type HiredAgentStudioStepKey,
-  type HiredAgentStudioUpdate,
-} from '../services/hiredAgentStudio.service'
 import { plantAPIService } from '../services/plant.service'
 import { upsertExchangeSetup } from '../services/exchangeSetup.service'
 import { upsertTradingStrategyConfig } from '../services/tradingStrategy.service'
 import { upsertPlatformCredential } from '../services/platformCredentials.service'
 import {
+  attachYouTubeConnection,
   finalizeYouTubeConnection,
   listYouTubeConnections,
   startYouTubeConnection,
@@ -49,16 +44,12 @@ type MarketingPlatformConfig = {
   posting_identity?: string | null
 }
 
-function resolveRequestedStep(searchParams: URLSearchParams): Step | null {
-  const raw = String(searchParams.get('step') || searchParams.get('stage') || '').trim().toLowerCase()
-  if (!raw) return null
-
-  if (raw === '1' || raw === 'identity' || raw === 'profile') return 1
-  if (raw === '2' || raw === 'voice' || raw === 'theme') return 2
-  if (raw === '3' || raw === 'connection' || raw === 'youtube' || raw === 'platform') return 3
-  if (raw === '4' || raw === 'review' || raw === 'launch') return 4
-
-  return null
+type ReviewSummaryItem = {
+  label: string
+  value: string
+  actionLabel?: string
+  actionStep?: Step
+  action?: () => void
 }
 
 function buildRedirectUri(searchParams: URLSearchParams): string {
@@ -74,6 +65,27 @@ function buildRedirectUri(searchParams: URLSearchParams): string {
 
 function getMarketingSkillId(): string {
   return 'default'
+}
+
+function parseRequestedStep(value?: string | null): Step | null {
+  if (!value) return null
+  const parsed = Number(value)
+  if (parsed === 1 || parsed === 2 || parsed === 3 || parsed === 4) {
+    return parsed
+  }
+  return null
+}
+
+function upsertMarketingPlatformConfig(
+  platforms: MarketingPlatformConfig[],
+  nextItem: MarketingPlatformConfig
+): MarketingPlatformConfig[] {
+  const rest = platforms.filter((item) => item.platform !== nextItem.platform)
+  return [...rest, nextItem]
+}
+
+function removeMarketingPlatformConfig(platforms: MarketingPlatformConfig[], platform: string): MarketingPlatformConfig[] {
+  return platforms.filter((item) => item.platform !== platform)
 }
 
 function resolveAgentTypeId(agentTypeId?: string | null, agentId?: string): string {
@@ -100,17 +112,11 @@ function isMarketingAgentType(agentTypeId?: string | null): boolean {
   return String(agentTypeId || '').trim().startsWith('marketing.')
 }
 
-function mapStudioStepToWizardStep(stepKey?: HiredAgentStudioStepKey | null): Step {
-  if (stepKey === 'identity') return 1
-  if (stepKey === 'connection') return 3
-  if (stepKey === 'operating_plan') return 3
-  return 4
-}
-
 export default function HireSetupWizard() {
   const navigate = useNavigate()
   const params = useParams()
   const [searchParams] = useSearchParams()
+  const stepHeaderRef = useRef<HTMLDivElement | null>(null)
 
   const subscriptionId = params.subscriptionId
   const agentId = searchParams.get('agentId') || ''
@@ -118,14 +124,14 @@ export default function HireSetupWizard() {
   const requestedCatalogVersion = searchParams.get('catalogVersion') || ''
   const requestedLifecycleState = searchParams.get('lifecycleState') || ''
   const requestedAgentName = searchParams.get('agentName') || ''
-  const requestedStep = resolveRequestedStep(searchParams)
+  const requestedStep = parseRequestedStep(searchParams.get('step'))
+  const requestedFocus = String(searchParams.get('focus') || '').trim().toLowerCase()
 
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<HireWizardDraft | null>(null)
-  const [studio, setStudio] = useState<HiredAgentStudio | null>(null)
   const [resolvedAgentTypeId, setResolvedAgentTypeId] = useState(() => resolveAgentTypeId(requestedAgentTypeId, agentId))
   const [resolvedCatalogVersion, setResolvedCatalogVersion] = useState(requestedCatalogVersion)
   const [resolvedLifecycleState, setResolvedLifecycleState] = useState(requestedLifecycleState)
@@ -172,8 +178,8 @@ export default function HireSetupWizard() {
       body: 'Theme and working defaults shape how the agent presents itself in your runtime and customer surfaces.',
     },
     3: {
-      title: 'Connect the systems it needs',
-      body: 'This is where trust is won or lost. Make setup expectations clear and keep credentials server-side.',
+      title: 'Connect the channel it needs',
+      body: 'Make setup feel deliberate: connect the right account, confirm the exact channel, and keep approval in front of every publish action.',
     },
     4: {
       title: 'Review before activation',
@@ -189,6 +195,18 @@ export default function HireSetupWizard() {
     return `${base}${versionLabel}${lifecycleLabel}`
   }, [agentId, resolvedAgentName, resolvedCatalogVersion, resolvedLifecycleState])
 
+  const selectedYouTubeConnection = useMemo(() => {
+    return youtubeConnections.find((row) => row.id === selectedYouTubeConnectionId) || null
+  }, [selectedYouTubeConnectionId, youtubeConnections])
+
+  const selectedYouTubeReady = Boolean(
+    selectedYouTubeConnectionId.trim() && selectedYouTubeConnection?.connection_status === 'connected'
+  )
+
+  const marketingHasSavedNonYouTubePlatform = useMemo(() => {
+    return marketingPlatforms.some((platform) => platform.platform !== 'youtube' && Boolean(platform.credential_ref))
+  }, [marketingPlatforms])
+
   const canNext = useMemo(() => {
     if (step === 1) return Boolean(nickname.trim())
     if (step === 2) return Boolean(theme.trim())
@@ -201,11 +219,9 @@ export default function HireSetupWizard() {
       return hasProvider && hasCoins && hasInterval && (hasExistingCred || hasNewCred)
     }
     if (step === 3 && isMarketingAgent) {
-      const hasExisting = marketingPlatforms.length > 0
-      const hasSelectedYouTube = Boolean(selectedYouTubeConnectionId.trim())
       const hasPending = marketingPlatform !== 'youtube' && Boolean(marketingAccessToken.trim())
-      if (marketingPlatform === 'youtube') return hasExisting || hasSelectedYouTube
-      return hasExisting || hasPending
+      if (marketingPlatform === 'youtube') return selectedYouTubeReady
+      return marketingHasSavedNonYouTubePlatform || hasPending
     }
     return true
   }, [
@@ -223,7 +239,7 @@ export default function HireSetupWizard() {
     marketingPlatforms,
     marketingAccessToken,
     marketingPlatform,
-    selectedYouTubeConnectionId
+    selectedYouTubeReady
   ])
 
   const inferInitialStep = (existing: HireWizardDraft): Step => {
@@ -236,6 +252,13 @@ export default function HireSetupWizard() {
     if (alreadyAtReview) return 4
     return 3
   }
+
+  useEffect(() => {
+    if (loading) return
+    const node = stepHeaderRef.current
+    if (!node || typeof node.scrollIntoView !== 'function') return
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [step, loading])
 
   useEffect(() => {
     let cancelled = false
@@ -266,16 +289,10 @@ export default function HireSetupWizard() {
         const existing = await getHireWizardDraftBySubscription(subscriptionId)
         if (cancelled) return
         setDraft(existing)
-        const existingStudio = existing.hired_instance_id
-          ? await getHiredAgentStudio(existing.hired_instance_id).catch(() => null)
-          : null
-        if (cancelled) return
-        setStudio(existingStudio)
-
         setResolvedAgentTypeId(resolveAgentTypeId(existing.agent_type_id || requestedAgentTypeId, existing.agent_id || agentId))
-        setNickname(String(existingStudio?.identity.nickname ?? existing.nickname ?? ''))
-        setTheme(String(existingStudio?.identity.theme ?? existing.theme ?? 'default'))
-        setGoalsCompleted(Boolean(existingStudio?.goals_completed ?? existing.goals_completed))
+        setNickname(String(existing.nickname || ''))
+        setTheme(String(existing.theme || 'default'))
+        setGoalsCompleted(Boolean(existing.goals_completed))
         setConfigJson(JSON.stringify(existing.config || {}, null, 2))
 
         if (!requestedCatalogVersion && existing.external_catalog_version) {
@@ -323,13 +340,28 @@ export default function HireSetupWizard() {
           setMarketingAccessToken('')
           setMarketingRefreshToken('')
           setMarketingPostingIdentity('')
+          if (requestedFocus === 'youtube') {
+            setMarketingPlatform('youtube')
+          }
         }
-        setStep(requestedStep ?? (existingStudio ? mapStudioStepToWizardStep(existingStudio.current_step) : inferInitialStep(existing)))
+
+        if (requestedStep) {
+          setStep(requestedStep)
+        } else if (requestedFocus === 'youtube' && isMarketingAgentType(existingAgentTypeId)) {
+          setStep(3)
+        } else {
+          setStep(inferInitialStep(existing))
+        }
       } catch (e: any) {
         // 404 is fine: user hasn't saved draft yet.
         if (e?.status && Number(e.status) === 404) {
           setDraft(null)
-          if (!cancelled && requestedStep) setStep(requestedStep)
+          if (requestedFocus === 'youtube') {
+            setMarketingPlatform('youtube')
+          }
+          if (requestedStep) {
+            setStep(requestedStep)
+          }
         } else {
           setError(e?.message || 'Failed to load wizard draft')
         }
@@ -342,7 +374,7 @@ export default function HireSetupWizard() {
     return () => {
       cancelled = true
     }
-  }, [subscriptionId, agentId, requestedAgentTypeId, requestedCatalogVersion, requestedLifecycleState, requestedStep])
+  }, [subscriptionId, agentId, requestedAgentTypeId, requestedCatalogVersion, requestedLifecycleState, requestedStep, requestedFocus])
 
   useEffect(() => {
     if (!isMarketingAgent) return
@@ -353,7 +385,16 @@ export default function HireSetupWizard() {
         const rows = await listYouTubeConnections()
         if (cancelled) return
         setYouTubeConnections(rows)
-        if (!selectedYouTubeConnectionId) {
+        const currentSelection = rows.find((row) => row.id === selectedYouTubeConnectionId)
+        if (selectedYouTubeConnectionId && (!currentSelection || currentSelection.connection_status !== 'connected')) {
+          setMarketingPlatforms((prev) => removeMarketingPlatformConfig(prev, 'youtube'))
+          setYouTubeConnectStatus(
+            currentSelection
+              ? `${currentSelection.display_name || 'This channel'} needs to be reconnected before continuing.`
+              : 'Reconnect YouTube before continuing.'
+          )
+        }
+        if (!selectedYouTubeConnectionId || !currentSelection) {
           const connected = rows.find((row) => row.connection_status === 'connected')
           if (connected) setSelectedYouTubeConnectionId(connected.id)
         }
@@ -393,18 +434,14 @@ export default function HireSetupWizard() {
         setYouTubeConnections(nextConnections)
         setSelectedYouTubeConnectionId(credential.id)
         setMarketingPlatform('youtube')
-        setMarketingPlatforms((prev) => {
-          const remaining = prev.filter((item) => item.platform !== 'youtube')
-          return [
-            ...remaining,
-            {
-              platform: 'youtube',
-              customer_platform_credential_id: credential.id,
-              display_name: credential.display_name || 'YouTube Channel',
-              posting_identity: credential.display_name || null,
-            },
-          ]
-        })
+        setMarketingPlatforms((prev) =>
+          upsertMarketingPlatformConfig(prev, {
+            platform: 'youtube',
+            customer_platform_credential_id: credential.id,
+            display_name: credential.display_name || 'YouTube Channel',
+            posting_identity: credential.display_name || null,
+          })
+        )
         setYouTubeConnectStatus(`Connected ${credential.display_name || 'YouTube channel'}`)
         const nextSearch = new URLSearchParams(searchParams)
         nextSearch.delete('code')
@@ -523,20 +560,16 @@ export default function HireSetupWizard() {
         const hasPending = Boolean(marketingAccessToken.trim())
         const isYouTubeFlow = marketingPlatform === 'youtube'
         if (isYouTubeFlow) {
-          if (!selectedYouTubeConnectionId.trim()) {
-            throw new Error('Connect YouTube before continuing')
+          if (!selectedYouTubeConnectionId.trim() || !selectedYouTubeConnection || selectedYouTubeConnection.connection_status !== 'connected') {
+            throw new Error('Reconnect YouTube before continuing')
           }
 
-          const selectedConnection = youtubeConnections.find((row) => row.id === selectedYouTubeConnectionId)
-          const nextPlatforms = [
-            ...marketingPlatforms.filter((p) => p.platform !== 'youtube'),
-            {
-              platform: 'youtube',
-              customer_platform_credential_id: selectedYouTubeConnectionId,
-              display_name: selectedConnection?.display_name || 'YouTube Channel',
-              posting_identity: selectedConnection?.display_name || undefined,
-            },
-          ]
+          const nextPlatforms = upsertMarketingPlatformConfig(marketingPlatforms, {
+            platform: 'youtube',
+            customer_platform_credential_id: selectedYouTubeConnectionId,
+            display_name: selectedYouTubeConnection.display_name || 'YouTube Channel',
+            posting_identity: selectedYouTubeConnection.display_name || undefined,
+          })
           setMarketingPlatforms(nextPlatforms)
           cfg = { platforms: nextPlatforms }
         } else if (hasPending) {
@@ -574,46 +607,15 @@ export default function HireSetupWizard() {
         theme: theme.trim() || undefined,
         config: cfg
       })
-      const studioUpdate: HiredAgentStudioUpdate = {
-        identity: {
-          ...(nickname.trim() ? { nickname: nickname.trim() } : {}),
-          ...(theme.trim() ? { theme: theme.trim() } : {}),
-        },
-        operating_plan: {
-          config_patch: cfg,
-          ...(goalsCompleted ? { goals_completed: true } : {}),
-        },
-      }
-
-      if (isTradingAgent) {
-        const credentialRef = String((cfg as any).exchange_credential_ref || exchangeCredentialRef || '').trim()
-        if (credentialRef) {
-          studioUpdate.connection = {
-            platform_key: 'delta_exchange_india',
-            skill_id: 'default',
-            secret_ref: credentialRef,
-            mark_connected: false,
-          }
-        }
-      }
+      setDraft(next)
 
       if (isMarketingAgent && selectedYouTubeConnectionId.trim()) {
-        studioUpdate.connection = {
-          platform_key: 'youtube',
+        await attachYouTubeConnection(selectedYouTubeConnectionId, {
+          hired_instance_id: next.hired_instance_id,
           skill_id: getMarketingSkillId(),
-          customer_platform_credential_id: selectedYouTubeConnectionId,
-          mark_connected: true,
-        }
+          platform_key: 'youtube',
+        })
       }
-
-      const refreshedStudio = await updateHiredAgentStudio(next.hired_instance_id, studioUpdate)
-      setStudio(refreshedStudio)
-      setDraft({
-        ...next,
-        goals_completed: refreshedStudio.goals_completed,
-        trial_status: refreshedStudio.trial_status as HireWizardDraft['trial_status'],
-        subscription_status: refreshedStudio.subscription_status ?? next.subscription_status,
-      })
 
       return next
     } finally {
@@ -643,19 +645,12 @@ export default function HireSetupWizard() {
     setError(null)
     try {
       const saved = await saveDraft()
-      const finalizedStudio = await updateHiredAgentStudio(saved.hired_instance_id, {
-        review: {
-          goals_completed: Boolean(goalsCompleted),
-          finalize: true,
-        },
+      const finalized = await finalizeHireWizard({
+        hired_instance_id: saved.hired_instance_id,
+        agent_type_id: inferAgentTypeId(resolvedAgentTypeId, agentId),
+        goals_completed: Boolean(goalsCompleted)
       })
-      setStudio(finalizedStudio)
-      setDraft({
-        ...saved,
-        goals_completed: finalizedStudio.goals_completed,
-        trial_status: finalizedStudio.trial_status as HireWizardDraft['trial_status'],
-        subscription_status: finalizedStudio.subscription_status ?? saved.subscription_status,
-      })
+      setDraft(finalized)
 
       navigate('/portal', {
         state: {
@@ -663,8 +658,8 @@ export default function HireSetupWizard() {
             page: 'my-agents',
             agentId,
             agentName: resolvedAgentName || undefined,
-            catalogVersion: saved.external_catalog_version || resolvedCatalogVersion || undefined,
-            lifecycleState: saved.catalog_status_at_hire || resolvedLifecycleState || undefined,
+            catalogVersion: finalized.external_catalog_version || resolvedCatalogVersion || undefined,
+            lifecycleState: finalized.catalog_status_at_hire || resolvedLifecycleState || undefined,
             source: 'trial-activated',
             subscriptionId,
           },
@@ -683,10 +678,28 @@ export default function HireSetupWizard() {
     )
   }
 
-  const reviewSummary = [
+  const reviewSummary: ReviewSummaryItem[] = [
     { label: 'Selected agent', value: selectedAgentSummary },
-    { label: 'Agent nickname', value: nickname || 'Not set' },
-    { label: 'Theme', value: theme || 'Default' },
+    {
+      label: 'Agent nickname',
+      value: nickname || 'Not set',
+      actionLabel: 'Open identity setup',
+      actionStep: 1,
+      action: () => {
+        setError(null)
+        setStep(1)
+      },
+    },
+    {
+      label: 'Theme',
+      value: theme || 'Default',
+      actionLabel: 'Open working style setup',
+      actionStep: 2,
+      action: () => {
+        setError(null)
+        setStep(2)
+      },
+    },
     {
       label: 'Connected systems',
       value: isTradingAgent
@@ -702,6 +715,15 @@ export default function HireSetupWizard() {
                 ? `${marketingPlatform} token staged`
                 : 'No platform connected yet'
           : 'Custom config provided',
+      actionLabel: isMarketingAgent ? 'Open YouTube setup' : 'Open system setup',
+      actionStep: 3,
+      action: () => {
+        setError(null)
+        if (isMarketingAgent) {
+          setMarketingPlatform('youtube')
+        }
+        setStep(3)
+      },
     },
     { label: 'Activation readiness', value: goalsCompleted ? 'Goals confirmed' : 'Waiting for goal confirmation' },
   ]
@@ -711,23 +733,34 @@ export default function HireSetupWizard() {
       <div className="hire-wizard-hero">
         <div>
           <div className="hire-wizard-kicker">Hire Activation</div>
-          <h1 style={{ fontSize: '1.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>Setup & Activate Trial</h1>
+          <h1 style={{ fontSize: '1.95rem', fontWeight: 700, marginBottom: '0.6rem' }}>Configure your trial</h1>
           <p style={{ marginBottom: 0, color: 'var(--colorNeutralForeground2)', maxWidth: '58ch' }}>
-            Trial starts only after setup is completed. The flow should make clear what this agent needs, how it works,
-            and what you will be able to monitor after activation.
+            Finish identity, working style, and system access before the trial starts. Credentials stay in CP, and the
+            setup should feel clear enough that you always know what the agent can do next.
           </p>
         </div>
-        <div className="hire-wizard-hero-note">
-          <div className="hire-wizard-hero-note-title">Activation context</div>
-          <p>
-            You are activating <strong>{selectedAgentSummary}</strong>. Complete identity, connection, and review in this flow,
-            then return to My Agents for ongoing runtime management.
-          </p>
+        <div className="hire-wizard-proof-grid">
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">Agent</div>
+            <div className="hire-wizard-proof-label">{selectedAgentSummary}</div>
+          </div>
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">4</div>
+            <div className="hire-wizard-proof-label">Simple steps</div>
+          </div>
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">0</div>
+            <div className="hire-wizard-proof-label">Secret leakage to Plant</div>
+          </div>
+          <div className="hire-wizard-proof-card">
+            <div className="hire-wizard-proof-value">1</div>
+            <div className="hire-wizard-proof-label">Clear activation moment</div>
+          </div>
         </div>
       </div>
 
       <Card style={{ padding: '1.5rem' }}>
-        <div className="hire-wizard-step-header" data-testid={`cp-hire-setup-step-${step}`}>
+        <div className="hire-wizard-step-header" data-testid={`cp-hire-setup-step-${step}`} ref={stepHeaderRef}>
           <div>
             <div style={{ marginBottom: '0.35rem', fontWeight: 600 }}>Step {step} of 4</div>
             <div className="hire-wizard-step-title">{stepCopy[step].title}</div>
@@ -739,7 +772,26 @@ export default function HireSetupWizard() {
                 key={item}
                 type="button"
                 className={`hire-wizard-step-pill ${step >= item ? 'active' : ''}`}
-                onClick={() => setStep(item as Step)}
+                data-testid={`cp-hire-setup-step-pill-${item}`}
+                onClick={() => {
+                  setError(null)
+                  if (item === 3 && isMarketingAgent) {
+                    setMarketingPlatform('youtube')
+                  }
+                  setStep(item as Step)
+                }}
+                aria-current={step === item ? 'step' : undefined}
+                aria-label={
+                  item === 1
+                    ? 'Open identity setup'
+                    : item === 2
+                      ? 'Open working style setup'
+                      : item === 3
+                        ? isMarketingAgent
+                          ? 'Open YouTube setup'
+                          : 'Open system setup'
+                        : 'Open activation review'
+                }
               >
                 0{item}
               </button>
@@ -812,8 +864,9 @@ export default function HireSetupWizard() {
               </>
             ) : isMarketingAgent ? (
               <>
-                <div className="hire-wizard-inline-note" style={{ marginBottom: '0.75rem' }}>
-                  Connect your marketing platforms. Tokens are stored securely in CP; Plant receives only credential references.
+                <div className="hire-wizard-inline-note hire-wizard-section-intro">
+                  Connect the channel once, confirm the verified account, and keep publishing approval-led. WAOOAW stores
+                  the credential in CP and sends Plant only a safe reference.
                 </div>
 
                 <div className="form-group">
@@ -839,98 +892,131 @@ export default function HireSetupWizard() {
 
                 {marketingPlatform === 'youtube' ? (
                   <div className="hire-wizard-youtube-connect" data-testid="cp-hire-setup-youtube-connect">
-                    <div className="hire-wizard-inline-note" style={{ marginBottom: '0.75rem' }}>
-                      Connect YouTube once with Google, then choose the verified channel you want this agent to use.
+                    <div className="hire-wizard-connection-summary-bar">
+                      <div>
+                        <div className="hire-wizard-review-label">What happens here</div>
+                        <div className="hire-wizard-review-value">Authorize Google, choose the verified channel, then keep every publish behind your approval.</div>
+                      </div>
+                      <div className="hire-wizard-trust-pill">Credentials stay in CP</div>
                     </div>
 
-                    {youtubeConnectStatus && (
-                      <div style={{ marginBottom: '0.75rem', color: 'var(--colorBrandForeground1)' }}>{youtubeConnectStatus}</div>
-                    )}
+                    <div className="hire-wizard-connection-grid">
+                      <div className="hire-wizard-connection-card">
+                        <div className="hire-wizard-review-label">01</div>
+                        <div className="hire-wizard-step-title">Authorize your Google account</div>
+                        <p>Use Google once so WAOOAW can store a server-side channel credential without exposing tokens to Plant.</p>
+                      </div>
+                      <div className="hire-wizard-connection-card">
+                        <div className="hire-wizard-review-label">02</div>
+                        <div className="hire-wizard-step-title">Choose the exact channel</div>
+                        <p>Select the verified YouTube channel this hire should use so approvals and publish readiness stay unambiguous.</p>
+                      </div>
+                      <div className="hire-wizard-connection-card">
+                        <div className="hire-wizard-review-label">03</div>
+                        <div className="hire-wizard-step-title">Keep approval in the loop</div>
+                        <p>The agent can draft immediately, but every external action still waits for your approval before publish or schedule.</p>
+                      </div>
+                    </div>
 
-                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                      <Button
-                        appearance="primary"
-                        disabled={youtubeConnectBusy}
-                        data-testid="cp-hire-setup-youtube-connect-button"
-                        onClick={async () => {
-                          setError(null)
-                          setYouTubeConnectBusy(true)
-                          setYouTubeConnectStatus(null)
-                          try {
-                            const redirectUri = buildRedirectUri(searchParams)
-                            const start = await startYouTubeConnection(redirectUri)
-                            if (typeof window !== 'undefined') {
-                              window.location.assign(start.authorization_url)
-                            }
-                          } catch (e: any) {
-                            setError(e?.message || 'Failed to start YouTube connection')
-                            setYouTubeConnectBusy(false)
-                          }
-                        }}
-                      >
-                        {youtubeConnections.length > 0 ? 'Reconnect YouTube' : 'Connect YouTube'}
-                      </Button>
+                    <div className="hire-wizard-youtube-panel">
+                      <div className="hire-wizard-youtube-panel-header">
+                        <div>
+                          <div className="hire-wizard-step-title">YouTube channel setup</div>
+                          <div className="hire-wizard-step-body">
+                            {selectedYouTubeReady
+                              ? `${selectedYouTubeConnection?.display_name || 'Selected channel'} is ready for upload approvals.`
+                              : 'Connect or reconnect the channel before saving step 3.'}
+                          </div>
+                        </div>
+                        {selectedYouTubeConnection ? (
+                          <div className="hire-wizard-channel-badge">
+                            {selectedYouTubeConnection.connection_status.replace(/_/g, ' ')}
+                          </div>
+                        ) : null}
+                      </div>
 
-                      {selectedYouTubeConnectionId && (
-                        <Button
-                          appearance="outline"
-                          disabled={youtubeConnectBusy}
-                          onClick={() => setSelectedYouTubeConnectionId('')}
-                          data-testid="cp-hire-setup-youtube-clear-selection"
-                        >
-                          Clear selection
-                        </Button>
+                      {youtubeConnectStatus && (
+                        <div className="hire-wizard-channel-success">{youtubeConnectStatus}</div>
                       )}
-                    </div>
 
-                    {youtubeConnections.length > 0 ? (
-                      <div style={{ display: 'grid', gap: '0.75rem' }}>
-                        <div style={{ fontWeight: 600 }}>Available YouTube channels</div>
-                        {youtubeConnections.map((connection) => {
-                          const selected = selectedYouTubeConnectionId === connection.id
-                          return (
-                            <button
-                              key={connection.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedYouTubeConnectionId(connection.id)
-                                setMarketingPlatforms((prev) => {
-                                  const rest = prev.filter((item) => item.platform !== 'youtube')
-                                  return [
-                                    ...rest,
-                                    {
+                      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                        <Button
+                          appearance="primary"
+                          disabled={youtubeConnectBusy}
+                          data-testid="cp-hire-setup-youtube-connect-button"
+                          onClick={async () => {
+                            setError(null)
+                            setYouTubeConnectBusy(true)
+                            setYouTubeConnectStatus(null)
+                            try {
+                              const redirectUri = buildRedirectUri(searchParams)
+                              const start = await startYouTubeConnection(redirectUri)
+                              if (typeof window !== 'undefined') {
+                                window.location.assign(start.authorization_url)
+                              }
+                            } catch (e: any) {
+                              setError(e?.message || 'Failed to start YouTube connection')
+                              setYouTubeConnectBusy(false)
+                            }
+                          }}
+                        >
+                          {youtubeConnections.length > 0 ? 'Reconnect YouTube' : 'Connect YouTube'}
+                        </Button>
+
+                        {selectedYouTubeConnectionId && (
+                          <Button
+                            appearance="outline"
+                            disabled={youtubeConnectBusy}
+                            onClick={() => {
+                              setSelectedYouTubeConnectionId('')
+                              setMarketingPlatforms((prev) => removeMarketingPlatformConfig(prev, 'youtube'))
+                              setYouTubeConnectStatus(null)
+                            }}
+                            data-testid="cp-hire-setup-youtube-clear-selection"
+                          >
+                            Clear selection
+                          </Button>
+                        )}
+                      </div>
+
+                      {youtubeConnections.length > 0 ? (
+                        <div style={{ display: 'grid', gap: '0.75rem' }}>
+                          <div style={{ fontWeight: 600 }}>Available YouTube channels</div>
+                          {youtubeConnections.map((connection) => {
+                            const selected = selectedYouTubeConnectionId === connection.id
+                            return (
+                              <button
+                                key={connection.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedYouTubeConnectionId(connection.id)
+                                  setMarketingPlatforms((prev) =>
+                                    upsertMarketingPlatformConfig(prev, {
                                       platform: 'youtube',
                                       customer_platform_credential_id: connection.id,
                                       display_name: connection.display_name || 'YouTube Channel',
                                       posting_identity: connection.display_name || undefined,
-                                    },
-                                  ]
-                                })
-                              }}
-                              data-testid={`cp-hire-setup-youtube-option-${connection.id}`}
-                              style={{
-                                textAlign: 'left',
-                                padding: '0.9rem 1rem',
-                                borderRadius: 12,
-                                border: selected ? '2px solid var(--colorBrandStroke1)' : '1px solid var(--colorNeutralStroke2)',
-                                background: selected ? 'var(--colorNeutralBackground1Selected)' : 'var(--colorNeutralBackground1)',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <div style={{ fontWeight: 600 }}>{connection.display_name || 'YouTube Channel'}</div>
-                              <div style={{ fontSize: '0.9rem', color: 'var(--colorNeutralForeground2)' }}>
-                                {connection.connection_status} · {connection.verification_status}
-                                {connection.last_verified_at ? ` · verified ${new Date(connection.last_verified_at).toLocaleString()}` : ''}
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <div style={{ color: 'var(--colorNeutralForeground2)' }}>
-                        No YouTube channel connected yet.
-                      </div>
-                    )}
+                                    })
+                                  )
+                                }}
+                                data-testid={`cp-hire-setup-youtube-option-${connection.id}`}
+                                className={`hire-wizard-channel-option ${selected ? 'active' : ''}`}
+                              >
+                                <div style={{ fontWeight: 600 }}>{connection.display_name || 'YouTube Channel'}</div>
+                                <div className="hire-wizard-channel-option-status">
+                                  {connection.connection_status.replace(/_/g, ' ')} · {connection.verification_status}
+                                  {connection.last_verified_at ? ` · verified ${new Date(connection.last_verified_at).toLocaleString()}` : ''}
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="hire-wizard-channel-empty">
+                          No verified YouTube channel is connected yet. Start with Google authorization, then return here to select the channel.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -961,7 +1047,7 @@ export default function HireSetupWizard() {
                 {marketingPlatforms.length > 0 && (
                   <div style={{ marginTop: '0.75rem' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Connected platforms</div>
-                    <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                    <ul className="hire-wizard-connected-list">
                       {marketingPlatforms.map((p) => (
                         <li key={`${p.platform}:${p.customer_platform_credential_id || p.credential_ref || 'pending'}`}>
                           {p.display_name || p.platform}
@@ -1001,7 +1087,20 @@ export default function HireSetupWizard() {
             <div className="hire-wizard-review-grid">
               {reviewSummary.map((item) => (
                 <div key={item.label} className="hire-wizard-review-card">
-                  <div className="hire-wizard-review-label">{item.label}</div>
+                  <div className="hire-wizard-review-card-header">
+                    <div className="hire-wizard-review-label">{item.label}</div>
+                    {item.action ? (
+                      <button
+                        type="button"
+                        className="hire-wizard-review-action"
+                        data-testid={item.actionStep ? `cp-hire-setup-review-action-${item.actionStep}` : undefined}
+                        onClick={item.action}
+                        aria-label={item.actionLabel || `Open step ${item.actionStep || ''}`}
+                      >
+                        {item.actionLabel}
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="hire-wizard-review-value">{item.value}</div>
                 </div>
               ))}
@@ -1014,9 +1113,9 @@ export default function HireSetupWizard() {
               data-testid="cp-hire-setup-goals-completed"
             />
 
-            {(studio?.trial_status === 'active' || draft?.trial_status === 'active') && (
+            {draft?.trial_status === 'active' && (
               <div style={{ marginTop: '1rem' }}>
-                Trial is active{draft?.trial_end_at ? ` until ${draft.trial_end_at}` : ''}.
+                Trial is active{draft.trial_end_at ? ` until ${draft.trial_end_at}` : ''}.
               </div>
             )}
           </>
@@ -1050,6 +1149,17 @@ export default function HireSetupWizard() {
           </Button>
         </div>
       </Card>
+
+      <div className="hire-wizard-bottom-grid">
+        <Card className="hire-wizard-bottom-card">
+          <div className="hire-wizard-bottom-title">What the customer should know next</div>
+          <p>After activation, WAOOAW should route them cleanly to hiring runtime, approvals, spend, and results.</p>
+        </Card>
+        <Card className="hire-wizard-bottom-card">
+          <div className="hire-wizard-bottom-title">What the system should guarantee</div>
+          <p>Credentials stay protected, setup feels finite, and activation does not feel like a hidden background side effect.</p>
+        </Card>
+      </div>
     </div>
   )
 }
