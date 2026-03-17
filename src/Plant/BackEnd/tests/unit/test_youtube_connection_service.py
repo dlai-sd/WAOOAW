@@ -16,8 +16,8 @@ async def test_start_connect_persists_session_and_returns_google_url(monkeypatch
     db = AsyncMock()
     db.add = MagicMock()
     db.commit = AsyncMock()
-    monkeypatch.setattr(settings, "youtube_client_id", "test-youtube-client-id", raising=False)
-    monkeypatch.setattr(settings, "youtube_client_secret", "test-youtube-client-secret", raising=False)
+    monkeypatch.setattr(settings, "google_client_id", "test-google-client-id", raising=False)
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "test-google-client-secret")
 
     service = YouTubeConnectionService(db=db)
     result = await service.start_connect(
@@ -34,8 +34,6 @@ async def test_start_connect_persists_session_and_returns_google_url(monkeypatch
 @pytest.mark.asyncio
 async def test_start_connect_rejects_missing_youtube_oauth_config(monkeypatch):
     db = AsyncMock()
-    monkeypatch.setattr(settings, "youtube_client_id", "", raising=False)
-    monkeypatch.setattr(settings, "youtube_client_secret", "", raising=False)
     monkeypatch.setattr(settings, "google_client_id", "", raising=False)
     monkeypatch.delenv("GOOGLE_CLIENT_SECRET", raising=False)
 
@@ -53,8 +51,6 @@ async def test_start_connect_falls_back_to_google_oauth_config(monkeypatch):
     db = AsyncMock()
     db.add = MagicMock()
     db.commit = AsyncMock()
-    monkeypatch.setattr(settings, "youtube_client_id", "", raising=False)
-    monkeypatch.setattr(settings, "youtube_client_secret", "", raising=False)
     monkeypatch.setattr(settings, "google_client_id", "google-web-client-id", raising=False)
     monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "google-web-client-secret")
 
