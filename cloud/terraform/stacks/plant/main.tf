@@ -46,6 +46,7 @@ module "plant_database" {
   enable_pitr         = var.db_enable_pitr
   max_connections     = var.db_max_connections
   private_network_id  = var.private_network_id
+  enable_public_ip    = var.db_enable_public_ip
   database_name       = "plant"
   database_user       = "plant_app"
   database_password   = var.database_password

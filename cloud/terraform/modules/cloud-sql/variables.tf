@@ -59,6 +59,12 @@ variable "private_network_id" {
   type        = string
 }
 
+variable "enable_public_ip" {
+  description = "Enable public IPv4 for environments that must be reachable via the Cloud SQL Auth Proxy from Codespaces or other non-VPC clients."
+  type        = bool
+  default     = false
+}
+
 variable "database_name" {
   description = "Database name"
   type        = string
