@@ -168,3 +168,59 @@ async def test_health_check_returns_false_on_exception(monkeypatch):
     connector = db.DatabaseConnector()
     ok = await connector.health_check()
     assert ok is False
+
+
+@pytest.mark.asyncio
+async def test_initialize_database_retries_until_success(monkeypatch):
+    from core import database as db
+
+    class FlakyConnector:
+        def __init__(self):
+            self.calls = 0
+
+        async def initialize(self) -> None:
+            self.calls += 1
+            if self.calls < 3:
+                raise TimeoutError("temporary db timeout")
+
+    connector = FlakyConnector()
+    sleep_calls: list[int] = []
+
+    async def fake_sleep(seconds: int) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(db, "_connector", connector)
+    monkeypatch.setattr(db.asyncio, "sleep", fake_sleep)
+
+    await db.initialize_database()
+
+    assert connector.calls == 3
+    assert sleep_calls == [db.DATABASE_STARTUP_RETRY_DELAY_SECONDS, db.DATABASE_STARTUP_RETRY_DELAY_SECONDS]
+
+
+@pytest.mark.asyncio
+async def test_initialize_database_raises_after_max_attempts(monkeypatch):
+    from core import database as db
+
+    class BrokenConnector:
+        def __init__(self):
+            self.calls = 0
+
+        async def initialize(self) -> None:
+            self.calls += 1
+            raise TimeoutError("persistent db timeout")
+
+    connector = BrokenConnector()
+    sleep_calls: list[int] = []
+
+    async def fake_sleep(seconds: int) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(db, "_connector", connector)
+    monkeypatch.setattr(db.asyncio, "sleep", fake_sleep)
+
+    with pytest.raises(TimeoutError, match="persistent db timeout"):
+        await db.initialize_database()
+
+    assert connector.calls == db.DATABASE_STARTUP_MAX_ATTEMPTS
+    assert sleep_calls == [db.DATABASE_STARTUP_RETRY_DELAY_SECONDS] * (db.DATABASE_STARTUP_MAX_ATTEMPTS - 1)
