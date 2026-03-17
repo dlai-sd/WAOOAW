@@ -27,6 +27,10 @@ Base = declarative_base()
 logger = logging.getLogger(__name__)
 
 
+DATABASE_STARTUP_MAX_ATTEMPTS = 4
+DATABASE_STARTUP_RETRY_DELAY_SECONDS = 5
+
+
 class DatabaseConnector:
     """
     Global database connector managing async SQLAlchemy engine and session factory.
@@ -321,7 +325,35 @@ async def initialize_database():
         async def startup():
             await initialize_database()
     """
-    await _connector.initialize()
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, DATABASE_STARTUP_MAX_ATTEMPTS + 1):
+        try:
+            await _connector.initialize()
+            if attempt > 1:
+                logger.info(
+                    "Database initialization succeeded on retry %s/%s",
+                    attempt,
+                    DATABASE_STARTUP_MAX_ATTEMPTS,
+                )
+            return
+        except Exception as exc:
+            last_error = exc
+            is_last_attempt = attempt == DATABASE_STARTUP_MAX_ATTEMPTS
+            if is_last_attempt:
+                break
+
+            logger.warning(
+                "Database initialization attempt %s/%s failed with %s; retrying in %ss",
+                attempt,
+                DATABASE_STARTUP_MAX_ATTEMPTS,
+                type(exc).__name__,
+                DATABASE_STARTUP_RETRY_DELAY_SECONDS,
+            )
+            await asyncio.sleep(DATABASE_STARTUP_RETRY_DELAY_SECONDS)
+
+    assert last_error is not None
+    raise last_error
 
 
 async def shutdown_database():
