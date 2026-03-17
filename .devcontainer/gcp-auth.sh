@@ -22,7 +22,7 @@ DB_ENV_FILE="/root/.env.db"
 PROXY_LOG="/tmp/cloud-sql-proxy.log"
 INSTANCE="waooaw-oauth:asia-south1:plant-sql-demo"
 PROXY_PORT=15432
-INSTANCE_NAME="plant-sql-demo"
+INSTANCE_NAME="${INSTANCE##*:}"
 
 # ── 1. Auth ──────────────────────────────────────────────────────────────────
 if [[ -z "${GCP_SA_KEY:-}" ]]; then
