@@ -8,6 +8,7 @@ import { LoadingIndicator, SaveIndicator, FeedbackMessage, ValidationFeedback } 
 import { ListItemSkeleton, PageSkeleton } from '../../components/SkeletonLoaders'
 import { cancelSubscription } from '../../services/subscriptions.service'
 import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../../services/myAgentsSummary.service'
+import { getHireWizardDraftBySubscription, type HireWizardDraft } from '../../services/hireWizard.service'
 import { getAgentTypeDefinition, type AgentTypeDefinition, type GoalTemplateDefinition, type SchemaFieldDefinition } from '../../services/agentTypes.service'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../../services/hiredAgents.service'
 import { upsertPlatformCredential } from '../../services/platformCredentials.service'
@@ -145,6 +146,67 @@ function renderFrequencyLabel(freq: string): string {
   if (!key) return '—'
   if (key === 'on_demand') return 'On demand'
   return key[0].toUpperCase() + key.slice(1)
+}
+
+type ActivationStageKey = 'select-agent' | 'identity' | 'connection' | 'strategy' | 'review'
+
+function isPendingActivation(instance: MyAgentInstanceSummary | null): boolean {
+  if (!instance) return false
+  const trialStatus = String(instance.trial_status || '').trim().toLowerCase()
+  const subscriptionStatus = String(instance.status || '').trim().toLowerCase()
+
+  if (!instance.hired_instance_id) return false
+  if (subscriptionStatus === 'canceled' || instance.cancel_at_period_end) return false
+  if (trialStatus === 'active' || trialStatus === 'ended_converted' || trialStatus === 'ended_not_converted') return false
+
+  return trialStatus === 'pending' || trialStatus === 'not_started' || (!Boolean(instance.configured) && !Boolean(instance.goals_completed))
+}
+
+function isReadOnlyExpired(
+  instance: MyAgentInstanceSummary | null,
+  nowMs: number,
+  retentionDaysAfterEnd: number
+): boolean {
+  if (!instance) return false
+
+  const retentionExpiresAtMs = instance.retention_expires_at
+    ? new Date(instance.retention_expires_at).getTime()
+    : NaN
+  if (Number.isFinite(retentionExpiresAtMs)) {
+    return nowMs > retentionExpiresAtMs
+  }
+
+  const endMs = new Date(instance.current_period_end).getTime()
+  if (!Number.isFinite(endMs)) return false
+  if (String(instance.status || '').toLowerCase() !== 'canceled') return false
+  return nowMs > endMs + retentionDaysAfterEnd * 24 * 60 * 60 * 1000
+}
+
+function isInReadOnlyRetention(
+  instance: MyAgentInstanceSummary | null,
+  nowMs: number,
+  retentionDaysAfterEnd: number
+): boolean {
+  if (!instance) return false
+  if (isReadOnlyExpired(instance, nowMs, retentionDaysAfterEnd)) return false
+
+  const status = String(instance.status || '').toLowerCase()
+  if (status !== 'canceled') return false
+
+  const endMs = new Date(instance.current_period_end).getTime()
+  if (!Number.isFinite(endMs)) return false
+  return nowMs <= endMs + retentionDaysAfterEnd * 24 * 60 * 60 * 1000
+}
+
+function buildHireSetupUrl(instance: MyAgentInstanceSummary, stage: 'identity' | 'connection' | 'review'): string {
+  const nextQuery = new URLSearchParams()
+  nextQuery.set('agentId', String(instance.agent_id || ''))
+  if (instance.agent_type_id) nextQuery.set('agentTypeId', String(instance.agent_type_id))
+  if (instance.external_catalog_version) nextQuery.set('catalogVersion', String(instance.external_catalog_version))
+  if (instance.catalog_status_at_hire) nextQuery.set('lifecycleState', String(instance.catalog_status_at_hire))
+  if (instance.nickname) nextQuery.set('agentName', String(instance.nickname))
+  nextQuery.set('stage', stage)
+  return `/hire/setup/${encodeURIComponent(instance.subscription_id)}?${nextQuery.toString()}`
 }
 
 function DigitalMarketingBriefPreview(props: { hiredInstanceId: string }) {
@@ -1726,6 +1788,553 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   )
 }
 
+function ActivationStudioPanel(props: {
+  instances: MyAgentInstanceSummary[]
+  selectedSubscriptionId: string
+  onSelectSubscriptionId: (subscriptionId: string) => void
+  readOnly: boolean
+  onOpenAdvanced: (section: 'configure' | 'goals') => void
+}) {
+  const { instances, selectedSubscriptionId, onSelectSubscriptionId, readOnly, onOpenAdvanced } = props
+  const navigate = useNavigate()
+  const instance = useMemo(
+    () => instances.find((item) => item.subscription_id === selectedSubscriptionId) || instances[0] || null,
+    [instances, selectedSubscriptionId]
+  )
+  const [draft, setDraft] = useState<HireWizardDraft | null>(null)
+  const [draftLoading, setDraftLoading] = useState(true)
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const [activeStage, setActiveStage] = useState<ActivationStageKey>('select-agent')
+  const isMarketingInstance = useMemo(
+    () => isDigitalMarketingAgent(instance?.agent_id || '', instance?.agent_type_id),
+    [instance?.agent_id, instance?.agent_type_id]
+  )
+
+  const [connectionsLoading, setConnectionsLoading] = useState(false)
+  const [connectionsError, setConnectionsError] = useState<string | null>(null)
+  const [connections, setConnections] = useState<PlatformConnection[]>([])
+  const [youtubeCredentials, setYouTubeCredentials] = useState<YouTubeConnection[]>([])
+
+  useEffect(() => {
+    if (!instance?.subscription_id) {
+      setDraft(null)
+      setDraftError(null)
+      setDraftLoading(false)
+      return () => undefined
+    }
+
+    let cancelled = false
+
+    const loadDraft = async () => {
+      setDraftLoading(true)
+      setDraftError(null)
+      try {
+        const next = await getHireWizardDraftBySubscription(instance.subscription_id)
+        if (!cancelled) setDraft(next)
+      } catch (e: any) {
+        if (!cancelled) {
+          if (Number(e?.status || e?.problem?.status) !== 404) {
+            setDraftError(e?.message || 'Failed to load activation draft')
+          }
+          setDraft(null)
+        }
+      } finally {
+        if (!cancelled) setDraftLoading(false)
+      }
+    }
+
+    void loadDraft()
+    return () => {
+      cancelled = true
+    }
+  }, [instance?.subscription_id])
+
+  useEffect(() => {
+    if (!instance?.hired_instance_id) {
+      setConnections([])
+      setYouTubeCredentials([])
+      setConnectionsError(null)
+      setConnectionsLoading(false)
+      return () => undefined
+    }
+
+    let cancelled = false
+
+    const loadConnections = async () => {
+      if (!isMarketingInstance || !instance.hired_instance_id) {
+        setConnections([])
+        setYouTubeCredentials([])
+        setConnectionsError(null)
+        return
+      }
+
+      setConnectionsLoading(true)
+      setConnectionsError(null)
+      try {
+        const [nextConnections, nextYouTubeCredentials] = await Promise.all([
+          listPlatformConnections(String(instance.hired_instance_id)),
+          listYouTubeConnections(),
+        ])
+        if (!cancelled) {
+          setConnections(nextConnections)
+          setYouTubeCredentials(nextYouTubeCredentials)
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setConnections([])
+          setYouTubeCredentials([])
+          setConnectionsError(e?.message || 'Failed to load connection status')
+        }
+      } finally {
+        if (!cancelled) setConnectionsLoading(false)
+      }
+    }
+
+    void loadConnections()
+    return () => {
+      cancelled = true
+    }
+  }, [instance?.hired_instance_id, isMarketingInstance])
+
+  const youtubeConnectionSummary = useMemo(() => {
+    if (!isMarketingInstance) return null
+    const attached = connections.find((connection) => String(connection.platform_key || '').trim().toLowerCase() === 'youtube') || null
+    const attachedCredential = attached?.customer_platform_credential_id
+      ? youtubeCredentials.find((connection) => connection.id === attached.customer_platform_credential_id) || null
+      : youtubeCredentials.find((connection) => connection.connection_status === 'connected') || null
+
+    const labelPrefix = attachedCredential?.display_name || 'YouTube'
+    const lastVerified = attachedCredential?.last_verified_at
+      ? new Date(attachedCredential.last_verified_at).toLocaleString()
+      : null
+
+    if (!attached && attachedCredential) {
+      return {
+        platformKey: 'youtube',
+        label: `${labelPrefix} ready to attach`,
+        message: `${labelPrefix} is connected in your account, but this hire is not attached yet. Resume activation to connect it cleanly.`,
+        tone: 'warning' as const,
+        isReady: false,
+        connection: null,
+      }
+    }
+
+    if (!attached) {
+      return {
+        platformKey: 'youtube',
+        label: 'YouTube not connected',
+        message: 'Connect and validate YouTube before this agent can publish with confidence.',
+        tone: 'danger' as const,
+        isReady: false,
+        connection: null,
+      }
+    }
+
+    const attachmentStatus = String(attached.status || '').trim().toLowerCase()
+    const credentialStatus = String(attachedCredential?.connection_status || '').trim().toLowerCase()
+    const verificationStatus = String(attachedCredential?.verification_status || '').trim().toLowerCase()
+
+    if (credentialStatus === 'reconnect_required' || credentialStatus === 'needs_attention' || verificationStatus === 'failed') {
+      return {
+        platformKey: 'youtube',
+        label: `${labelPrefix} needs attention`,
+        message: lastVerified
+          ? `${labelPrefix} was last verified on ${lastVerified} and now needs reconnection before publishing can resume.`
+          : `${labelPrefix} needs reconnection before publishing can resume.`,
+        tone: 'danger' as const,
+        isReady: false,
+        connection: attached,
+      }
+    }
+
+    if (attachmentStatus === 'connected' && (credentialStatus === 'connected' || !credentialStatus)) {
+      return {
+        platformKey: 'youtube',
+        label: `${labelPrefix} connected`,
+        message: lastVerified
+          ? `${labelPrefix} was last verified on ${lastVerified}.`
+          : `${labelPrefix} is connected and ready for governed publishing.`,
+        tone: 'success' as const,
+        isReady: true,
+        connection: attached,
+      }
+    }
+
+    return {
+      platformKey: 'youtube',
+      label: `${labelPrefix} pending verification`,
+      message: `${labelPrefix} still needs verification before activation should be treated as complete.`,
+      tone: 'warning' as const,
+      isReady: false,
+      connection: attached,
+    }
+  }, [connections, isMarketingInstance, youtubeCredentials])
+
+  const identityComplete = Boolean(String(draft?.nickname || instance?.nickname || '').trim() && String(draft?.theme || '').trim())
+  const connectionComplete = isMarketingInstance ? Boolean(youtubeConnectionSummary?.isReady) : Boolean(instance.configured)
+  const strategyComplete = Boolean(instance?.goals_completed)
+  const reviewComplete = Boolean(instance) && identityComplete && connectionComplete && strategyComplete
+
+  const stages = [
+    {
+      key: 'select-agent' as const,
+      title: 'Select agent',
+      eyebrow: 'Step 1',
+      complete: Boolean(instance?.subscription_id),
+      summary: instance
+        ? `${String(instance.nickname || instance.agent_id).trim()} is selected for activation.`
+        : 'Choose the hire you want to activate first.',
+    },
+    {
+      key: 'identity' as const,
+      title: 'Identity and voice',
+      eyebrow: 'Step 2',
+      complete: identityComplete,
+      summary: identityComplete
+        ? `${String(draft?.nickname || instance?.nickname || 'Agent').trim()} · ${String(draft?.theme || 'default')} theme chosen`
+        : 'Name the agent and choose how it should show up for your business.',
+    },
+    {
+      key: 'connection' as const,
+      title: isMarketingInstance ? 'YouTube connection' : 'Platform connection',
+      eyebrow: 'Step 3',
+      complete: connectionComplete,
+      summary: isMarketingInstance
+        ? (youtubeConnectionSummary?.label || 'Connect and verify YouTube before launch.')
+        : 'Connect the systems this hire depends on before launch.',
+    },
+    {
+      key: 'strategy' as const,
+      title: 'Operating plan',
+      eyebrow: 'Step 4',
+      complete: strategyComplete,
+      summary: strategyComplete
+        ? 'Posting rhythm and activation readiness have been confirmed.'
+        : 'Set publishing rhythm, themes, and approval expectations before launch.',
+    },
+    {
+      key: 'review' as const,
+      title: 'Review and activate',
+      eyebrow: 'Step 5',
+      complete: reviewComplete,
+      summary: reviewComplete
+        ? 'Everything needed for trial activation is in place.'
+        : 'Use the final review only after identity, connection, and plan are complete.',
+    },
+  ]
+
+  useEffect(() => {
+    setActiveStage('select-agent')
+  }, [selectedSubscriptionId])
+
+  const completedStages = stages.filter((stage) => stage.complete).length
+  const activeStageIndex = Math.max(stages.findIndex((stage) => stage.key === activeStage), 0)
+  const activeStageDetail = stages[activeStageIndex] || stages[0]
+  const activationSummarySource = instance ? String(instance.nickname || instance.agent_id || 'Selected hire') : 'Selected hire'
+  const selectionHelperText = instances.length > 1
+    ? 'Choose which hired agent you want to bring live first.'
+    : 'This is the only hired agent still waiting for activation.'
+
+  const moveStage = (offset: number) => {
+    const nextIndex = Math.min(Math.max(activeStageIndex + offset, 0), stages.length - 1)
+    setActiveStage(stages[nextIndex].key)
+  }
+
+  const workspaceAction = (() => {
+    if (!instance) return null
+    if (activeStage === 'identity') {
+      return {
+        label: 'Open identity setup',
+        onClick: () => navigate(buildHireSetupUrl(instance, 'identity')),
+      }
+    }
+    if (activeStage === 'connection') {
+      return {
+        label: isMarketingInstance ? 'Open YouTube setup' : 'Open connection setup',
+        onClick: () => navigate(buildHireSetupUrl(instance, 'connection')),
+      }
+    }
+    if (activeStage === 'strategy') {
+      return {
+        label: 'Open operating plan',
+        onClick: () => onOpenAdvanced('goals'),
+      }
+    }
+    if (activeStage === 'review') {
+      return {
+        label: 'Open activation review',
+        onClick: () => navigate(buildHireSetupUrl(instance, 'review')),
+      }
+    }
+    return null
+  })()
+
+  const continueAction = (() => {
+    if (activeStage === 'select-agent') {
+      return {
+        label: 'Continue to identity',
+        disabled: !instance,
+      }
+    }
+    if (activeStage === 'identity') {
+      return {
+        label: 'Continue to connection',
+        disabled: !identityComplete,
+      }
+    }
+    if (activeStage === 'connection') {
+      return {
+        label: 'Continue to operating plan',
+        disabled: !connectionComplete,
+      }
+    }
+    if (activeStage === 'strategy') {
+      return {
+        label: 'Continue to review',
+        disabled: !strategyComplete,
+      }
+    }
+    return null
+  })()
+
+  const footerCopy = (() => {
+    if (activeStage === 'select-agent') {
+      return 'Start by choosing the hire that still needs activation. The rest of the wizard stays focused on that one outcome.'
+    }
+    if (activeStage === 'identity') {
+      return identityComplete
+        ? 'Identity is in place. Move to connection only after the business-facing name and theme feel right.'
+        : 'Identity needs to be completed before the activation flow should advance.'
+    }
+    if (activeStage === 'connection') {
+      return connectionComplete
+        ? 'Connection status is clear enough to move forward.'
+        : 'Do not advance until the channel or platform status is explicit and trustworthy.'
+    }
+    if (activeStage === 'strategy') {
+      return strategyComplete
+        ? 'The customer has confirmed how this hire should operate.'
+        : 'Activation is still blocked until the operating plan is defined.'
+    }
+    return reviewComplete
+      ? 'Open the review step to activate the trial with full context.'
+      : 'Finish the earlier steps before the activation review is unlocked.'
+  })()
+
+  return (
+    <div className="my-agents-activation-shell" data-testid="cp-my-agents-activation-studio">
+      <div className="my-agents-activation-hero">
+        <div>
+          <div className="my-agents-activation-kicker">Activation studio</div>
+          <h3 className="my-agents-activation-title">Activate one hired agent at a time without dropping the customer into a long management screen</h3>
+          <p className="my-agents-activation-body">
+            Start with agent selection, then move through identity, connection, operating plan, and final review in the same PP-style frame.
+          </p>
+        </div>
+        <div className="my-agents-activation-hero-note">
+          <div className="my-agents-activation-rail-note-title">Why this flow works</div>
+          <p>Each step isolates one business decision, so the customer always knows what to do next and what still blocks activation.</p>
+          <div className="my-agents-activation-hero-stat">{completedStages}/{stages.length} steps complete</div>
+        </div>
+      </div>
+
+      <div className="my-agents-activation-grid">
+        <aside className="my-agents-activation-rail">
+          {stages.map((stage, index) => (
+            <button
+              key={stage.key}
+              type="button"
+              className={`my-agents-activation-stage-button ${activeStage === stage.key ? 'is-active' : ''}`}
+              onClick={() => {
+                if (stage.key === 'select-agent' || instance) {
+                  setActiveStage(stage.key)
+                }
+              }}
+            >
+              <span className="my-agents-activation-stage-index">0{index + 1}</span>
+              <span className="my-agents-activation-stage-copy">
+                <span className="my-agents-activation-stage-eyebrow">{stage.eyebrow}</span>
+                <span className="my-agents-activation-stage-title">{stage.title}</span>
+                <span className="my-agents-activation-stage-summary">{stage.summary}</span>
+              </span>
+              <span className={`my-agents-activation-stage-state ${stage.complete ? 'is-complete' : 'is-pending'}`}>
+                {stage.complete ? 'Complete' : 'Next'}
+              </span>
+            </button>
+          ))}
+
+          <div className="my-agents-activation-rail-note">
+            <div className="my-agents-activation-rail-note-title">Need more control?</div>
+            <p>Open the advanced workspace only when you need direct control over detailed configuration, goals, and runtime management.</p>
+            <Button appearance="outline" onClick={() => onOpenAdvanced('configure')} disabled={readOnly}>Open advanced workspace</Button>
+          </div>
+        </aside>
+
+        <Card className="my-agents-activation-stage-card">
+          <div className="my-agents-activation-stage-header">
+            <div>
+              <div className="my-agents-activation-stage-eyebrow">{activeStageDetail.eyebrow}</div>
+              <div className="my-agents-activation-stage-heading">{activeStageDetail.title}</div>
+            </div>
+            <Badge appearance={activeStageDetail.complete ? 'filled' : 'outline'} color={activeStageDetail.complete ? 'success' : undefined}>
+              {activeStageDetail.complete ? 'Complete' : 'Needs attention'}
+            </Badge>
+          </div>
+
+          {draftLoading ? <LoadingIndicator message="Loading activation progress..." size="small" /> : null}
+          {draftError ? <FeedbackMessage intent="error" message={draftError} /> : null}
+
+          {activeStage === 'select-agent' ? (
+            <div className="my-agents-activation-stage-content">
+              <p className="my-agents-activation-stage-body">
+                Choose the hired agent you want to activate first. This step replaces the old long scroll so the customer starts with a single, confident decision.
+              </p>
+              <div className="my-agents-activation-selector-wrap">
+                <AgentSelector
+                  agents={instances}
+                  selectedId={instance?.subscription_id || ''}
+                  onChange={onSelectSubscriptionId}
+                  disabled={readOnly}
+                  label="Agent to activate"
+                  helperText={selectionHelperText}
+                  required
+                />
+              </div>
+              {instance ? (
+                <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
+                  <div className="my-agents-activation-summary-card">
+                    <div className="my-agents-activation-summary-label">Selected hire</div>
+                    <div className="my-agents-activation-summary-value">{activationSummarySource}</div>
+                  </div>
+                  <div className="my-agents-activation-summary-card">
+                    <div className="my-agents-activation-summary-label">Activation status</div>
+                    <div className="my-agents-activation-summary-value">{String(instance.trial_status || 'pending').replace(/_/g, ' ')}</div>
+                  </div>
+                  <div className="my-agents-activation-summary-card">
+                    <div className="my-agents-activation-summary-label">Catalog lifecycle</div>
+                    <div className="my-agents-activation-summary-value">{formatLifecycleLabel(instance.catalog_status_at_hire) || 'Live on CP'}</div>
+                  </div>
+                  <div className="my-agents-activation-summary-card">
+                    <div className="my-agents-activation-summary-label">Next billing</div>
+                    <div className="my-agents-activation-summary-value">{new Date(instance.current_period_end).toLocaleDateString()}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="my-agents-activation-inline-note">No hired agents are waiting for activation right now.</div>
+              )}
+            </div>
+          ) : null}
+
+          {activeStage === 'identity' ? (
+            <div className="my-agents-activation-stage-content">
+              <p className="my-agents-activation-stage-body">
+                The first thing your team should feel is who this hire is for your business. Lock identity before you connect anything or define operations.
+              </p>
+              <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Agent name</div>
+                  <div className="my-agents-activation-summary-value">{String(draft?.nickname || instance?.nickname || 'Not chosen yet')}</div>
+                </div>
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Avatar / theme</div>
+                  <div className="my-agents-activation-summary-value">{String(draft?.theme || 'Not chosen yet')}</div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeStage === 'connection' ? (
+            <div className="my-agents-activation-stage-content">
+              <p className="my-agents-activation-stage-body">
+                {isMarketingInstance
+                  ? 'Customers should never wonder whether YouTube is really connected. This stage makes validation, attachment, and readiness explicit before publishing starts.'
+                  : 'Connect the external systems this hire depends on before the agent moves into live operation.'}
+              </p>
+              {isMarketingInstance ? (
+                <DigitalMarketingChannelStatusCard
+                  summary={youtubeConnectionSummary}
+                  loading={connectionsLoading}
+                  error={connectionsError}
+                  actionLabel={connectionComplete ? null : 'Resume connection setup'}
+                  onAction={connectionComplete || !instance ? null : () => navigate(buildHireSetupUrl(instance, 'connection'))}
+                />
+              ) : (
+                <div className="my-agents-activation-inline-note">Connection details for this hire are managed during guided setup.</div>
+              )}
+            </div>
+          ) : null}
+
+          {activeStage === 'strategy' ? (
+            <div className="my-agents-activation-stage-content">
+              <p className="my-agents-activation-stage-body">
+                Activation is not complete until the customer has shaped how often the agent works, what it should pursue, and what good output looks like.
+              </p>
+              {instance?.hired_instance_id && isMarketingInstance ? (
+                <DigitalMarketingBriefPreview hiredInstanceId={String(instance.hired_instance_id)} />
+              ) : (
+                <div className="my-agents-activation-inline-note">Use the operating plan workspace to define goals, cadence, and approval expectations.</div>
+              )}
+              <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Operating plan</div>
+                  <div className="my-agents-activation-summary-value">{strategyComplete ? 'Confirmed' : 'Still needs customer input'}</div>
+                </div>
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Launch readiness</div>
+                  <div className="my-agents-activation-summary-value">{strategyComplete && connectionComplete && identityComplete ? 'Ready for review' : 'Not ready yet'}</div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeStage === 'review' ? (
+            <div className="my-agents-activation-stage-content">
+              <p className="my-agents-activation-stage-body">
+                Final review is where the customer confirms that identity, connection, and operating plan now tell one coherent story. Only then should the trial start.
+              </p>
+              <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Identity</div>
+                  <div className="my-agents-activation-summary-value">{identityComplete ? 'Ready' : 'Incomplete'}</div>
+                </div>
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Connection</div>
+                  <div className="my-agents-activation-summary-value">{connectionComplete ? 'Ready' : 'Incomplete'}</div>
+                </div>
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Operating plan</div>
+                  <div className="my-agents-activation-summary-value">{strategyComplete ? 'Ready' : 'Incomplete'}</div>
+                </div>
+                <div className="my-agents-activation-summary-card">
+                  <div className="my-agents-activation-summary-label">Trial launch</div>
+                  <div className="my-agents-activation-summary-value">{reviewComplete ? 'Ready for activation review' : 'Blocked by earlier steps'}</div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="my-agents-activation-footer">
+            <div className="my-agents-activation-footer-copy">{footerCopy}</div>
+            <div className="my-agents-activation-footer-actions">
+              <Button appearance="subtle" onClick={() => moveStage(-1)} disabled={activeStageIndex === 0}>Back</Button>
+              {workspaceAction ? (
+                <Button appearance="outline" onClick={workspaceAction.onClick} disabled={readOnly || !instance || (activeStage === 'review' && !reviewComplete)}>
+                  {workspaceAction.label}
+                </Button>
+              ) : null}
+              {continueAction ? (
+                <Button appearance="primary" onClick={() => moveStage(1)} disabled={continueAction.disabled}>
+                  {continueAction.label}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
 function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
   const { instance } = props
   const hiredInstanceId = String(instance.hired_instance_id || '').trim()
@@ -1812,6 +2421,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
   const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>('')
   const [activeSection, setActiveSection] = useState<'configure' | 'goals' | 'skills' | 'performance'>('configure')
+  const [showAdvancedWorkspace, setShowAdvancedWorkspace] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -1820,6 +2430,15 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [selected, setSelected] = useState<MyAgentInstanceSummary | null>(null)
   const [cancelling, setCancelling] = useState(false)
+
+  const activationCandidates = useMemo(
+    () => instances.filter((instance) => (
+      isPendingActivation(instance)
+      && !isReadOnlyExpired(instance, nowMs, RETENTION_DAYS_AFTER_END)
+      && !isInReadOnlyRetention(instance, nowMs, RETENTION_DAYS_AFTER_END)
+    )),
+    [instances, nowMs]
+  )
 
   const activeCount = useMemo(() => instances.length, [instances])
 
@@ -1848,7 +2467,14 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
           }
         })()
 
+        const pendingCandidate = nextInstances.find((instance) => (
+          isPendingActivation(instance)
+          && !isReadOnlyExpired(instance, Date.now(), RETENTION_DAYS_AFTER_END)
+          && !isInReadOnlyRetention(instance, Date.now(), RETENTION_DAYS_AFTER_END)
+        ))
+
         const initial =
+          pendingCandidate?.subscription_id ||
           (persisted && nextInstances.some((x) => x.subscription_id === persisted) ? persisted : '') ||
           (nextInstances[0]?.subscription_id || '')
 
@@ -1873,6 +2499,11 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
     } catch {
       // ignore
     }
+  }, [selectedSubscriptionId])
+
+  useEffect(() => {
+    setShowAdvancedWorkspace(false)
+    setActiveSection('configure')
   }, [selectedSubscriptionId])
 
   const selectedInstance = useMemo(() => {
@@ -1971,32 +2602,17 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
   }
 
   const selectedReadOnlyExpired = useMemo(() => {
-    if (!selectedInstance) return false
-
-    const retentionExpiresAtMs = selectedInstance.retention_expires_at
-      ? new Date(selectedInstance.retention_expires_at).getTime()
-      : NaN
-    if (Number.isFinite(retentionExpiresAtMs)) {
-      return nowMs > retentionExpiresAtMs
-    }
-
-    const endMs = new Date(selectedInstance.current_period_end).getTime()
-    if (!Number.isFinite(endMs)) return false
-    if (String(selectedInstance.status || '').toLowerCase() !== 'canceled') return false
-    return nowMs > endMs + RETENTION_DAYS_AFTER_END * 24 * 60 * 60 * 1000
+    return isReadOnlyExpired(selectedInstance, nowMs, RETENTION_DAYS_AFTER_END)
   }, [selectedInstance, nowMs])
 
   const selectedInReadOnlyRetention = useMemo(() => {
-    if (!selectedInstance) return false
-    if (selectedReadOnlyExpired) return false
-
-    const status = String(selectedInstance.status || '').toLowerCase()
-    if (status !== 'canceled') return false
-
-    const endMs = new Date(selectedInstance.current_period_end).getTime()
-    if (!Number.isFinite(endMs)) return false
-    return nowMs <= endMs + RETENTION_DAYS_AFTER_END * 24 * 60 * 60 * 1000
+    return isInReadOnlyRetention(selectedInstance, nowMs, RETENTION_DAYS_AFTER_END)
   }, [selectedInstance, selectedReadOnlyExpired, nowMs])
+
+  const selectedNeedsActivation = useMemo(
+    () => isPendingActivation(selectedInstance) && !selectedReadOnlyExpired && !selectedInReadOnlyRetention,
+    [selectedInstance, selectedReadOnlyExpired, selectedInReadOnlyRetention]
+  )
 
   return (
     <div className="my-agents-page">
@@ -2031,6 +2647,20 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
       )}
 
       {instances.length > 0 ? (
+        selectedNeedsActivation && !showAdvancedWorkspace ? (
+          <Card className="agent-detail-card" style={{ marginTop: '1rem', padding: '0.75rem' }}>
+            <ActivationStudioPanel
+              instances={activationCandidates.length > 0 ? activationCandidates : [selectedInstance].filter(Boolean) as MyAgentInstanceSummary[]}
+              selectedSubscriptionId={selectedSubscriptionId}
+              onSelectSubscriptionId={setSelectedSubscriptionId}
+              readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+              onOpenAdvanced={(section) => {
+                setShowAdvancedWorkspace(true)
+                setActiveSection(section)
+              }}
+            />
+          </Card>
+        ) : (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <div style={{ minWidth: 0, width: '100%', maxWidth: '500px', flex: '1 1 260px' }}>
@@ -2044,36 +2674,45 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                 helperText={selectedReadOnlyExpired ? "This agent's trial has ended" : "View and manage your hired agents"}
               />
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <Button
-                appearance={activeSection === 'configure' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('configure')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Configure
-              </Button>
-              <Button
-                appearance={activeSection === 'goals' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('goals')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Goal Setting
-              </Button>
-              <Button
-                appearance={activeSection === 'skills' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('skills')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Skills
-              </Button>
-              <Button
-                appearance={activeSection === 'performance' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('performance')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Performance
-              </Button>
-            </div>
+            {selectedNeedsActivation ? (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Badge appearance="tint" color="warning">Activation in progress</Badge>
+                <Button appearance={showAdvancedWorkspace ? 'primary' : 'outline'} onClick={() => setShowAdvancedWorkspace((prev) => !prev)}>
+                  {showAdvancedWorkspace ? 'Back to activation guide' : 'Open advanced workspace'}
+                </Button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  appearance={activeSection === 'configure' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('configure')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Configure
+                </Button>
+                <Button
+                  appearance={activeSection === 'goals' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('goals')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Goal Setting
+                </Button>
+                <Button
+                  appearance={activeSection === 'skills' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('skills')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Skills
+                </Button>
+                <Button
+                  appearance={activeSection === 'performance' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('performance')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Performance
+                </Button>
+              </div>
+            )}
           </div>
 
           {selectedInstance ? (
@@ -2204,7 +2843,9 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                       </div>
                     )}
                   </>
-                ) : activeSection === 'goals' ? (
+                ) : null}
+
+                {activeSection === 'goals' ? (
                   <>
                     <div style={{ fontWeight: 600 }}>Goal Setting</div>
                     <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
@@ -2219,7 +2860,9 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
 
                     <GoalSettingPanel instance={selectedInstance} readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention} />
                   </>
-                ) : activeSection === 'skills' ? (
+                ) : null}
+
+                {activeSection === 'skills' ? (
                   <>
                     <div style={{ fontWeight: 600 }}>Skills &amp; Goal Configuration</div>
                     <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
@@ -2230,7 +2873,9 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                       readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
                     />
                   </>
-                ) : (
+                ) : null}
+
+                {activeSection === 'performance' ? (
                   <>
                     <div style={{ fontWeight: 600 }}>Performance</div>
                     <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
@@ -2238,11 +2883,12 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
                     </div>
                     <PerformancePanel instance={selectedInstance} />
                   </>
-                )}
+                ) : null}
               </div>
             </div>
           ) : null}
         </Card>
+        )
       ) : (
         !loading && !error && (
           <Card style={{ marginTop: '1.5rem', padding: '2.5rem', textAlign: 'center' }}>

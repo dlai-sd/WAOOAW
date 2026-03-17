@@ -117,6 +117,31 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
     expect(screen.getByText(/Review your setup and activate trial\./i)).toBeInTheDocument()
   })
 
+  it('supports direct entry into the YouTube connection stage', async () => {
+    const svc = await import('../services/hireWizard.service')
+    vi.mocked(svc.getHireWizardDraftBySubscription).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-4',
+      subscription_id: 'SUB-4',
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'Channel Copilot',
+      theme: 'default',
+      config: {},
+      configured: false,
+      goals_completed: false,
+      trial_status: 'not_started',
+      trial_start_at: null,
+      trial_end_at: null
+    } as any)
+
+    renderWizard('/hire/setup/SUB-4?agentId=AGT-MKT-DMA-001&stage=youtube')
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 3 of 4')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('cp-hire-setup-platform')).toBeInTheDocument()
+  })
+
   it('shows marketing platform connection UI at step 3 for marketing agents', async () => {
     const svc = await import('../services/hireWizard.service')
     const plantSvc = await import('../services/plant.service')

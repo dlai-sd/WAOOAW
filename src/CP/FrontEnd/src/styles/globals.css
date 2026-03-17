@@ -1937,6 +1937,215 @@ section[id] {
   padding: 24px;
 }
 
+.my-agents-activation-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.my-agents-activation-kicker,
+.my-agents-activation-stage-eyebrow,
+.my-agents-activation-summary-label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--colorBrandForeground1);
+}
+
+.my-agents-activation-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  padding: 20px 22px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(0, 120, 212, 0.16), transparent 32%),
+    linear-gradient(160deg, var(--colorNeutralBackground2), var(--colorNeutralBackground1));
+  border: 1px solid var(--colorNeutralStroke2);
+}
+
+.my-agents-activation-hero-note {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.my-agents-activation-title {
+  margin: 0.45rem 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 2.5vw, 2.3rem);
+  line-height: 1.04;
+}
+
+.my-agents-activation-hero-stat {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.my-agents-activation-body,
+.my-agents-activation-stage-body,
+.my-agents-activation-stage-summary,
+.my-agents-activation-rail-note p,
+.my-agents-activation-inline-note {
+  color: var(--colorNeutralForeground2);
+  line-height: 1.55;
+}
+
+.my-agents-activation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.my-agents-activation-summary-card,
+.my-agents-activation-rail-note {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground2);
+}
+
+.my-agents-activation-summary-grid--two-column {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.my-agents-activation-summary-value,
+.my-agents-activation-stage-heading,
+.my-agents-activation-rail-note-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.my-agents-activation-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
+  gap: 16px;
+}
+
+.my-agents-activation-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.my-agents-activation-stage-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 15px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground1);
+  text-align: left;
+  cursor: pointer;
+}
+
+.my-agents-activation-stage-button.is-active {
+  border-color: rgba(0, 120, 212, 0.42);
+  background: rgba(0, 120, 212, 0.08);
+}
+
+.my-agents-activation-stage-index {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.my-agents-activation-stage-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.my-agents-activation-stage-title {
+  font-weight: 700;
+}
+
+.my-agents-activation-stage-state {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.my-agents-activation-stage-state.is-complete {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.my-agents-activation-stage-state.is-pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.my-agents-activation-stage-card {
+  padding: 20px;
+  border-radius: 22px;
+}
+
+.my-agents-activation-stage-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.my-agents-activation-stage-heading {
+  font-size: 1.25rem;
+  margin-top: 0.35rem;
+}
+
+.my-agents-activation-stage-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.my-agents-activation-selector-wrap {
+  max-width: 540px;
+}
+
+.my-agents-activation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.my-agents-activation-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--colorNeutralStroke2);
+}
+
+.my-agents-activation-footer-copy {
+  flex: 1;
+  color: var(--colorNeutralForeground2);
+  line-height: 1.5;
+}
+
+.my-agents-activation-footer-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .agent-header {
   margin-bottom: 16px;
 }
@@ -2719,6 +2928,26 @@ section[id] {
   margin-bottom: 20px;
 }
 
+.hire-wizard-hero-note {
+  border-radius: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: var(--colorNeutralBackground2);
+}
+
+.hire-wizard-hero-note-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.hire-wizard-hero-note p {
+  color: var(--colorNeutralForeground2);
+  line-height: 1.55;
+  margin: 0;
+}
+
 .hire-wizard-step-header {
   display: flex;
   justify-content: space-between;
@@ -2774,6 +3003,9 @@ section[id] {
 }
 
 @media (max-width: 980px) {
+  .my-agents-activation-hero,
+  .my-agents-activation-grid,
+  .my-agents-activation-summary-grid,
   .portal-hero,
   .command-centre-grid,
   .usage-billing-overview,
@@ -2781,6 +3013,15 @@ section[id] {
   .discover-hero,
   .hire-wizard-hero {
     grid-template-columns: 1fr;
+  }
+
+  .my-agents-activation-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .my-agents-activation-footer-actions {
+    justify-content: flex-start;
   }
 
   .portal-hero-metrics {

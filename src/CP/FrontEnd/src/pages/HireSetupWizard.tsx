@@ -44,6 +44,18 @@ type MarketingPlatformConfig = {
   posting_identity?: string | null
 }
 
+function resolveRequestedStep(searchParams: URLSearchParams): Step | null {
+  const raw = String(searchParams.get('step') || searchParams.get('stage') || '').trim().toLowerCase()
+  if (!raw) return null
+
+  if (raw === '1' || raw === 'identity' || raw === 'profile') return 1
+  if (raw === '2' || raw === 'voice' || raw === 'theme') return 2
+  if (raw === '3' || raw === 'connection' || raw === 'youtube' || raw === 'platform') return 3
+  if (raw === '4' || raw === 'review' || raw === 'launch') return 4
+
+  return null
+}
+
 function buildRedirectUri(searchParams: URLSearchParams): string {
   if (typeof window === 'undefined') return ''
   const nextParams = new URLSearchParams(searchParams)
@@ -94,6 +106,7 @@ export default function HireSetupWizard() {
   const requestedCatalogVersion = searchParams.get('catalogVersion') || ''
   const requestedLifecycleState = searchParams.get('lifecycleState') || ''
   const requestedAgentName = searchParams.get('agentName') || ''
+  const requestedStep = resolveRequestedStep(searchParams)
 
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(true)
@@ -292,11 +305,12 @@ export default function HireSetupWizard() {
           setMarketingRefreshToken('')
           setMarketingPostingIdentity('')
         }
-        setStep(inferInitialStep(existing))
+        setStep(requestedStep ?? inferInitialStep(existing))
       } catch (e: any) {
         // 404 is fine: user hasn't saved draft yet.
         if (e?.status && Number(e.status) === 404) {
           setDraft(null)
+          if (!cancelled && requestedStep) setStep(requestedStep)
         } else {
           setError(e?.message || 'Failed to load wizard draft')
         }
@@ -309,7 +323,7 @@ export default function HireSetupWizard() {
     return () => {
       cancelled = true
     }
-  }, [subscriptionId, agentId, requestedAgentTypeId, requestedCatalogVersion, requestedLifecycleState])
+  }, [subscriptionId, agentId, requestedAgentTypeId, requestedCatalogVersion, requestedLifecycleState, requestedStep])
 
   useEffect(() => {
     if (!isMarketingAgent) return
@@ -646,23 +660,12 @@ export default function HireSetupWizard() {
             and what you will be able to monitor after activation.
           </p>
         </div>
-        <div className="hire-wizard-proof-grid">
-          <div className="hire-wizard-proof-card">
-            <div className="hire-wizard-proof-value">Agent</div>
-            <div className="hire-wizard-proof-label">{selectedAgentSummary}</div>
-          </div>
-          <div className="hire-wizard-proof-card">
-            <div className="hire-wizard-proof-value">4</div>
-            <div className="hire-wizard-proof-label">Simple steps</div>
-          </div>
-          <div className="hire-wizard-proof-card">
-            <div className="hire-wizard-proof-value">0</div>
-            <div className="hire-wizard-proof-label">Secret leakage to Plant</div>
-          </div>
-          <div className="hire-wizard-proof-card">
-            <div className="hire-wizard-proof-value">1</div>
-            <div className="hire-wizard-proof-label">Clear activation moment</div>
-          </div>
+        <div className="hire-wizard-hero-note">
+          <div className="hire-wizard-hero-note-title">Activation context</div>
+          <p>
+            You are activating <strong>{selectedAgentSummary}</strong>. Complete identity, connection, and review in this flow,
+            then return to My Agents for ongoing runtime management.
+          </p>
         </div>
       </div>
 
@@ -675,7 +678,14 @@ export default function HireSetupWizard() {
           </div>
           <div className="hire-wizard-step-pills">
             {[1, 2, 3, 4].map((item) => (
-              <span key={item} className={`hire-wizard-step-pill ${step >= item ? 'active' : ''}`}>0{item}</span>
+              <button
+                key={item}
+                type="button"
+                className={`hire-wizard-step-pill ${step >= item ? 'active' : ''}`}
+                onClick={() => setStep(item as Step)}
+              >
+                0{item}
+              </button>
             ))}
           </div>
         </div>
@@ -983,17 +993,6 @@ export default function HireSetupWizard() {
           </Button>
         </div>
       </Card>
-
-      <div className="hire-wizard-bottom-grid">
-        <Card className="hire-wizard-bottom-card">
-          <div className="hire-wizard-bottom-title">What the customer should know next</div>
-          <p>After activation, WAOOAW should route them cleanly to hiring runtime, approvals, spend, and results.</p>
-        </Card>
-        <Card className="hire-wizard-bottom-card">
-          <div className="hire-wizard-bottom-title">What the system should guarantee</div>
-          <p>Credentials stay protected, setup feels finite, and activation does not feel like a hidden background side effect.</p>
-        </Card>
-      </div>
     </div>
   )
 }
