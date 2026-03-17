@@ -148,6 +148,16 @@ def _to_customer_credential_response(
     )
 
 
+def _raise_youtube_connection_error(exc: YouTubeConnectionError) -> None:
+    detail = str(exc)
+    if detail == "youtube_oauth_not_configured":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="YouTube OAuth is not configured on the Plant backend.",
+        ) from exc
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from exc
+
+
 async def get_connected_platform_connection(
     db: AsyncSession,
     *,
@@ -249,7 +259,10 @@ async def start_youtube_connect(
     db: AsyncSession = Depends(get_db_session),
 ) -> StartYouTubeConnectResponse:
     service = YouTubeConnectionService(db=db)
-    result = await service.start_connect(customer_id=body.customer_id, redirect_uri=body.redirect_uri)
+    try:
+        result = await service.start_connect(customer_id=body.customer_id, redirect_uri=body.redirect_uri)
+    except YouTubeConnectionError as exc:
+        _raise_youtube_connection_error(exc)
     return StartYouTubeConnectResponse(
         state=result.state,
         authorization_url=result.authorization_url,
@@ -274,7 +287,7 @@ async def finalize_youtube_connect(
             redirect_uri=body.redirect_uri,
         )
     except YouTubeConnectionError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        _raise_youtube_connection_error(exc)
     return _to_customer_credential_response(result.credential)
 
 

@@ -49,8 +49,6 @@ def _unwrap_gateway_error_detail(detail: Any) -> Any:
 
 
 def _raise_for_gateway_response(resp: Any) -> None:
-    if resp.status_code >= 500:
-        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail=_unwrap_gateway_error_detail(resp.json))
 

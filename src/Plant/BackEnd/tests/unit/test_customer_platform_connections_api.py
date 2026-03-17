@@ -61,6 +61,28 @@ async def test_start_youtube_connect_maps_service_result(mock_db):
     assert "accounts.google.com" in response.authorization_url
 
 
+    @pytest.mark.asyncio
+    async def test_start_youtube_connect_returns_503_when_oauth_not_configured(mock_db):
+        from api.v1.platform_connections import StartYouTubeConnectRequest, start_youtube_connect
+        from services.youtube_connection_service import YouTubeConnectionError
+
+        with patch(
+            "api.v1.platform_connections.YouTubeConnectionService.start_connect",
+            AsyncMock(side_effect=YouTubeConnectionError("youtube_oauth_not_configured")),
+        ):
+            with pytest.raises(HTTPException) as excinfo:
+                await start_youtube_connect(
+                    StartYouTubeConnectRequest(
+                        customer_id="cust-1",
+                        redirect_uri="https://cp.demo.waooaw.com/oauth/youtube/callback",
+                    ),
+                    db=mock_db,
+                )
+
+        assert excinfo.value.status_code == 503
+        assert excinfo.value.detail == "YouTube OAuth is not configured on the Plant backend."
+
+
 @pytest.mark.asyncio
 async def test_finalize_youtube_connect_returns_customer_credential(mock_db):
     from api.v1.platform_connections import FinalizeYouTubeConnectRequest, finalize_youtube_connect

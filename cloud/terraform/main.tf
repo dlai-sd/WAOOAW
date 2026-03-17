@@ -50,6 +50,8 @@ module "backend_api" {
   secrets = {
     GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
     GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
+    YOUTUBE_CLIENT_ID    = "YOUTUBE_CLIENT_ID:latest"
+    YOUTUBE_CLIENT_SECRET = "YOUTUBE_CLIENT_SECRET:latest"
     JWT_SECRET           = "JWT_SECRET:latest"
   }
 }
