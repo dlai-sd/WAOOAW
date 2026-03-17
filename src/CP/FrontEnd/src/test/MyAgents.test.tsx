@@ -1,9 +1,19 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
 import { MemoryRouter } from 'react-router-dom'
 import { waooawLightTheme } from '../theme'
 import MyAgents from '../pages/authenticated/MyAgents'
+
+const navigateMock = vi.fn()
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  }
+})
 
 vi.mock('../services/subscriptions.service', () => ({
   cancelSubscription: vi.fn().mockResolvedValue({
@@ -169,11 +179,14 @@ const renderWithProvider = (component: React.ReactElement) => {
 }
 
 async function openDetailedWorkspace(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: /Operating plan/i }))
-  fireEvent.click(await screen.findByRole('button', { name: 'Open operating plan' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Open detailed workspace' }))
 }
 
 describe('MyAgents Component', () => {
+  beforeEach(() => {
+    navigateMock.mockReset()
+  })
+
   it('renders page title with agent count', async () => {
     renderWithProvider(<MyAgents />)
     await waitFor(() => {
@@ -374,7 +387,7 @@ describe('MyAgents Component', () => {
     })
 
     expect(screen.getByText('YouTube not connected')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reconnect YouTube' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
     expect(screen.getByText('Blocked by approval')).toBeInTheDocument()
     expect(screen.getByText('Customer approval')).toBeInTheDocument()
     expect(screen.getByText('Approve exact deliverable')).toBeInTheDocument()
@@ -569,6 +582,90 @@ describe('MyAgents Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Dormant Channel reconnect required')).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Reconnect YouTube' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+  })
+
+  it('renders the inline studio rail alongside the selected subscription UI', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Selected hire')).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('button', { name: /Identity setup/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Platform connections/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Review and (activate|approve)/i })).toBeInTheDocument()
+    expect(screen.getByText('Subscription')).toBeInTheDocument()
+    expect(screen.getByText('SUB-1')).toBeInTheDocument()
+  })
+
+  it('keeps identity and YouTube setup actions inline inside the studio shell', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
+    const connectionsModule = await import('../services/platformConnections.service')
+    const youtubeModule = await import('../services/youtubeConnections.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-MKT-4',
+          agent_id: 'AGT-MKT-YT-004',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-MKT-4',
+          agent_type_id: 'marketing.digital_marketing.v1',
+          nickname: 'Digital Marketing Agent',
+        },
+      ],
+    })
+    vi.mocked(deliverablesModule.listHiredAgentDeliverables).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-MKT-4',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-MKT-4',
+          hired_instance_id: 'HIRED-MKT-4',
+          goal_instance_id: 'GOAL-MKT-4',
+          goal_template_id: 'marketing.theme_discovery.v1',
+          title: 'YouTube growth draft',
+          payload: { destination: { destination_type: 'youtube' }, summary: 'Draft pending exact approval.' },
+          review_status: 'pending_review',
+          review_notes: null,
+          approval_id: null,
+          execution_status: 'not_executed',
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+    })
+    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValueOnce([])
+    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([])
+
+    renderWithProvider(<MyAgents initialStudioStep="review" initialStudioFocus="review" initialSubscriptionId="SUB-MKT-4" />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open identity setup' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open identity setup' }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Continue to platform connections' })).toBeInTheDocument()
+    })
+    expect(navigateMock).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /Review and (activate|approve)/i }))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open YouTube setup' }))
+    await waitFor(() => {
+      expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
+      expect(screen.getByText(/platform connections/i)).toBeInTheDocument()
+    })
+    expect(navigateMock).not.toHaveBeenCalled()
+    expect(screen.queryByText('Saved Theme Discovery brief')).not.toBeInTheDocument()
   })
 })

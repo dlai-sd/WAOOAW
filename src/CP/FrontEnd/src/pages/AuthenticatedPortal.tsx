@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@fluentui/react-components'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { 
   WeatherMoon20Regular, 
   WeatherSunny20Regular,
@@ -49,6 +49,8 @@ interface AuthenticatedPortalProps {
 type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail' | 'hire-setup' | 'hire-receipt'
 
 type JourneySource = 'payment-confirmed' | 'trial-activated' | 'setup-incomplete'
+type StudioStep = 'identity' | 'platforms' | 'review'
+type StudioFocus = 'identity' | 'youtube' | 'review'
 
 type PortalJourneyContext = {
   source: JourneySource
@@ -62,8 +64,10 @@ type PortalLocationState = {
   portalEntry?: {
     page?: Page
     agentId?: string
-    source?: JourneySource
     subscriptionId?: string
+    studioStep?: StudioStep
+    studioFocus?: StudioFocus
+    source?: JourneySource
     lifecycleState?: string
     catalogVersion?: string
     agentName?: string
@@ -149,10 +153,12 @@ export default function AuthenticatedPortal({
   initialJourneyContext,
 }: AuthenticatedPortalProps) {
   const location = useLocation()
-  const navigate = useNavigate()
   const portalEntry = (location.state as PortalLocationState | null)?.portalEntry
   const derivedInitialPage = portalEntry?.page ?? initialPage ?? 'command-centre'
   const derivedInitialAgentId = portalEntry?.agentId ?? initialAgentId
+  const derivedInitialSubscriptionId = portalEntry?.subscriptionId
+  const derivedInitialStudioStep = portalEntry?.studioStep
+  const derivedInitialStudioFocus = portalEntry?.studioFocus
   const derivedJourneyContext = portalEntry?.source
     ? {
         source: portalEntry.source,
@@ -386,6 +392,9 @@ export default function AuthenticatedPortal({
   const currentMeta = pageMeta[activeNavPage]
   const journeyAgentLabel = journeyContext?.agentName || selectedAgentId || ''
   const journeyLifecycleLabel = formatLifecycleLabel(journeyContext?.lifecycleState)
+  const myAgentsInitialSubscriptionId = derivedInitialSubscriptionId ?? journeyContext?.subscriptionId
+  const myAgentsInitialStudioStep = derivedInitialStudioStep ?? (journeyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
+  const myAgentsInitialStudioFocus = derivedInitialStudioFocus ?? (journeyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
 
   const journeyBanner = useMemo(() => {
     if (!journeyContext) return null
@@ -404,8 +413,7 @@ export default function AuthenticatedPortal({
         body: `Payment is complete, but the agent is not ready to work until setup is finished. Resume setup to connect systems and activate the trial.${continuityNote}`,
         primaryLabel: 'Resume setup',
         onPrimary: () => {
-          if (!journeyContext.subscriptionId || !selectedAgentId) return
-          navigate(`/hire/setup/${encodeURIComponent(journeyContext.subscriptionId)}?agentId=${encodeURIComponent(selectedAgentId)}`)
+          setCurrentPage('my-agents')
         },
       }
     }
@@ -440,7 +448,14 @@ export default function AuthenticatedPortal({
       case 'command-centre':
         return <CommandCentre onOpenDiscover={() => openPage('discover')} onOpenBilling={() => openPage('billing')} onOpenMyAgents={() => openPage('my-agents')} onOpenGoals={() => openPage('goals')} />
       case 'my-agents':
-        return <MyAgents onNavigateToDiscover={() => openPage('discover')} />
+        return (
+          <MyAgents
+            onNavigateToDiscover={() => openPage('discover')}
+            initialSubscriptionId={myAgentsInitialSubscriptionId}
+            initialStudioStep={myAgentsInitialStudioStep}
+            initialStudioFocus={myAgentsInitialStudioFocus}
+          />
+        )
       case 'discover':
         return <AgentDiscovery onSelectAgent={handleSelectAgent} />
       case 'agent-detail':
