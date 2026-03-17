@@ -171,3 +171,26 @@ def test_attach_youtube_connection_proxies_hired_agent_binding(client, auth_head
     assert fake.calls[0]["path"] == "api/v1/customer-platform-connections/cred-1/attach"
     assert fake.calls[0]["json"]["platform_key"] == "youtube"
     app.dependency_overrides.clear()
+
+
+def test_start_youtube_connect_surfaces_upstream_oauth_config_error(client, auth_headers, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
+
+    from api.cp_youtube_connections import get_plant_gateway_client
+    from main import app
+
+    fake = _FakePlantClient(
+        response_status=503,
+        response_json={"detail": "YouTube OAuth is not configured on the Plant backend."},
+    )
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    resp = client.post(
+        "/api/cp/youtube-connections/connect/start",
+        headers=auth_headers,
+        json={"redirect_uri": "https://cp.demo.waooaw.com/oauth/youtube/callback"},
+    )
+
+    assert resp.status_code == 503
+    assert resp.json()["detail"]["detail"] == "YouTube OAuth is not configured on the Plant backend."
+    app.dependency_overrides.clear()

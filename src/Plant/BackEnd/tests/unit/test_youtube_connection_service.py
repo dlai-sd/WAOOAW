@@ -5,16 +5,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from core.config import settings
 from models.customer_platform_credential import CustomerPlatformCredentialModel
 from models.oauth_connection_session import OAuthConnectionSessionModel
 from services.youtube_connection_service import YouTubeConnectionError, YouTubeConnectionService
 
 
 @pytest.mark.asyncio
-async def test_start_connect_persists_session_and_returns_google_url():
+async def test_start_connect_persists_session_and_returns_google_url(monkeypatch):
     db = AsyncMock()
     db.add = MagicMock()
     db.commit = AsyncMock()
+    monkeypatch.setattr(settings, "youtube_client_id", "test-youtube-client-id", raising=False)
+    monkeypatch.setattr(settings, "youtube_client_secret", "test-youtube-client-secret", raising=False)
 
     service = YouTubeConnectionService(db=db)
     result = await service.start_connect(
@@ -26,6 +29,21 @@ async def test_start_connect_persists_session_and_returns_google_url():
     assert "accounts.google.com" in result.authorization_url
     db.add.assert_called_once()
     db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_start_connect_rejects_missing_youtube_oauth_config(monkeypatch):
+    db = AsyncMock()
+    monkeypatch.setattr(settings, "youtube_client_id", "", raising=False)
+    monkeypatch.setattr(settings, "youtube_client_secret", "", raising=False)
+
+    service = YouTubeConnectionService(db=db)
+
+    with pytest.raises(YouTubeConnectionError, match="youtube_oauth_not_configured"):
+        await service.start_connect(
+            customer_id="cust-1",
+            redirect_uri="https://cp.demo.waooaw.com/oauth/youtube/callback",
+        )
 
 
 @pytest.mark.asyncio

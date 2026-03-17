@@ -53,7 +53,12 @@ class YouTubeConnectionService:
         self._db = db
         self._secret_manager = secret_manager or get_secret_manager_service()
 
+    def _ensure_oauth_configured(self) -> None:
+        if not str(settings.youtube_client_id or "").strip() or not str(settings.youtube_client_secret or "").strip():
+            raise YouTubeConnectionError("youtube_oauth_not_configured")
+
     async def start_connect(self, *, customer_id: str, redirect_uri: str) -> StartConnectResult:
+        self._ensure_oauth_configured()
         now = datetime.now(timezone.utc)
         state = secrets.token_urlsafe(32)
         nonce = secrets.token_urlsafe(24)
@@ -226,6 +231,7 @@ class YouTubeConnectionService:
         return session
 
     async def _exchange_code_for_tokens(self, *, code: str, redirect_uri: str) -> dict[str, Any]:
+        self._ensure_oauth_configured()
         payload = {
             "code": code,
             "client_id": settings.youtube_client_id,
