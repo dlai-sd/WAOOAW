@@ -69,8 +69,8 @@ class YouTubeClient(SocialPlatformClient):
         self.oauth_token_url = "https://oauth2.googleapis.com/token"
         
         # OAuth2 credentials from env or params
-        self.client_id = client_id or os.getenv("YOUTUBE_CLIENT_ID", "")
-        self.client_secret = client_secret or os.getenv("YOUTUBE_CLIENT_SECRET", "")
+        self.client_id = client_id or os.getenv("GOOGLE_CLIENT_ID", "")
+        self.client_secret = client_secret or os.getenv("GOOGLE_CLIENT_SECRET", "")
         
         self.quota_limit = quota_limit
         self.quota_used = 0

@@ -121,13 +121,11 @@ module "plant_backend" {
 
   secrets = merge(
     var.attach_secret_manager_secrets ? {
-      GOOGLE_CLIENT_ID      = "GOOGLE_CLIENT_ID:latest"
-      GOOGLE_CLIENT_SECRET  = "GOOGLE_CLIENT_SECRET:latest"
-      YOUTUBE_CLIENT_ID     = "YOUTUBE_CLIENT_ID:latest"
-      YOUTUBE_CLIENT_SECRET = "YOUTUBE_CLIENT_SECRET:latest"
-      JWT_SECRET            = "JWT_SECRET:latest"
-      SMTP_USERNAME         = "${var.smtp_username_secret}:latest"
-      SMTP_PASSWORD         = "${var.smtp_password_secret}:latest"
+      GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
+      GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
+      JWT_SECRET           = "JWT_SECRET:latest"
+      SMTP_USERNAME        = "${var.smtp_username_secret}:latest"
+      SMTP_PASSWORD        = "${var.smtp_password_secret}:latest"
     } : {},
     # Razorpay keys — only injected when attach_razorpay_secrets=true (prod/uat).
     # Kept separate from attach_secret_manager_secrets so demo can run with

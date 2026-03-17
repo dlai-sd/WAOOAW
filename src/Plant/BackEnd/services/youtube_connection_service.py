@@ -55,10 +55,10 @@ class YouTubeConnectionService:
         self._secret_manager = secret_manager or get_secret_manager_service()
 
     def _oauth_client_id(self) -> str:
-        return str(settings.youtube_client_id or settings.google_client_id or "").strip()
+        return str(settings.google_client_id or "").strip()
 
     def _oauth_client_secret(self) -> str:
-        return str(settings.youtube_client_secret or os.getenv("GOOGLE_CLIENT_SECRET") or "").strip()
+        return str(os.getenv("GOOGLE_CLIENT_SECRET") or "").strip()
 
     def _ensure_oauth_configured(self) -> None:
         if not self._oauth_client_id() or not self._oauth_client_secret():

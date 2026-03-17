@@ -149,12 +149,6 @@ services:
       - name: GOOGLE_CLIENT_SECRET
         secret_name: GOOGLE_CLIENT_SECRET
         version: latest
-      - name: YOUTUBE_CLIENT_ID
-        secret_name: YOUTUBE_CLIENT_ID
-        version: latest
-      - name: YOUTUBE_CLIENT_SECRET
-        secret_name: YOUTUBE_CLIENT_SECRET
-        version: latest
       - name: JWT_SECRET
         secret_name: JWT_SECRET
         version: latest
