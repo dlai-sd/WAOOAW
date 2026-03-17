@@ -21,6 +21,7 @@ db_availability_type   = "ZONAL"
 db_disk_size_gb        = 20
 db_enable_pitr         = false
 db_max_connections     = "50"
+db_enable_public_ip    = true  # Required for the documented Codespaces Cloud SQL Auth Proxy path.
 db_deletion_protection = false # Allow easy cleanup for demo
 
 # OTP email delivery — runtime-injected SMTP config (NOT baked into image)

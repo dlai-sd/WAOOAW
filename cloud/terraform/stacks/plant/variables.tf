@@ -105,6 +105,12 @@ variable "db_max_connections" {
   default     = "100"
 }
 
+variable "db_enable_public_ip" {
+  description = "Enable public IPv4 on the Plant Cloud SQL instance for environments that rely on the Codespaces Cloud SQL Auth Proxy path."
+  type        = bool
+  default     = false
+}
+
 variable "db_deletion_protection" {
   description = "Enable deletion protection on Cloud SQL instance"
   type        = bool

@@ -22,6 +22,7 @@ DB_ENV_FILE="/root/.env.db"
 PROXY_LOG="/tmp/cloud-sql-proxy.log"
 INSTANCE="waooaw-oauth:asia-south1:plant-sql-demo"
 PROXY_PORT=15432
+INSTANCE_NAME="plant-sql-demo"
 
 # ── 1. Auth ──────────────────────────────────────────────────────────────────
 if [[ -z "${GCP_SA_KEY:-}" ]]; then
@@ -38,6 +39,17 @@ chmod 600 "$KEY_FILE"
 gcloud auth activate-service-account --key-file="$KEY_FILE" --quiet
 gcloud config set project waooaw-oauth --quiet
 echo "✅ GCP auth active: $(gcloud config get-value account 2>/dev/null)"
+
+PUBLIC_IP_ENABLED=$(gcloud sql instances describe "$INSTANCE_NAME" \
+    --project=waooaw-oauth \
+    --format='value(settings.ipConfiguration.ipv4Enabled)' 2>/dev/null || true)
+
+if [[ "$PUBLIC_IP_ENABLED" != "True" && "$PUBLIC_IP_ENABLED" != "true" ]]; then
+    echo "❌ Cloud SQL public IP is disabled for ${INSTANCE_NAME}."
+    echo "   Codespaces uses the public-IP-backed Auth Proxy path documented in docs/CONTEXT_AND_INDEX.md."
+    echo "   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=waooaw-oauth --quiet"
+    exit 1
+fi
 
 # ── 2. Cloud SQL Auth Proxy ───────────────────────────────────────────────────
 PROXY_BIN="/usr/local/bin/cloud-sql-proxy"
@@ -67,6 +79,10 @@ if kill -0 "$PROXY_PID" 2>/dev/null && grep -q "ready for new connections" "$PRO
 else
     echo "❌ Cloud SQL Proxy failed to start — check $PROXY_LOG"
     cat "$PROXY_LOG" || true
+    if grep -q 'instance does not have IP of type "PUBLIC"' "$PROXY_LOG"; then
+        echo "   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=waooaw-oauth --quiet"
+    fi
+    exit 1
 fi
 
 # ── 3. DB credentials from Secret Manager ────────────────────────────────────
@@ -100,4 +116,5 @@ else
     echo "⚠️  Could not read DB credentials from Secret Manager."
     echo "   SA may need roles/secretmanager.secretAccessor"
     echo "   Once granted, re-run: bash .devcontainer/gcp-auth.sh"
+    exit 1
 fi
