@@ -1,5 +1,43 @@
 # Tech Debt: Clean PR Branch Verification Gap
 
+---
+
+# Tech Debt: CP Activation Journey Is Split Across Handoff Screens Instead of One Inline Studio
+
+## Story
+
+The current customer activation path asks users to think in terms of multiple surfaces at once: the hire/payment completion flow, a separate `Hire Setup` route, and the `My Agents` workspace that already contains the operational context they actually need. That split created product confusion and led to UI clutter, duplicated status/setup summaries, and button behavior that felt broken because the user expectation was to keep working in place.
+
+The deeper issue is structural, not cosmetic. CP still treats setup as a handoff from one page to another rather than as one stable studio shell where the customer can review progress, open a stage, edit identity or YouTube details inline, and continue without route churn.
+
+## Why This Matters
+
+- Customers should experience one activation workspace, not a chain of overlapping setup surfaces.
+- Separate handoff and setup pages make state continuity, QA coverage, and support diagnosis harder.
+- Repeated summary/setup chrome wastes the most valuable screen area on the exact journey where customers need focused input controls.
+
+## Debt Item
+
+**Name:** Unify CP customer activation into one inline studio
+
+**Problem:** Customer setup is fragmented between `Hire Setup` and `My Agents`, with stage actions that imply inline editing but still rely on separate routes or redundant panels.
+
+**Impact:** The activation journey feels inconsistent, users lose context during setup, and frontend fixes keep landing as local patches instead of solving the underlying surface-design problem.
+
+**Root cause:** The product flow evolved incrementally around payment and review checkpoints, but the CP experience was never consolidated into a single Agent-Studio-style shell with explicit handoff boundaries.
+
+## What Is Needed To Pay This Debt Down
+
+1. Make `My Agents` the only customer setup studio after hire activation.
+2. Reduce `Hire Setup` to a payment-success handoff surface with a clear CTA back into `My Agents`.
+3. Replace duplicated summary/setup cards with a stable shell modeled on the PP Agent Studio layout: fixed navigation and descriptive chrome, scrollable working pane.
+4. Keep identity and YouTube editing inline in the current studio pane so stage actions do not trigger route changes.
+5. Add end-to-end coverage that proves portal entry, handoff, inline editing, and completion all work as one journey.
+
+## Recommended Follow-up
+
+Execute `CP-STUDIO-1` as the first consolidation pass, then reassess whether any remaining `Hire Setup` route behavior still serves a real customer need. If not, the next iteration should delete the leftover route-specific setup UI instead of maintaining two parallel activation surfaces.
+
 ## Story
 
 We created PR 918 as a clean, main-based replay of fixes that were already implemented and tested on `feat/ui-ux-revamp`. That improved reviewability, but it also introduced a verification debt: several commits had to be replayed with conflict resolution, and the resulting clean branch was not fully revalidated in its own environment.
