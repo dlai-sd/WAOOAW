@@ -973,12 +973,12 @@ Static IP (waooaw-lb-ip)
 #### Cloud SQL Proxy — permanent DB tunnel
 
 - **Binary**: `/usr/local/bin/cloud-sql-proxy` (v2.14.2, auto-downloaded by `gcp-auth.sh` if missing)
-- **Instance**: `waooaw-oauth:asia-south1:plant-sql-demo`
-- **Port**: `127.0.0.1:15432`
+- **Instance**: defaults to `waooaw-oauth:asia-south1:plant-sql-demo`; override with `WAOOAW_CLOUDSQL_ENV=uat|prod` or explicit `WAOOAW_CLOUDSQL_INSTANCE_NAME`
+- **Port**: `127.0.0.1:15432` by default; override with `WAOOAW_CLOUDSQL_PROXY_PORT`
 - **Auth**: `--credentials-file=/root/.gcp/waooaw-sa.json` (written by `gcp-auth.sh` from Codespaces secret `GCP_SA_KEY`)
 - **Starts automatically** via `gcp-auth.sh` on Codespace boot, but for any DB work the safe path is to re-run the script once in the current shell
 - **Log**: `/tmp/cloud-sql-proxy.log`
-- **pgpass**: `/root/.pgpass` — enables passwordless `psql` (written by `gcp-auth.sh` from Secret Manager `demo-plant-database-url`)
+- **pgpass**: `/root/.pgpass` — enables passwordless `psql` (written by `gcp-auth.sh` from `${WAOOAW_CLOUDSQL_ENV}-plant-database-url` unless overridden)
 - **DB env file**: `/root/.env.db` — exports host/port/user/db only; passwordless `psql` works because `gcp-auth.sh` also writes `/root/.pgpass`
 
 **First-attempt path:**
@@ -987,24 +987,31 @@ Static IP (waooaw-lb-ip)
 which gcloud
 printenv GCP_SA_KEY >/dev/null && echo "GCP_SA_KEY present"
 
-# 1. Run the auth/bootstrap script once per Codespace shell when you need DB access
+# 1. Choose target environment (default is demo if unset)
+export WAOOAW_CLOUDSQL_ENV=demo
+
+# Examples:
+# export WAOOAW_CLOUDSQL_ENV=uat
+# export WAOOAW_CLOUDSQL_ENV=prod
+
+# 2. Run the auth/bootstrap script once per Codespace shell when you need DB access
 bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 
-# 2. Confirm success before querying
+# 3. Confirm success before querying
 gcloud auth list
 test -f /root/.env.db && echo ".env.db ready"
 pgrep -fa cloud-sql-proxy
 
-# 3. Connect
+# 4. Connect
 source /root/.env.db && psql -c "SELECT current_database(), current_user;"
 
-# 4. Optional direct form if you need to avoid sourcing shell state
+# 5. Optional direct form if you need to avoid sourcing shell state
 psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembic_version;"
 ```
 
-> **Public IP**: `plant-sql-demo` has public IP enabled (patched 8 Mar 2026 — SA has `cloudsql.admin`).
+> **Public IP**: the selected `plant-sql-<env>` instance must have public IP enabled for this Codespaces Auth Proxy path.
 > If the proxy log ever shows `instance does not have IP of type "PUBLIC"` (e.g. after a Terraform refresh),
-> re-run: `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth`, wait ~30s, then restart the auth script.
+> re-run: `gcloud sql instances patch plant-sql-${WAOOAW_CLOUDSQL_ENV:-demo} --assign-ip --project=waooaw-oauth`, wait ~30s, then restart the auth script.
 
 ### Secrets in GitHub
 
@@ -1049,22 +1056,23 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembi
 | `infrastructure/database/` | DB infrastructure (migration SQL, tests) |
 | `docker-compose.local.yml` | Local Postgres + pgvector container |
 
-### How to connect to demo DB from Codespace
+### How to connect to Plant Cloud SQL from Codespace
 
-Agent rule: schema changes, persisted-behavior stories, and DB smoke validation must use Cloud SQL demo through the Auth Proxy. The Docker Postgres containers are only for isolated regression tests and must not be treated as the persistence source of truth.
+Agent rule: schema changes, persisted-behavior stories, and DB smoke validation should use the intended Cloud SQL environment through the Auth Proxy. Demo remains the default and the normal proving ground before UAT/prod; the Docker Postgres containers are only for isolated regression tests and must not be treated as the persistence source of truth.
 
-Cloud SQL `plant-sql-demo` must be reached through the Cloud SQL Auth Proxy for IAM-based authentication — do not connect directly on port 5432.
-The normal Codespaces path is the public-IP-backed proxy listener on `127.0.0.1:15432`; if the instance drifts to private-IP-only, first re-enable public IP with `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, then rerun `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh`.
+Cloud SQL `plant-sql-<env>` must be reached through the Cloud SQL Auth Proxy for IAM-based authentication — do not connect directly on port 5432.
+The normal Codespaces path is the public-IP-backed proxy listener on `127.0.0.1:15432`; if the selected instance drifts to private-IP-only, first re-enable public IP with `gcloud sql instances patch plant-sql-${WAOOAW_CLOUDSQL_ENV:-demo} --assign-ip --project=waooaw-oauth --quiet`, then rerun `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh`.
 
 **Non-negotiable first-attempt rule:** do not start with ad-hoc `psql`, manual proxy commands, or package installs. Start with `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh`, confirm the three success signals below, then run the query.
 
 | Property | Value |
 |----------|-------|
-| Instance | `waooaw-oauth:asia-south1:plant-sql-demo` |
+| Environment selector | `WAOOAW_CLOUDSQL_ENV=demo|uat|prod` |
+| Instance | `waooaw-oauth:asia-south1:plant-sql-${WAOOAW_CLOUDSQL_ENV}` |
 | DB name | `plant` |
 | DB user | `plant_app` |
 | Local port | `15432` (via proxy) |
-| Password | Stored in Secret Manager: `demo-plant-database-url` (special chars — handled by `gcp-auth.sh`) |
+| Password | Stored in Secret Manager: `${WAOOAW_CLOUDSQL_ENV}-plant-database-url` by default (special chars — handled by `gcp-auth.sh`) |
 | pgpass | `/root/.pgpass` (auto-written by `gcp-auth.sh`) |
 | env file | `/root/.env.db` — `source /root/.env.db && psql` is all you need |
 
@@ -1081,25 +1089,33 @@ The normal Codespaces path is the public-IP-backed proxy listener on `127.0.0.1:
 which gcloud
 printenv GCP_SA_KEY >/dev/null && echo "GCP_SA_KEY present"
 
-# 2. Run auth script — activates SA, starts proxy, writes /root/.env.db + /root/.pgpass
+# 2. Select environment (demo is the default if you skip this line)
+export WAOOAW_CLOUDSQL_ENV=demo
+
+# Examples:
+# export WAOOAW_CLOUDSQL_ENV=uat
+# export WAOOAW_CLOUDSQL_ENV=prod
+
+# 3. Run auth script — activates SA, starts proxy, writes /root/.env.db + /root/.pgpass
 bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 
 # Expected success signals
 #   a) output contains: "✅ GCP auth active: waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com"
+#   a1) output contains: "Target env: <env> | Instance: waooaw-oauth:asia-south1:plant-sql-<env> | Secret: <env>-plant-database-url"
 #   b) output contains: "✅ Cloud SQL Proxy listening on 127.0.0.1:15432"
 #   c) output contains: "✅ DB ready — connect: source /root/.env.db && psql"
 
-# 3. Validate the bootstrap state before running real queries
+# 4. Validate the bootstrap state before running real queries
 gcloud auth list
 test -f /root/.env.db && echo ".env.db ready"
 test -f /root/.pgpass && echo ".pgpass ready"
 pgrep -fa cloud-sql-proxy
 
-# 4. Connect and verify
+# 5. Connect and verify
 source /root/.env.db && psql -c "SELECT current_database(), current_user;"
 psql -c "SELECT version_num FROM alembic_version;"
 
-# 5. Optional sanity check against seeded data
+# 6. Optional sanity check against seeded data
 psql -c "SELECT COUNT(*) AS customers FROM customer_entity;"
 # Expected: 4 (yogeshkhandge@gmail.com, rupalikhandge@gmail.com, yogeshk7377@gmail.com, demo@waooaw.com)
 
@@ -1110,8 +1126,8 @@ psql -c "SELECT COUNT(*) AS customers FROM customer_entity;"
 
 # If the proxy log says "instance does not have IP of type PUBLIC" then public IP drifted off.
 tail -n 50 /tmp/cloud-sql-proxy.log
-gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth
-# Wait ~30s for the patch, then re-run step 2
+gcloud sql instances patch plant-sql-${WAOOAW_CLOUDSQL_ENV:-demo} --assign-ip --project=waooaw-oauth
+# Wait ~30s for the patch, then re-run step 3
 
 # If the proxy is missing or stale, restart it cleanly:
 pkill -f cloud-sql-proxy 2>/dev/null || true
