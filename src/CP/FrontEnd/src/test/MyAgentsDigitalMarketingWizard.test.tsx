@@ -36,11 +36,8 @@ const defaultWorkspace = {
     notes: '',
   },
   prepare_agent: {
-    selected_platforms: ['youtube', 'instagram'],
-    platform_steps: [
-      { platform_key: 'youtube', complete: false, status: 'pending' },
-      { platform_key: 'instagram', complete: false, status: 'pending' },
-    ],
+    selected_platforms: [],
+    platform_steps: [],
     all_selected_platforms_completed: false,
   },
   campaign_setup: {
@@ -81,6 +78,7 @@ function renderWizard() {
 
 describe('MyAgents Digital Marketing wizard', () => {
   beforeEach(async () => {
+    vi.clearAllMocks()
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValue(structuredClone(defaultWorkspace) as any)
     vi.mocked(serviceModule.patchDigitalMarketingActivationWorkspace).mockImplementation(async (_id, patch: any) => ({
@@ -170,6 +168,19 @@ describe('MyAgents Digital Marketing wizard', () => {
   })
 
   it('renders only the selected platform steps and advances to the next incomplete one', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      ...structuredClone(defaultWorkspace),
+      prepare_agent: {
+        selected_platforms: ['youtube', 'instagram'],
+        platform_steps: [
+          { platform_key: 'youtube', complete: false, status: 'pending' },
+          { platform_key: 'instagram', complete: false, status: 'pending' },
+        ],
+        all_selected_platforms_completed: false,
+      },
+    } as any)
+
     renderWizard()
     fireEvent.click(await screen.findByText('Prepare Agent'))
 

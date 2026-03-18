@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/gatewayApiClient', () => ({
   gatewayRequestJson: vi.fn(),
@@ -13,6 +13,10 @@ import {
 } from '../services/digitalMarketingActivation.service'
 
 describe('digitalMarketingActivation.service', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('hits the expected CP route for workspace GET', async () => {
     vi.mocked(gatewayRequestJson).mockResolvedValueOnce({ hired_instance_id: 'HAI-1' } as any)
 
