@@ -599,6 +599,23 @@ describe('MyAgents Component', () => {
     expect(screen.getByText('SUB-1')).toBeInTheDocument()
   })
 
+  it('switches studio content in place when a different step is selected from the rail', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cp-my-agents-activation-studio')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Review and approve/i })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Review and approve/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open identity setup' })).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('cp-my-agents-activation-studio')).toBeInTheDocument()
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
   it('keeps identity and YouTube setup actions inline inside the studio shell', async () => {
     const summaryModule = await import('../services/myAgentsSummary.service')
     const deliverablesModule = await import('../services/hiredAgentDeliverables.service')

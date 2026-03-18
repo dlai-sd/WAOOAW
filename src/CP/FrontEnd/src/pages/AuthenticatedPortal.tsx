@@ -411,7 +411,7 @@ export default function AuthenticatedPortal({
         eyebrow: 'Payment captured',
         title: `Setup is still required for ${selectedLabel}`,
         body: `Payment is complete, but the agent is not ready to work until setup is finished. Resume setup to connect systems and activate the trial.${continuityNote}`,
-        primaryLabel: 'Resume setup',
+        primaryLabel: 'Open My Agents setup',
         onPrimary: () => {
           setCurrentPage('my-agents')
         },
