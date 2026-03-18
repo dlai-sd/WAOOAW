@@ -85,7 +85,13 @@ vi.mock('../pages/authenticated/CommandCentre', () => ({
   default: () => <div data-testid="page-command-centre">Command Centre Page</div>,
 }))
 vi.mock('../pages/authenticated/MyAgents', () => ({
-  default: () => <div data-testid="page-my-agents">My Agents Page</div>,
+  default: ({ initialSubscriptionId, initialSection }: { initialSubscriptionId?: string; initialSection?: string }) => (
+    <div data-testid="page-my-agents">
+      <div>My Agents Page</div>
+      <div data-testid="page-my-agents-initial-subscription">{initialSubscriptionId || 'none'}</div>
+      <div data-testid="page-my-agents-initial-section">{initialSection || 'none'}</div>
+    </div>
+  ),
 }))
 vi.mock('../pages/authenticated/GoalsSetup', () => ({
   default: () => <div data-testid="page-goals">Theme Discovery Goals Page</div>,
@@ -320,7 +326,10 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
 
     fireEvent.click(screen.getByTestId('cp-portal-entry-primary'))
 
-    expect(navigateMock).toHaveBeenCalledWith('/hire/setup/SUB-123?agentId=AGT-MKT-001')
+    expect(screen.getByTestId('page-my-agents')).toBeTruthy()
+    expect(screen.getByTestId('page-my-agents-initial-subscription').textContent).toBe('SUB-123')
+    expect(screen.getByTestId('page-my-agents-initial-section').textContent).toBe('configure')
+    expect(navigateMock).not.toHaveBeenCalledWith('/hire/setup/SUB-123?agentId=AGT-MKT-001')
   })
 
   it('lands on My Agents with truthful post-activation guidance', async () => {

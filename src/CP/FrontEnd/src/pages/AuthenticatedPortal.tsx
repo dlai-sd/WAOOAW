@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@fluentui/react-components'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { 
   WeatherMoon20Regular, 
   WeatherSunny20Regular,
@@ -147,7 +147,6 @@ export default function AuthenticatedPortal({
   initialJourneyContext,
 }: AuthenticatedPortalProps) {
   const location = useLocation()
-  const navigate = useNavigate()
   const portalEntry = (location.state as PortalLocationState | null)?.portalEntry
   const derivedInitialPage = portalEntry?.page ?? initialPage ?? 'command-centre'
   const derivedInitialAgentId = portalEntry?.agentId ?? initialAgentId
@@ -166,6 +165,8 @@ export default function AuthenticatedPortal({
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(derivedInitialAgentId)
   const [journeyContext, setJourneyContext] = useState<PortalJourneyContext | undefined>(derivedJourneyContext)
+  const [myAgentsInitialSubscriptionId, setMyAgentsInitialSubscriptionId] = useState<string | undefined>(derivedJourneyContext?.source === 'payment-confirmed' ? derivedJourneyContext.subscriptionId : undefined)
+  const [myAgentsInitialSection, setMyAgentsInitialSection] = useState<'configure' | 'goals' | 'skills' | 'performance'>(derivedJourneyContext?.source === 'payment-confirmed' ? 'configure' : 'configure')
   const [inboxItems, setInboxItems] = useState<CustomerInboxItem[]>([])
   const [inboxLoading, setInboxLoading] = useState(false)
   const [inboxError, setInboxError] = useState<string | null>(null)
@@ -180,6 +181,16 @@ export default function AuthenticatedPortal({
 
   useEffect(() => {
     setJourneyContext(derivedJourneyContext)
+  }, [derivedJourneyContext])
+
+  useEffect(() => {
+    if (derivedJourneyContext?.source === 'payment-confirmed') {
+      setMyAgentsInitialSubscriptionId(derivedJourneyContext.subscriptionId)
+      setMyAgentsInitialSection('configure')
+      return
+    }
+
+    setMyAgentsInitialSubscriptionId(undefined)
   }, [derivedJourneyContext])
 
   useEffect(() => {
@@ -398,8 +409,10 @@ export default function AuthenticatedPortal({
         body: `Payment is complete, but the agent is not ready to work until setup is finished. Resume setup to connect systems and activate the trial.${continuityNote}`,
         primaryLabel: 'Resume setup',
         onPrimary: () => {
-          if (!journeyContext.subscriptionId || !selectedAgentId) return
-          navigate(`/hire/setup/${encodeURIComponent(journeyContext.subscriptionId)}?agentId=${encodeURIComponent(selectedAgentId)}`)
+          if (!journeyContext.subscriptionId) return
+          setCurrentPage('my-agents')
+          setMyAgentsInitialSubscriptionId(journeyContext.subscriptionId)
+          setMyAgentsInitialSection('configure')
         },
       }
     }
@@ -427,14 +440,20 @@ export default function AuthenticatedPortal({
         setCurrentPage('agent-detail')
       },
     }
-  }, [journeyContext, navigate, selectedAgentId])
+  }, [journeyContext, selectedAgentId])
 
   const renderPage = () => {
     switch (currentPage) {
       case 'command-centre':
         return <CommandCentre onOpenDiscover={() => openPage('discover')} onOpenBilling={() => openPage('billing')} onOpenMyAgents={() => openPage('my-agents')} onOpenGoals={() => openPage('goals')} />
       case 'my-agents':
-        return <MyAgents onNavigateToDiscover={() => openPage('discover')} />
+        return (
+          <MyAgents
+            onNavigateToDiscover={() => openPage('discover')}
+            initialSubscriptionId={myAgentsInitialSubscriptionId}
+            initialSection={myAgentsInitialSection}
+          />
+        )
       case 'discover':
         return <AgentDiscovery onSelectAgent={handleSelectAgent} />
       case 'agent-detail':

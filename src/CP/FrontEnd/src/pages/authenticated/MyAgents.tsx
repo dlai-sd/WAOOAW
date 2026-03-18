@@ -35,6 +35,8 @@ import { listPlatformConnections, type PlatformConnection } from '../../services
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 import { listYouTubeConnections, type YouTubeConnection } from '../../services/youtubeConnections.service'
 
+type MyAgentsSection = 'configure' | 'goals' | 'skills' | 'performance'
+
 type JsonObject = Record<string, unknown>
 
 function agentTypeIdFromAgentId(agentId: string): string | null {
@@ -1140,10 +1142,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   const youtubeConnectionAction = useMemo(() => {
     if (!isDigitalMarketingInstance || !youtubeConnectionSummary || youtubeConnectionSummary.isReady) return null
     return {
-      label: youtubeConnectionSummary.label.toLowerCase().includes('ready to attach') ? 'Reconnect in setup' : 'Reconnect YouTube',
+      label: 'Open YouTube setup',
       onAction: () => {
         navigate(
-          `/hire/setup/${encodeURIComponent(instance.subscription_id)}?agentId=${encodeURIComponent(instance.agent_id)}&agentTypeId=${encodeURIComponent(String(instance.agent_type_id || ''))}`
+          `/hire/setup/${encodeURIComponent(instance.subscription_id)}?agentId=${encodeURIComponent(instance.agent_id)}&agentTypeId=${encodeURIComponent(String(instance.agent_type_id || ''))}&step=3&focus=youtube`
         )
       },
     }
@@ -1803,15 +1805,24 @@ function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
 }
 
 
-export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscover?: () => void } = {}) {
+export default function MyAgents({
+  onNavigateToDiscover,
+  initialSubscriptionId,
+  initialSection = 'configure',
+}: {
+  onNavigateToDiscover?: () => void
+  initialSubscriptionId?: string
+  initialSection?: MyAgentsSection
+} = {}) {
   const navigate = useNavigate()
 
   const RETENTION_DAYS_AFTER_END = 30
   const SELECTED_SUBSCRIPTION_STORAGE_KEY = 'cp_my_agents_selected_subscription_id'
+  const preferredInitialSubscriptionId = String(initialSubscriptionId || '').trim()
 
   const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>('')
-  const [activeSection, setActiveSection] = useState<'configure' | 'goals' | 'skills' | 'performance'>('configure')
+  const [activeSection, setActiveSection] = useState<MyAgentsSection>(initialSection)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -1849,6 +1860,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
         })()
 
         const initial =
+          (preferredInitialSubscriptionId && nextInstances.some((x) => x.subscription_id === preferredInitialSubscriptionId) ? preferredInitialSubscriptionId : '') ||
           (persisted && nextInstances.some((x) => x.subscription_id === persisted) ? persisted : '') ||
           (nextInstances[0]?.subscription_id || '')
 
@@ -1864,7 +1876,17 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [preferredInitialSubscriptionId])
+
+  useEffect(() => {
+    setActiveSection(initialSection)
+  }, [initialSection])
+
+  useEffect(() => {
+    if (!preferredInitialSubscriptionId) return
+    if (!instances.some((x) => x.subscription_id === preferredInitialSubscriptionId)) return
+    setSelectedSubscriptionId(preferredInitialSubscriptionId)
+  }, [instances, preferredInitialSubscriptionId])
 
   useEffect(() => {
     if (!selectedSubscriptionId) return
