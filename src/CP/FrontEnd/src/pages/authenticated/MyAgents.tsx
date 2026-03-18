@@ -36,6 +36,8 @@ import { listPlatformConnections, type PlatformConnection } from '../../services
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 import { listYouTubeConnections, type YouTubeConnection } from '../../services/youtubeConnections.service'
 
+type MyAgentsSection = 'configure' | 'goals' | 'skills' | 'performance'
+
 type JsonObject = Record<string, unknown>
 type StudioStep = 'identity' | 'platforms' | 'review'
 type StudioFocus = 'identity' | 'youtube' | 'review'
@@ -2275,6 +2277,7 @@ export default function MyAgents({
 
   const RETENTION_DAYS_AFTER_END = 30
   const SELECTED_SUBSCRIPTION_STORAGE_KEY = 'cp_my_agents_selected_subscription_id'
+  const preferredInitialSubscriptionId = String(initialSubscriptionId || '').trim()
 
   const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>('')
@@ -2333,9 +2336,8 @@ export default function MyAgents({
           && !isInReadOnlyRetention(instance, Date.now(), RETENTION_DAYS_AFTER_END)
         ))
 
-        const incomingSubscriptionId = String(initialSubscriptionId || '').trim()
         const initial =
-          (incomingSubscriptionId && nextInstances.some((x) => x.subscription_id === incomingSubscriptionId) ? incomingSubscriptionId : '') ||
+          (preferredInitialSubscriptionId && nextInstances.some((x) => x.subscription_id === preferredInitialSubscriptionId) ? preferredInitialSubscriptionId : '') ||
           pendingCandidate?.subscription_id ||
           (persisted && nextInstances.some((x) => x.subscription_id === persisted) ? persisted : '') ||
           (nextInstances[0]?.subscription_id || '')
@@ -2352,7 +2354,7 @@ export default function MyAgents({
     return () => {
       cancelled = true
     }
-  }, [initialSubscriptionId])
+  }, [preferredInitialSubscriptionId])
 
   useEffect(() => {
     if (!selectedSubscriptionId) return

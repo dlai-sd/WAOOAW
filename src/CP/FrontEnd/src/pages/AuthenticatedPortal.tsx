@@ -441,7 +441,7 @@ export default function AuthenticatedPortal({
         setCurrentPage('agent-detail')
       },
     }
-  }, [journeyContext, navigate, selectedAgentId])
+  }, [journeyContext, selectedAgentId])
 
   const renderPage = () => {
     switch (currentPage) {
