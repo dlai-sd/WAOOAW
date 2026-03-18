@@ -36,6 +36,11 @@ describe('HireReceipt', () => {
   it('routes payment confirmation to My Agents setup instead of the standalone wizard', () => {
     renderReceipt()
 
+    expect(screen.getByText('Order ID')).toBeInTheDocument()
+    expect(screen.getByText('ORD-1')).toBeInTheDocument()
+    expect(screen.getByText('Subscription ID')).toBeInTheDocument()
+    expect(screen.getByText('SUB-1')).toBeInTheDocument()
+
     fireEvent.click(screen.getByTestId('cp-hire-receipt-continue'))
 
     expect(navigateMock).toHaveBeenCalledWith('/portal', {
