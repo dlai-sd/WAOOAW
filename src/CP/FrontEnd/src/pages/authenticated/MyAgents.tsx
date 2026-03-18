@@ -1,7 +1,7 @@
 import { Card, Button, Badge, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Input, Textarea, Checkbox } from '@fluentui/react-components'
 import { Star20Filled } from '@fluentui/react-icons'
-import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { AgentSelector } from '../../components/AgentSelector'
 import { LoadingIndicator, SaveIndicator, FeedbackMessage, ValidationFeedback } from '../../components/FeedbackIndicators'
@@ -36,7 +36,11 @@ import { listPlatformConnections, type PlatformConnection } from '../../services
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 import { listYouTubeConnections, type YouTubeConnection } from '../../services/youtubeConnections.service'
 
+type MyAgentsSection = 'configure' | 'goals' | 'skills' | 'performance'
+
 type JsonObject = Record<string, unknown>
+type StudioStep = 'identity' | 'platforms' | 'review'
+type StudioFocus = 'identity' | 'youtube' | 'review'
 
 function agentTypeIdFromAgentId(agentId: string): string | null {
   const normalized = String(agentId || '').trim().toUpperCase()
@@ -148,8 +152,6 @@ function renderFrequencyLabel(freq: string): string {
   return key[0].toUpperCase() + key.slice(1)
 }
 
-type ActivationStageKey = 'select-agent' | 'identity' | 'connection' | 'strategy' | 'review'
-
 function isPendingActivation(instance: MyAgentInstanceSummary | null): boolean {
   if (!instance) return false
   const trialStatus = String(instance.trial_status || '').trim().toLowerCase()
@@ -196,17 +198,6 @@ function isInReadOnlyRetention(
   const endMs = new Date(instance.current_period_end).getTime()
   if (!Number.isFinite(endMs)) return false
   return nowMs <= endMs + retentionDaysAfterEnd * 24 * 60 * 60 * 1000
-}
-
-function buildHireSetupUrl(instance: MyAgentInstanceSummary, stage: 'identity' | 'connection' | 'review'): string {
-  const nextQuery = new URLSearchParams()
-  nextQuery.set('agentId', String(instance.agent_id || ''))
-  if (instance.agent_type_id) nextQuery.set('agentTypeId', String(instance.agent_type_id))
-  if (instance.external_catalog_version) nextQuery.set('catalogVersion', String(instance.external_catalog_version))
-  if (instance.catalog_status_at_hire) nextQuery.set('lifecycleState', String(instance.catalog_status_at_hire))
-  if (instance.nickname) nextQuery.set('agentName', String(instance.nickname))
-  nextQuery.set('stage', stage)
-  return `/hire/setup/${encodeURIComponent(instance.subscription_id)}?${nextQuery.toString()}`
 }
 
 function DigitalMarketingBriefPreview(props: { hiredInstanceId: string }) {
@@ -930,9 +921,12 @@ function ConfigureAgentPanel(props: {
   )
 }
 
-function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: boolean }) {
+function GoalSettingPanel(props: {
+  instance: MyAgentInstanceSummary
+  readOnly: boolean
+  onOpenStudioStep?: (step: StudioStep, focus: StudioFocus) => void
+}) {
   const { instance, readOnly } = props
-  const navigate = useNavigate()
 
   const hiredInstanceId = String(instance.hired_instance_id || '').trim()
   const [loading, setLoading] = useState(false)
@@ -1202,14 +1196,10 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   const youtubeConnectionAction = useMemo(() => {
     if (!isDigitalMarketingInstance || !youtubeConnectionSummary || youtubeConnectionSummary.isReady) return null
     return {
-      label: youtubeConnectionSummary.label.toLowerCase().includes('ready to attach') ? 'Reconnect in setup' : 'Reconnect YouTube',
-      onAction: () => {
-        navigate(
-          `/hire/setup/${encodeURIComponent(instance.subscription_id)}?agentId=${encodeURIComponent(instance.agent_id)}&agentTypeId=${encodeURIComponent(String(instance.agent_type_id || ''))}`
-        )
-      },
+      label: 'Open YouTube setup',
+      onAction: () => props.onOpenStudioStep?.('platforms', 'youtube'),
     }
-  }, [instance.agent_id, instance.agent_type_id, instance.subscription_id, isDigitalMarketingInstance, navigate, youtubeConnectionSummary])
+  }, [isDigitalMarketingInstance, props.onOpenStudioStep, youtubeConnectionSummary])
 
   const activeDeliverableReadiness = useMemo(() => {
     if (!activeDeliverable || !isDigitalMarketingInstance) return null
@@ -1793,10 +1783,23 @@ function ActivationStudioPanel(props: {
   selectedSubscriptionId: string
   onSelectSubscriptionId: (subscriptionId: string) => void
   readOnly: boolean
-  onOpenAdvanced: (section: 'configure' | 'goals') => void
+  studioStep: StudioStep
+  studioFocus: StudioFocus
+  onOpenStudioStep: (step: StudioStep, focus: StudioFocus) => void
+  onSavedInstance: (updated: HiredAgentInstance) => void
+  onOpenDetailedWorkspace: () => void
 }) {
-  const { instances, selectedSubscriptionId, onSelectSubscriptionId, readOnly, onOpenAdvanced } = props
-  const navigate = useNavigate()
+  const {
+    instances,
+    selectedSubscriptionId,
+    onSelectSubscriptionId,
+    readOnly,
+    studioStep,
+    studioFocus,
+    onOpenStudioStep,
+    onSavedInstance,
+    onOpenDetailedWorkspace,
+  } = props
   const instance = useMemo(
     () => instances.find((item) => item.subscription_id === selectedSubscriptionId) || instances[0] || null,
     [instances, selectedSubscriptionId]
@@ -1804,7 +1807,6 @@ function ActivationStudioPanel(props: {
   const [studio, setStudio] = useState<HiredAgentStudio | null>(null)
   const [studioLoading, setStudioLoading] = useState(true)
   const [studioError, setStudioError] = useState<string | null>(null)
-  const [activeStage, setActiveStage] = useState<ActivationStageKey>('select-agent')
   const isMarketingInstance = useMemo(
     () => isDigitalMarketingAgent(instance?.agent_id || '', instance?.agent_type_id),
     [instance?.agent_id, instance?.agent_type_id]
@@ -1913,23 +1915,13 @@ function ActivationStudioPanel(props: {
 
   const identityComplete = Boolean(studio?.identity.complete)
   const connectionComplete = Boolean(studio?.connection.complete)
-  const strategyComplete = Boolean(studio?.operating_plan.complete)
   const reviewComplete = Boolean(studio?.review.complete)
 
   const stages = [
     {
-      key: 'select-agent' as const,
-      title: 'Select agent',
-      eyebrow: 'Step 1',
-      complete: Boolean(instance?.subscription_id),
-      summary: instance
-        ? `${String(instance.nickname || instance.agent_id).trim()} is selected for activation.`
-        : 'Choose the hire you want to activate first.',
-    },
-    {
       key: 'identity' as const,
-      title: 'Identity and voice',
-      eyebrow: 'Step 2',
+      title: 'Identity setup',
+      eyebrow: 'Step 1',
       complete: identityComplete,
       summary: studioStepMap.get('identity')?.summary
         || (identityComplete
@@ -1937,9 +1929,9 @@ function ActivationStudioPanel(props: {
           : 'Name the agent and choose how it should show up for your business.'),
     },
     {
-      key: 'connection' as const,
-      title: isMarketingInstance ? 'YouTube connection' : 'Platform connection',
-      eyebrow: 'Step 3',
+      key: 'platforms' as const,
+      title: isMarketingInstance ? 'Platform connections' : 'Connection setup',
+      eyebrow: 'Step 2',
       complete: connectionComplete,
       summary: studioStepMap.get('connection')?.summary
         || (isMarketingInstance
@@ -1947,19 +1939,9 @@ function ActivationStudioPanel(props: {
           : 'Connect the systems this hire depends on before launch.'),
     },
     {
-      key: 'strategy' as const,
-      title: 'Operating plan',
-      eyebrow: 'Step 4',
-      complete: strategyComplete,
-      summary: studioStepMap.get('operating_plan')?.summary
-        || (strategyComplete
-          ? 'Posting rhythm and activation readiness have been confirmed.'
-          : 'Set publishing rhythm, themes, and approval expectations before launch.'),
-    },
-    {
       key: 'review' as const,
-      title: studio?.mode === 'edit' ? 'Review edits' : 'Review and activate',
-      eyebrow: 'Step 5',
+      title: studio?.mode === 'edit' ? 'Review and approve' : 'Review and activate',
+      eyebrow: 'Step 3',
       complete: reviewComplete,
       summary: studioStepMap.get('review')?.summary
         || (reviewComplete
@@ -1967,13 +1949,8 @@ function ActivationStudioPanel(props: {
           : 'Use the final review only after identity, connection, and plan are complete.'),
     },
   ]
-
-  useEffect(() => {
-    setActiveStage('select-agent')
-  }, [selectedSubscriptionId])
-
   const completedStages = stages.filter((stage) => stage.complete).length
-  const activeStageIndex = Math.max(stages.findIndex((stage) => stage.key === activeStage), 0)
+  const activeStageIndex = Math.max(stages.findIndex((stage) => stage.key === studioStep), 0)
   const activeStageDetail = stages[activeStageIndex] || stages[0]
   const activationSummarySource = instance ? String(studio?.identity.nickname || instance.nickname || instance.agent_id || 'Selected hire') : 'Selected hire'
   const selectionHelperText = instances.length > 1
@@ -1982,84 +1959,35 @@ function ActivationStudioPanel(props: {
 
   const moveStage = (offset: number) => {
     const nextIndex = Math.min(Math.max(activeStageIndex + offset, 0), stages.length - 1)
-    setActiveStage(stages[nextIndex].key)
+    onOpenStudioStep(stages[nextIndex].key, stages[nextIndex].key === 'platforms' ? 'youtube' : stages[nextIndex].key)
   }
 
-  const workspaceAction = (() => {
-    if (!instance) return null
-    if (activeStage === 'identity') {
-      return {
-        label: 'Open identity setup',
-        onClick: () => navigate(buildHireSetupUrl(instance, 'identity')),
-      }
-    }
-    if (activeStage === 'connection') {
-      return {
-        label: isMarketingInstance ? 'Open YouTube setup' : 'Open connection setup',
-        onClick: () => navigate(buildHireSetupUrl(instance, 'connection')),
-      }
-    }
-    if (activeStage === 'strategy') {
-      return {
-        label: 'Open operating plan',
-        onClick: () => onOpenAdvanced('goals'),
-      }
-    }
-    if (activeStage === 'review') {
-      return {
-        label: 'Open activation review',
-        onClick: () => navigate(buildHireSetupUrl(instance, 'review')),
-      }
-    }
-    return null
-  })()
-
   const continueAction = (() => {
-    if (activeStage === 'select-agent') {
+    if (studioStep === 'identity') {
       return {
-        label: 'Continue to identity',
-        disabled: !instance,
-      }
-    }
-    if (activeStage === 'identity') {
-      return {
-        label: 'Continue to connection',
+        label: 'Continue to platform connections',
         disabled: !identityComplete,
       }
     }
-    if (activeStage === 'connection') {
-      return {
-        label: 'Continue to operating plan',
-        disabled: !connectionComplete,
-      }
-    }
-    if (activeStage === 'strategy') {
+    if (studioStep === 'platforms') {
       return {
         label: 'Continue to review',
-        disabled: !strategyComplete,
+        disabled: !connectionComplete,
       }
     }
     return null
   })()
 
   const footerCopy = (() => {
-    if (activeStage === 'select-agent') {
-      return 'Start by choosing the hire that still needs activation. The rest of the wizard stays focused on that one outcome.'
-    }
-    if (activeStage === 'identity') {
+    if (studioStep === 'identity') {
       return identityComplete
-        ? 'Identity is in place. Move to connection only after the business-facing name and theme feel right.'
+        ? 'Identity is in place. Move to platform setup only after the business-facing name and theme feel right.'
         : 'Identity needs to be completed before the activation flow should advance.'
     }
-    if (activeStage === 'connection') {
+    if (studioStep === 'platforms') {
       return connectionComplete
         ? 'Connection status is clear enough to move forward.'
         : 'Do not advance until the channel or platform status is explicit and trustworthy.'
-    }
-    if (activeStage === 'strategy') {
-      return strategyComplete
-        ? 'The customer has confirmed how this hire should operate.'
-        : 'Activation is still blocked until the operating plan is defined.'
     }
     return reviewComplete
       ? (studio?.mode === 'edit'
@@ -2075,47 +2003,72 @@ function ActivationStudioPanel(props: {
           <div className="my-agents-activation-kicker">Activation studio</div>
           <h3 className="my-agents-activation-title">Guide one hired agent at a time through activation or edits without dropping the customer into a long management screen</h3>
           <p className="my-agents-activation-body">
-            Start with agent selection, then move through identity, connection, operating plan, and final review in the same PP-style frame.
+            Keep selection above the studio, then move through identity, platform connections, and review in the same operating surface.
           </p>
         </div>
         <div className="my-agents-activation-hero-note">
           <div className="my-agents-activation-rail-note-title">Why this flow works</div>
           <p>Each step isolates one business decision, so the customer always knows what to do next and what still blocks activation.</p>
           <div className="my-agents-activation-hero-stat">{completedStages}/{stages.length} steps complete</div>
+          <Button appearance="subtle" onClick={onOpenDetailedWorkspace}>
+            Open detailed workspace
+          </Button>
         </div>
       </div>
 
-      <div className="my-agents-activation-grid">
-        <aside className="my-agents-activation-rail">
+      <div className="cp-agent-studio-selector">
+        <div style={{ minWidth: 0, width: '100%', maxWidth: '520px', flex: '1 1 280px' }}>
+          <AgentSelector
+            agents={instances}
+            selectedId={instance?.subscription_id || ''}
+            onChange={onSelectSubscriptionId}
+            disabled={readOnly}
+            label="Selected hire"
+            helperText={selectionHelperText}
+            required
+          />
+        </div>
+        {instance ? (
+          <div className="cp-agent-studio-summary-row">
+            <div className="cp-agent-studio-summary-card">
+              <div className="cp-agent-studio-summary-label">Selected hire</div>
+              <div className="cp-agent-studio-summary-value">{activationSummarySource}</div>
+            </div>
+            <div className="cp-agent-studio-summary-card">
+              <div className="cp-agent-studio-summary-label">Subscription</div>
+              <div className="cp-agent-studio-summary-value">{instance.subscription_id}</div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="cp-agent-studio-shell">
+        <aside className="cp-agent-studio-rail">
           {stages.map((stage, index) => (
             <button
               key={stage.key}
               type="button"
-              className={`my-agents-activation-stage-button ${activeStage === stage.key ? 'is-active' : ''}`}
-              onClick={() => {
-                if (stage.key === 'select-agent' || instance) {
-                  setActiveStage(stage.key)
-                }
-              }}
+              className={`cp-agent-studio-step-button ${studioStep === stage.key ? 'is-active' : ''}`}
+              onClick={() => instance ? onOpenStudioStep(stage.key, stage.key === 'platforms' ? 'youtube' : stage.key) : undefined}
+              disabled={!instance}
             >
-              <span className="my-agents-activation-stage-index">0{index + 1}</span>
-              <span className="my-agents-activation-stage-copy">
-                <span className="my-agents-activation-stage-eyebrow">{stage.eyebrow}</span>
-                <span className="my-agents-activation-stage-title">{stage.title}</span>
-                <span className="my-agents-activation-stage-summary">{stage.summary}</span>
+              <span className="cp-agent-studio-step-index">0{index + 1}</span>
+              <span className="cp-agent-studio-step-copy">
+                <span className="cp-agent-studio-step-eyebrow">{stage.eyebrow}</span>
+                <span className="cp-agent-studio-step-title">{stage.title}</span>
+                <span className="cp-agent-studio-step-description">{stage.summary}</span>
               </span>
-              <span className={`my-agents-activation-stage-state ${stage.complete ? 'is-complete' : 'is-pending'}`}>
-                {stage.complete ? 'Complete' : 'Next'}
+              <span className={`cp-agent-studio-step-state ${stage.complete ? 'is-complete' : 'is-pending'}`}>
+                {stage.complete ? 'Ready' : 'Needs work'}
               </span>
             </button>
           ))}
-
         </aside>
 
-        <Card className="my-agents-activation-stage-card">
-          <div className="my-agents-activation-stage-header">
+        <Card className="cp-agent-studio-canvas-card">
+          <div className="cp-agent-studio-canvas-header">
             <div>
-              <div className="my-agents-activation-stage-eyebrow">{activeStageDetail.eyebrow}</div>
+              <div className="cp-agent-studio-step-eyebrow">{activeStageDetail.eyebrow}</div>
               <div className="my-agents-activation-stage-heading">{activeStageDetail.title}</div>
             </div>
             <Badge appearance={activeStageDetail.complete ? 'filled' : 'outline'} color={activeStageDetail.complete ? 'success' : undefined}>
@@ -2123,149 +2076,104 @@ function ActivationStudioPanel(props: {
             </Badge>
           </div>
 
-          {studioLoading ? <LoadingIndicator message="Loading wizard progress..." size="small" /> : null}
-          {studioError ? <FeedbackMessage intent="error" message={studioError} /> : null}
+          <div className="cp-agent-studio-canvas-body">
+            {studioLoading ? <LoadingIndicator message="Loading wizard progress..." size="small" /> : null}
+            {studioError ? <FeedbackMessage intent="error" message={studioError} /> : null}
+            {!instance ? <div className="my-agents-activation-inline-note">No hired agents are waiting for activation right now.</div> : null}
 
-          {activeStage === 'select-agent' ? (
-            <div className="my-agents-activation-stage-content">
-              <p className="my-agents-activation-stage-body">
-                Choose the hired agent you want to activate first. This step replaces the old long scroll so the customer starts with a single, confident decision.
-              </p>
-              <div className="my-agents-activation-selector-wrap">
-                <AgentSelector
-                  agents={instances}
-                  selectedId={instance?.subscription_id || ''}
-                  onChange={onSelectSubscriptionId}
-                  disabled={readOnly}
-                  label="Agent to activate"
-                  helperText={selectionHelperText}
-                  required
-                />
-              </div>
-              {instance ? (
+            {studioStep === 'identity' && instance ? (
+              <div className="my-agents-activation-stage-content">
+                <p className="my-agents-activation-stage-body">
+                The first thing your team should feel is who this hire is for your business. Lock identity before you connect anything or define operations.
+                </p>
                 <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
                   <div className="my-agents-activation-summary-card">
-                    <div className="my-agents-activation-summary-label">Selected hire</div>
-                    <div className="my-agents-activation-summary-value">{activationSummarySource}</div>
+                    <div className="my-agents-activation-summary-label">Agent name</div>
+                    <div className="my-agents-activation-summary-value">{String(studio?.identity.nickname || instance.nickname || 'Not chosen yet')}</div>
                   </div>
                   <div className="my-agents-activation-summary-card">
-                    <div className="my-agents-activation-summary-label">Activation status</div>
-                    <div className="my-agents-activation-summary-value">{String(studio?.mode === 'edit' ? 'edit mode' : (instance.trial_status || 'pending')).replace(/_/g, ' ')}</div>
-                  </div>
-                  <div className="my-agents-activation-summary-card">
-                    <div className="my-agents-activation-summary-label">Catalog lifecycle</div>
-                    <div className="my-agents-activation-summary-value">{formatLifecycleLabel(instance.catalog_status_at_hire) || 'Live on CP'}</div>
-                  </div>
-                  <div className="my-agents-activation-summary-card">
-                    <div className="my-agents-activation-summary-label">Next billing</div>
-                    <div className="my-agents-activation-summary-value">{new Date(instance.current_period_end).toLocaleDateString()}</div>
+                    <div className="my-agents-activation-summary-label">Avatar / theme</div>
+                    <div className="my-agents-activation-summary-value">{String(studio?.identity.theme || 'Not chosen yet')}</div>
                   </div>
                 </div>
-              ) : (
-                <div className="my-agents-activation-inline-note">No hired agents are waiting for activation right now.</div>
-              )}
-            </div>
-          ) : null}
-
-          {activeStage === 'identity' ? (
-            <div className="my-agents-activation-stage-content">
-              <p className="my-agents-activation-stage-body">
-                The first thing your team should feel is who this hire is for your business. Lock identity before you connect anything or define operations.
-              </p>
-              <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Agent name</div>
-                  <div className="my-agents-activation-summary-value">{String(studio?.identity.nickname || instance?.nickname || 'Not chosen yet')}</div>
-                </div>
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Avatar / theme</div>
-                  <div className="my-agents-activation-summary-value">{String(studio?.identity.theme || 'Not chosen yet')}</div>
+                <div style={{ marginTop: '1rem' }}>
+                  <ConfigureAgentPanel
+                    instance={instance}
+                    readOnly={readOnly}
+                    onSaved={onSavedInstance}
+                  />
                 </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {activeStage === 'connection' ? (
-            <div className="my-agents-activation-stage-content">
-              <p className="my-agents-activation-stage-body">
+            {studioStep === 'platforms' && instance ? (
+              <div className="my-agents-activation-stage-content">
+                <p className="my-agents-activation-stage-body">
                 {isMarketingInstance
                   ? 'Customers should never wonder whether YouTube is really connected. This stage makes validation, attachment, and readiness explicit before publishing starts.'
                   : 'Connect the external systems this hire depends on before the agent moves into live operation.'}
-              </p>
-              {isMarketingInstance ? (
-                <DigitalMarketingChannelStatusCard
-                  summary={youtubeConnectionSummary}
-                  loading={studioLoading}
-                  error={studioError}
-                  actionLabel={connectionComplete ? null : 'Resume connection setup'}
-                  onAction={connectionComplete || !instance ? null : () => navigate(buildHireSetupUrl(instance, 'connection'))}
-                />
-              ) : (
-                <div className="my-agents-activation-inline-note">{studio?.connection.summary || 'Connection details for this hire are managed during guided setup.'}</div>
-              )}
-            </div>
-          ) : null}
+                </p>
+                {isMarketingInstance ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <DigitalMarketingChannelStatusCard
+                      summary={youtubeConnectionSummary}
+                      loading={studioLoading}
+                      error={studioError}
+                      actionLabel={studioFocus === 'youtube' || !connectionComplete ? 'Open YouTube setup' : null}
+                      onAction={studioFocus === 'youtube' || !connectionComplete ? () => onOpenStudioStep('platforms', 'youtube') : null}
+                    />
+                    {instance.hired_instance_id ? (
+                      <PlatformConnectionsPanel
+                        hiredInstanceId={String(instance.hired_instance_id)}
+                        requiredPlatformKeys={['youtube']}
+                        readOnly={readOnly}
+                      />
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="my-agents-activation-inline-note">{studio?.connection.summary || 'Connection details for this hire are managed during guided setup.'}</div>
+                )}
+              </div>
+            ) : null}
 
-          {activeStage === 'strategy' ? (
-            <div className="my-agents-activation-stage-content">
-              <p className="my-agents-activation-stage-body">
-                Activation is not complete until the customer has shaped how often the agent works, what it should pursue, and what good output looks like.
-              </p>
-              {instance?.hired_instance_id && isMarketingInstance ? (
-                <DigitalMarketingBriefPreview hiredInstanceId={String(instance.hired_instance_id)} />
-              ) : (
-                <div className="my-agents-activation-inline-note">Use the operating plan workspace to define goals, cadence, and approval expectations.</div>
-              )}
-              <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Operating plan</div>
-                  <div className="my-agents-activation-summary-value">{strategyComplete ? 'Confirmed' : 'Still needs customer input'}</div>
+            {studioStep === 'review' && instance ? (
+              <div className="my-agents-activation-stage-content">
+                <p className="my-agents-activation-stage-body">
+                  Final review is where the customer confirms that identity, connection, and operating plan now tell one coherent story. Only then should the trial start.
+                </p>
+                <div className="cp-agent-studio-review-actions">
+                  <Button appearance="outline" onClick={() => onOpenStudioStep('identity', 'identity')}>
+                    Open identity setup
+                  </Button>
+                  {isMarketingInstance ? (
+                    <Button appearance="outline" onClick={() => onOpenStudioStep('platforms', 'youtube')}>
+                      Open YouTube setup
+                    </Button>
+                  ) : null}
                 </div>
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Launch readiness</div>
-                  <div className="my-agents-activation-summary-value">{strategyComplete && connectionComplete && identityComplete ? 'Ready for review' : 'Not ready yet'}</div>
+                <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
+                  <div className="my-agents-activation-summary-card">
+                    <div className="my-agents-activation-summary-label">Identity</div>
+                    <div className="my-agents-activation-summary-value">{identityComplete ? 'Ready' : 'Incomplete'}</div>
+                  </div>
+                  <div className="my-agents-activation-summary-card">
+                    <div className="my-agents-activation-summary-label">Connection</div>
+                    <div className="my-agents-activation-summary-value">{connectionComplete ? 'Ready' : 'Incomplete'}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: '1rem' }}>
+                  <GoalSettingPanel instance={instance} readOnly={readOnly} onOpenStudioStep={onOpenStudioStep} />
                 </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
 
-          {activeStage === 'review' ? (
-            <div className="my-agents-activation-stage-content">
-              <p className="my-agents-activation-stage-body">
-                Final review is where the customer confirms that identity, connection, and operating plan now tell one coherent story. Only then should the trial start.
-              </p>
-              <div className="my-agents-activation-summary-grid my-agents-activation-summary-grid--two-column">
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Identity</div>
-                  <div className="my-agents-activation-summary-value">{identityComplete ? 'Ready' : 'Incomplete'}</div>
-                </div>
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Connection</div>
-                  <div className="my-agents-activation-summary-value">{connectionComplete ? 'Ready' : 'Incomplete'}</div>
-                </div>
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Operating plan</div>
-                  <div className="my-agents-activation-summary-value">{strategyComplete ? 'Ready' : 'Incomplete'}</div>
-                </div>
-                <div className="my-agents-activation-summary-card">
-                  <div className="my-agents-activation-summary-label">Trial launch</div>
-                  <div className="my-agents-activation-summary-value">{reviewComplete ? 'Ready for activation review' : 'Blocked by earlier steps'}</div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="my-agents-activation-footer">
+          <div className="cp-agent-studio-action-bar">
             <div className="my-agents-activation-footer-copy">{footerCopy}</div>
             <div className="my-agents-activation-footer-actions">
               <Button appearance="subtle" onClick={() => moveStage(-1)} disabled={activeStageIndex === 0}>Back</Button>
-              {workspaceAction ? (
-                <Button appearance="outline" onClick={workspaceAction.onClick} disabled={readOnly || !instance || (activeStage === 'review' && !reviewComplete)}>
-                  {workspaceAction.label}
-                </Button>
-              ) : null}
               {continueAction ? (
-                <Button appearance="primary" onClick={() => moveStage(1)} disabled={continueAction.disabled}>
+                <Button appearance="primary" onClick={() => moveStage(1)} disabled={continueAction.disabled || !instance}>
                   {continueAction.label}
                 </Button>
               ) : null}
@@ -2354,11 +2262,22 @@ function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
 }
 
 
-export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscover?: () => void } = {}) {
+export default function MyAgents({
+  onNavigateToDiscover,
+  initialSubscriptionId,
+  initialStudioStep,
+  initialStudioFocus,
+}: {
+  onNavigateToDiscover?: () => void
+  initialSubscriptionId?: string
+  initialStudioStep?: StudioStep
+  initialStudioFocus?: StudioFocus
+} = {}) {
   const navigate = useNavigate()
 
   const RETENTION_DAYS_AFTER_END = 30
   const SELECTED_SUBSCRIPTION_STORAGE_KEY = 'cp_my_agents_selected_subscription_id'
+  const preferredInitialSubscriptionId = String(initialSubscriptionId || '').trim()
 
   const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string>('')
@@ -2366,6 +2285,8 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
   const [showAdvancedWorkspace, setShowAdvancedWorkspace] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [studioStep, setStudioStep] = useState<StudioStep>(initialStudioStep ?? 'identity')
+  const [studioFocus, setStudioFocus] = useState<StudioFocus>(initialStudioFocus ?? 'identity')
 
   const [nowMs, setNowMs] = useState(() => Date.now())
 
@@ -2416,6 +2337,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
         ))
 
         const initial =
+          (preferredInitialSubscriptionId && nextInstances.some((x) => x.subscription_id === preferredInitialSubscriptionId) ? preferredInitialSubscriptionId : '') ||
           pendingCandidate?.subscription_id ||
           (persisted && nextInstances.some((x) => x.subscription_id === persisted) ? persisted : '') ||
           (nextInstances[0]?.subscription_id || '')
@@ -2432,7 +2354,7 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [preferredInitialSubscriptionId])
 
   useEffect(() => {
     if (!selectedSubscriptionId) return
@@ -2447,6 +2369,14 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
     setShowAdvancedWorkspace(false)
     setActiveSection('configure')
   }, [selectedSubscriptionId])
+
+  useEffect(() => {
+    setStudioStep(initialStudioStep ?? 'identity')
+  }, [initialStudioStep])
+
+  useEffect(() => {
+    setStudioFocus(initialStudioFocus ?? 'identity')
+  }, [initialStudioFocus])
 
   const selectedInstance = useMemo(() => {
     if (!selectedSubscriptionId) return null
@@ -2551,6 +2481,13 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
     return isInReadOnlyRetention(selectedInstance, nowMs, RETENTION_DAYS_AFTER_END)
   }, [selectedInstance, selectedReadOnlyExpired, nowMs])
 
+  const openStudioStep = (step: StudioStep, focus: StudioFocus) => {
+    setActiveSection('configure')
+    setShowAdvancedWorkspace(false)
+    setStudioStep(step)
+    setStudioFocus(focus)
+  }
+
   return (
     <div className="my-agents-page">
       <div className="page-header">
@@ -2591,10 +2528,30 @@ export default function MyAgents({ onNavigateToDiscover }: { onNavigateToDiscove
               selectedSubscriptionId={selectedSubscriptionId}
               onSelectSubscriptionId={setSelectedSubscriptionId}
               readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-              onOpenAdvanced={(section) => {
-                setShowAdvancedWorkspace(true)
-                setActiveSection(section)
+              studioStep={studioStep}
+              studioFocus={studioFocus}
+              onOpenStudioStep={openStudioStep}
+              onSavedInstance={(updated) => {
+                setInstances((prev) =>
+                  prev.map((x) =>
+                    x.subscription_id === selectedSubscriptionId
+                      ? {
+                          ...x,
+                          nickname: updated.nickname ?? x.nickname,
+                          configured: updated.configured ?? x.configured,
+                          goals_completed: updated.goals_completed ?? x.goals_completed,
+                          hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
+                          agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                          catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
+                          internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
+                          external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
+                          catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire,
+                        }
+                      : x
+                  )
+                )
               }}
+              onOpenDetailedWorkspace={() => setShowAdvancedWorkspace(true)}
             />
           </Card>
         ) : (
