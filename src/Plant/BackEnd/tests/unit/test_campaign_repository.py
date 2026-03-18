@@ -232,6 +232,62 @@ async def test_delete_campaign_returns_false():
     session.delete.assert_not_called()
 
 
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_get_active_draft_campaign_by_hired_instance_returns_single_latest_draft():
+    """E2-S1-T1: same hired instance reuses one active draft campaign."""
+    session = _make_mock_session()
+    latest_campaign = _make_campaign("CAM-LATEST")
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.first.return_value = latest_campaign
+    session.execute = AsyncMock(return_value=mock_result)
+
+    repo = CampaignRepository(session)
+    result = await repo.get_active_draft_campaign_by_hired_instance("hired-001")
+
+    assert result is latest_campaign
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_replace_theme_items_removes_old_and_persists_new():
+    """E2-S1-T2: replacing theme items deletes old rows before inserting new ones."""
+    session = _make_mock_session()
+    repo = CampaignRepository(session)
+
+    existing_item = _make_theme_item("THM-OLD")
+    repo.create_theme_item = AsyncMock(
+        side_effect=[
+            _make_theme_item("THM-NEW-1"),
+            _make_theme_item("THM-NEW-2"),
+        ]
+    )
+
+    with patch.object(repo, "list_theme_items_by_campaign", AsyncMock(return_value=[existing_item])):
+        items = await repo.replace_theme_items(
+            "CAM-001",
+            [
+                {
+                    "day_number": 1,
+                    "scheduled_date": date(2026, 3, 7),
+                    "theme_title": "New 1",
+                    "theme_description": "New theme 1",
+                    "dimensions": ["weekly"],
+                },
+                {
+                    "day_number": 2,
+                    "scheduled_date": date(2026, 3, 8),
+                    "theme_title": "New 2",
+                    "theme_description": "New theme 2",
+                    "dimensions": ["weekly"],
+                },
+            ],
+        )
+
+    session.execute.assert_awaited()
+    assert [item.theme_item_id for item in items] == ["THM-NEW-1", "THM-NEW-2"]
+
+
 # ── CampaignRepository — DailyThemeItem ───────────────────────────────────────
 
 @pytest.mark.asyncio
