@@ -141,3 +141,53 @@ def test_generate_theme_plan_reuses_existing_draft_campaign(test_client, monkeyp
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.json()["campaign_id"] == second.json()["campaign_id"]
+
+
+@pytest.mark.unit
+def test_patch_theme_plan_persists_manual_revisions_into_same_draft(test_client, monkeypatch):
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    hired_instance_id = _create_marketing_hire(test_client, customer_id="cust-dma-3")
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(
+        dma_module,
+        "grok_complete",
+        lambda *args, **kwargs: json.dumps(
+            {
+                "master_theme": "Trust-first launch",
+                "derived_themes": [{"title": "Week 1", "description": "Initial theme", "frequency": "weekly"}],
+            }
+        ),
+    )
+    generated = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={"campaign_setup": {"schedule": {"start_date": "2026-03-22", "posts_per_week": 2}}},
+    )
+    assert generated.status_code == 200, generated.text
+    campaign_id = generated.json()["campaign_id"]
+
+    updated = test_client.patch(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "master_theme": "Trust-first launch revised",
+            "derived_themes": [
+                {"title": "Week 2", "description": "Manual edit", "frequency": "weekly"},
+                {"title": "Week 3", "description": "Second edit", "frequency": "weekly"},
+            ],
+            "campaign_setup": {"schedule": {"start_date": "2026-03-22", "posts_per_week": 2}},
+        },
+    )
+
+    assert updated.status_code == 200, updated.text
+    body = updated.json()
+    assert body["campaign_id"] == campaign_id
+    assert body["master_theme"] == "Trust-first launch revised"
+    assert len(body["derived_themes"]) == 2
+    assert len(campaigns_module._theme_items[campaign_id]) == 2
