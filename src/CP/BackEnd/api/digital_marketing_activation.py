@@ -1,123 +1,105 @@
 from __future__ import annotations
 
 import os
+from typing import Any, Dict
 
-import httpx
 from fastapi import Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from api.auth.dependencies import get_current_user
 from core.routing import waooaw_router
 from models.user import User
-
-router = waooaw_router(
-    prefix="/cp/digital-marketing-activation",
-    tags=["cp-digital-marketing-activation"],
-)
+from services.plant_gateway_client import PlantGatewayClient, ServiceUnavailableError
 
 
-def _plant_base_url() -> str:
+router = waooaw_router(prefix="/cp/digital-marketing-activation", tags=["cp-digital-marketing-activation"])
+
+
+def _customer_id_from_user(user: User) -> str:
+    return f"CUST-{user.id}"
+
+
+def get_plant_gateway_client() -> PlantGatewayClient:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
-        raise RuntimeError("PLANT_GATEWAY_URL not configured")
-    return base_url
+        raise HTTPException(status_code=503, detail="PLANT_GATEWAY_URL not configured")
+    return PlantGatewayClient(base_url=base_url)
 
 
-async def _proxy_json(
-    *,
-    method: str,
-    url: str,
-    request: Request,
-    body: dict | None = None,
-) -> dict:
-    headers: dict[str, str] = {}
-    if request.headers.get("Authorization"):
-        headers["Authorization"] = str(request.headers["Authorization"])
-    if request.headers.get("X-Correlation-ID"):
-        headers["X-Correlation-ID"] = str(request.headers["X-Correlation-ID"])
-    if body is not None:
-        headers["Content-Type"] = "application/json"
+def _forward_headers(request: Request) -> Dict[str, str]:
+    headers: Dict[str, str] = {}
+    auth = request.headers.get("authorization")
+    if auth:
+        headers["Authorization"] = auth
+    correlation = request.headers.get("x-correlation-id")
+    if correlation:
+        headers["X-Correlation-ID"] = correlation
+    return headers
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.request(method, url, json=body, headers=headers)
-        if response.status_code >= 400:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
-        return response.json()
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+def _unwrap_gateway_error_detail(detail: Any) -> Any:
+    if isinstance(detail, str):
+        try:
+            import json
+
+            return json.loads(detail)
+        except Exception:
+            return detail
+    return detail
+
+
+def _raise_for_gateway_response(resp: Any) -> None:
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=_unwrap_gateway_error_detail(resp.json))
+
+
+class ActivationWorkspaceUpsertRequest(BaseModel):
+    workspace: dict[str, Any] = Field(default_factory=dict)
 
 
 @router.get("/{hired_instance_id}")
-async def get_workspace(
+async def get_activation_workspace(
     hired_instance_id: str,
     request: Request,
-    _user: User = Depends(get_current_user),
-) -> dict:
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
     try:
-        base = _plant_base_url()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return await _proxy_json(
-        method="GET",
-        url=f"{base}/api/v1/digital-marketing-activation/{hired_instance_id}",
-        request=request,
-    )
+        resp = await plant.request_json(
+            method="GET",
+            path=f"api/v1/hired-agents/{hired_instance_id}/digital-marketing-activation",
+            headers=_forward_headers(request),
+            params={"customer_id": _customer_id_from_user(current_user)},
+        )
+    except ServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    _raise_for_gateway_response(resp)
+    return resp.json if isinstance(resp.json, dict) else {"detail": resp.json}
 
 
-@router.patch("/{hired_instance_id}")
-async def patch_workspace(
+@router.put("/{hired_instance_id}")
+async def upsert_activation_workspace(
     hired_instance_id: str,
-    body: dict,
+    body: ActivationWorkspaceUpsertRequest,
     request: Request,
-    _user: User = Depends(get_current_user),
-) -> dict:
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
     try:
-        base = _plant_base_url()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return await _proxy_json(
-        method="PATCH",
-        url=f"{base}/api/v1/digital-marketing-activation/{hired_instance_id}",
-        body=body,
-        request=request,
-    )
+        resp = await plant.request_json(
+            method="PUT",
+            path=f"api/v1/hired-agents/{hired_instance_id}/digital-marketing-activation",
+            headers=_forward_headers(request),
+            json_body={
+                "customer_id": _customer_id_from_user(current_user),
+                "workspace": body.workspace,
+            },
+        )
+    except ServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
-
-@router.post("/{hired_instance_id}/generate-theme-plan")
-async def generate_theme_plan(
-    hired_instance_id: str,
-    body: dict,
-    request: Request,
-    _user: User = Depends(get_current_user),
-) -> dict:
-    try:
-        base = _plant_base_url()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return await _proxy_json(
-        method="POST",
-        url=f"{base}/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
-        body=body,
-        request=request,
-    )
-
-
-@router.patch("/{hired_instance_id}/theme-plan")
-async def patch_theme_plan(
-    hired_instance_id: str,
-    body: dict,
-    request: Request,
-    _user: User = Depends(get_current_user),
-) -> dict:
-    try:
-        base = _plant_base_url()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return await _proxy_json(
-        method="PATCH",
-        url=f"{base}/api/v1/digital-marketing-activation/{hired_instance_id}/theme-plan",
-        body=body,
-        request=request,
-    )
+    _raise_for_gateway_response(resp)
+    return resp.json if isinstance(resp.json, dict) else {"detail": resp.json}

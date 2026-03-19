@@ -1,19 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+const mockedNavigate = vi.fn()
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<any>('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockedNavigate,
+  }
+})
+
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
 import { MemoryRouter } from 'react-router-dom'
 import { waooawLightTheme } from '../theme'
 import MyAgents from '../pages/authenticated/MyAgents'
-
-const navigateMock = vi.fn()
-
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-  }
-})
 
 vi.mock('../services/subscriptions.service', () => ({
   cancelSubscription: vi.fn().mockResolvedValue({
@@ -71,36 +72,52 @@ vi.mock('../services/agentTypes.service', () => ({
 
 vi.mock('../services/hiredAgents.service', () => ({
   getHiredAgentBySubscription: vi.fn().mockRejectedValue({ status: 404 }),
-  upsertHiredAgentDraft: vi.fn()
-}))
-
-vi.mock('../services/hiredAgentStudio.service', () => ({
-  getHiredAgentStudio: vi.fn().mockResolvedValue({
-    hired_instance_id: 'HIRED-1',
+  upsertHiredAgentDraft: vi.fn().mockResolvedValue({
     subscription_id: 'SUB-1',
+    hired_instance_id: 'HIRED-1',
     agent_id: 'AGT-TRD-DELTA-001',
     agent_type_id: 'trading.share_trader.v1',
-    customer_id: 'CUST-user-1',
-    mode: 'edit',
-    selection_required: false,
-    current_step: 'review',
-    steps: [
-      { key: 'identity', title: 'Identity and voice', complete: true, blocked: false, summary: 'Business-facing name and theme are ready.' },
-      { key: 'connection', title: 'Connection', complete: true, blocked: false, summary: 'Connection verified and ready.' },
-      { key: 'operating_plan', title: 'Operating plan', complete: true, blocked: false, summary: 'Operating plan is in place.' },
-      { key: 'review', title: 'Review edits', complete: true, blocked: false, summary: 'Use review to confirm the updated operating setup.' },
-    ],
-    identity: { nickname: 'Trader One', theme: 'default', complete: true },
-    connection: { platform_key: 'delta_exchange_india', skill_id: 'default', connection_id: null, customer_platform_credential_id: 'cred-1', status: 'connected', complete: true, summary: 'Exchange credential reference is configured.' },
-    operating_plan: { complete: true, goals_completed: true, goal_count: 0, skill_config_count: 1, summary: 'Operating plan is in place.' },
-    review: { complete: true, summary: 'Ready to save the updated configuration.' },
+    nickname: 'Trader',
+    theme: 'steady',
+    config: {},
     configured: true,
-    goals_completed: true,
-    trial_status: 'active',
-    subscription_status: 'active',
-    updated_at: '2026-03-17T00:00:00Z',
   })
 }))
+
+vi.mock('../services/digitalMarketingActivation.service', async () => {
+  const actual = await vi.importActual<any>('../services/digitalMarketingActivation.service')
+  return {
+    ...actual,
+    getDigitalMarketingActivationWorkspace: vi.fn().mockResolvedValue({
+      hired_instance_id: 'HIRED-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {},
+      readiness: {
+        brief_complete: false,
+        youtube_selected: false,
+        youtube_connection_ready: true,
+        configured: false,
+        can_finalize: false,
+        missing_requirements: ['business_profile', 'agent_configuration'],
+      },
+      updated_at: '2026-03-19T12:00:00Z',
+    }),
+    upsertDigitalMarketingActivationWorkspace: vi.fn().mockResolvedValue({
+      hired_instance_id: 'HIRED-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {},
+      readiness: {
+        brief_complete: false,
+        youtube_selected: false,
+        youtube_connection_ready: true,
+        configured: false,
+        can_finalize: false,
+        missing_requirements: ['business_profile', 'agent_configuration'],
+      },
+      updated_at: '2026-03-19T12:05:00Z',
+    }),
+  }
+})
 
 vi.mock('../services/platformCredentials.service', () => ({
   upsertPlatformCredential: vi.fn()
@@ -178,13 +195,208 @@ const renderWithProvider = (component: React.ReactElement) => {
   )
 }
 
-async function openDetailedWorkspace(): Promise<void> {
-  fireEvent.click(await screen.findByRole('button', { name: 'Open detailed workspace' }))
-}
-
 describe('MyAgents Component', () => {
-  beforeEach(() => {
-    navigateMock.mockReset()
+  it('routes Open YouTube setup into step 3 of the hire wizard', async () => {
+    mockedNavigate.mockReset()
+
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
+    const connectionsModule = await import('../services/platformConnections.service')
+    const youtubeModule = await import('../services/youtubeConnections.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-MKT-0',
+          agent_id: 'AGT-MKT-YT-000',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-MKT-0',
+          agent_type_id: 'marketing.digital_marketing.v1'
+        }
+      ]
+    })
+
+    vi.mocked(deliverablesModule.listHiredAgentDeliverables).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-MKT-0',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-MKT-0',
+          hired_instance_id: 'HIRED-MKT-0',
+          goal_instance_id: 'GOAL-MKT-0',
+          goal_template_id: 'marketing.theme_discovery.v1',
+          title: 'YouTube setup draft',
+          payload: { destination: { destination_type: 'youtube' } },
+          review_status: 'approved',
+          review_notes: null,
+          approval_id: 'APR-MKT-0',
+          execution_status: 'not_executed',
+          created_at: null,
+          updated_at: null,
+        }
+      ]
+    })
+
+    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValueOnce([])
+    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([
+      {
+        id: 'cred-yt-0',
+        customer_id: 'CUST-0',
+        platform_key: 'youtube',
+        display_name: 'Dormant Channel',
+        granted_scopes: ['youtube.upload'],
+        verification_status: 'verified',
+        connection_status: 'reconnect_required',
+        created_at: '2026-03-10T10:00:00Z',
+        updated_at: '2026-03-16T10:05:00Z',
+      }
+    ] as any)
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open YouTube setup' }))
+
+    expect(mockedNavigate).toHaveBeenCalledWith(
+      '/hire/setup/SUB-MKT-0?agentId=AGT-MKT-YT-000&agentTypeId=marketing.digital_marketing.v1&step=3&focus=youtube'
+    )
+  })
+
+  it('renders the digital marketing activation wizard and saves its workspace', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const hiredModule = await import('../services/hiredAgents.service')
+    const activationModule = await import('../services/digitalMarketingActivation.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-DM-1',
+          agent_id: 'AGT-MKT-DMA-001',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-DM-1',
+          agent_type_id: 'marketing.digital_marketing.v1',
+        }
+      ]
+    })
+
+    vi.mocked(hiredModule.getHiredAgentBySubscription)
+      .mockResolvedValueOnce({
+        subscription_id: 'SUB-DM-1',
+        hired_instance_id: 'HIRED-DM-1',
+        agent_id: 'AGT-MKT-DMA-001',
+        agent_type_id: 'marketing.digital_marketing.v1',
+        nickname: 'Growth Engine',
+        theme: 'midnight',
+        config: {},
+        configured: false,
+      })
+      .mockResolvedValueOnce({
+        subscription_id: 'SUB-DM-1',
+        hired_instance_id: 'HIRED-DM-1',
+        agent_id: 'AGT-MKT-DMA-001',
+        agent_type_id: 'marketing.digital_marketing.v1',
+        nickname: 'Growth Engine',
+        theme: 'midnight',
+        config: {},
+        configured: true,
+      })
+
+    vi.mocked(activationModule.getDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-DM-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Bengaluru',
+        primary_language: 'English',
+        timezone: 'Asia/Kolkata',
+        offerings_services: ['SEO'],
+        platforms_enabled: [],
+        platform_bindings: {},
+      },
+      readiness: {
+        brief_complete: false,
+        youtube_selected: false,
+        youtube_connection_ready: true,
+        configured: false,
+        can_finalize: false,
+        missing_requirements: ['business_profile', 'agent_configuration'],
+      },
+      updated_at: '2026-03-19T12:00:00Z',
+    })
+
+    vi.mocked(activationModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-DM-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Bengaluru',
+        primary_language: 'English',
+        timezone: 'Asia/Kolkata',
+        offerings_services: ['SEO', 'Content'],
+        platforms_enabled: ['youtube'],
+        platform_bindings: { youtube: { skill_id: 'default' } },
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: false,
+        configured: true,
+        can_finalize: false,
+        missing_requirements: ['youtube_connection'],
+      },
+      updated_at: '2026-03-19T12:05:00Z',
+    })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Digital Marketing activation')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText('Offerings and services'), { target: { value: 'SEO\nContent' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'YouTube' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save activation' }))
+
+    await waitFor(() => {
+      expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledTimes(1)
+    })
+
+    expect(activationModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenCalledWith('HIRED-1', {
+      workspace: expect.objectContaining({
+        brand_name: 'WAOOAW',
+        offerings_services: ['SEO', 'Content'],
+        platforms_enabled: ['youtube'],
+        platform_bindings: {
+          youtube: { skill_id: 'default' },
+        },
+      }),
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Needs setup')).toBeInTheDocument()
+    })
   })
 
   it('renders page title with agent count', async () => {
@@ -208,8 +420,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('AGT-TRD-DELTA-001')).toBeInTheDocument()
     })
 
-    await openDetailedWorkspace()
-
     fireEvent.click(screen.getByRole('button', { name: 'End Hire' }))
     expect(screen.getByText('End hire at next billing date?')).toBeInTheDocument()
     expect(screen.getByText('After your hire ends')).toBeInTheDocument()
@@ -231,10 +441,8 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('Servicing only')).toBeInTheDocument()
     })
-
-    await openDetailedWorkspace()
 
     expect(screen.getByText('Version: v3')).toBeInTheDocument()
     expect(screen.getByText('Lifecycle: Servicing only')).toBeInTheDocument()
@@ -252,7 +460,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -291,7 +498,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -373,7 +579,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -478,7 +683,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -570,7 +774,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    await openDetailedWorkspace()
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
@@ -583,106 +786,5 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('Dormant Channel reconnect required')).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
-  })
-
-  it('renders the inline studio rail alongside the selected subscription UI', async () => {
-    renderWithProvider(<MyAgents />)
-
-    await waitFor(() => {
-      expect(screen.getByText('Selected hire')).toBeInTheDocument()
-    })
-
-    expect(screen.getByRole('button', { name: /Identity setup/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Platform connections/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Review and (activate|approve)/i })).toBeInTheDocument()
-    expect(screen.getByText('Subscription')).toBeInTheDocument()
-    expect(screen.getByText('SUB-1')).toBeInTheDocument()
-  })
-
-  it('switches studio content in place when a different step is selected from the rail', async () => {
-    renderWithProvider(<MyAgents />)
-
-    await waitFor(() => {
-      expect(screen.getByTestId('cp-my-agents-activation-studio')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Review and approve/i })).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /Review and approve/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Open identity setup' })).toBeInTheDocument()
-    })
-    expect(screen.getByTestId('cp-my-agents-activation-studio')).toBeInTheDocument()
-    expect(navigateMock).not.toHaveBeenCalled()
-  })
-
-  it('keeps identity and YouTube setup actions inline inside the studio shell', async () => {
-    const summaryModule = await import('../services/myAgentsSummary.service')
-    const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
-    const connectionsModule = await import('../services/platformConnections.service')
-    const youtubeModule = await import('../services/youtubeConnections.service')
-
-    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
-      instances: [
-        {
-          subscription_id: 'SUB-MKT-4',
-          agent_id: 'AGT-MKT-YT-004',
-          duration: 'monthly',
-          status: 'active',
-          current_period_start: '2026-03-01T00:00:00Z',
-          current_period_end: '2026-04-01T00:00:00Z',
-          cancel_at_period_end: false,
-          hired_instance_id: 'HIRED-MKT-4',
-          agent_type_id: 'marketing.digital_marketing.v1',
-          nickname: 'Digital Marketing Agent',
-        },
-      ],
-    })
-    vi.mocked(deliverablesModule.listHiredAgentDeliverables).mockResolvedValueOnce({
-      hired_instance_id: 'HIRED-MKT-4',
-      deliverables: [
-        {
-          deliverable_id: 'DEL-MKT-4',
-          hired_instance_id: 'HIRED-MKT-4',
-          goal_instance_id: 'GOAL-MKT-4',
-          goal_template_id: 'marketing.theme_discovery.v1',
-          title: 'YouTube growth draft',
-          payload: { destination: { destination_type: 'youtube' }, summary: 'Draft pending exact approval.' },
-          review_status: 'pending_review',
-          review_notes: null,
-          approval_id: null,
-          execution_status: 'not_executed',
-          created_at: null,
-          updated_at: null,
-        },
-      ],
-    })
-    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValueOnce([])
-    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([])
-
-    renderWithProvider(<MyAgents initialStudioStep="review" initialStudioFocus="review" initialSubscriptionId="SUB-MKT-4" />)
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Open identity setup' })).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open identity setup' }))
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Continue to platform connections' })).toBeInTheDocument()
-    })
-    expect(navigateMock).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: /Review and (activate|approve)/i }))
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open YouTube setup' }))
-    await waitFor(() => {
-      expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
-      expect(screen.getByText(/platform connections/i)).toBeInTheDocument()
-    })
-    expect(navigateMock).not.toHaveBeenCalled()
-    expect(screen.queryByText('Saved Theme Discovery brief')).not.toBeInTheDocument()
   })
 })
