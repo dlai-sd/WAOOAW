@@ -120,7 +120,7 @@ describe('MyAgents Digital Marketing wizard', () => {
         youtube_selected: true,
         youtube_connection_ready: true,
         configured: true,
-        can_finalize: false,
+        can_finalize: true,
         missing_requirements: [],
       },
       updated_at: '2026-03-18T09:00:00Z',
@@ -137,6 +137,8 @@ describe('MyAgents Digital Marketing wizard', () => {
         business_context: '',
         offerings_services: ['Activation'],
         platforms_enabled: ['youtube'],
+        activation_complete: false,
+        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
       },
       readiness: {
         brief_complete: true,
@@ -216,7 +218,7 @@ describe('MyAgents Digital Marketing wizard', () => {
           youtube_selected: true,
           youtube_connection_ready: true,
           configured: true,
-          can_finalize: false,
+          can_finalize: true,
           missing_requirements: [],
         },
         updated_at: '2026-03-18T09:00:00Z',
@@ -247,7 +249,7 @@ describe('MyAgents Digital Marketing wizard', () => {
           youtube_selected: true,
           youtube_connection_ready: true,
           configured: true,
-          can_finalize: false,
+          can_finalize: true,
           missing_requirements: [],
         },
         updated_at: '2026-03-18T09:00:00Z',
@@ -287,5 +289,80 @@ describe('MyAgents Digital Marketing wizard', () => {
       expect(screen.queryByTestId('dma-help-panel-primary')).not.toBeInTheDocument()
       expect(screen.queryByTestId('dma-help-panel-secondary')).not.toBeInTheDocument()
     })
+  })
+
+  it('keeps finish disabled until schedule is present', async () => {
+    renderWizard()
+    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
+    })
+
+    const finishButton = screen.getByRole('button', { name: 'Finish activation' })
+    expect(finishButton).toBeDisabled()
+  })
+
+  it('enables finish and shows success state when schedule is complete', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockImplementation(async (_id, input: any) => ({
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        ...input.workspace,
+        activation_complete: true,
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: true,
+        missing_requirements: [],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    }) as any)
+
+    renderWizard()
+    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-03-22' } })
+    fireEvent.change(screen.getByLabelText('Posts per week'), { target: { value: '3' } })
+
+    const finishButton = screen.getByRole('button', { name: 'Finish activation' })
+    await waitFor(() => {
+      expect(finishButton).not.toBeDisabled()
+    })
+
+    fireEvent.click(finishButton)
+
+    await waitFor(() => {
+      expect(screen.getByText('Runtime-ready')).toBeInTheDocument()
+    })
+  })
+
+  it('renders the final summary with platforms, master theme, derived themes, and cadence', async () => {
+    renderWizard()
+    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText('Posts per week'), { target: { value: '3' } })
+
+    expect(screen.getByText('Activation summary')).toBeInTheDocument()
+    expect(screen.getByText(/Platforms:/)).toHaveTextContent('Platforms: youtube')
+    expect(screen.getByText(/Master theme:/)).toHaveTextContent('Master theme: Trust-first growth')
+    expect(screen.getByText(/Derived themes:/)).toHaveTextContent('Derived themes: Proof, Education')
+    expect(screen.getByText(/Cadence:/)).toHaveTextContent('Cadence: 3 posts/week')
   })
 })

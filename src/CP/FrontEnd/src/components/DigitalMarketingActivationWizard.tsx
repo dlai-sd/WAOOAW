@@ -64,6 +64,17 @@ function parseListTextarea(value: string): string[] {
     .filter(Boolean)
 }
 
+function parseHourList(value: string): number[] {
+  return String(value || '')
+    .split(/\n|,/g)
+    .map((entry) => Number(entry.trim()))
+    .filter((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 23)
+}
+
+function formatHours(value: unknown): string {
+  return Array.isArray(value) ? value.map((entry) => String(entry)).join(', ') : ''
+}
+
 function buildFallbackDraft(instance: MyAgentInstanceSummary): HiredAgentInstance {
   return {
     subscription_id: instance.subscription_id,
@@ -106,6 +117,12 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const [themePlanLoading, setThemePlanLoading] = useState(false)
   const [themePlanSaving, setThemePlanSaving] = useState(false)
   const [themePlanError, setThemePlanError] = useState<string | null>(null)
+  const [scheduleStartDate, setScheduleStartDate] = useState('')
+  const [postsPerWeek, setPostsPerWeek] = useState('')
+  const [preferredDaysText, setPreferredDaysText] = useState('')
+  const [preferredHoursText, setPreferredHoursText] = useState('')
+  const [finishStatus, setFinishStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
+  const [finishError, setFinishError] = useState<string | null>(null)
 
   const hiredInstanceId = useMemo(
     () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
@@ -115,11 +132,23 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const campaignSetup = activation?.workspace.campaign_setup || {}
   const schedule = campaignSetup.schedule || {}
 
+  const normalizedSchedule: DigitalMarketingCampaignSchedule = {
+    start_date: scheduleStartDate.trim(),
+    posts_per_week: Math.max(Number(postsPerWeek || 0), 0),
+    preferred_days: parseListTextarea(preferredDaysText),
+    preferred_hours_utc: parseHourList(preferredHoursText),
+  }
+
   const applyThemePlanState = (workspace: DigitalMarketingActivationResponse['workspace'] | Record<string, unknown> | null | undefined) => {
     const resolvedWorkspace = (workspace || {}) as DigitalMarketingActivationResponse['workspace']
     const nextCampaignSetup = resolvedWorkspace.campaign_setup || {}
+    const nextSchedule = nextCampaignSetup.schedule || {}
     setMasterTheme(String(nextCampaignSetup.master_theme || ''))
     setDerivedThemes(Array.isArray(nextCampaignSetup.derived_themes) ? nextCampaignSetup.derived_themes : [])
+    setScheduleStartDate(String(nextSchedule.start_date || ''))
+    setPostsPerWeek(String(nextSchedule.posts_per_week || ''))
+    setPreferredDaysText(Array.isArray(nextSchedule.preferred_days) ? nextSchedule.preferred_days.join(', ') : '')
+    setPreferredHoursText(formatHours(nextSchedule.preferred_hours_utc))
   }
 
   const loadState = async () => {
@@ -161,6 +190,8 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
       setSaveStatus('idle')
       setSaveError(null)
       setThemePlanError(null)
+      setFinishStatus('idle')
+      setFinishError(null)
     } catch (e: any) {
       setError(e?.message || 'Failed to load activation workspace')
     } finally {
@@ -189,6 +220,7 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
 
   const milestoneCount = getActivationMilestoneCount(readiness)
   const completedMilestones = milestoneCount + (masterTheme.trim() ? 1 : 0)
+  const canFinish = Boolean(masterTheme.trim()) && Boolean(scheduleStartDate.trim()) && Boolean(readiness.can_finalize)
   const missingProfileFields = useMemo(() => {
     const items: string[] = []
     if (!brandName.trim()) items.push('brand name')
@@ -302,7 +334,7 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
     try {
       const response = await generateDigitalMarketingThemePlan(hiredInstanceId, {
         campaign_setup: {
-          schedule,
+          schedule: normalizedSchedule,
         },
       })
       applyThemePlanResponse(response)
@@ -324,7 +356,7 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
         derived_themes: derivedThemes,
         campaign_setup: {
           campaign_id: campaignSetup.campaign_id,
-          schedule,
+          schedule: normalizedSchedule,
         },
       })
       applyThemePlanResponse(response)
@@ -343,6 +375,55 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
 
   const addDerivedTheme = () => {
     setDerivedThemes((current) => [...current, { title: `Derived theme ${current.length + 1}`, description: '', frequency: 'weekly' }])
+  }
+
+  const finishActivation = async () => {
+    if (!hiredInstanceId || readOnly) return
+    setFinishStatus('saving')
+    setFinishError(null)
+    try {
+      const savedActivation = await upsertDigitalMarketingActivationWorkspace(hiredInstanceId, {
+        workspace: {
+          ...(activation?.workspace || {}),
+          help_visible: showHelp,
+          activation_complete: true,
+          platforms_enabled: selectedPlatforms,
+          campaign_setup: {
+            campaign_id: campaignSetup.campaign_id,
+            master_theme: masterTheme.trim(),
+            derived_themes: derivedThemes,
+            schedule: normalizedSchedule,
+          },
+        },
+      })
+      setActivation(savedActivation)
+      applyThemePlanState(savedActivation.workspace)
+      setFinishStatus('success')
+
+      const updatedDraft = draft
+        ? {
+            ...draft,
+            configured: true,
+            goals_completed: true,
+            hired_instance_id: savedActivation.hired_instance_id,
+          }
+        : null
+
+      if (updatedDraft) {
+        setDraft(updatedDraft)
+        onSaved?.(updatedDraft)
+      }
+      onSavedInstance?.({
+        configured: true,
+        goals_completed: true,
+        hired_instance_id: savedActivation.hired_instance_id,
+        agent_type_id: activeInstance?.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID,
+      })
+      setActiveMilestone('schedule')
+    } catch (e: any) {
+      setFinishStatus('error')
+      setFinishError(e?.message || 'Failed to finish activation.')
+    }
   }
 
   if (!activeInstance) {
@@ -600,6 +681,55 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
             onSave={() => void saveThemePlan()}
           />
         ) : null}
+      </Card>
+
+      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div>
+          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Final step</div>
+          <h4 style={{ margin: '0.35rem 0 0' }}>Confirm Schedule</h4>
+          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Confirm cadence and finish setup so this hire stays runtime-ready inside My Agents.</div>
+        </div>
+
+        <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '1rem', display: 'grid', gap: '0.6rem' }}>
+          <div style={{ fontWeight: 600 }}>Activation summary</div>
+          <div>Platforms: {selectedPlatforms.length > 0 ? selectedPlatforms.join(', ') : 'No platforms selected yet'}</div>
+          <div>Master theme: {masterTheme.trim() || 'No master theme yet'}</div>
+          <div>Derived themes: {derivedThemes.length > 0 ? derivedThemes.map((theme) => theme.title).join(', ') : 'No derived themes yet'}</div>
+          <div>Cadence: {postsPerWeek.trim() ? `${postsPerWeek} posts/week` : 'Posts per week not set'}</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Start date</span>
+            <Input aria-label="Start date" type="date" value={scheduleStartDate} onChange={(_, data) => setScheduleStartDate(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Posts per week</span>
+            <Input aria-label="Posts per week" type="number" value={postsPerWeek} onChange={(_, data) => setPostsPerWeek(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Preferred days</span>
+            <Input aria-label="Preferred days" value={preferredDaysText} onChange={(_, data) => setPreferredDaysText(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Preferred hours (UTC)</span>
+            <Input aria-label="Preferred hours UTC" value={preferredHoursText} onChange={(_, data) => setPreferredHoursText(data.value)} disabled={readOnly} />
+          </label>
+        </div>
+
+        {finishError ? <FeedbackMessage intent="error" title="Finish activation failed" message={finishError} /> : null}
+        {finishStatus === 'success' || activation?.workspace.activation_complete ? (
+          <FeedbackMessage intent="success" title="Runtime-ready" message="This hire now has channels, theme plan, and schedule confirmed. My Agents will keep showing it as ready to run." />
+        ) : null}
+
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Button appearance="primary" onClick={() => void finishActivation()} disabled={!canFinish || finishStatus === 'saving' || readOnly}>
+            {finishStatus === 'saving' ? 'Finishing activation...' : 'Finish activation'}
+          </Button>
+          <Badge appearance={canFinish ? 'filled' : 'outline'} color={canFinish ? 'success' : 'warning'}>
+            {canFinish ? 'Ready to finish' : 'Finish is blocked until platform prep, theme setup, and schedule are complete'}
+          </Badge>
+        </div>
       </Card>
 
       <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

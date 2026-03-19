@@ -75,6 +75,7 @@ export type DigitalMarketingThemePlanResponse = {
 
 export type DigitalMarketingActivationWorkspace = {
   help_visible?: boolean
+  activation_complete?: boolean
   brand_name?: string
   location?: string
   primary_language?: string
