@@ -452,8 +452,6 @@ export default function AuthenticatedPortal({
           <MyAgents
             onNavigateToDiscover={() => openPage('discover')}
             initialSubscriptionId={myAgentsInitialSubscriptionId}
-            initialStudioStep={myAgentsInitialStudioStep}
-            initialStudioFocus={myAgentsInitialStudioFocus}
           />
         )
       case 'discover':

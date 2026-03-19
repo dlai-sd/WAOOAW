@@ -1,270 +1,154 @@
 from __future__ import annotations
 
 import json
-import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import Body, Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_mold.skills.content_models import Campaign, CampaignWorkflowState, DailyThemeItem, estimate_cost
 from agent_mold.skills.grok_client import GrokClientError, get_grok_client, grok_complete
 from api.v1 import campaigns as campaigns_module
-from api.v1.hired_agents_simple import (
-    _HiredAgentRecord,
-    _by_id,
-    _db_model_to_record,
-    _get_hired_agents_db_session,
-    _get_read_hired_agents_db_session,
-    _get_record_by_id,
-)
-from core.logging import PiiMaskingFilter
+from api.v1 import hired_agents_simple
+from api.v1.platform_connections import get_connected_platform_connection
 from core.routing import waooaw_router
 from repositories.campaign_repository import CampaignRepository
 from repositories.hired_agent_repository import HiredAgentRepository
 
-logger = logging.getLogger(__name__)
-logger.addFilter(PiiMaskingFilter())
 
-router = waooaw_router(
-    prefix="/digital-marketing-activation",
-    tags=["digital-marketing-activation"],
-)
+router = waooaw_router(prefix="/hired-agents", tags=["digital-marketing-activation"])
+theme_router = waooaw_router(prefix="/digital-marketing-activation", tags=["digital-marketing-activation"])
 
-
-class DerivedThemeItemResponse(BaseModel):
-    title: str = Field(..., min_length=1)
-    description: str = ""
-    frequency: str = "weekly"
+_WORKSPACE_KEY = "digital_marketing_activation"
+_DIGITAL_MARKETING_AGENT_TYPE = "marketing.digital_marketing.v1"
 
 
-class PlatformStepResponse(BaseModel):
-    platform_key: str = Field(..., min_length=1)
-    complete: bool = False
-    status: str = "pending"
+class ActivationWorkspaceUpsertRequest(BaseModel):
+    customer_id: str = Field(..., min_length=1)
+    workspace: dict[str, Any] = Field(default_factory=dict)
 
 
-class InductionStateResponse(BaseModel):
-    nickname: str = ""
-    theme: str = "default"
-    primary_language: str = "en"
-    timezone: str = ""
-    brand_name: str = ""
-    offerings_services: list[str] = Field(default_factory=list)
-    location: str = ""
-    target_audience: str = ""
-    notes: str = ""
+class ActivationReadinessResponse(BaseModel):
+    brief_complete: bool
+    youtube_selected: bool
+    youtube_connection_ready: bool
+    configured: bool
+    can_finalize: bool
+    missing_requirements: list[str] = Field(default_factory=list)
 
 
-class PrepareAgentStateResponse(BaseModel):
-    selected_platforms: list[str] = Field(default_factory=list)
-    platform_steps: list[PlatformStepResponse] = Field(default_factory=list)
-    all_selected_platforms_completed: bool = False
-
-
-class CampaignScheduleResponse(BaseModel):
-    start_date: str = ""
-    posts_per_week: int = 0
-    preferred_days: list[str] = Field(default_factory=list)
-    preferred_hours_utc: list[int] = Field(default_factory=list)
-
-
-class CampaignSetupStateResponse(BaseModel):
-    campaign_id: str | None = None
-    master_theme: str = ""
-    derived_themes: list[DerivedThemeItemResponse] = Field(default_factory=list)
-    schedule: CampaignScheduleResponse = Field(default_factory=CampaignScheduleResponse)
-
-
-class DigitalMarketingActivationWorkspaceResponse(BaseModel):
+class ActivationWorkspaceResponse(BaseModel):
     hired_instance_id: str
-    help_visible: bool = False
-    activation_complete: bool = False
-    induction: InductionStateResponse = Field(default_factory=InductionStateResponse)
-    prepare_agent: PrepareAgentStateResponse = Field(default_factory=PrepareAgentStateResponse)
-    campaign_setup: CampaignSetupStateResponse = Field(default_factory=CampaignSetupStateResponse)
+    customer_id: str | None = None
+    agent_type_id: str
+    workspace: dict[str, Any] = Field(default_factory=dict)
+    readiness: ActivationReadinessResponse
     updated_at: datetime
+
+
+class ThemePlanGenerateRequest(BaseModel):
+    customer_id: str | None = None
+    campaign_setup: dict[str, Any] = Field(default_factory=dict)
 
 
 class ThemePlanResponse(BaseModel):
     campaign_id: str | None = None
     master_theme: str
-    derived_themes: list[DerivedThemeItemResponse] = Field(default_factory=list)
-    workspace: DigitalMarketingActivationWorkspaceResponse
+    derived_themes: list[dict[str, Any]] = Field(default_factory=list)
+    workspace: dict[str, Any] = Field(default_factory=dict)
+
+
+def _workspace_from_config(config: dict[str, Any] | None) -> dict[str, Any]:
+    raw = (config or {}).get(_WORKSPACE_KEY)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _selected_platforms(workspace: dict[str, Any]) -> list[str]:
+    raw = workspace.get("platforms_enabled") or workspace.get("selected_platforms") or []
+    selected: list[str] = []
+    if isinstance(raw, list):
+        for value in raw:
+            platform = str(value or "").strip().lower()
+            if platform:
+                selected.append(platform)
+    return selected
+
+
+def _platform_bindings(workspace: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw = workspace.get("platform_bindings")
+    if not isinstance(raw, dict):
+        return {}
+
+    bindings: dict[str, dict[str, Any]] = {}
+    for platform_key, value in raw.items():
+        if not isinstance(value, dict):
+            continue
+        normalized_key = str(platform_key or "").strip().lower()
+        if normalized_key:
+            bindings[normalized_key] = dict(value)
+    return bindings
 
 
 def _require_auth(authorization: Optional[str]) -> None:
     if not authorization:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header required.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=401, detail="Authorization header required.")
 
 
-def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
-    for key, value in patch.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _deep_merge(dict(merged[key]), value)
-        else:
-            merged[key] = value
-    return merged
-
-
-def _normalize_platform_steps(
-    selected_platforms: list[str],
-    existing_steps: list[dict[str, Any]] | list[PlatformStepResponse] | None,
-) -> list[dict[str, Any]]:
-    normalized_selected = []
-    for platform in selected_platforms:
-        candidate = str(platform or "").strip().lower()
-        if candidate and candidate not in normalized_selected:
-            normalized_selected.append(candidate)
-
-    step_map: dict[str, dict[str, Any]] = {}
-    for step in existing_steps or []:
-        raw = step.model_dump(mode="json") if hasattr(step, "model_dump") else dict(step or {})
-        platform_key = str(raw.get("platform_key") or "").strip().lower()
-        if platform_key:
-            step_map[platform_key] = {
-                "platform_key": platform_key,
-                "complete": bool(raw.get("complete", False)),
-                "status": str(raw.get("status") or ("complete" if raw.get("complete") else "pending")),
-            }
-
-    steps: list[dict[str, Any]] = []
-    for platform in normalized_selected:
-        existing = step_map.get(platform) or {}
-        complete = bool(existing.get("complete", False))
-        steps.append(
-            {
-                "platform_key": platform,
-                "complete": complete,
-                "status": str(existing.get("status") or ("complete" if complete else "pending")),
-            }
-        )
-    return steps
-
-
-def _build_workspace(record: _HiredAgentRecord) -> DigitalMarketingActivationWorkspaceResponse:
-    config = dict(record.config or {})
-    activation = dict(config.get("digital_marketing_activation") or {})
-    induction = dict(activation.get("induction") or {})
-    prepare_agent = dict(activation.get("prepare_agent") or {})
-    campaign_setup = dict(activation.get("campaign_setup") or {})
-
-    selected_platforms_raw = prepare_agent.get("selected_platforms")
-    if not isinstance(selected_platforms_raw, list):
-        selected_platforms_raw = list(config.get("platforms_enabled") or [])
-
-    selected_platforms = [
-        str(platform or "").strip().lower()
-        for platform in selected_platforms_raw
-        if str(platform or "").strip()
-    ]
-    selected_platforms = list(dict.fromkeys(selected_platforms))
-
-    platform_steps = _normalize_platform_steps(
-        selected_platforms,
-        prepare_agent.get("platform_steps") if isinstance(prepare_agent.get("platform_steps"), list) else None,
-    )
-    all_selected_platforms_completed = bool(platform_steps) and all(
-        bool(step.get("complete", False)) for step in platform_steps
-    )
-
-    return DigitalMarketingActivationWorkspaceResponse.model_validate(
-        {
-            "hired_instance_id": record.hired_instance_id,
-            "help_visible": bool(activation.get("help_visible", False)),
-            "activation_complete": bool(activation.get("activation_complete", False)),
-            "induction": {
-                "nickname": str(induction.get("nickname") or record.nickname or ""),
-                "theme": str(induction.get("theme") or record.theme or "default"),
-                "primary_language": str(induction.get("primary_language") or config.get("primary_language") or "en"),
-                "timezone": str(induction.get("timezone") or config.get("timezone") or ""),
-                "brand_name": str(induction.get("brand_name") or config.get("brand_name") or ""),
-                "offerings_services": list(induction.get("offerings_services") or config.get("offerings_services") or []),
-                "location": str(induction.get("location") or config.get("location") or ""),
-                "target_audience": str(induction.get("target_audience") or ""),
-                "notes": str(induction.get("notes") or ""),
-            },
-            "prepare_agent": {
-                "selected_platforms": selected_platforms,
-                "platform_steps": platform_steps,
-                "all_selected_platforms_completed": all_selected_platforms_completed,
-            },
-            "campaign_setup": {
-                "campaign_id": campaign_setup.get("campaign_id"),
-                "master_theme": str(campaign_setup.get("master_theme") or ""),
-                "derived_themes": list(campaign_setup.get("derived_themes") or []),
-                "schedule": {
-                    "start_date": str(dict(campaign_setup.get("schedule") or {}).get("start_date") or ""),
-                    "posts_per_week": int(dict(campaign_setup.get("schedule") or {}).get("posts_per_week") or 0),
-                    "preferred_days": list(dict(campaign_setup.get("schedule") or {}).get("preferred_days") or []),
-                    "preferred_hours_utc": list(dict(campaign_setup.get("schedule") or {}).get("preferred_hours_utc") or []),
-                },
-            },
-            "updated_at": record.updated_at,
-        }
-    )
-
-
-async def _persist_workspace(
+def _materialize_marketing_config(
     *,
-    record: _HiredAgentRecord,
-    workspace: DigitalMarketingActivationWorkspaceResponse,
-    db: AsyncSession | None,
-) -> _HiredAgentRecord:
-    serialized_workspace = workspace.model_dump(mode="json")
-    next_config = dict(record.config or {})
-    next_config["digital_marketing_activation"] = serialized_workspace
-    now = datetime.now(timezone.utc)
+    existing_config: dict[str, Any],
+    workspace: dict[str, Any],
+) -> dict[str, Any]:
+    config = dict(existing_config or {})
+    config[_WORKSPACE_KEY] = workspace
 
-    if db is None:
-        updated = record.model_copy(
-            update={
-                "nickname": workspace.induction.nickname or record.nickname,
-                "theme": workspace.induction.theme or record.theme,
-                "config": next_config,
-                "configured": bool(record.configured or workspace.activation_complete),
-                "goals_completed": bool(record.goals_completed or workspace.activation_complete),
-                "updated_at": now,
-            }
+    for field_name in (
+        "brand_name",
+        "location",
+        "primary_language",
+        "timezone",
+        "business_context",
+    ):
+        value = workspace.get(field_name)
+        if value is not None:
+            config[field_name] = value
+
+    offerings = workspace.get("offerings_services")
+    if isinstance(offerings, list):
+        config["offerings_services"] = offerings
+
+    selected_platforms = _selected_platforms(workspace)
+    if selected_platforms:
+        config["platforms_enabled"] = selected_platforms
+
+    bindings = _platform_bindings(workspace)
+    platform_credentials: dict[str, dict[str, str]] = {}
+    for platform in selected_platforms:
+        binding = bindings.get(platform) or {}
+        credential_ref = (
+            binding.get("credential_ref")
+            or binding.get("customer_platform_credential_id")
+            or binding.get("credential_id")
         )
-        _by_id[record.hired_instance_id] = updated
-        return updated
+        if isinstance(credential_ref, str) and credential_ref.strip():
+            platform_credentials[platform] = {"credential_ref": credential_ref.strip()}
+    if platform_credentials:
+        config["platform_credentials"] = platform_credentials
 
-    repo = HiredAgentRepository(db)
-    model = await repo.get_by_id(record.hired_instance_id)
-    if model is None:
-        raise HTTPException(status_code=404, detail="Hired agent not found.")
-    model.nickname = workspace.induction.nickname or model.nickname
-    model.theme = workspace.induction.theme or model.theme
-    model.config = next_config
-    model.configured = bool(model.configured or workspace.activation_complete)
-    model.goals_completed = bool(model.goals_completed or workspace.activation_complete)
-    model.updated_at = now
-    await db.flush()
-    await db.refresh(model)
-    return _db_model_to_record(model)
+    return config
 
 
-def _theme_prompt(workspace: DigitalMarketingActivationWorkspaceResponse) -> str:
-    induction = workspace.induction
-    schedule = workspace.campaign_setup.schedule
+def _theme_prompt(workspace: dict[str, Any], campaign_setup: dict[str, Any]) -> str:
     return json.dumps(
         {
-            "brand_name": induction.brand_name,
-            "offerings_services": induction.offerings_services,
-            "location": induction.location,
-            "target_audience": induction.target_audience,
-            "selected_platforms": workspace.prepare_agent.selected_platforms,
-            "posts_per_week": schedule.posts_per_week,
-            "preferred_days": schedule.preferred_days,
-            "preferred_hours_utc": schedule.preferred_hours_utc,
+            "brand_name": workspace.get("brand_name") or "",
+            "offerings_services": workspace.get("offerings_services") or [],
+            "location": workspace.get("location") or "",
+            "selected_platforms": _selected_platforms(workspace),
+            "schedule": dict(campaign_setup.get("schedule") or {}),
+            "business_context": workspace.get("business_context") or "",
         },
         ensure_ascii=False,
     )
@@ -286,7 +170,8 @@ def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
     derived = payload.get("derived_themes")
     if not isinstance(derived, list):
         derived = []
-    normalized = []
+
+    normalized: list[dict[str, Any]] = []
     for row in derived:
         row_dict = dict(row or {})
         title = str(row_dict.get("title") or "").strip()
@@ -304,18 +189,31 @@ def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
 
 async def _persist_theme_plan_to_campaign(
     *,
-    record: _HiredAgentRecord,
-    workspace: DigitalMarketingActivationWorkspaceResponse,
+    record: hired_agents_simple._HiredAgentRecord,
+    workspace: dict[str, Any],
+    master_theme: str,
+    derived_themes: list[dict[str, Any]],
+    campaign_setup: dict[str, Any],
     db: AsyncSession | None,
 ) -> str:
     activation_payload = {
-        "induction": workspace.induction.model_dump(mode="json"),
-        "selected_platforms": workspace.prepare_agent.selected_platforms,
-        "theme_plan": {
-            "master_theme": workspace.campaign_setup.master_theme,
-            "derived_themes": [item.model_dump(mode="json") for item in workspace.campaign_setup.derived_themes],
+        "induction": {
+            "nickname": record.nickname,
+            "theme": record.theme,
+            "primary_language": workspace.get("primary_language") or dict(record.config or {}).get("primary_language") or "en",
+            "timezone": workspace.get("timezone") or dict(record.config or {}).get("timezone") or "",
+            "brand_name": workspace.get("brand_name") or dict(record.config or {}).get("brand_name") or "",
+            "offerings_services": workspace.get("offerings_services") or dict(record.config or {}).get("offerings_services") or [],
+            "location": workspace.get("location") or dict(record.config or {}).get("location") or "",
+            "target_audience": workspace.get("target_audience") or "",
+            "notes": workspace.get("business_context") or "",
         },
-        "schedule": workspace.campaign_setup.schedule.model_dump(mode="json"),
+        "selected_platforms": _selected_platforms(workspace),
+        "theme_plan": {
+            "master_theme": master_theme,
+            "derived_themes": derived_themes,
+        },
+        "schedule": dict(campaign_setup.get("schedule") or {}),
     }
     brief = campaigns_module.build_campaign_brief_from_activation_payload(activation_payload)
     cost_estimate = estimate_cost(brief, model_used="grok-3-latest")
@@ -346,6 +244,7 @@ async def _persist_theme_plan_to_campaign(
                     "updated_at": datetime.now(timezone.utc),
                 }
             )
+
         theme_items = [
             DailyThemeItem.model_validate(item)
             for item in campaigns_module.build_theme_items_from_activation_payload(
@@ -392,88 +291,174 @@ async def _persist_theme_plan_to_campaign(
     return existing_campaign.campaign_id
 
 
-def _response_from_workspace(workspace: DigitalMarketingActivationWorkspaceResponse) -> ThemePlanResponse:
-    return ThemePlanResponse(
-        campaign_id=workspace.campaign_setup.campaign_id,
-        master_theme=workspace.campaign_setup.master_theme,
-        derived_themes=workspace.campaign_setup.derived_themes,
+def _ensure_supported_record(record: hired_agents_simple._HiredAgentRecord) -> None:
+    if hired_agents_simple._canonical_agent_type_id_or_400(record.agent_type_id) != _DIGITAL_MARKETING_AGENT_TYPE:
+        raise HTTPException(status_code=409, detail="Digital marketing activation is only supported for marketing.digital_marketing.v1")
+
+
+async def _youtube_connection_ready(
+    *,
+    hired_instance_id: str,
+    workspace: dict[str, Any],
+    db: AsyncSession | None,
+) -> bool:
+    if "youtube" not in _selected_platforms(workspace):
+        return True
+
+    bindings = _platform_bindings(workspace)
+    youtube_binding = bindings.get("youtube") or {}
+    if db is None:
+        return bool(youtube_binding.get("connected"))
+
+    skill_id = str(youtube_binding.get("skill_id") or "").strip()
+    if not skill_id:
+        return False
+
+    connection = await get_connected_platform_connection(
+        db,
+        hired_instance_id=hired_instance_id,
+        skill_id=skill_id,
+        platform_key="youtube",
+    )
+    return connection is not None
+
+
+async def _build_response(
+    *,
+    record: hired_agents_simple._HiredAgentRecord,
+    db: AsyncSession | None,
+) -> ActivationWorkspaceResponse:
+    workspace = _workspace_from_config(record.config)
+    youtube_selected = "youtube" in _selected_platforms(workspace)
+    youtube_connection_ready = await _youtube_connection_ready(
+        hired_instance_id=record.hired_instance_id,
+        workspace=workspace,
+        db=db,
+    )
+    configured = hired_agents_simple._compute_agent_configured(
+        record.nickname,
+        record.theme,
+        agent_id=record.agent_id,
+        config=record.config,
+    )
+    brief_complete = hired_agents_simple._marketing_config_complete(record.config)
+
+    missing_requirements: list[str] = []
+    if not brief_complete:
+        missing_requirements.append("business_profile")
+    if youtube_selected and not youtube_connection_ready:
+        missing_requirements.append("youtube_connection")
+    if not configured:
+        missing_requirements.append("agent_configuration")
+
+    return ActivationWorkspaceResponse(
+        hired_instance_id=record.hired_instance_id,
+        customer_id=record.customer_id,
+        agent_type_id=hired_agents_simple._canonical_agent_type_id_or_400(record.agent_type_id),
+        workspace=workspace,
+        readiness=ActivationReadinessResponse(
+            brief_complete=brief_complete,
+            youtube_selected=youtube_selected,
+            youtube_connection_ready=youtube_connection_ready,
+            configured=configured,
+            can_finalize=brief_complete and youtube_connection_ready and configured,
+            missing_requirements=missing_requirements,
+        ),
+        updated_at=record.updated_at,
+    )
+
+
+@router.get("/{hired_instance_id}/digital-marketing-activation", response_model=ActivationWorkspaceResponse)
+async def get_activation_workspace(
+    hired_instance_id: str,
+    customer_id: str,
+    db: AsyncSession | None = Depends(hired_agents_simple._get_read_hired_agents_db_session),
+) -> ActivationWorkspaceResponse:
+    record = await hired_agents_simple._get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    hired_agents_simple._assert_customer_owns_record(record, customer_id)
+    _ensure_supported_record(record)
+    await hired_agents_simple._assert_readable(record, db=db)
+    return await _build_response(record=record, db=db)
+
+
+@router.put("/{hired_instance_id}/digital-marketing-activation", response_model=ActivationWorkspaceResponse)
+async def upsert_activation_workspace(
+    hired_instance_id: str,
+    body: ActivationWorkspaceUpsertRequest,
+    db: AsyncSession | None = Depends(hired_agents_simple._get_hired_agents_db_session),
+) -> ActivationWorkspaceResponse:
+    record = await hired_agents_simple._get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Hired agent instance not found.")
+
+    hired_agents_simple._assert_customer_owns_record(record, body.customer_id)
+    _ensure_supported_record(record)
+    await hired_agents_simple._assert_writable(record, db=db)
+
+    existing_workspace = _workspace_from_config(record.config)
+    workspace = {**existing_workspace, **dict(body.workspace or {})}
+    materialized_config = _materialize_marketing_config(
+        existing_config=dict(record.config or {}),
         workspace=workspace,
     )
-
-
-@router.get("/{hired_instance_id}", response_model=DigitalMarketingActivationWorkspaceResponse)
-async def get_workspace(
-    hired_instance_id: str,
-    authorization: Optional[str] = Header(default=None, alias="Authorization"),
-    db: AsyncSession | None = Depends(_get_read_hired_agents_db_session),
-) -> DigitalMarketingActivationWorkspaceResponse:
-    _require_auth(authorization)
-    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Hired agent not found.")
-    return _build_workspace(record)
-
-
-@router.patch("/{hired_instance_id}", response_model=DigitalMarketingActivationWorkspaceResponse)
-async def patch_workspace(
-    hired_instance_id: str,
-    body: dict[str, Any] = Body(default_factory=dict),
-    authorization: Optional[str] = Header(default=None, alias="Authorization"),
-    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
-) -> DigitalMarketingActivationWorkspaceResponse:
-    _require_auth(authorization)
-    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Hired agent not found.")
-
-    current = _build_workspace(record)
-    merged_dict = _deep_merge(current.model_dump(mode="json"), body)
-    merged_dict["hired_instance_id"] = hired_instance_id
-    selected_platforms = list(
-        merged_dict.get("prepare_agent", {}).get("selected_platforms")
-        or current.prepare_agent.selected_platforms
+    configured = hired_agents_simple._compute_agent_configured(
+        record.nickname,
+        record.theme,
+        agent_id=record.agent_id,
+        config=materialized_config,
     )
-    merged_dict.setdefault("prepare_agent", {})
-    merged_dict["prepare_agent"]["platform_steps"] = _normalize_platform_steps(
-        selected_platforms,
-        merged_dict["prepare_agent"].get("platform_steps"),
+    now = datetime.now(timezone.utc)
+
+    if db is None:
+        updated = record.model_copy(
+            update={
+                "config": materialized_config,
+                "configured": configured,
+                "updated_at": now,
+            }
+        )
+        hired_agents_simple._by_id[hired_instance_id] = updated
+        return await _build_response(record=updated, db=db)
+
+    repo = HiredAgentRepository(db)
+    model = await repo.update_config(
+        hired_instance_id,
+        config=materialized_config,
+        configured=configured,
     )
-    merged_dict["prepare_agent"]["all_selected_platforms_completed"] = bool(
-        merged_dict["prepare_agent"]["platform_steps"]
-    ) and all(bool(step.get("complete", False)) for step in merged_dict["prepare_agent"]["platform_steps"])
-    merged_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-
-    workspace = DigitalMarketingActivationWorkspaceResponse.model_validate(merged_dict)
-    persisted = await _persist_workspace(record=record, workspace=workspace, db=db)
-    if db is not None:
-        await db.commit()
-    return _build_workspace(persisted)
+    await db.commit()
+    refreshed = hired_agents_simple._db_model_to_record(model)
+    return await _build_response(record=refreshed, db=db)
 
 
-@router.post("/{hired_instance_id}/generate-theme-plan", response_model=ThemePlanResponse)
+@theme_router.post("/{hired_instance_id}/generate-theme-plan", response_model=ThemePlanResponse)
 async def generate_theme_plan(
     hired_instance_id: str,
-    body: dict[str, Any] = Body(default_factory=dict),
+    body: ThemePlanGenerateRequest,
     authorization: Optional[str] = Header(default=None, alias="Authorization"),
-    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
+    db: AsyncSession | None = Depends(hired_agents_simple._get_hired_agents_db_session),
 ) -> ThemePlanResponse:
     _require_auth(authorization)
-    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    record = await hired_agents_simple._get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if record is None:
         raise HTTPException(status_code=404, detail="Hired agent not found.")
 
-    current = _build_workspace(record)
-    merged_dict = _deep_merge(current.model_dump(mode="json"), body)
-    merged_dict["hired_instance_id"] = hired_instance_id
-    merged_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-    workspace = DigitalMarketingActivationWorkspaceResponse.model_validate(merged_dict)
+    if body.customer_id is not None:
+        hired_agents_simple._assert_customer_owns_record(record, body.customer_id)
+    _ensure_supported_record(record)
+
+    workspace = _workspace_from_config(record.config)
+    campaign_setup = dict(body.campaign_setup or {})
 
     try:
         client = get_grok_client()
         proposal = grok_complete(
             client,
             system="You are a digital marketing strategist creating one master theme and a short list of derived campaign themes. Return JSON with master_theme and derived_themes.",
-            user=_theme_prompt(workspace),
+            user=_theme_prompt(workspace, campaign_setup),
             model="grok-3-latest",
             temperature=0.7,
         )
@@ -483,61 +468,28 @@ async def generate_theme_plan(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     master_theme, derived_themes = _parse_theme_plan(proposal)
-    workspace = DigitalMarketingActivationWorkspaceResponse.model_validate(
-        {
-            **workspace.model_dump(mode="json"),
+    campaign_id = await _persist_theme_plan_to_campaign(
+        record=record,
+        workspace=workspace,
+        master_theme=master_theme,
+        derived_themes=derived_themes,
+        campaign_setup=campaign_setup,
+        db=db,
+    )
+    if db is not None:
+        await db.commit()
+
+    return ThemePlanResponse(
+        campaign_id=campaign_id,
+        master_theme=master_theme,
+        derived_themes=derived_themes,
+        workspace={
+            **workspace,
             "campaign_setup": {
-                **workspace.campaign_setup.model_dump(mode="json"),
+                **campaign_setup,
+                "campaign_id": campaign_id,
                 "master_theme": master_theme,
                 "derived_themes": derived_themes,
             },
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
+        },
     )
-    campaign_id = await _persist_theme_plan_to_campaign(record=record, workspace=workspace, db=db)
-    workspace = DigitalMarketingActivationWorkspaceResponse.model_validate(
-        {
-            **workspace.model_dump(mode="json"),
-            "campaign_setup": {
-                **workspace.campaign_setup.model_dump(mode="json"),
-                "campaign_id": campaign_id,
-            },
-        }
-    )
-    persisted = await _persist_workspace(record=record, workspace=workspace, db=db)
-    if db is not None:
-        await db.commit()
-    return _response_from_workspace(_build_workspace(persisted))
-
-
-@router.patch("/{hired_instance_id}/theme-plan", response_model=ThemePlanResponse)
-async def patch_theme_plan(
-    hired_instance_id: str,
-    body: dict[str, Any] = Body(default_factory=dict),
-    authorization: Optional[str] = Header(default=None, alias="Authorization"),
-    db: AsyncSession | None = Depends(_get_hired_agents_db_session),
-) -> ThemePlanResponse:
-    _require_auth(authorization)
-    record = await _get_record_by_id(hired_instance_id=hired_instance_id, db=db)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Hired agent not found.")
-
-    current = _build_workspace(record)
-    merged_dict = _deep_merge(current.model_dump(mode="json"), {"campaign_setup": body})
-    merged_dict["hired_instance_id"] = hired_instance_id
-    merged_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
-    workspace = DigitalMarketingActivationWorkspaceResponse.model_validate(merged_dict)
-    campaign_id = await _persist_theme_plan_to_campaign(record=record, workspace=workspace, db=db)
-    workspace = DigitalMarketingActivationWorkspaceResponse.model_validate(
-        {
-            **workspace.model_dump(mode="json"),
-            "campaign_setup": {
-                **workspace.campaign_setup.model_dump(mode="json"),
-                "campaign_id": campaign_id,
-            },
-        }
-    )
-    persisted = await _persist_workspace(record=record, workspace=workspace, db=db)
-    if db is not None:
-        await db.commit()
-    return _response_from_workspace(_build_workspace(persisted))
