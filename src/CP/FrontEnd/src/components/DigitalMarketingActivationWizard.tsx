@@ -27,9 +27,17 @@ const PLATFORM_OPTIONS = [
 ]
 
 type DigitalMarketingActivationWizardProps = {
-  instance: MyAgentInstanceSummary
+  instance?: MyAgentInstanceSummary | null
+  selectedInstance?: MyAgentInstanceSummary | null
   readOnly: boolean
-  onSaved: (updated: HiredAgentInstance) => void
+  onSaved?: (updated: HiredAgentInstance) => void
+  onSavedInstance?: (patch: {
+    nickname?: string | null
+    configured?: boolean
+    goals_completed?: boolean
+    hired_instance_id?: string | null
+    agent_type_id?: string | null
+  }) => void
 }
 
 function normalizeText(value: unknown): string {
@@ -65,8 +73,9 @@ function buildFallbackDraft(instance: MyAgentInstanceSummary): HiredAgentInstanc
   }
 }
 
-export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }: DigitalMarketingActivationWizardProps) {
+export function DigitalMarketingActivationWizard({ instance, selectedInstance, readOnly, onSaved, onSavedInstance }: DigitalMarketingActivationWizardProps) {
   const navigate = useNavigate()
+  const activeInstance = instance ?? selectedInstance ?? null
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -88,8 +97,8 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
 
   const hiredInstanceId = useMemo(
-    () => String(draft?.hired_instance_id || instance.hired_instance_id || '').trim(),
-    [draft?.hired_instance_id, instance.hired_instance_id]
+    () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
+    [draft?.hired_instance_id, activeInstance?.hired_instance_id]
   )
 
   const loadState = async () => {
@@ -98,13 +107,19 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
     try {
       let nextDraft: HiredAgentInstance
       try {
-        nextDraft = await getHiredAgentBySubscription(instance.subscription_id)
+        if (!activeInstance?.subscription_id) {
+          throw new Error('Missing subscription context for digital marketing activation.')
+        }
+        nextDraft = await getHiredAgentBySubscription(activeInstance.subscription_id)
       } catch (draftError: any) {
         if (draftError?.status !== 404) throw draftError
-        nextDraft = buildFallbackDraft(instance)
+        if (!activeInstance) {
+          throw new Error('Missing hired agent context for digital marketing activation.')
+        }
+        nextDraft = buildFallbackDraft(activeInstance)
       }
 
-      const nextHiredInstanceId = String(nextDraft.hired_instance_id || instance.hired_instance_id || '').trim()
+      const nextHiredInstanceId = String(nextDraft.hired_instance_id || activeInstance?.hired_instance_id || '').trim()
       let nextActivation: DigitalMarketingActivationResponse | null = null
       if (nextHiredInstanceId) {
         nextActivation = await getDigitalMarketingActivationWorkspace(nextHiredInstanceId)
@@ -131,8 +146,14 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
   }
 
   useEffect(() => {
+    if (!activeInstance?.subscription_id) {
+      setDraft(null)
+      setActivation(null)
+      setLoading(false)
+      return
+    }
     void loadState()
-  }, [instance.subscription_id])
+  }, [activeInstance?.subscription_id])
 
   const readiness = activation?.readiness || {
     brief_complete: false,
@@ -161,10 +182,13 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
     setSaveError(null)
 
     try {
-      const resolvedAgentTypeId = String(instance.agent_type_id || draft?.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID).trim() || DIGITAL_MARKETING_AGENT_TYPE_ID
+      if (!activeInstance?.subscription_id || !activeInstance?.agent_id) {
+        throw new Error('Missing hired agent context for digital marketing activation.')
+      }
+      const resolvedAgentTypeId = String(activeInstance.agent_type_id || draft?.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID).trim() || DIGITAL_MARKETING_AGENT_TYPE_ID
       const savedDraft = await upsertHiredAgentDraft({
-        subscription_id: instance.subscription_id,
-        agent_id: instance.agent_id,
+        subscription_id: activeInstance.subscription_id,
+        agent_id: activeInstance.agent_id,
         agent_type_id: resolvedAgentTypeId,
         nickname: nickname.trim(),
         theme: theme.trim(),
@@ -191,7 +215,7 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
         },
       })
 
-      const refreshedDraft = await getHiredAgentBySubscription(instance.subscription_id).catch(() => ({
+      const refreshedDraft = await getHiredAgentBySubscription(activeInstance.subscription_id).catch(() => ({
         ...savedDraft,
         configured: savedActivation.readiness.configured,
       }))
@@ -199,10 +223,17 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
       setDraft(refreshedDraft)
       setActivation(savedActivation)
       setSaveStatus('saved')
-      onSaved({
+      onSaved?.({
         ...refreshedDraft,
         hired_instance_id: savedActivation.hired_instance_id,
         configured: savedActivation.readiness.configured,
+      })
+      onSavedInstance?.({
+        nickname: refreshedDraft.nickname,
+        configured: savedActivation.readiness.configured,
+        goals_completed: refreshedDraft.goals_completed,
+        hired_instance_id: savedActivation.hired_instance_id,
+        agent_type_id: refreshedDraft.agent_type_id,
       })
     } catch (e: any) {
       setSaveError(e?.message || 'Failed to save activation workspace')
@@ -217,6 +248,10 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
       else next.delete(platformKey)
       return Array.from(next)
     })
+  }
+
+  if (!activeInstance) {
+    return <FeedbackMessage intent="warning" title="Activation unavailable" message="Select a hired agent before opening the digital marketing activation workspace." />
   }
 
   if (loading) {
@@ -400,7 +435,7 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <Button
                 appearance="primary"
-                onClick={() => navigate(`/hire/setup/${encodeURIComponent(instance.subscription_id)}?agentId=${encodeURIComponent(instance.agent_id)}&agentTypeId=${encodeURIComponent(String(instance.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID))}&step=3&focus=youtube`)}
+                onClick={() => navigate(`/hire/setup/${encodeURIComponent(activeInstance.subscription_id)}?agentId=${encodeURIComponent(activeInstance.agent_id)}&agentTypeId=${encodeURIComponent(String(activeInstance.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID))}&step=3&focus=youtube`)}
               >
                 Open YouTube setup
               </Button>

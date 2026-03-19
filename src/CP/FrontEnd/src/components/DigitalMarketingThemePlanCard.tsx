@@ -1,6 +1,10 @@
 import { Button, Input, Textarea } from '@fluentui/react-components'
 
-import type { DigitalMarketingDerivedTheme } from '../services/digitalMarketingActivation.service'
+type DigitalMarketingDerivedTheme = {
+  title: string
+  description?: string
+  frequency?: string
+}
 
 export function DigitalMarketingThemePlanCard(props: {
   masterTheme: string

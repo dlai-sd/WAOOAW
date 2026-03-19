@@ -1,19 +1,25 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_mold.skills.content_models import Campaign, CampaignWorkflowState, DailyThemeItem, estimate_cost
+from agent_mold.skills.grok_client import GrokClientError, get_grok_client, grok_complete
+from api.v1 import campaigns as campaigns_module
 from api.v1 import hired_agents_simple
 from api.v1.platform_connections import get_connected_platform_connection
 from core.routing import waooaw_router
+from repositories.campaign_repository import CampaignRepository
 from repositories.hired_agent_repository import HiredAgentRepository
 
 
 router = waooaw_router(prefix="/hired-agents", tags=["digital-marketing-activation"])
+theme_router = waooaw_router(prefix="/digital-marketing-activation", tags=["digital-marketing-activation"])
 
 _WORKSPACE_KEY = "digital_marketing_activation"
 _DIGITAL_MARKETING_AGENT_TYPE = "marketing.digital_marketing.v1"
@@ -40,6 +46,18 @@ class ActivationWorkspaceResponse(BaseModel):
     workspace: dict[str, Any] = Field(default_factory=dict)
     readiness: ActivationReadinessResponse
     updated_at: datetime
+
+
+class ThemePlanGenerateRequest(BaseModel):
+    customer_id: str | None = None
+    campaign_setup: dict[str, Any] = Field(default_factory=dict)
+
+
+class ThemePlanResponse(BaseModel):
+    campaign_id: str | None = None
+    master_theme: str
+    derived_themes: list[dict[str, Any]] = Field(default_factory=list)
+    workspace: dict[str, Any] = Field(default_factory=dict)
 
 
 def _workspace_from_config(config: dict[str, Any] | None) -> dict[str, Any]:
@@ -71,6 +89,11 @@ def _platform_bindings(workspace: dict[str, Any]) -> dict[str, dict[str, Any]]:
         if normalized_key:
             bindings[normalized_key] = dict(value)
     return bindings
+
+
+def _require_auth(authorization: Optional[str]) -> None:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header required.")
 
 
 def _materialize_marketing_config(
@@ -115,6 +138,157 @@ def _materialize_marketing_config(
         config["platform_credentials"] = platform_credentials
 
     return config
+
+
+def _theme_prompt(workspace: dict[str, Any], campaign_setup: dict[str, Any]) -> str:
+    return json.dumps(
+        {
+            "brand_name": workspace.get("brand_name") or "",
+            "offerings_services": workspace.get("offerings_services") or [],
+            "location": workspace.get("location") or "",
+            "selected_platforms": _selected_platforms(workspace),
+            "schedule": dict(campaign_setup.get("schedule") or {}),
+            "business_context": workspace.get("business_context") or "",
+        },
+        ensure_ascii=False,
+    )
+
+
+def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
+    cleaned = str(raw_text or "").strip()
+    if not cleaned:
+        return "Digital marketing activation plan", []
+    try:
+        payload = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return cleaned.splitlines()[0][:120] or "Digital marketing activation plan", []
+
+    if not isinstance(payload, dict):
+        return "Digital marketing activation plan", []
+
+    master_theme = str(payload.get("master_theme") or payload.get("theme") or "Digital marketing activation plan").strip()
+    derived = payload.get("derived_themes")
+    if not isinstance(derived, list):
+        derived = []
+
+    normalized: list[dict[str, Any]] = []
+    for row in derived:
+        row_dict = dict(row or {})
+        title = str(row_dict.get("title") or "").strip()
+        if not title:
+            continue
+        normalized.append(
+            {
+                "title": title,
+                "description": str(row_dict.get("description") or "").strip(),
+                "frequency": str(row_dict.get("frequency") or "weekly").strip() or "weekly",
+            }
+        )
+    return master_theme or "Digital marketing activation plan", normalized
+
+
+async def _persist_theme_plan_to_campaign(
+    *,
+    record: hired_agents_simple._HiredAgentRecord,
+    workspace: dict[str, Any],
+    master_theme: str,
+    derived_themes: list[dict[str, Any]],
+    campaign_setup: dict[str, Any],
+    db: AsyncSession | None,
+) -> str:
+    activation_payload = {
+        "induction": {
+            "nickname": record.nickname,
+            "theme": record.theme,
+            "primary_language": workspace.get("primary_language") or dict(record.config or {}).get("primary_language") or "en",
+            "timezone": workspace.get("timezone") or dict(record.config or {}).get("timezone") or "",
+            "brand_name": workspace.get("brand_name") or dict(record.config or {}).get("brand_name") or "",
+            "offerings_services": workspace.get("offerings_services") or dict(record.config or {}).get("offerings_services") or [],
+            "location": workspace.get("location") or dict(record.config or {}).get("location") or "",
+            "target_audience": workspace.get("target_audience") or "",
+            "notes": workspace.get("business_context") or "",
+        },
+        "selected_platforms": _selected_platforms(workspace),
+        "theme_plan": {
+            "master_theme": master_theme,
+            "derived_themes": derived_themes,
+        },
+        "schedule": dict(campaign_setup.get("schedule") or {}),
+    }
+    brief = campaigns_module.build_campaign_brief_from_activation_payload(activation_payload)
+    cost_estimate = estimate_cost(brief, model_used="grok-3-latest")
+
+    if db is None or campaigns_module.CAMPAIGN_PERSISTENCE_MODE != "db":
+        existing = next(
+            (
+                campaign
+                for campaign in campaigns_module._campaigns.values()
+                if campaign.hired_instance_id == record.hired_instance_id
+                and campaign.status == campaigns_module.CampaignStatus.DRAFT
+            ),
+            None,
+        )
+        if existing is None:
+            campaign = Campaign(
+                hired_instance_id=record.hired_instance_id,
+                customer_id=str(record.customer_id or ""),
+                brief=brief,
+                cost_estimate=cost_estimate,
+            )
+        else:
+            campaign = existing.model_copy(
+                update={
+                    "brief": brief,
+                    "cost_estimate": cost_estimate,
+                    "workflow_state": CampaignWorkflowState.BRIEF_CAPTURED,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            )
+
+        theme_items = [
+            DailyThemeItem.model_validate(item)
+            for item in campaigns_module.build_theme_items_from_activation_payload(
+                campaign_id=campaign.campaign_id,
+                payload=activation_payload,
+            )
+        ]
+        campaigns_module._campaigns[campaign.campaign_id] = campaigns_module._enrich_campaign_runtime(
+            campaign,
+            theme_items=theme_items,
+            posts=[],
+        )
+        campaigns_module._theme_items[campaign.campaign_id] = {
+            item.theme_item_id: item for item in theme_items
+        }
+        campaigns_module._posts[campaign.campaign_id] = {}
+        return campaign.campaign_id
+
+    repo = CampaignRepository(db)
+    existing_campaign = await repo.get_active_draft_campaign_by_hired_instance(record.hired_instance_id)
+    if existing_campaign is None:
+        existing_campaign = await repo.create_campaign(
+            hired_instance_id=record.hired_instance_id,
+            customer_id=str(record.customer_id or ""),
+            brief=brief.model_dump(mode="json"),
+            cost_estimate=cost_estimate.model_dump(mode="json"),
+        )
+    else:
+        existing_campaign = await repo.update_campaign_brief(
+            existing_campaign.campaign_id,
+            brief=brief.model_dump(mode="json"),
+            cost_estimate=cost_estimate.model_dump(mode="json"),
+            workflow_state=CampaignWorkflowState.BRIEF_CAPTURED.value,
+            brief_summary=campaigns_module._build_brief_summary(brief).model_dump(mode="json"),
+        )
+    await repo.replace_theme_items(
+        existing_campaign.campaign_id,
+        campaigns_module.build_theme_items_from_activation_payload(
+            campaign_id=existing_campaign.campaign_id,
+            payload=activation_payload,
+        ),
+    )
+    await campaigns_module._persist_campaign_runtime(repo, existing_campaign.campaign_id)
+    return existing_campaign.campaign_id
 
 
 def _ensure_supported_record(record: hired_agents_simple._HiredAgentRecord) -> None:
@@ -258,3 +432,64 @@ async def upsert_activation_workspace(
     await db.commit()
     refreshed = hired_agents_simple._db_model_to_record(model)
     return await _build_response(record=refreshed, db=db)
+
+
+@theme_router.post("/{hired_instance_id}/generate-theme-plan", response_model=ThemePlanResponse)
+async def generate_theme_plan(
+    hired_instance_id: str,
+    body: ThemePlanGenerateRequest,
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: AsyncSession | None = Depends(hired_agents_simple._get_hired_agents_db_session),
+) -> ThemePlanResponse:
+    _require_auth(authorization)
+    record = await hired_agents_simple._get_record_by_id(hired_instance_id=hired_instance_id, db=db)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Hired agent not found.")
+
+    if body.customer_id is not None:
+        hired_agents_simple._assert_customer_owns_record(record, body.customer_id)
+    _ensure_supported_record(record)
+
+    workspace = _workspace_from_config(record.config)
+    campaign_setup = dict(body.campaign_setup or {})
+
+    try:
+        client = get_grok_client()
+        proposal = grok_complete(
+            client,
+            system="You are a digital marketing strategist creating one master theme and a short list of derived campaign themes. Return JSON with master_theme and derived_themes.",
+            user=_theme_prompt(workspace, campaign_setup),
+            model="grok-3-latest",
+            temperature=0.7,
+        )
+    except GrokClientError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    master_theme, derived_themes = _parse_theme_plan(proposal)
+    campaign_id = await _persist_theme_plan_to_campaign(
+        record=record,
+        workspace=workspace,
+        master_theme=master_theme,
+        derived_themes=derived_themes,
+        campaign_setup=campaign_setup,
+        db=db,
+    )
+    if db is not None:
+        await db.commit()
+
+    return ThemePlanResponse(
+        campaign_id=campaign_id,
+        master_theme=master_theme,
+        derived_themes=derived_themes,
+        workspace={
+            **workspace,
+            "campaign_setup": {
+                **campaign_setup,
+                "campaign_id": campaign_id,
+                "master_theme": master_theme,
+                "derived_themes": derived_themes,
+            },
+        },
+    )
