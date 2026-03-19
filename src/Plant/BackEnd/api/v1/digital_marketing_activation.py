@@ -221,6 +221,44 @@ def _build_theme_plan_workspace(
     }
 
 
+async def _persist_workspace_state(
+    *,
+    record: hired_agents_simple._HiredAgentRecord,
+    workspace: dict[str, Any],
+    db: AsyncSession | None,
+) -> hired_agents_simple._HiredAgentRecord:
+    materialized_config = _materialize_marketing_config(
+        existing_config=dict(record.config or {}),
+        workspace=workspace,
+    )
+    configured = hired_agents_simple._compute_agent_configured(
+        record.nickname,
+        record.theme,
+        agent_id=record.agent_id,
+        config=materialized_config,
+    )
+    now = datetime.now(timezone.utc)
+
+    if db is None:
+        updated = record.model_copy(
+            update={
+                "config": materialized_config,
+                "configured": configured,
+                "updated_at": now,
+            }
+        )
+        hired_agents_simple._by_id[record.hired_instance_id] = updated
+        return updated
+
+    repo = HiredAgentRepository(db)
+    model = await repo.update_config(
+        record.hired_instance_id,
+        config=materialized_config,
+        configured=configured,
+    )
+    return hired_agents_simple._db_model_to_record(model)
+
+
 async def _persist_theme_plan_to_campaign(
     *,
     record: hired_agents_simple._HiredAgentRecord,
@@ -501,6 +539,18 @@ async def generate_theme_plan(
         campaign_setup=campaign_setup,
         db=db,
     )
+    persisted_workspace = _build_theme_plan_workspace(
+        workspace=workspace,
+        campaign_setup=campaign_setup,
+        campaign_id=campaign_id,
+        master_theme=master_theme,
+        derived_themes=derived_themes,
+    )
+    await _persist_workspace_state(
+        record=record,
+        workspace=persisted_workspace,
+        db=db,
+    )
     if db is not None:
         await db.commit()
 
@@ -508,13 +558,7 @@ async def generate_theme_plan(
         campaign_id=campaign_id,
         master_theme=master_theme,
         derived_themes=derived_themes,
-        workspace=_build_theme_plan_workspace(
-            workspace=workspace,
-            campaign_setup=campaign_setup,
-            campaign_id=campaign_id,
-            master_theme=master_theme,
-            derived_themes=derived_themes,
-        ),
+        workspace=persisted_workspace,
     )
 
 
@@ -549,6 +593,18 @@ async def update_theme_plan(
         campaign_setup=campaign_setup,
         db=db,
     )
+    persisted_workspace = _build_theme_plan_workspace(
+        workspace=workspace,
+        campaign_setup=campaign_setup,
+        campaign_id=campaign_id,
+        master_theme=master_theme,
+        derived_themes=derived_themes,
+    )
+    await _persist_workspace_state(
+        record=record,
+        workspace=persisted_workspace,
+        db=db,
+    )
     if db is not None:
         await db.commit()
 
@@ -557,11 +613,5 @@ async def update_theme_plan(
         campaign_id=campaign_id,
         master_theme=master_theme,
         derived_themes=derived_themes,
-        workspace=_build_theme_plan_workspace(
-            workspace=workspace,
-            campaign_setup=campaign_setup,
-            campaign_id=campaign_id,
-            master_theme=master_theme,
-            derived_themes=derived_themes,
-        ),
+        workspace=persisted_workspace,
     )

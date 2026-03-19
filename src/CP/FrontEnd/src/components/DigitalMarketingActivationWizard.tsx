@@ -4,14 +4,19 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { FeedbackMessage, LoadingIndicator, ProgressIndicator, SaveIndicator } from './FeedbackIndicators'
 import { PlatformConnectionsPanel } from './PlatformConnectionsPanel'
+import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
 import {
   buildMarketingPlatformBindings,
+  generateDigitalMarketingThemePlan,
   getActivationMilestoneCount,
   getDigitalMarketingActivationWorkspace,
   getSelectedMarketingPlatforms,
+  patchDigitalMarketingThemePlan,
   upsertDigitalMarketingActivationWorkspace,
+  type DigitalMarketingCampaignSchedule,
+  type DigitalMarketingDerivedTheme,
   type DigitalMarketingActivationResponse,
 } from '../services/digitalMarketingActivation.service'
 
@@ -82,6 +87,7 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showHelp, setShowHelp] = useState(false)
+  const [activeMilestone, setActiveMilestone] = useState<'induct' | 'prepare' | 'theme' | 'schedule'>('induct')
 
   const [draft, setDraft] = useState<HiredAgentInstance | null>(null)
   const [activation, setActivation] = useState<DigitalMarketingActivationResponse | null>(null)
@@ -95,11 +101,26 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const [businessContext, setBusinessContext] = useState('')
   const [offeringsText, setOfferingsText] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [masterTheme, setMasterTheme] = useState('')
+  const [derivedThemes, setDerivedThemes] = useState<DigitalMarketingDerivedTheme[]>([])
+  const [themePlanLoading, setThemePlanLoading] = useState(false)
+  const [themePlanSaving, setThemePlanSaving] = useState(false)
+  const [themePlanError, setThemePlanError] = useState<string | null>(null)
 
   const hiredInstanceId = useMemo(
     () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
     [draft?.hired_instance_id, activeInstance?.hired_instance_id]
   )
+
+  const campaignSetup = activation?.workspace.campaign_setup || {}
+  const schedule = campaignSetup.schedule || {}
+
+  const applyThemePlanState = (workspace: DigitalMarketingActivationResponse['workspace'] | Record<string, unknown> | null | undefined) => {
+    const resolvedWorkspace = (workspace || {}) as DigitalMarketingActivationResponse['workspace']
+    const nextCampaignSetup = resolvedWorkspace.campaign_setup || {}
+    setMasterTheme(String(nextCampaignSetup.master_theme || ''))
+    setDerivedThemes(Array.isArray(nextCampaignSetup.derived_themes) ? nextCampaignSetup.derived_themes : [])
+  }
 
   const loadState = async () => {
     setLoading(true)
@@ -136,8 +157,10 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
       setBusinessContext(normalizeText(nextActivation?.workspace.business_context))
       setOfferingsText(formatListForTextarea(nextActivation?.workspace.offerings_services))
       setSelectedPlatforms(getSelectedMarketingPlatforms(nextActivation?.workspace))
+      applyThemePlanState(nextActivation?.workspace)
       setSaveStatus('idle')
       setSaveError(null)
+      setThemePlanError(null)
     } catch (e: any) {
       setError(e?.message || 'Failed to load activation workspace')
     } finally {
@@ -165,6 +188,7 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   }
 
   const milestoneCount = getActivationMilestoneCount(readiness)
+  const completedMilestones = milestoneCount + (masterTheme.trim() ? 1 : 0)
   const missingProfileFields = useMemo(() => {
     const items: string[] = []
     if (!brandName.trim()) items.push('brand name')
@@ -250,6 +274,77 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
     })
   }
 
+  const applyThemePlanResponse = (response: { workspace?: unknown; master_theme?: string; derived_themes?: DigitalMarketingDerivedTheme[] }) => {
+    const responseWorkspace = ((response.workspace as any)?.workspace || response.workspace || {}) as DigitalMarketingActivationResponse['workspace']
+    const nextWorkspace = {
+      ...(activation?.workspace || {}),
+      ...responseWorkspace,
+      campaign_setup: {
+        ...(activation?.workspace.campaign_setup || {}),
+        ...(responseWorkspace?.campaign_setup || {}),
+      },
+    }
+    setActivation((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        workspace: nextWorkspace,
+      }
+    })
+    setMasterTheme(String(response.master_theme || nextWorkspace.campaign_setup?.master_theme || ''))
+    setDerivedThemes(Array.isArray(response.derived_themes) ? response.derived_themes : nextWorkspace.campaign_setup?.derived_themes || [])
+  }
+
+  const generateThemePlan = async () => {
+    if (!hiredInstanceId) return
+    setThemePlanLoading(true)
+    setThemePlanError(null)
+    try {
+      const response = await generateDigitalMarketingThemePlan(hiredInstanceId, {
+        campaign_setup: {
+          schedule,
+        },
+      })
+      applyThemePlanResponse(response)
+      setActiveMilestone('theme')
+    } catch (e: any) {
+      setThemePlanError(e?.message || 'Failed to generate theme plan.')
+    } finally {
+      setThemePlanLoading(false)
+    }
+  }
+
+  const saveThemePlan = async () => {
+    if (!hiredInstanceId) return
+    setThemePlanSaving(true)
+    setThemePlanError(null)
+    try {
+      const response = await patchDigitalMarketingThemePlan(hiredInstanceId, {
+        master_theme: masterTheme.trim(),
+        derived_themes: derivedThemes,
+        campaign_setup: {
+          campaign_id: campaignSetup.campaign_id,
+          schedule,
+        },
+      })
+      applyThemePlanResponse(response)
+    } catch (e: any) {
+      setThemePlanError(e?.message || 'Failed to save theme plan.')
+    } finally {
+      setThemePlanSaving(false)
+    }
+  }
+
+  const updateDerivedTheme = (index: number, field: keyof DigitalMarketingDerivedTheme, value: string) => {
+    setDerivedThemes((current) =>
+      current.map((theme, themeIndex) => (themeIndex === index ? { ...theme, [field]: value } : theme))
+    )
+  }
+
+  const addDerivedTheme = () => {
+    setDerivedThemes((current) => [...current, { title: `Derived theme ${current.length + 1}`, description: '', frequency: 'weekly' }])
+  }
+
   if (!activeInstance) {
     return <FeedbackMessage intent="warning" title="Activation unavailable" message="Select a hired agent before opening the digital marketing activation workspace." />
   }
@@ -292,10 +387,27 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
           </div>
         </div>
 
-        <ProgressIndicator current={milestoneCount} total={3} label="Activation milestones" />
+        <ProgressIndicator current={completedMilestones} total={4} label="Activation milestones" />
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {[
+            ['induct', 'Induct Agent'],
+            ['prepare', 'Prepare Agent'],
+            ['theme', 'Master Theme'],
+            ['schedule', 'Confirm Schedule'],
+          ].map(([key, label]) => (
+            <Button
+              key={key}
+              appearance={activeMilestone === key ? 'primary' : 'secondary'}
+              onClick={() => setActiveMilestone(key as 'induct' | 'prepare' | 'theme' | 'schedule')}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
 
         {showHelp ? (
-          <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
+          <div data-testid="dma-help-panel-primary" style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
             Save this workspace whenever you update the business brief or channel choices. If YouTube is selected, use the setup shortcut below once and then refresh this page so the backend can verify the channel attachment for this hire.
           </div>
         ) : null}
@@ -454,6 +566,39 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
             </div>
             <PlatformConnectionsPanel hiredInstanceId={hiredInstanceId} readOnly={readOnly} />
           </div>
+        ) : null}
+      </Card>
+
+      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div>
+          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Step 4</div>
+          <h4 style={{ margin: '0.35rem 0 0' }}>Master Theme</h4>
+          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Generate a persisted campaign theme plan, review the derived themes, and save manual revisions back through the activation API.</div>
+        </div>
+
+        {showHelp ? (
+          <div data-testid="dma-help-panel-secondary" style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
+            Generate a first draft from the saved induction brief, then edit the master theme or derived themes before saving. Use Refresh status after saving to confirm the persisted plan reloads from the backend.
+          </div>
+        ) : null}
+
+        {themePlanLoading ? <LoadingIndicator message="Generating theme plan..." size="small" /> : null}
+        {!themePlanLoading && themePlanError ? <FeedbackMessage intent="error" title="Theme plan unavailable" message={themePlanError} /> : null}
+
+        {!themePlanLoading ? (
+          <DigitalMarketingThemePlanCard
+            masterTheme={masterTheme}
+            derivedThemes={derivedThemes}
+            editable={!readOnly}
+            saving={themePlanSaving}
+            error={themePlanError}
+            onMasterThemeChange={setMasterTheme}
+            onDerivedThemeChange={updateDerivedTheme}
+            onAddDerivedTheme={addDerivedTheme}
+            onGenerate={() => void generateThemePlan()}
+            onRegenerate={masterTheme.trim() || derivedThemes.length > 0 ? () => void generateThemePlan() : undefined}
+            onSave={() => void saveThemePlan()}
+          />
         ) : null}
       </Card>
 

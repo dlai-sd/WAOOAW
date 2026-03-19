@@ -191,3 +191,44 @@ def test_patch_theme_plan_persists_manual_revisions_into_same_draft(test_client,
     assert body["master_theme"] == "Trust-first launch revised"
     assert len(body["derived_themes"]) == 2
     assert len(campaigns_module._theme_items[campaign_id]) == 2
+
+
+@pytest.mark.unit
+def test_get_workspace_returns_persisted_theme_plan_after_generation(test_client, monkeypatch):
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    customer_id = "cust-dma-4"
+    hired_instance_id = _create_marketing_hire(test_client, customer_id=customer_id)
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(
+        dma_module,
+        "grok_complete",
+        lambda *args, **kwargs: json.dumps(
+            {
+                "master_theme": "Trust-first launch persisted",
+                "derived_themes": [{"title": "Week 1", "description": "Initial theme", "frequency": "weekly"}],
+            }
+        ),
+    )
+
+    generated = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={"customer_id": customer_id, "campaign_setup": {"schedule": {"start_date": "2026-03-22", "posts_per_week": 2}}},
+    )
+    assert generated.status_code == 200, generated.text
+
+    refreshed = test_client.get(
+        f"/api/v1/hired-agents/{hired_instance_id}/digital-marketing-activation",
+        params={"customer_id": customer_id},
+    )
+
+    assert refreshed.status_code == 200, refreshed.text
+    campaign_setup = refreshed.json()["workspace"]["campaign_setup"]
+    assert campaign_setup["master_theme"] == "Trust-first launch persisted"
+    assert len(campaign_setup["derived_themes"]) == 1
