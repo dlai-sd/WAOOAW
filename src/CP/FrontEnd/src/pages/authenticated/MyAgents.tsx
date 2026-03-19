@@ -30,6 +30,7 @@ import { DigitalMarketingBriefSummaryCard } from '../../components/DigitalMarket
 import { DigitalMarketingApprovalCard } from '../../components/DigitalMarketingApprovalCard'
 import { DigitalMarketingChannelStatusCard } from '../../components/DigitalMarketingChannelStatusCard'
 import { DigitalMarketingPublishReadinessCard } from '../../components/DigitalMarketingPublishReadinessCard'
+import { DigitalMarketingActivationWizard } from '../../components/DigitalMarketingActivationWizard'
 import { SkillsPanel } from '../../components/SkillsPanel'
 import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
 import { listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
@@ -1996,6 +1997,51 @@ function ActivationStudioPanel(props: {
       : 'Finish the earlier steps before the activation review is unlocked.'
   })()
 
+  if (isMarketingInstance) {
+    return (
+      <div className="my-agents-activation-shell" data-testid="cp-my-agents-digital-marketing-wizard">
+        <div className="my-agents-activation-hero">
+          <div>
+            <div className="my-agents-activation-kicker">Activation studio</div>
+            <h3 className="my-agents-activation-title">Guide one Digital Marketing hire from induction to runtime-ready launch inside My Agents.</h3>
+            <p className="my-agents-activation-body">
+              Select the hire first, then move through induction, platform preparation, theme planning, and schedule confirmation without losing saved progress.
+            </p>
+          </div>
+          <div className="my-agents-activation-hero-note">
+            <div className="my-agents-activation-rail-note-title">Wizard status</div>
+            <p>Each milestone saves back to the activation workspace so customers can leave and resume later.</p>
+            <Button appearance="subtle" onClick={onOpenDetailedWorkspace}>
+              Open detailed workspace
+            </Button>
+          </div>
+        </div>
+
+        <div className="cp-agent-studio-selector">
+          <div style={{ minWidth: 0, width: '100%', maxWidth: '520px', flex: '1 1 280px' }}>
+            <AgentSelector
+              agents={instances}
+              selectedId={instance?.subscription_id || ''}
+              onChange={onSelectSubscriptionId}
+              disabled={readOnly}
+              label="Selected hire"
+              helperText={selectionHelperText}
+              required
+            />
+          </div>
+        </div>
+
+        <Card className="cp-agent-studio-canvas-card">
+          <DigitalMarketingActivationWizard
+            selectedInstance={instance}
+            readOnly={readOnly}
+            onSavedInstance={(patch) => onSavedInstance(patch as any)}
+          />
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="my-agents-activation-shell" data-testid="cp-my-agents-activation-studio">
       <div className="my-agents-activation-hero">
@@ -2698,42 +2744,67 @@ export default function MyAgents({
                       Update this agent’s configuration and connected accounts.
                     </div>
 
-                    <ConfigureAgentPanel
-                      instance={selectedInstance}
-                      readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-                      onSaved={(updated) => {
-                        setInstances((prev) =>
-                          prev.map((x) =>
-                            x.subscription_id === selectedInstance.subscription_id
-                              ? {
-                                  ...x,
-                                  nickname: updated.nickname ?? x.nickname,
-                                  configured: updated.configured ?? x.configured,
-                                  goals_completed: updated.goals_completed ?? x.goals_completed,
-                                  hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
-                                  agent_type_id: updated.agent_type_id ?? x.agent_type_id,
-                                  catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
-                                  internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
-                                  external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
-                                  catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
-                                }
-                              : x
+                    {isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
+                      <DigitalMarketingActivationWizard
+                        selectedInstance={selectedInstance}
+                        readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                        onSavedInstance={(updated) => {
+                          setInstances((prev) =>
+                            prev.map((x) =>
+                              x.subscription_id === selectedInstance.subscription_id
+                                ? {
+                                    ...x,
+                                    nickname: updated.nickname ?? x.nickname,
+                                    configured: updated.configured ?? x.configured,
+                                    goals_completed: updated.goals_completed ?? x.goals_completed,
+                                    hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
+                                    agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                                  }
+                                : x
+                            )
                           )
-                        )
-                      }}
-                    />
-
-                    {selectedInstance.hired_instance_id && (
-                      <div style={{ marginTop: '1.25rem' }}>
-                        <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Platform Connections</div>
-                        <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', opacity: 0.75 }}>
-                          Connect external platforms your agent needs to do its work.
-                        </div>
-                        <PlatformConnectionsPanel
-                          hiredInstanceId={String(selectedInstance.hired_instance_id)}
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <ConfigureAgentPanel
+                          instance={selectedInstance}
                           readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                          onSaved={(updated) => {
+                            setInstances((prev) =>
+                              prev.map((x) =>
+                                x.subscription_id === selectedInstance.subscription_id
+                                  ? {
+                                      ...x,
+                                      nickname: updated.nickname ?? x.nickname,
+                                      configured: updated.configured ?? x.configured,
+                                      goals_completed: updated.goals_completed ?? x.goals_completed,
+                                      hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
+                                      agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                                      catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
+                                      internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
+                                      external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
+                                      catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
+                                    }
+                                  : x
+                              )
+                            )
+                          }}
                         />
-                      </div>
+
+                        {selectedInstance.hired_instance_id && (
+                          <div style={{ marginTop: '1.25rem' }}>
+                            <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Platform Connections</div>
+                            <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', opacity: 0.75 }}>
+                              Connect external platforms your agent needs to do its work.
+                            </div>
+                            <PlatformConnectionsPanel
+                              hiredInstanceId={String(selectedInstance.hired_instance_id)}
+                              readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                            />
+                          </div>
+                        )}
+                      </>
                     )}
                   </>
                 ) : null}
