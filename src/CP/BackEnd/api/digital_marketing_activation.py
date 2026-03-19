@@ -59,6 +59,10 @@ class ActivationWorkspaceUpsertRequest(BaseModel):
     workspace: dict[str, Any] = Field(default_factory=dict)
 
 
+class ThemePlanGenerateRequest(BaseModel):
+    campaign_setup: dict[str, Any] = Field(default_factory=dict)
+
+
 @router.get("/{hired_instance_id}")
 async def get_activation_workspace(
     hired_instance_id: str,
@@ -96,6 +100,31 @@ async def upsert_activation_workspace(
             json_body={
                 "customer_id": _customer_id_from_user(current_user),
                 "workspace": body.workspace,
+            },
+        )
+    except ServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    _raise_for_gateway_response(resp)
+    return resp.json if isinstance(resp.json, dict) else {"detail": resp.json}
+
+
+@router.post("/{hired_instance_id}/generate-theme-plan")
+async def generate_theme_plan(
+    hired_instance_id: str,
+    body: ThemePlanGenerateRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
+    try:
+        resp = await plant.request_json(
+            method="POST",
+            path=f"api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+            headers=_forward_headers(request),
+            json_body={
+                **body.model_dump(mode="json", exclude_none=True),
+                "customer_id": _customer_id_from_user(current_user),
             },
         )
     except ServiceUnavailableError as exc:
