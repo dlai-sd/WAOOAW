@@ -212,6 +212,44 @@ class CampaignRepository:
         await self.session.refresh(existing)
         return existing
 
+    async def upsert_draft_campaign_with_theme_items(
+        self,
+        *,
+        hired_instance_id: str,
+        customer_id: str,
+        brief: dict[str, Any],
+        cost_estimate: dict[str, Any],
+        theme_items: list[dict[str, Any]],
+        workflow_state: str = "brief_captured",
+        brief_summary: dict[str, Any] | None = None,
+    ) -> CampaignModel:
+        """Create or update the single active draft campaign for a hired instance.
+
+        This keeps DMA setup on one reusable draft campaign while replacing the
+        derived theme list in the same session transaction.
+        """
+        existing = await self.get_active_draft_campaign_by_hired_instance(hired_instance_id)
+        if existing is None:
+            campaign = await self.create_campaign(
+                hired_instance_id=hired_instance_id,
+                customer_id=customer_id,
+                brief=brief,
+                cost_estimate=cost_estimate,
+                workflow_state=workflow_state,
+                brief_summary=brief_summary,
+            )
+        else:
+            campaign = await self.update_campaign_brief(
+                existing.campaign_id,
+                brief=brief,
+                cost_estimate=cost_estimate,
+                workflow_state=workflow_state,
+                brief_summary=brief_summary,
+            )
+
+        await self.replace_theme_items(campaign.campaign_id, theme_items)
+        return campaign
+
     async def delete_campaign(self, campaign_id: str) -> bool:
         """Delete a campaign and its dependent rows (cascade).
 

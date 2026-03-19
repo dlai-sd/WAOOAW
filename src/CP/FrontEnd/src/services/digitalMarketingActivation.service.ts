@@ -30,6 +30,13 @@ export type DigitalMarketingCampaignSchedule = {
   preferred_hours_utc: number[]
 }
 
+export type DigitalMarketingCampaignSetup = {
+  campaign_id?: string | null
+  master_theme?: string
+  derived_themes?: DigitalMarketingDerivedTheme[]
+  schedule?: Partial<DigitalMarketingCampaignSchedule>
+}
+
 export type DigitalMarketingLegacyWorkspace = {
   hired_instance_id: string
   help_visible?: boolean
@@ -67,6 +74,8 @@ export type DigitalMarketingThemePlanResponse = {
 }
 
 export type DigitalMarketingActivationWorkspace = {
+  help_visible?: boolean
+  activation_complete?: boolean
   brand_name?: string
   location?: string
   primary_language?: string
@@ -76,6 +85,7 @@ export type DigitalMarketingActivationWorkspace = {
   platforms_enabled?: string[]
   selected_platforms?: string[]
   platform_bindings?: Record<string, DigitalMarketingPlatformBinding>
+  campaign_setup?: DigitalMarketingCampaignSetup
 }
 
 export type DigitalMarketingActivationReadiness = {

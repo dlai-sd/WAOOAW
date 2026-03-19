@@ -344,8 +344,12 @@ def test_build_campaign_brief_from_activation_payload_maps_theme_cadence_and_des
     )
 
     assert brief.theme == "AI agents that earn trust first"
+    assert brief.start_date.isoformat() == "2026-03-22"
+    assert brief.schedule.preferred_hours_utc == [9, 17]
     assert brief.theme_discovery is not None
     assert brief.theme_discovery.posting_cadence.posts_per_week == 3
+    assert brief.theme_discovery.posting_cadence.preferred_days == ["mon", "wed", "fri"]
+    assert brief.theme_discovery.posting_cadence.preferred_hours_utc == [9, 17]
     assert [destination.destination_type for destination in brief.destinations] == ["youtube", "instagram"]
 
 

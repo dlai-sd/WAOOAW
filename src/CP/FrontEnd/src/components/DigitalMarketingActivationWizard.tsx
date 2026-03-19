@@ -4,14 +4,19 @@ import { useEffect, useMemo, useState } from 'react'
 
 import { FeedbackMessage, LoadingIndicator, ProgressIndicator, SaveIndicator } from './FeedbackIndicators'
 import { PlatformConnectionsPanel } from './PlatformConnectionsPanel'
+import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
 import {
   buildMarketingPlatformBindings,
+  generateDigitalMarketingThemePlan,
   getActivationMilestoneCount,
   getDigitalMarketingActivationWorkspace,
   getSelectedMarketingPlatforms,
+  patchDigitalMarketingThemePlan,
   upsertDigitalMarketingActivationWorkspace,
+  type DigitalMarketingCampaignSchedule,
+  type DigitalMarketingDerivedTheme,
   type DigitalMarketingActivationResponse,
 } from '../services/digitalMarketingActivation.service'
 
@@ -59,6 +64,17 @@ function parseListTextarea(value: string): string[] {
     .filter(Boolean)
 }
 
+function parseHourList(value: string): number[] {
+  return String(value || '')
+    .split(/\n|,/g)
+    .map((entry) => Number(entry.trim()))
+    .filter((entry) => Number.isFinite(entry) && entry >= 0 && entry <= 23)
+}
+
+function formatHours(value: unknown): string {
+  return Array.isArray(value) ? value.map((entry) => String(entry)).join(', ') : ''
+}
+
 function buildFallbackDraft(instance: MyAgentInstanceSummary): HiredAgentInstance {
   return {
     subscription_id: instance.subscription_id,
@@ -82,6 +98,7 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showHelp, setShowHelp] = useState(false)
+  const [activeMilestone, setActiveMilestone] = useState<'induct' | 'prepare' | 'theme' | 'schedule'>('induct')
 
   const [draft, setDraft] = useState<HiredAgentInstance | null>(null)
   const [activation, setActivation] = useState<DigitalMarketingActivationResponse | null>(null)
@@ -95,11 +112,44 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const [businessContext, setBusinessContext] = useState('')
   const [offeringsText, setOfferingsText] = useState('')
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [masterTheme, setMasterTheme] = useState('')
+  const [derivedThemes, setDerivedThemes] = useState<DigitalMarketingDerivedTheme[]>([])
+  const [themePlanLoading, setThemePlanLoading] = useState(false)
+  const [themePlanSaving, setThemePlanSaving] = useState(false)
+  const [themePlanError, setThemePlanError] = useState<string | null>(null)
+  const [scheduleStartDate, setScheduleStartDate] = useState('')
+  const [postsPerWeek, setPostsPerWeek] = useState('')
+  const [preferredDaysText, setPreferredDaysText] = useState('')
+  const [preferredHoursText, setPreferredHoursText] = useState('')
+  const [finishStatus, setFinishStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
+  const [finishError, setFinishError] = useState<string | null>(null)
 
   const hiredInstanceId = useMemo(
     () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
     [draft?.hired_instance_id, activeInstance?.hired_instance_id]
   )
+
+  const campaignSetup = activation?.workspace.campaign_setup || {}
+  const schedule = campaignSetup.schedule || {}
+
+  const normalizedSchedule: DigitalMarketingCampaignSchedule = {
+    start_date: scheduleStartDate.trim(),
+    posts_per_week: Math.max(Number(postsPerWeek || 0), 0),
+    preferred_days: parseListTextarea(preferredDaysText),
+    preferred_hours_utc: parseHourList(preferredHoursText),
+  }
+
+  const applyThemePlanState = (workspace: DigitalMarketingActivationResponse['workspace'] | Record<string, unknown> | null | undefined) => {
+    const resolvedWorkspace = (workspace || {}) as DigitalMarketingActivationResponse['workspace']
+    const nextCampaignSetup = resolvedWorkspace.campaign_setup || {}
+    const nextSchedule = nextCampaignSetup.schedule || {}
+    setMasterTheme(String(nextCampaignSetup.master_theme || ''))
+    setDerivedThemes(Array.isArray(nextCampaignSetup.derived_themes) ? nextCampaignSetup.derived_themes : [])
+    setScheduleStartDate(String(nextSchedule.start_date || ''))
+    setPostsPerWeek(String(nextSchedule.posts_per_week || ''))
+    setPreferredDaysText(Array.isArray(nextSchedule.preferred_days) ? nextSchedule.preferred_days.join(', ') : '')
+    setPreferredHoursText(formatHours(nextSchedule.preferred_hours_utc))
+  }
 
   const loadState = async () => {
     setLoading(true)
@@ -136,8 +186,12 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
       setBusinessContext(normalizeText(nextActivation?.workspace.business_context))
       setOfferingsText(formatListForTextarea(nextActivation?.workspace.offerings_services))
       setSelectedPlatforms(getSelectedMarketingPlatforms(nextActivation?.workspace))
+      applyThemePlanState(nextActivation?.workspace)
       setSaveStatus('idle')
       setSaveError(null)
+      setThemePlanError(null)
+      setFinishStatus('idle')
+      setFinishError(null)
     } catch (e: any) {
       setError(e?.message || 'Failed to load activation workspace')
     } finally {
@@ -165,6 +219,8 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   }
 
   const milestoneCount = getActivationMilestoneCount(readiness)
+  const completedMilestones = milestoneCount + (masterTheme.trim() ? 1 : 0)
+  const canFinish = Boolean(masterTheme.trim()) && Boolean(scheduleStartDate.trim()) && Boolean(readiness.can_finalize)
   const missingProfileFields = useMemo(() => {
     const items: string[] = []
     if (!brandName.trim()) items.push('brand name')
@@ -250,6 +306,126 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
     })
   }
 
+  const applyThemePlanResponse = (response: { workspace?: unknown; master_theme?: string; derived_themes?: DigitalMarketingDerivedTheme[] }) => {
+    const responseWorkspace = ((response.workspace as any)?.workspace || response.workspace || {}) as DigitalMarketingActivationResponse['workspace']
+    const nextWorkspace = {
+      ...(activation?.workspace || {}),
+      ...responseWorkspace,
+      campaign_setup: {
+        ...(activation?.workspace.campaign_setup || {}),
+        ...(responseWorkspace?.campaign_setup || {}),
+      },
+    }
+    setActivation((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        workspace: nextWorkspace,
+      }
+    })
+    setMasterTheme(String(response.master_theme || nextWorkspace.campaign_setup?.master_theme || ''))
+    setDerivedThemes(Array.isArray(response.derived_themes) ? response.derived_themes : nextWorkspace.campaign_setup?.derived_themes || [])
+  }
+
+  const generateThemePlan = async () => {
+    if (!hiredInstanceId) return
+    setThemePlanLoading(true)
+    setThemePlanError(null)
+    try {
+      const response = await generateDigitalMarketingThemePlan(hiredInstanceId, {
+        campaign_setup: {
+          schedule: normalizedSchedule,
+        },
+      })
+      applyThemePlanResponse(response)
+      setActiveMilestone('theme')
+    } catch (e: any) {
+      setThemePlanError(e?.message || 'Failed to generate theme plan.')
+    } finally {
+      setThemePlanLoading(false)
+    }
+  }
+
+  const saveThemePlan = async () => {
+    if (!hiredInstanceId) return
+    setThemePlanSaving(true)
+    setThemePlanError(null)
+    try {
+      const response = await patchDigitalMarketingThemePlan(hiredInstanceId, {
+        master_theme: masterTheme.trim(),
+        derived_themes: derivedThemes,
+        campaign_setup: {
+          campaign_id: campaignSetup.campaign_id,
+          schedule: normalizedSchedule,
+        },
+      })
+      applyThemePlanResponse(response)
+    } catch (e: any) {
+      setThemePlanError(e?.message || 'Failed to save theme plan.')
+    } finally {
+      setThemePlanSaving(false)
+    }
+  }
+
+  const updateDerivedTheme = (index: number, field: keyof DigitalMarketingDerivedTheme, value: string) => {
+    setDerivedThemes((current) =>
+      current.map((theme, themeIndex) => (themeIndex === index ? { ...theme, [field]: value } : theme))
+    )
+  }
+
+  const addDerivedTheme = () => {
+    setDerivedThemes((current) => [...current, { title: `Derived theme ${current.length + 1}`, description: '', frequency: 'weekly' }])
+  }
+
+  const finishActivation = async () => {
+    if (!hiredInstanceId || readOnly) return
+    setFinishStatus('saving')
+    setFinishError(null)
+    try {
+      const savedActivation = await upsertDigitalMarketingActivationWorkspace(hiredInstanceId, {
+        workspace: {
+          ...(activation?.workspace || {}),
+          help_visible: showHelp,
+          activation_complete: true,
+          platforms_enabled: selectedPlatforms,
+          campaign_setup: {
+            campaign_id: campaignSetup.campaign_id,
+            master_theme: masterTheme.trim(),
+            derived_themes: derivedThemes,
+            schedule: normalizedSchedule,
+          },
+        },
+      })
+      setActivation(savedActivation)
+      applyThemePlanState(savedActivation.workspace)
+      setFinishStatus('success')
+
+      const updatedDraft = draft
+        ? {
+            ...draft,
+            configured: true,
+            goals_completed: true,
+            hired_instance_id: savedActivation.hired_instance_id,
+          }
+        : null
+
+      if (updatedDraft) {
+        setDraft(updatedDraft)
+        onSaved?.(updatedDraft)
+      }
+      onSavedInstance?.({
+        configured: true,
+        goals_completed: true,
+        hired_instance_id: savedActivation.hired_instance_id,
+        agent_type_id: activeInstance?.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID,
+      })
+      setActiveMilestone('schedule')
+    } catch (e: any) {
+      setFinishStatus('error')
+      setFinishError(e?.message || 'Failed to finish activation.')
+    }
+  }
+
   if (!activeInstance) {
     return <FeedbackMessage intent="warning" title="Activation unavailable" message="Select a hired agent before opening the digital marketing activation workspace." />
   }
@@ -292,10 +468,27 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
           </div>
         </div>
 
-        <ProgressIndicator current={milestoneCount} total={3} label="Activation milestones" />
+        <ProgressIndicator current={completedMilestones} total={4} label="Activation milestones" />
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {[
+            ['induct', 'Induct Agent'],
+            ['prepare', 'Prepare Agent'],
+            ['theme', 'Master Theme'],
+            ['schedule', 'Confirm Schedule'],
+          ].map(([key, label]) => (
+            <Button
+              key={key}
+              appearance={activeMilestone === key ? 'primary' : 'secondary'}
+              onClick={() => setActiveMilestone(key as 'induct' | 'prepare' | 'theme' | 'schedule')}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
 
         {showHelp ? (
-          <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
+          <div data-testid="dma-help-panel-primary" style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
             Save this workspace whenever you update the business brief or channel choices. If YouTube is selected, use the setup shortcut below once and then refresh this page so the backend can verify the channel attachment for this hire.
           </div>
         ) : null}
@@ -455,6 +648,88 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
             <PlatformConnectionsPanel hiredInstanceId={hiredInstanceId} readOnly={readOnly} />
           </div>
         ) : null}
+      </Card>
+
+      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div>
+          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Step 4</div>
+          <h4 style={{ margin: '0.35rem 0 0' }}>Master Theme</h4>
+          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Generate a persisted campaign theme plan, review the derived themes, and save manual revisions back through the activation API.</div>
+        </div>
+
+        {showHelp ? (
+          <div data-testid="dma-help-panel-secondary" style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
+            Generate a first draft from the saved induction brief, then edit the master theme or derived themes before saving. Use Refresh status after saving to confirm the persisted plan reloads from the backend.
+          </div>
+        ) : null}
+
+        {themePlanLoading ? <LoadingIndicator message="Generating theme plan..." size="small" /> : null}
+        {!themePlanLoading && themePlanError ? <FeedbackMessage intent="error" title="Theme plan unavailable" message={themePlanError} /> : null}
+
+        {!themePlanLoading ? (
+          <DigitalMarketingThemePlanCard
+            masterTheme={masterTheme}
+            derivedThemes={derivedThemes}
+            editable={!readOnly}
+            saving={themePlanSaving}
+            error={themePlanError}
+            onMasterThemeChange={setMasterTheme}
+            onDerivedThemeChange={updateDerivedTheme}
+            onAddDerivedTheme={addDerivedTheme}
+            onGenerate={() => void generateThemePlan()}
+            onRegenerate={masterTheme.trim() || derivedThemes.length > 0 ? () => void generateThemePlan() : undefined}
+            onSave={() => void saveThemePlan()}
+          />
+        ) : null}
+      </Card>
+
+      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div>
+          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Final step</div>
+          <h4 style={{ margin: '0.35rem 0 0' }}>Confirm Schedule</h4>
+          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Confirm cadence and finish setup so this hire stays runtime-ready inside My Agents.</div>
+        </div>
+
+        <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '1rem', display: 'grid', gap: '0.6rem' }}>
+          <div style={{ fontWeight: 600 }}>Activation summary</div>
+          <div>Platforms: {selectedPlatforms.length > 0 ? selectedPlatforms.join(', ') : 'No platforms selected yet'}</div>
+          <div>Master theme: {masterTheme.trim() || 'No master theme yet'}</div>
+          <div>Derived themes: {derivedThemes.length > 0 ? derivedThemes.map((theme) => theme.title).join(', ') : 'No derived themes yet'}</div>
+          <div>Cadence: {postsPerWeek.trim() ? `${postsPerWeek} posts/week` : 'Posts per week not set'}</div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Start date</span>
+            <Input aria-label="Start date" type="date" value={scheduleStartDate} onChange={(_, data) => setScheduleStartDate(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Posts per week</span>
+            <Input aria-label="Posts per week" type="number" value={postsPerWeek} onChange={(_, data) => setPostsPerWeek(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Preferred days</span>
+            <Input aria-label="Preferred days" value={preferredDaysText} onChange={(_, data) => setPreferredDaysText(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Preferred hours (UTC)</span>
+            <Input aria-label="Preferred hours UTC" value={preferredHoursText} onChange={(_, data) => setPreferredHoursText(data.value)} disabled={readOnly} />
+          </label>
+        </div>
+
+        {finishError ? <FeedbackMessage intent="error" title="Finish activation failed" message={finishError} /> : null}
+        {finishStatus === 'success' || activation?.workspace.activation_complete ? (
+          <FeedbackMessage intent="success" title="Runtime-ready" message="This hire now has channels, theme plan, and schedule confirmed. My Agents will keep showing it as ready to run." />
+        ) : null}
+
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Button appearance="primary" onClick={() => void finishActivation()} disabled={!canFinish || finishStatus === 'saving' || readOnly}>
+            {finishStatus === 'saving' ? 'Finishing activation...' : 'Finish activation'}
+          </Button>
+          <Badge appearance={canFinish ? 'filled' : 'outline'} color={canFinish ? 'success' : 'warning'}>
+            {canFinish ? 'Ready to finish' : 'Finish is blocked until platform prep, theme setup, and schedule are complete'}
+          </Badge>
+        </div>
       </Card>
 
       <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

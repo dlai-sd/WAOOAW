@@ -63,6 +63,12 @@ class ThemePlanGenerateRequest(BaseModel):
     campaign_setup: dict[str, Any] = Field(default_factory=dict)
 
 
+class ThemePlanUpdateRequest(BaseModel):
+    master_theme: str = Field(..., min_length=1)
+    derived_themes: list[dict[str, Any]] = Field(default_factory=list)
+    campaign_setup: dict[str, Any] = Field(default_factory=dict)
+
+
 @router.get("/{hired_instance_id}")
 async def get_activation_workspace(
     hired_instance_id: str,
@@ -121,6 +127,31 @@ async def generate_theme_plan(
         resp = await plant.request_json(
             method="POST",
             path=f"api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+            headers=_forward_headers(request),
+            json_body={
+                **body.model_dump(mode="json", exclude_none=True),
+                "customer_id": _customer_id_from_user(current_user),
+            },
+        )
+    except ServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    _raise_for_gateway_response(resp)
+    return resp.json if isinstance(resp.json, dict) else {"detail": resp.json}
+
+
+@router.patch("/{hired_instance_id}/theme-plan")
+async def update_theme_plan(
+    hired_instance_id: str,
+    body: ThemePlanUpdateRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
+    try:
+        resp = await plant.request_json(
+            method="PATCH",
+            path=f"api/v1/digital-marketing-activation/{hired_instance_id}/theme-plan",
             headers=_forward_headers(request),
             json_body={
                 **body.model_dump(mode="json", exclude_none=True),

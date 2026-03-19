@@ -149,6 +149,12 @@ variable "smtp_password_secret" {
   # No default — must be set explicitly per env.
 }
 
+variable "xai_api_key_secret_name" {
+  description = "GCP Secret Manager secret name (no version suffix) for the Grok/XAI API key injected into Plant runtime."
+  type        = string
+  default     = "XAI_API_KEY"
+}
+
 # ---------------------------------------------------------------------------
 # Payments configuration
 # ---------------------------------------------------------------------------

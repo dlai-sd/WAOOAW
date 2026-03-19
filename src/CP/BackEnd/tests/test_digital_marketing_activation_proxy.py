@@ -88,7 +88,7 @@ def test_generate_theme_plan_proxy_returns_identical_payload(client, auth_header
 
     response = client.post(
         "/api/cp/digital-marketing-activation/HAI-1/generate-theme-plan",
-        headers=auth_headers,
+        headers={**auth_headers, "X-Correlation-ID": "corr-123"},
         json={"campaign_setup": {"schedule": {"posts_per_week": 3}}},
     )
 
@@ -98,6 +98,47 @@ def test_generate_theme_plan_proxy_returns_identical_payload(client, auth_header
     assert fake.calls[0]["method"] == "POST"
     assert fake.calls[0]["path"] == "api/v1/digital-marketing-activation/HAI-1/generate-theme-plan"
     assert fake.calls[0]["json"]["campaign_setup"]["schedule"]["posts_per_week"] == 3
+    assert fake.calls[0]["json"]["customer_id"].startswith("CUST-")
+    assert fake.calls[0]["headers"]["X-Correlation-ID"] == "corr-123"
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+def test_update_theme_plan_proxy_returns_identical_payload(client, auth_headers, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
+    payload = {
+        "campaign_id": "CAM-1",
+        "master_theme": "Trust-first growth revised",
+        "derived_themes": [
+            {"title": "Proof", "description": "Show results", "frequency": "weekly"},
+            {"title": "Education", "description": "Teach the market", "frequency": "weekly"},
+        ],
+        "workspace": {"campaign_setup": {"campaign_id": "CAM-1", "master_theme": "Trust-first growth revised"}},
+    }
+    from api.digital_marketing_activation import get_plant_gateway_client
+    from main import app
+
+    fake = _FakePlantClient(response_status=200, response_json=payload)
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    response = client.patch(
+        "/api/cp/digital-marketing-activation/HAI-1/theme-plan",
+        headers=auth_headers,
+        json={
+            "master_theme": "Trust-first growth revised",
+            "derived_themes": [
+                {"title": "Proof", "description": "Show results", "frequency": "weekly"},
+                {"title": "Education", "description": "Teach the market", "frequency": "weekly"},
+            ],
+            "campaign_setup": {"schedule": {"posts_per_week": 2}},
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == payload
+    assert fake.calls[0]["method"] == "PATCH"
+    assert fake.calls[0]["path"] == "api/v1/digital-marketing-activation/HAI-1/theme-plan"
+    assert fake.calls[0]["json"]["master_theme"] == "Trust-first growth revised"
     assert fake.calls[0]["json"]["customer_id"].startswith("CUST-")
     app.dependency_overrides.clear()
 
