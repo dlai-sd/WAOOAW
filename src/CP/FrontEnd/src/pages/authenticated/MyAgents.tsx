@@ -541,15 +541,20 @@ function ConfigureAgentPanel(props: {
       const payloadConfig: JsonObject = { ...config }
       if (constraintsObj) payloadConfig.constraints = constraintsObj
 
-      const inferredAgentTypeId = agentTypeIdFromAgentId(instance.agent_id)
-      if (!inferredAgentTypeId) {
+      const resolvedAgentTypeId =
+        String(draft?.agent_type_id || '').trim() ||
+        String(instance.agent_type_id || '').trim() ||
+        agentTypeIdFromAgentId(instance.agent_id) ||
+        null
+
+      if (!resolvedAgentTypeId) {
         throw new Error('Unable to determine agent type for this agent')
       }
 
       const updated = await upsertHiredAgentDraft({
         subscription_id: instance.subscription_id,
         agent_id: instance.agent_id,
-        agent_type_id: inferredAgentTypeId,
+        agent_type_id: resolvedAgentTypeId,
         nickname: nickname || undefined,
         theme: theme || undefined,
         config: payloadConfig
@@ -1810,10 +1815,14 @@ export default function MyAgents({
   onNavigateToDiscover,
   initialSubscriptionId,
   initialSection = 'configure',
+  initialStudioStep,
+  initialStudioFocus,
 }: {
   onNavigateToDiscover?: () => void
   initialSubscriptionId?: string
   initialSection?: MyAgentsSection
+  initialStudioStep?: string
+  initialStudioFocus?: string
 } = {}) {
   const navigate = useNavigate()
 
@@ -2074,9 +2083,9 @@ export default function MyAgents({
                 selectedId={selectedSubscriptionId}
                 onChange={setSelectedSubscriptionId}
                 loading={loading}
-                disabled={selectedReadOnlyExpired}
+                disabled={loading}
                 label="Selected Agent"
-                helperText={selectedReadOnlyExpired ? "This agent's trial has ended" : "View and manage your hired agents"}
+                helperText={selectedReadOnlyExpired ? "This agent's trial has ended. Select another hire or review retained access." : "View and manage your hired agents"}
               />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2171,8 +2180,6 @@ export default function MyAgents({
               )}
 
               <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <Button appearance="outline" disabled={selectedReadOnlyExpired}>View Dashboard</Button>
-                <Button appearance="outline" disabled={selectedReadOnlyExpired}>Settings</Button>
                 <Button
                   appearance="subtle"
                   onClick={() => onOpenCancel(selectedInstance)}

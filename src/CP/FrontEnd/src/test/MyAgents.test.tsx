@@ -398,7 +398,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('Needs setup')).toBeInTheDocument()
     })
   })
-
   it('renders page title with agent count', async () => {
     renderWithProvider(<MyAgents />)
     await waitFor(() => {
@@ -409,6 +408,17 @@ describe('MyAgents Component', () => {
   it('displays hire new agent button', () => {
     renderWithProvider(<MyAgents />)
     expect(screen.getByText('+ Hire New Agent')).toBeInTheDocument()
+  })
+
+  it('does not render dead View Dashboard or Settings actions', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('AGT-TRD-DELTA-001')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByRole('button', { name: 'View Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
   })
 
   it('loads subscriptions and can schedule cancel', async () => {
@@ -437,6 +447,47 @@ describe('MyAgents Component', () => {
     expect(screen.getByText(/you keep read-only access to deliverables and configuration/i)).toBeInTheDocument()
   })
 
+  it('saves configuration using the persisted agent type instead of agent-id prefix inference', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const hiredModule = await import('../services/hiredAgents.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-CUSTOM-1',
+          agent_id: 'CUSTOM-AGENT-001',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-CUSTOM-1',
+          agent_type_id: 'trading.share_trader.v1',
+        }
+      ]
+    })
+
+    vi.mocked(hiredModule.getHiredAgentBySubscription).mockRejectedValueOnce({ status: 404 })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save configuration' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+
+    await waitFor(() => {
+      expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_id: 'SUB-CUSTOM-1',
+          agent_id: 'CUSTOM-AGENT-001',
+          agent_type_id: 'trading.share_trader.v1',
+        })
+      )
+    })
+  })
+
   it('shows lifecycle continuity for hires that are no longer open for new sale', async () => {
     renderWithProvider(<MyAgents />)
 
@@ -449,6 +500,61 @@ describe('MyAgents Component', () => {
     expect(
       screen.getByText(/your active service continues on the release you already purchased/i)
     ).toBeInTheDocument()
+  })
+
+  it('lets users switch away from an expired read-only hire', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+
+    window.localStorage.clear()
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-EXP-1',
+          agent_id: 'AGT-OLD-001',
+          nickname: 'Expired Agent',
+          duration: 'monthly',
+          status: 'canceled',
+          current_period_start: '2025-01-01T00:00:00Z',
+          current_period_end: '2025-01-31T00:00:00Z',
+          retention_expires_at: '2025-02-02T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-EXP-1',
+          agent_type_id: 'trading.share_trader.v1',
+        },
+        {
+          subscription_id: 'SUB-ACT-1',
+          agent_id: 'AGT-LIVE-001',
+          nickname: 'Active Agent',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-ACT-1',
+          agent_type_id: 'trading.share_trader.v1',
+          configured: true,
+        }
+      ]
+    })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Read-only access expired')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("This agent's trial has ended. Select another hire or review retained access.")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('combobox'))
+    fireEvent.click(await screen.findByText('Active Agent'))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Read-only access expired')).not.toBeInTheDocument()
+    })
+
+    expect(screen.getByText('View and manage your hired agents')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Configure' })).not.toBeDisabled()
   })
 
   it('renders Goal Setting templates and can save a goal', async () => {

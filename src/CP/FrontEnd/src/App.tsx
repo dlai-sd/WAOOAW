@@ -17,27 +17,15 @@ import TrialDashboard from './pages/TrialDashboard'
 import HireSetupWizard from './pages/HireSetupWizard'
 import HireReceipt from './pages/HireReceipt'
 
-const HELP_BOXES_STORAGE_KEY = 'waooaw.cp.helpBoxesVisible'
-
-function loadHelpBoxesPreference(): boolean {
-  if (typeof window === 'undefined') return true
-  const stored = window.localStorage.getItem(HELP_BOXES_STORAGE_KEY)
-  return stored === null ? true : stored !== 'false'
-}
-
 // Wrapper that reads :agentId from the URL and opens the portal at agent-detail page.
 // Must be a named component (not inline) so useParams is called inside a Route renderer.
 function AgentDetailInPortal({
   theme,
   toggleTheme,
-  showHelpBoxes,
-  toggleHelpBoxes,
   handleLogout,
 }: {
   theme: 'light' | 'dark'
   toggleTheme: () => void
-  showHelpBoxes: boolean
-  toggleHelpBoxes: () => void
   handleLogout: () => void
 }) {
   const { agentId } = useParams<{ agentId: string }>()
@@ -45,8 +33,6 @@ function AgentDetailInPortal({
     <AuthenticatedPortal
       theme={theme}
       toggleTheme={toggleTheme}
-      showHelpBoxes={showHelpBoxes}
-      toggleHelpBoxes={toggleHelpBoxes}
       onLogout={handleLogout}
       initialPage="agent-detail"
       initialAgentId={agentId}
@@ -57,22 +43,16 @@ function AgentDetailInPortal({
 function HireSetupInPortal({
   theme,
   toggleTheme,
-  showHelpBoxes,
-  toggleHelpBoxes,
   handleLogout,
 }: {
   theme: 'light' | 'dark'
   toggleTheme: () => void
-  showHelpBoxes: boolean
-  toggleHelpBoxes: () => void
   handleLogout: () => void
 }) {
   return (
     <AuthenticatedPortal
       theme={theme}
       toggleTheme={toggleTheme}
-      showHelpBoxes={showHelpBoxes}
-      toggleHelpBoxes={toggleHelpBoxes}
       onLogout={handleLogout}
       initialPage="hire-setup"
     />
@@ -82,22 +62,16 @@ function HireSetupInPortal({
 function HireReceiptInPortal({
   theme,
   toggleTheme,
-  showHelpBoxes,
-  toggleHelpBoxes,
   handleLogout,
 }: {
   theme: 'light' | 'dark'
   toggleTheme: () => void
-  showHelpBoxes: boolean
-  toggleHelpBoxes: () => void
   handleLogout: () => void
 }) {
   return (
     <AuthenticatedPortal
       theme={theme}
       toggleTheme={toggleTheme}
-      showHelpBoxes={showHelpBoxes}
-      toggleHelpBoxes={toggleHelpBoxes}
       onLogout={handleLogout}
       initialPage="hire-receipt"
     />
@@ -106,7 +80,6 @@ function HireReceiptInPortal({
 
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
-  const [showHelpBoxes, setShowHelpBoxes] = useState<boolean>(() => loadHelpBoxesPreference())
   const { isAuthenticated, isLoading, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -120,30 +93,22 @@ function AppContent() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light')
   }
 
-  const toggleHelpBoxes = () => {
-    setShowHelpBoxes(prev => !prev)
-  }
-
-  useEffect(() => {
-    window.localStorage.setItem(HELP_BOXES_STORAGE_KEY, String(showHelpBoxes))
-  }, [showHelpBoxes])
-
   return (
     <FluentProvider theme={theme === 'light' ? waooawLightTheme : waooawDarkTheme}>
-      <div className="app" data-help-boxes={showHelpBoxes ? 'visible' : 'hidden'}>
+      <div className="app">
         <Routes>
           {/* Public routes */}
           <Route path="/" element={
             isLoading ? (
               <>
-                <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+                <Header theme={theme} toggleTheme={toggleTheme} />
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
                   <Spinner size="large" />
                 </div>
               </>
             ) : !isAuthenticated ? (
               <>
-                <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+                <Header theme={theme} toggleTheme={toggleTheme} />
                 <LandingPage />
               </>
             ) : (
@@ -155,7 +120,7 @@ function AppContent() {
             element={
               isLoading ? (
                 <>
-                  <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+                  <Header theme={theme} toggleTheme={toggleTheme} />
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
                     <Spinner size="large" />
                   </div>
@@ -163,7 +128,7 @@ function AppContent() {
               ) : isAuthenticated ? (
                 <Navigate to="/portal" replace />
               ) : (
-                <SignIn theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+                <SignIn theme={theme} toggleTheme={toggleTheme} />
               )
             }
           />
@@ -172,7 +137,7 @@ function AppContent() {
             element={
               isLoading ? (
                 <>
-                  <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+                  <Header theme={theme} toggleTheme={toggleTheme} />
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
                     <Spinner size="large" />
                   </div>
@@ -180,7 +145,7 @@ function AppContent() {
               ) : isAuthenticated ? (
                 <Navigate to="/portal" replace />
               ) : (
-                <SignUp theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+                <SignUp theme={theme} toggleTheme={toggleTheme} />
               )
             }
           />
@@ -193,7 +158,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} onLogout={handleLogout} />
+              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -207,7 +172,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} onLogout={handleLogout} initialPage="discover" />
+              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} initialPage="discover" />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -221,7 +186,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} onLogout={handleLogout} initialPage="my-agents" />
+              <AuthenticatedPortal theme={theme} toggleTheme={toggleTheme} onLogout={handleLogout} initialPage="my-agents" />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -235,7 +200,7 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <AgentDetailInPortal theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} handleLogout={handleLogout} />
+              <AgentDetailInPortal theme={theme} toggleTheme={toggleTheme} handleLogout={handleLogout} />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -250,7 +215,7 @@ function AppContent() {
               </div>
             ) : isAuthenticated ? (
               <>
-                <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+                <Header theme={theme} toggleTheme={toggleTheme} />
                 <TrialDashboard />
               </>
             ) : (
@@ -270,8 +235,6 @@ function AppContent() {
               <HireSetupInPortal
                 theme={theme}
                 toggleTheme={toggleTheme}
-                showHelpBoxes={showHelpBoxes}
-                toggleHelpBoxes={toggleHelpBoxes}
                 handleLogout={handleLogout}
               />
             ) : (
@@ -291,8 +254,6 @@ function AppContent() {
               <HireReceiptInPortal
                 theme={theme}
                 toggleTheme={toggleTheme}
-                showHelpBoxes={showHelpBoxes}
-                toggleHelpBoxes={toggleHelpBoxes}
                 handleLogout={handleLogout}
               />
             ) : (

@@ -812,10 +812,6 @@ section[id] {
   line-height: 1.55;
   font-size: 12.5px;
 }
-
-[data-help-boxes='hidden'] [data-help-box='true'] {
-  display: none !important;
-}
 .auth-unified-card--signin .auth-right-panel,
 .auth-unified-card--signup .auth-right-panel {
   position: relative;
@@ -2573,7 +2569,7 @@ section[id] {
   }
 
   .portal-signout-button,
-  .portal-help-toggle {
+  .portal-theme-toggle {
     justify-content: center;
   }
 }
@@ -3182,6 +3178,20 @@ section[id] {
 
   .hire-wizard-connection-summary-bar {
     flex-direction: column;
+  }
+
+  .hire-wizard-trust-pill {
+    align-self: flex-start;
+  }
+
+  .hire-wizard-connection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hire-wizard-youtube-panel-header,
+  .hire-wizard-review-card-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

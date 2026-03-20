@@ -87,16 +87,19 @@ vi.mock('../pages/authenticated/CommandCentre', () => ({
 vi.mock('../pages/authenticated/MyAgents', () => ({
   default: ({
     initialSubscriptionId,
+    initialSection,
     initialStudioStep,
     initialStudioFocus,
   }: {
     initialSubscriptionId?: string
+    initialSection?: string
     initialStudioStep?: string
     initialStudioFocus?: string
   }) => (
     <div data-testid="page-my-agents">
       <div>My Agents Page</div>
       <div data-testid="page-my-agents-subscription">{initialSubscriptionId || 'none'}</div>
+      <div data-testid="page-my-agents-initial-section">{initialSection || 'none'}</div>
       <div data-testid="page-my-agents-step">{initialStudioStep || 'none'}</div>
       <div data-testid="page-my-agents-focus">{initialStudioFocus || 'none'}</div>
     </div>
@@ -161,8 +164,6 @@ async function renderPortal(
       <AuthenticatedPortal
         theme="light"
         toggleTheme={() => {}}
-        showHelpBoxes={true}
-        toggleHelpBoxes={() => {}}
         onLogout={() => {}}
         {...props}
       />
@@ -270,14 +271,11 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('page-billing')).toBeTruthy()
   })
 
-  it('calls the help toggle from the portal header', async () => {
-    const toggleHelpBoxes = vi.fn()
-    await renderPortal({ showHelpBoxes: true, toggleHelpBoxes })
+  it('does not render the old portal help toggle', async () => {
+    await renderPortal()
 
-    fireEvent.click(screen.getByTestId('cp-portal-help-toggle'))
-
-    expect(toggleHelpBoxes).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: 'Hide help boxes' })).toBeTruthy()
+    expect(screen.queryByTestId('cp-portal-help-toggle')).toBeNull()
+    expect(screen.queryByRole('button', { name: /help boxes/i })).toBeNull()
   })
 
   it('opens the mobile drawer and closes it from the overlay', async () => {
@@ -366,6 +364,7 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
 
     expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/hire/setup/'))
     expect(screen.getByTestId('page-my-agents-subscription')).toHaveTextContent('SUB-123')
+    expect(screen.getByTestId('page-my-agents-initial-section')).toHaveTextContent('configure')
     expect(screen.getByTestId('page-my-agents-step')).toHaveTextContent('identity')
   })
 
@@ -390,6 +389,7 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
 
     expect(screen.getByTestId('page-my-agents')).toBeTruthy()
     expect(screen.getByTestId('page-my-agents-subscription')).toHaveTextContent('none')
+    expect(screen.getByTestId('page-my-agents-initial-section')).toHaveTextContent('configure')
     expect(screen.getByTestId('page-my-agents-step')).toHaveTextContent('none')
   })
 

@@ -919,6 +919,19 @@ docker run --rm -v "$PWD/src/CP/FrontEnd:/app" -w /app node:20-bookworm \
 
 **Commit message:** `feat(cp-studio-2): add dma schedule confirmation`
 
+## CP Demo Defect Tracker
+
+| Defect | Plain-English defect | Evidence | Branch | Status | Notes |
+|---|---|---|---|---|---|
+| D01 | The Digital Marketing flow in My Agents is still a stacked form, not a horizontal wizard with Back and Continue like PP Agent Studio. | Source review of `DigitalMarketingActivationWizard.tsx` and PP `AgentSetupStudio.tsx` | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Refactored the activation form into a three-step wizard with a step rail, Back and Continue navigation, and a final-step save CTA; validated with `npx vitest run src/test/MyAgents.test.tsx` (11/11 passing). |
+| D02 | My Agents can trap users on one expired hire because the selector is disabled in retained/read-only states. | Source review of `MyAgents.tsx` selector gating | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Kept the hire selector interactive even when the current hire is expired and added a regression proving users can switch from an expired read-only hire to an active one; validated with `npx vitest run src/test/MyAgents.test.tsx` (12/12 passing). |
+| D03 | The View Dashboard and Settings actions in My Agents look live but do nothing. | Source review of `MyAgents.tsx` section actions | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Removed the dead View Dashboard and Settings buttons from the My Agents action row and added a regression that keeps them off the surface; validated with `npx vitest run src/test/MyAgents.test.tsx` (13/13 passing). |
+| D04 | Digital Marketing save logic guesses agent type from hard-coded agent-id prefixes, so valid hires can miss the right type. | Source review of `agentTypeIdFromAgentId()` usage in `MyAgents.tsx` | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Updated the configuration save path to prefer the persisted draft or instance `agent_type_id` before any prefix heuristic and added a regression with a non-standard agent id; validated with `npx vitest run src/test/MyAgents.test.tsx` (14/14 passing). |
+| D05 | The activation flow still allows save attempts without a complete business profile, so customers can leave setup half-defined. | Source review of `DigitalMarketingActivationWizard.tsx` required-field handling | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Kept Save draft available for partial work, but gated the final Save activation CTA on the required identity and business-profile fields and added a regression covering the incomplete-profile state; validated with `npx vitest run src/test/MyAgents.test.tsx` (15/15 passing). |
+| D06 | Authenticated My Agents requests are hitting hired-agent-by-subscription `404`s in live GCP logs, so the runtime can fail after login even when auth itself succeeds. | Latest 10-minute GCP logs from CP and Plant demo services | `feat/PLANT-YT-CONN-1-it1-e1` | Open | Fix the CP to Plant lookup contract or seed the missing hired-agent records. |
+| D07 | The top-menu Show/Hide Help control and the extra help-only panels add noise across CP pages. | Source review of `App.tsx`, `Header.tsx`, `AuthenticatedPortal.tsx`, `SignIn.tsx`, `SignUp.tsx`, and `GoalsSetup.tsx` | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Removed the shared help toggle plumbing and the page help-only panels; validated with updated portal tests. |
+| D08 | My Agents still shows the Runtime View promo box instead of focusing the page on real runtime state. | Source review of `AuthenticatedPortal.tsx` page meta for `my-agents` | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Removed the stale My Agents promo metadata from the portal shell and kept the page focused on the runtime surface only; validated with the portal regression test. |
+
 **Done signal:** `"E2-S4 done. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---

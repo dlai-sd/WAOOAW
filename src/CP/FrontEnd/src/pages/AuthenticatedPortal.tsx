@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Button } from '@fluentui/react-components'
 import { useLocation } from 'react-router-dom'
 import { 
@@ -38,8 +38,6 @@ import { getPlatformConnectionSummary, listPlatformConnections, type PlatformCon
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
   toggleTheme: () => void
-  showHelpBoxes: boolean
-  toggleHelpBoxes: () => void
   onLogout: () => void
   initialPage?: Page
   initialAgentId?: string
@@ -72,6 +70,13 @@ type PortalLocationState = {
     catalogVersion?: string
     agentName?: string
   }
+}
+
+type PortalPageMeta = {
+  eyebrow: string
+  title: string
+  description: string
+  metrics: string[]
 }
 
 function formatLifecycleLabel(value?: string): string | null {
@@ -145,8 +150,6 @@ function toInboxItem(
 export default function AuthenticatedPortal({
   theme,
   toggleTheme,
-  showHelpBoxes,
-  toggleHelpBoxes,
   onLogout,
   initialPage,
   initialAgentId,
@@ -154,26 +157,44 @@ export default function AuthenticatedPortal({
 }: AuthenticatedPortalProps) {
   const location = useLocation()
   const portalEntry = (location.state as PortalLocationState | null)?.portalEntry
-  const derivedInitialPage = portalEntry?.page ?? initialPage ?? 'command-centre'
-  const derivedInitialAgentId = portalEntry?.agentId ?? initialAgentId
-  const derivedInitialSubscriptionId = portalEntry?.subscriptionId
-  const derivedInitialStudioStep = portalEntry?.studioStep
-  const derivedInitialStudioFocus = portalEntry?.studioFocus
-  const derivedJourneyContext = portalEntry?.source
-    ? {
-        source: portalEntry.source,
-        subscriptionId: portalEntry.subscriptionId,
-        lifecycleState: portalEntry.lifecycleState,
-        catalogVersion: portalEntry.catalogVersion,
-        agentName: portalEntry.agentName,
-      }
-    : initialJourneyContext
+  const portalEntryState = useMemo(
+    () => ({
+      derivedInitialPage: portalEntry?.page ?? initialPage ?? 'command-centre',
+      derivedInitialAgentId: portalEntry?.agentId ?? initialAgentId,
+      derivedInitialSubscriptionId: portalEntry?.subscriptionId,
+      derivedInitialStudioStep: portalEntry?.studioStep,
+      derivedInitialStudioFocus: portalEntry?.studioFocus,
+      derivedJourneyContext: portalEntry?.source
+        ? {
+            source: portalEntry.source,
+            subscriptionId: portalEntry.subscriptionId,
+            lifecycleState: portalEntry.lifecycleState,
+            catalogVersion: portalEntry.catalogVersion,
+            agentName: portalEntry.agentName,
+          }
+        : initialJourneyContext,
+    }),
+    [initialAgentId, initialJourneyContext, initialPage, portalEntry]
+  )
+
+  const {
+    derivedInitialPage,
+    derivedInitialAgentId,
+    derivedInitialSubscriptionId,
+    derivedInitialStudioStep,
+    derivedInitialStudioFocus,
+    derivedJourneyContext,
+  } = portalEntryState
 
   const [currentPage, setCurrentPage] = useState<Page>(derivedInitialPage)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(derivedInitialAgentId)
   const [journeyContext, setJourneyContext] = useState<PortalJourneyContext | undefined>(derivedJourneyContext)
+  const [myAgentsInitialSubscriptionId, setMyAgentsInitialSubscriptionId] = useState<string | undefined>(derivedJourneyContext?.source === 'payment-confirmed' ? derivedJourneyContext.subscriptionId : undefined)
+  const [myAgentsInitialSection, setMyAgentsInitialSection] = useState<'configure' | 'goals' | 'skills' | 'performance'>(derivedJourneyContext?.source === 'payment-confirmed' ? 'configure' : 'configure')
+  const [myAgentsInitialStudioStep, setMyAgentsInitialStudioStep] = useState<StudioStep | undefined>(derivedJourneyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
+  const [myAgentsInitialStudioFocus, setMyAgentsInitialStudioFocus] = useState<StudioFocus | undefined>(derivedJourneyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
   const [inboxItems, setInboxItems] = useState<CustomerInboxItem[]>([])
   const [inboxLoading, setInboxLoading] = useState(false)
   const [inboxError, setInboxError] = useState<string | null>(null)
@@ -189,6 +210,20 @@ export default function AuthenticatedPortal({
   useEffect(() => {
     setJourneyContext(derivedJourneyContext)
   }, [derivedJourneyContext])
+
+  useEffect(() => {
+    if (derivedJourneyContext?.source === 'payment-confirmed') {
+      setMyAgentsInitialSubscriptionId(derivedJourneyContext.subscriptionId)
+      setMyAgentsInitialSection('configure')
+      setMyAgentsInitialStudioStep(derivedInitialStudioStep ?? 'identity')
+      setMyAgentsInitialStudioFocus(derivedInitialStudioFocus ?? 'identity')
+      return
+    }
+
+    setMyAgentsInitialSubscriptionId(undefined)
+    setMyAgentsInitialStudioStep(derivedInitialStudioStep)
+    setMyAgentsInitialStudioFocus(derivedInitialStudioFocus)
+  }, [derivedInitialStudioFocus, derivedInitialStudioStep, derivedJourneyContext])
 
   useEffect(() => {
     let cancelled = false
@@ -312,7 +347,7 @@ export default function AuthenticatedPortal({
 
   const menuSections: Array<{
     title: string
-    items: Array<{ id: Page; icon: React.ReactNode; label: string; badge?: number }>
+    items: Array<{ id: Page; icon: ReactNode; label: string; badge?: number }>
   }> = [
     {
       title: 'Operate',
@@ -334,7 +369,8 @@ export default function AuthenticatedPortal({
     },
   ]
 
-  const pageMeta = useMemo(() => ({
+  const pageMeta = useMemo(
+    (): Record<Exclude<Page, 'agent-detail'>, PortalPageMeta> => ({
     'command-centre': {
       eyebrow: 'Daily Mission',
       title: 'Run Your Agent Workforce With Confidence',
@@ -342,10 +378,22 @@ export default function AuthenticatedPortal({
       metrics: ['Open My Agents for runtime truth', 'Billing becomes real after subscriptions exist', 'Profile should reflect confirmed business data'],
     },
     'my-agents': {
-      eyebrow: 'Runtime View',
-      title: 'Every Hired Agent, One Clear Operating Surface',
-      description: 'Track trials, active hires, deliverables, and configuration without switching mental models.',
-      metrics: ['Trial and paid runtime states', 'Skill-level controls', 'Recent outputs after runtime starts'],
+      eyebrow: 'Runtime Truth',
+      title: 'Operate The Agents You Already Hired',
+      description: 'Stay close to live status, setup state, deliverables, and next actions without falling back to promotional filler.',
+      metrics: ['Live hire context', 'Setup continuity', 'Deliverable-linked operations'],
+    },
+    'hire-setup': {
+      eyebrow: 'Setup Continuity',
+      title: 'Complete Setup Before Runtime Begins',
+      description: 'Carry payment and studio context straight into the remaining setup work so the hire can move into real operation.',
+      metrics: ['Payment-linked entry', 'Studio context preserved', 'Activation still required'],
+    },
+    'hire-receipt': {
+      eyebrow: 'Proof Of Purchase',
+      title: 'Review The Confirmed Hire Before Setup',
+      description: 'Use the receipt surface to confirm what was purchased, then continue into setup without losing the operating context.',
+      metrics: ['Receipt confirmation', 'Subscription context', 'Next step clarity'],
     },
     'discover': {
       eyebrow: 'Marketplace',
@@ -387,14 +435,14 @@ export default function AuthenticatedPortal({
       description: 'Keep your business profile, preferences, and team-facing details aligned with how WAOOAW operates for you.',
       metrics: ['Business identity loaded from CP', 'Only current controls shown as live', 'Support paths'],
     },
-  }), [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected])
+    }),
+    [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected]
+  )
 
-  const currentMeta = pageMeta[activeNavPage]
+  const currentMeta = pageMeta[activeNavPage] ?? pageMeta['command-centre']
+  const showPortalHero = activeNavPage !== 'my-agents'
   const journeyAgentLabel = journeyContext?.agentName || selectedAgentId || ''
   const journeyLifecycleLabel = formatLifecycleLabel(journeyContext?.lifecycleState)
-  const myAgentsInitialSubscriptionId = derivedInitialSubscriptionId ?? journeyContext?.subscriptionId
-  const myAgentsInitialStudioStep = derivedInitialStudioStep ?? (journeyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
-  const myAgentsInitialStudioFocus = derivedInitialStudioFocus ?? (journeyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
 
   const journeyBanner = useMemo(() => {
     if (!journeyContext) return null
@@ -414,6 +462,12 @@ export default function AuthenticatedPortal({
         primaryLabel: 'Open My Agents setup',
         onPrimary: () => {
           setCurrentPage('my-agents')
+          if (journeyContext.subscriptionId) {
+            setMyAgentsInitialSubscriptionId(journeyContext.subscriptionId)
+          }
+          setMyAgentsInitialSection('configure')
+          setMyAgentsInitialStudioStep('identity')
+          setMyAgentsInitialStudioFocus('identity')
         },
       }
     }
@@ -452,6 +506,9 @@ export default function AuthenticatedPortal({
           <MyAgents
             onNavigateToDiscover={() => openPage('discover')}
             initialSubscriptionId={myAgentsInitialSubscriptionId}
+            initialSection={myAgentsInitialSection}
+            initialStudioStep={myAgentsInitialStudioStep}
+            initialStudioFocus={myAgentsInitialStudioFocus}
           />
         )
       case 'discover':
@@ -511,15 +568,6 @@ export default function AuthenticatedPortal({
             <div className="portal-header-controls">
               <Button
                 appearance="subtle"
-                className="portal-help-toggle"
-                onClick={toggleHelpBoxes}
-                aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
-                data-testid="cp-portal-help-toggle"
-              >
-                {showHelpBoxes ? 'Hide Help' : 'Show Help'}
-              </Button>
-              <Button
-                appearance="subtle"
                 className="portal-theme-toggle"
                 icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
                 onClick={toggleTheme}
@@ -551,7 +599,7 @@ export default function AuthenticatedPortal({
 
       <div className="portal-layout">
         <aside className={`portal-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileNavOpen ? 'open' : ''}`}>
-          <div className="portal-sidebar-card" data-help-box="true">
+          <div className="portal-sidebar-card">
             <div className="portal-sidebar-card-label">Workspace</div>
             {!sidebarCollapsed && (
               <>
@@ -595,18 +643,20 @@ export default function AuthenticatedPortal({
           </div>
         </aside>
         <main className="portal-content">
-          <section className="portal-hero">
-            <div>
-              <div className="portal-hero-eyebrow">{currentMeta.eyebrow}</div>
-              <h1 className="portal-hero-title">{currentMeta.title}</h1>
-              <p className="portal-hero-description">{currentMeta.description}</p>
-            </div>
-            <div className="portal-hero-metrics">
-              {currentMeta.metrics.map((metric) => (
-                <div key={metric} className="portal-hero-metric">{metric}</div>
-              ))}
-            </div>
-          </section>
+          {showPortalHero ? (
+            <section className="portal-hero">
+              <div>
+                <div className="portal-hero-eyebrow">{currentMeta.eyebrow}</div>
+                <h1 className="portal-hero-title">{currentMeta.title}</h1>
+                <p className="portal-hero-description">{currentMeta.description}</p>
+              </div>
+              <div className="portal-hero-metrics">
+                {currentMeta.metrics.map((metric: string) => (
+                  <div key={metric} className="portal-hero-metric">{metric}</div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {journeyBanner ? (
             <section className="portal-entry-banner" data-testid="cp-portal-entry-banner">

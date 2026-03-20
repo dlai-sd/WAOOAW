@@ -8,8 +8,6 @@ import { Dismiss24Regular } from '@fluentui/react-icons'
 type SignUpProps = {
   theme: 'light' | 'dark'
   toggleTheme: () => void
-  showHelpBoxes: boolean
-  toggleHelpBoxes: () => void
 }
 
 function sanitizeNextPath(raw: string | null): string | null {
@@ -69,7 +67,7 @@ const SIGNUP_NOTES = [
   'Every step should feel like product onboarding, not a slow enterprise form.',
 ]
 
-export default function SignUp({ theme, toggleTheme, showHelpBoxes, toggleHelpBoxes }: SignUpProps) {
+export default function SignUp({ theme, toggleTheme }: SignUpProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const [regStep, setRegStep] = useState<1 | 2 | 3>(1)
@@ -84,7 +82,7 @@ export default function SignUp({ theme, toggleTheme, showHelpBoxes, toggleHelpBo
 
   return (
     <>
-      <Header theme={theme} toggleTheme={toggleTheme} showHelpBoxes={showHelpBoxes} toggleHelpBoxes={toggleHelpBoxes} />
+      <Header theme={theme} toggleTheme={toggleTheme} />
       <main className="auth-page auth-page--signup">
         <div className="auth-center">
           <div className="auth-unified-card auth-unified-card--wide auth-unified-card--signup">
@@ -110,7 +108,7 @@ export default function SignUp({ theme, toggleTheme, showHelpBoxes, toggleHelpBo
                   <div className="auth-side-kicker">Start Your Workforce</div>
                   <h2 className="auth-left-heading">{step.heading}</h2>
                   <p className="auth-left-tagline">{step.tagline}</p>
-                  <div className="auth-startup-statement" data-help-box="true">
+                  <div className="auth-startup-statement">
                     A startup-grade onboarding flow should make the first trial feel close, concrete, and worth finishing.
                   </div>
                   <div className="auth-milestone-list">
@@ -127,14 +125,14 @@ export default function SignUp({ theme, toggleTheme, showHelpBoxes, toggleHelpBo
                     ))}
                   </ul>
                   <p className="auth-left-footnote">{step.footnote}</p>
-                  <div className="auth-confidence-card" data-help-box="true">
+                  <div className="auth-confidence-card">
                     <div className="auth-confidence-title">Why this matters</div>
                     <p className="auth-confidence-body">
                       Signup should explain the value ladder: try first, keep the work, then decide whether this agent
                       deserves a bigger role in the business.
                     </p>
                   </div>
-                  <div className="auth-note-list" data-help-box="true">
+                  <div className="auth-note-list">
                     {SIGNUP_NOTES.map((item) => (
                       <div key={item} className="auth-note-item">{item}</div>
                     ))}
