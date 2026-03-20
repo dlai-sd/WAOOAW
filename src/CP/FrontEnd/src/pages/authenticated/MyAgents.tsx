@@ -2159,8 +2159,6 @@ export default function MyAgents({
               )}
 
               <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <Button appearance="outline" disabled={selectedReadOnlyExpired}>View Dashboard</Button>
-                <Button appearance="outline" disabled={selectedReadOnlyExpired}>Settings</Button>
                 <Button
                   appearance="subtle"
                   onClick={() => onOpenCancel(selectedInstance)}

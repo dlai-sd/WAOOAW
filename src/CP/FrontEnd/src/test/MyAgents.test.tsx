@@ -442,6 +442,17 @@ describe('MyAgents Component', () => {
     expect(screen.getByText('+ Hire New Agent')).toBeInTheDocument()
   })
 
+  it('does not render dead View Dashboard or Settings actions', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('AGT-TRD-DELTA-001')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByRole('button', { name: 'View Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
+  })
+
   it('loads subscriptions and can schedule cancel', async () => {
     const { cancelSubscription } = await import('../services/subscriptions.service')
 
