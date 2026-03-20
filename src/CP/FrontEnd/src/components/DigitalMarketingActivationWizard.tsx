@@ -177,6 +177,7 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
     if (parseListTextarea(offeringsText).length === 0) items.push('offerings and services')
     return items
   }, [brandName, location, offeringsText, primaryLanguage, timezone])
+  const canFinalizeActivation = Boolean(nickname.trim() && theme.trim()) && missingProfileFields.length === 0
 
   const saveWorkspace = async () => {
     if (readOnly) return
@@ -408,6 +409,12 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
 
         {activeStep.id === 'channels' ? (
           <>
+            {!canFinalizeActivation ? (
+              <div style={{ border: '1px solid var(--colorPaletteYellowBorder2)', borderRadius: '12px', padding: '0.85rem 1rem', background: 'var(--colorPaletteYellowBackground1)' }}>
+                Complete the agent identity and business brief before final activation.
+              </div>
+            ) : null}
+
             <div style={{ display: 'grid', gap: '0.75rem' }}>
               {PLATFORM_OPTIONS.map((platform) => {
                 const checked = selectedPlatforms.includes(platform.key)
@@ -472,7 +479,7 @@ export function DigitalMarketingActivationWizard({ instance, readOnly, onSaved }
             Back
           </Button>
           {isFinalStep ? (
-            <Button appearance="primary" onClick={() => void saveWorkspace()} disabled={readOnly || saveStatus === 'saving'}>
+            <Button appearance="primary" onClick={() => void saveWorkspace()} disabled={readOnly || saveStatus === 'saving' || !canFinalizeActivation}>
               {saveStatus === 'saving' ? 'Saving activation...' : 'Save activation'}
             </Button>
           ) : (

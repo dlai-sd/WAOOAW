@@ -430,6 +430,86 @@ describe('MyAgents Component', () => {
     })
   })
 
+  it('keeps final activation disabled until the required business profile is complete', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const hiredModule = await import('../services/hiredAgents.service')
+    const activationModule = await import('../services/digitalMarketingActivation.service')
+
+    vi.mocked(activationModule.upsertDigitalMarketingActivationWorkspace).mockClear()
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-DM-2',
+          agent_id: 'AGT-MKT-DMA-002',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-DM-2',
+          agent_type_id: 'marketing.digital_marketing.v1',
+        }
+      ]
+    })
+
+    vi.mocked(hiredModule.getHiredAgentBySubscription).mockResolvedValueOnce({
+      subscription_id: 'SUB-DM-2',
+      hired_instance_id: 'HIRED-DM-2',
+      agent_id: 'AGT-MKT-DMA-002',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'Growth Engine',
+      theme: 'midnight',
+      config: {},
+      configured: false,
+    })
+
+    vi.mocked(activationModule.getDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-DM-2',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: '',
+        location: '',
+        primary_language: '',
+        timezone: '',
+        offerings_services: [],
+        platforms_enabled: [],
+        platform_bindings: {},
+      },
+      readiness: {
+        brief_complete: false,
+        youtube_selected: false,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: false,
+        missing_requirements: ['business_profile'],
+      },
+      updated_at: '2026-03-19T12:00:00Z',
+    })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Digital Marketing activation')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 2 of 3')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 3 of 3')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Complete the agent identity and business brief before final activation.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save activation' })).toBeDisabled()
+    expect(activationModule.upsertDigitalMarketingActivationWorkspace).not.toHaveBeenCalled()
+  })
+
   it('renders page title with agent count', async () => {
     renderWithProvider(<MyAgents />)
     await waitFor(() => {
