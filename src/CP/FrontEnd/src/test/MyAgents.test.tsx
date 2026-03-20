@@ -479,6 +479,47 @@ describe('MyAgents Component', () => {
     expect(screen.getByText(/you keep read-only access to deliverables and configuration/i)).toBeInTheDocument()
   })
 
+  it('saves configuration using the persisted agent type instead of agent-id prefix inference', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const hiredModule = await import('../services/hiredAgents.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-CUSTOM-1',
+          agent_id: 'CUSTOM-AGENT-001',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-CUSTOM-1',
+          agent_type_id: 'trading.share_trader.v1',
+        }
+      ]
+    })
+
+    vi.mocked(hiredModule.getHiredAgentBySubscription).mockRejectedValueOnce({ status: 404 })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save configuration' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+
+    await waitFor(() => {
+      expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subscription_id: 'SUB-CUSTOM-1',
+          agent_id: 'CUSTOM-AGENT-001',
+          agent_type_id: 'trading.share_trader.v1',
+        })
+      )
+    })
+  })
+
   it('shows lifecycle continuity for hires that are no longer open for new sale', async () => {
     renderWithProvider(<MyAgents />)
 
