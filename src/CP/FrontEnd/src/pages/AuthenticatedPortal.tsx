@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Button } from '@fluentui/react-components'
 import { useLocation } from 'react-router-dom'
 import { 
@@ -64,6 +64,13 @@ type PortalLocationState = {
     catalogVersion?: string
     agentName?: string
   }
+}
+
+type PortalPageMeta = {
+  eyebrow: string
+  title: string
+  description: string
+  metrics: string[]
 }
 
 function formatLifecycleLabel(value?: string): string | null {
@@ -307,7 +314,7 @@ export default function AuthenticatedPortal({
 
   const menuSections: Array<{
     title: string
-    items: Array<{ id: Page; icon: React.ReactNode; label: string; badge?: number }>
+    items: Array<{ id: Page; icon: ReactNode; label: string; badge?: number }>
   }> = [
     {
       title: 'Operate',
@@ -329,12 +336,19 @@ export default function AuthenticatedPortal({
     },
   ]
 
-  const pageMeta = useMemo(() => ({
+  const pageMeta = useMemo(
+    (): Record<Exclude<Page, 'agent-detail'>, PortalPageMeta> => ({
     'command-centre': {
       eyebrow: 'Daily Mission',
       title: 'Run Your Agent Workforce With Confidence',
       description: 'Use this shell to decide what to check next, not to pretend live runtime data already exists.',
       metrics: ['Open My Agents for runtime truth', 'Billing becomes real after subscriptions exist', 'Profile should reflect confirmed business data'],
+    },
+    'my-agents': {
+      eyebrow: 'Runtime Truth',
+      title: 'Operate The Agents You Already Hired',
+      description: 'Stay close to live status, setup state, deliverables, and next actions without falling back to promotional filler.',
+      metrics: ['Live hire context', 'Setup continuity', 'Deliverable-linked operations'],
     },
     'discover': {
       eyebrow: 'Marketplace',
@@ -376,7 +390,9 @@ export default function AuthenticatedPortal({
       description: 'Keep your business profile, preferences, and team-facing details aligned with how WAOOAW operates for you.',
       metrics: ['Business identity loaded from CP', 'Only current controls shown as live', 'Support paths'],
     },
-  }), [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected])
+    }),
+    [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected]
+  )
 
   const currentMeta = pageMeta[activeNavPage] ?? pageMeta['command-centre']
   const showPortalHero = activeNavPage !== 'my-agents'
@@ -581,7 +597,7 @@ export default function AuthenticatedPortal({
                 <p className="portal-hero-description">{currentMeta.description}</p>
               </div>
               <div className="portal-hero-metrics">
-                {currentMeta.metrics.map((metric) => (
+                {currentMeta.metrics.map((metric: string) => (
                   <div key={metric} className="portal-hero-metric">{metric}</div>
                 ))}
               </div>
