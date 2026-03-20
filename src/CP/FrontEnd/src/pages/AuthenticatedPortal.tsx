@@ -336,12 +336,6 @@ export default function AuthenticatedPortal({
       description: 'Use this shell to decide what to check next, not to pretend live runtime data already exists.',
       metrics: ['Open My Agents for runtime truth', 'Billing becomes real after subscriptions exist', 'Profile should reflect confirmed business data'],
     },
-    'my-agents': {
-      eyebrow: 'Runtime View',
-      title: 'Every Hired Agent, One Clear Operating Surface',
-      description: 'Track trials, active hires, deliverables, and configuration without switching mental models.',
-      metrics: ['Trial and paid runtime states', 'Skill-level controls', 'Recent outputs after runtime starts'],
-    },
     'discover': {
       eyebrow: 'Marketplace',
       title: 'Browse Talent, Not Generic Software',
@@ -384,7 +378,8 @@ export default function AuthenticatedPortal({
     },
   }), [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected])
 
-  const currentMeta = pageMeta[activeNavPage]
+  const currentMeta = pageMeta[activeNavPage] ?? pageMeta['command-centre']
+  const showPortalHero = activeNavPage !== 'my-agents'
   const journeyAgentLabel = journeyContext?.agentName || selectedAgentId || ''
   const journeyLifecycleLabel = formatLifecycleLabel(journeyContext?.lifecycleState)
 
@@ -578,18 +573,20 @@ export default function AuthenticatedPortal({
           </div>
         </aside>
         <main className="portal-content">
-          <section className="portal-hero">
-            <div>
-              <div className="portal-hero-eyebrow">{currentMeta.eyebrow}</div>
-              <h1 className="portal-hero-title">{currentMeta.title}</h1>
-              <p className="portal-hero-description">{currentMeta.description}</p>
-            </div>
-            <div className="portal-hero-metrics">
-              {currentMeta.metrics.map((metric) => (
-                <div key={metric} className="portal-hero-metric">{metric}</div>
-              ))}
-            </div>
-          </section>
+          {showPortalHero ? (
+            <section className="portal-hero">
+              <div>
+                <div className="portal-hero-eyebrow">{currentMeta.eyebrow}</div>
+                <h1 className="portal-hero-title">{currentMeta.title}</h1>
+                <p className="portal-hero-description">{currentMeta.description}</p>
+              </div>
+              <div className="portal-hero-metrics">
+                {currentMeta.metrics.map((metric) => (
+                  <div key={metric} className="portal-hero-metric">{metric}</div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {journeyBanner ? (
             <section className="portal-entry-banner" data-testid="cp-portal-entry-banner">
