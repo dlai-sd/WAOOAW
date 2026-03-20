@@ -105,6 +105,12 @@ variable "db_max_connections" {
   default     = "100"
 }
 
+variable "db_enable_public_ip" {
+  description = "Enable public IPv4 on the Plant Cloud SQL instance for environments that rely on the Codespaces Cloud SQL Auth Proxy path."
+  type        = bool
+  default     = false
+}
+
 variable "db_deletion_protection" {
   description = "Enable deletion protection on Cloud SQL instance"
   type        = bool
@@ -141,6 +147,12 @@ variable "smtp_password_secret" {
   description = "Secret Manager secret name (no version) for the SMTP app-password. Set per env in *.tfvars."
   type        = string
   # No default — must be set explicitly per env.
+}
+
+variable "xai_api_key_secret_name" {
+  description = "GCP Secret Manager secret name (no version suffix) for the Grok/XAI API key injected into Plant runtime."
+  type        = string
+  default     = "XAI_API_KEY"
 }
 
 # ---------------------------------------------------------------------------

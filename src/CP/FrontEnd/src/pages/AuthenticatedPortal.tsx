@@ -17,6 +17,8 @@ import {
 import logoImage from '../Waooaw-Logo.png'
 import AgentDiscovery from './AgentDiscovery'
 import AgentDetail from './AgentDetail'
+import HireReceipt from './HireReceipt'
+import HireSetupWizard from './HireSetupWizard'
 import CommandCentre from './authenticated/CommandCentre'
 import MyAgents from './authenticated/MyAgents'
 import GoalsSetup from './authenticated/GoalsSetup'
@@ -42,9 +44,11 @@ interface AuthenticatedPortalProps {
   initialJourneyContext?: PortalJourneyContext
 }
 
-type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail'
+type Page = 'command-centre' | 'my-agents' | 'goals' | 'deliverables' | 'inbox' | 'billing' | 'profile-settings' | 'discover' | 'agent-detail' | 'hire-setup' | 'hire-receipt'
 
 type JourneySource = 'payment-confirmed' | 'trial-activated' | 'setup-incomplete'
+type StudioStep = 'identity' | 'platforms' | 'review'
+type StudioFocus = 'identity' | 'youtube' | 'review'
 
 type PortalJourneyContext = {
   source: JourneySource
@@ -58,8 +62,10 @@ type PortalLocationState = {
   portalEntry?: {
     page?: Page
     agentId?: string
-    source?: JourneySource
     subscriptionId?: string
+    studioStep?: StudioStep
+    studioFocus?: StudioFocus
+    source?: JourneySource
     lifecycleState?: string
     catalogVersion?: string
     agentName?: string
@@ -151,17 +157,34 @@ export default function AuthenticatedPortal({
 }: AuthenticatedPortalProps) {
   const location = useLocation()
   const portalEntry = (location.state as PortalLocationState | null)?.portalEntry
-  const derivedInitialPage = portalEntry?.page ?? initialPage ?? 'command-centre'
-  const derivedInitialAgentId = portalEntry?.agentId ?? initialAgentId
-  const derivedJourneyContext = portalEntry?.source
-    ? {
-        source: portalEntry.source,
-        subscriptionId: portalEntry.subscriptionId,
-        lifecycleState: portalEntry.lifecycleState,
-        catalogVersion: portalEntry.catalogVersion,
-        agentName: portalEntry.agentName,
-      }
-    : initialJourneyContext
+  const portalEntryState = useMemo(
+    () => ({
+      derivedInitialPage: portalEntry?.page ?? initialPage ?? 'command-centre',
+      derivedInitialAgentId: portalEntry?.agentId ?? initialAgentId,
+      derivedInitialSubscriptionId: portalEntry?.subscriptionId,
+      derivedInitialStudioStep: portalEntry?.studioStep,
+      derivedInitialStudioFocus: portalEntry?.studioFocus,
+      derivedJourneyContext: portalEntry?.source
+        ? {
+            source: portalEntry.source,
+            subscriptionId: portalEntry.subscriptionId,
+            lifecycleState: portalEntry.lifecycleState,
+            catalogVersion: portalEntry.catalogVersion,
+            agentName: portalEntry.agentName,
+          }
+        : initialJourneyContext,
+    }),
+    [initialAgentId, initialJourneyContext, initialPage, portalEntry]
+  )
+
+  const {
+    derivedInitialPage,
+    derivedInitialAgentId,
+    derivedInitialSubscriptionId,
+    derivedInitialStudioStep,
+    derivedInitialStudioFocus,
+    derivedJourneyContext,
+  } = portalEntryState
 
   const [currentPage, setCurrentPage] = useState<Page>(derivedInitialPage)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -170,6 +193,8 @@ export default function AuthenticatedPortal({
   const [journeyContext, setJourneyContext] = useState<PortalJourneyContext | undefined>(derivedJourneyContext)
   const [myAgentsInitialSubscriptionId, setMyAgentsInitialSubscriptionId] = useState<string | undefined>(derivedJourneyContext?.source === 'payment-confirmed' ? derivedJourneyContext.subscriptionId : undefined)
   const [myAgentsInitialSection, setMyAgentsInitialSection] = useState<'configure' | 'goals' | 'skills' | 'performance'>(derivedJourneyContext?.source === 'payment-confirmed' ? 'configure' : 'configure')
+  const [myAgentsInitialStudioStep, setMyAgentsInitialStudioStep] = useState<StudioStep | undefined>(derivedJourneyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
+  const [myAgentsInitialStudioFocus, setMyAgentsInitialStudioFocus] = useState<StudioFocus | undefined>(derivedJourneyContext?.source === 'payment-confirmed' ? 'identity' : undefined)
   const [inboxItems, setInboxItems] = useState<CustomerInboxItem[]>([])
   const [inboxLoading, setInboxLoading] = useState(false)
   const [inboxError, setInboxError] = useState<string | null>(null)
@@ -190,11 +215,15 @@ export default function AuthenticatedPortal({
     if (derivedJourneyContext?.source === 'payment-confirmed') {
       setMyAgentsInitialSubscriptionId(derivedJourneyContext.subscriptionId)
       setMyAgentsInitialSection('configure')
+      setMyAgentsInitialStudioStep(derivedInitialStudioStep ?? 'identity')
+      setMyAgentsInitialStudioFocus(derivedInitialStudioFocus ?? 'identity')
       return
     }
 
     setMyAgentsInitialSubscriptionId(undefined)
-  }, [derivedJourneyContext])
+    setMyAgentsInitialStudioStep(derivedInitialStudioStep)
+    setMyAgentsInitialStudioFocus(derivedInitialStudioFocus)
+  }, [derivedInitialStudioFocus, derivedInitialStudioStep, derivedJourneyContext])
 
   useEffect(() => {
     let cancelled = false
@@ -293,8 +322,12 @@ export default function AuthenticatedPortal({
     setCurrentPage('discover')
   }
 
-  // agent-detail is a sub-page of discover — keep Discover highlighted in sidebar
-  const activeNavPage: Page = currentPage === 'agent-detail' ? 'discover' : currentPage
+  // agent-detail is a sub-page of discover; hire setup/receipt are sub-pages of My Agents.
+  const activeNavPage: Page = currentPage === 'agent-detail'
+    ? 'discover'
+    : currentPage === 'hire-setup' || currentPage === 'hire-receipt'
+      ? 'my-agents'
+      : currentPage
 
   const inboxCounts = useMemo(
     () =>
@@ -349,6 +382,18 @@ export default function AuthenticatedPortal({
       title: 'Operate The Agents You Already Hired',
       description: 'Stay close to live status, setup state, deliverables, and next actions without falling back to promotional filler.',
       metrics: ['Live hire context', 'Setup continuity', 'Deliverable-linked operations'],
+    },
+    'hire-setup': {
+      eyebrow: 'Setup Continuity',
+      title: 'Complete Setup Before Runtime Begins',
+      description: 'Carry payment and studio context straight into the remaining setup work so the hire can move into real operation.',
+      metrics: ['Payment-linked entry', 'Studio context preserved', 'Activation still required'],
+    },
+    'hire-receipt': {
+      eyebrow: 'Proof Of Purchase',
+      title: 'Review The Confirmed Hire Before Setup',
+      description: 'Use the receipt surface to confirm what was purchased, then continue into setup without losing the operating context.',
+      metrics: ['Receipt confirmation', 'Subscription context', 'Next step clarity'],
     },
     'discover': {
       eyebrow: 'Marketplace',
@@ -414,12 +459,15 @@ export default function AuthenticatedPortal({
         eyebrow: 'Payment captured',
         title: `Setup is still required for ${selectedLabel}`,
         body: `Payment is complete, but the agent is not ready to work until setup is finished. Resume setup to connect systems and activate the trial.${continuityNote}`,
-        primaryLabel: 'Resume setup',
+        primaryLabel: 'Open My Agents setup',
         onPrimary: () => {
-          if (!journeyContext.subscriptionId) return
           setCurrentPage('my-agents')
-          setMyAgentsInitialSubscriptionId(journeyContext.subscriptionId)
+          if (journeyContext.subscriptionId) {
+            setMyAgentsInitialSubscriptionId(journeyContext.subscriptionId)
+          }
           setMyAgentsInitialSection('configure')
+          setMyAgentsInitialStudioStep('identity')
+          setMyAgentsInitialStudioFocus('identity')
         },
       }
     }
@@ -459,12 +507,18 @@ export default function AuthenticatedPortal({
             onNavigateToDiscover={() => openPage('discover')}
             initialSubscriptionId={myAgentsInitialSubscriptionId}
             initialSection={myAgentsInitialSection}
+            initialStudioStep={myAgentsInitialStudioStep}
+            initialStudioFocus={myAgentsInitialStudioFocus}
           />
         )
       case 'discover':
         return <AgentDiscovery onSelectAgent={handleSelectAgent} />
       case 'agent-detail':
         return <AgentDetail agentIdProp={selectedAgentId} onBack={handleBackToDiscovery} />
+      case 'hire-setup':
+        return <HireSetupWizard />
+      case 'hire-receipt':
+        return <HireReceipt />
       case 'goals':
         return <GoalsSetup />
       case 'deliverables':

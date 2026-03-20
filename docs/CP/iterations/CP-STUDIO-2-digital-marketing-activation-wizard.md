@@ -932,7 +932,6 @@ docker run --rm -v "$PWD/src/CP/FrontEnd:/app" -w /app node:20-bookworm \
 | D07 | The top-menu Show/Hide Help control and the extra help-only panels add noise across CP pages. | Source review of `App.tsx`, `Header.tsx`, `AuthenticatedPortal.tsx`, `SignIn.tsx`, `SignUp.tsx`, and `GoalsSetup.tsx` | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Removed the shared help toggle plumbing and the page help-only panels; validated with updated portal tests. |
 | D08 | My Agents still shows the Runtime View promo box instead of focusing the page on real runtime state. | Source review of `AuthenticatedPortal.tsx` page meta for `my-agents` | `feat/PLANT-YT-CONN-1-it1-e1` | Complete | Removed the stale My Agents promo metadata from the portal shell and kept the page focused on the runtime surface only; validated with the portal regression test. |
 
-
 **Done signal:** `"E2-S4 done. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---

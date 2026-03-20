@@ -72,7 +72,7 @@ export default function HireReceipt() {
         <div className="hire-wizard-bottom-grid" style={{ marginTop: '1.5rem' }}>
           <Card className="hire-wizard-bottom-card">
             <div className="hire-wizard-bottom-title">What happens next</div>
-            <p>Continue into setup, connect what the agent needs, and move into trial or runtime operations with fewer surprises.</p>
+            <p>Continue into My Agents, finish setup inline, and move into trial or runtime operations with fewer surprises.</p>
           </Card>
           <Card className="hire-wizard-bottom-card">
             <div className="hire-wizard-bottom-title">If you stop here</div>
@@ -82,7 +82,7 @@ export default function HireReceipt() {
 
         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <Button
-            appearance="secondary"
+            appearance="primary"
             onClick={() =>
               navigate('/portal', {
                 state: {
@@ -94,29 +94,22 @@ export default function HireReceipt() {
                     lifecycleState,
                     catalogVersion,
                     agentName,
+                    studioStep: 'identity',
+                    studioFocus: 'identity',
                   },
                 },
               })
             }
-          >
-            Go to My Agents
-          </Button>
-          <Button
-            appearance="primary"
-            onClick={() => {
-              const nextQuery = new URLSearchParams({ agentId })
-              if (agentTypeId) nextQuery.set('agentTypeId', agentTypeId)
-              if (catalogReleaseId) nextQuery.set('catalogReleaseId', catalogReleaseId)
-              if (catalogVersion) nextQuery.set('catalogVersion', catalogVersion)
-              if (lifecycleState) nextQuery.set('lifecycleState', lifecycleState)
-              if (agentName) nextQuery.set('agentName', agentName)
-              navigate(`/hire/setup/${encodeURIComponent(subscriptionId)}?${nextQuery.toString()}`)
-            }}
             disabled={!canContinue}
             data-testid="cp-hire-receipt-continue"
           >
-            Continue Setup
+            Open My Agents setup
           </Button>
+          {agentTypeId || catalogReleaseId ? (
+            <Button appearance="secondary" onClick={() => navigate('/portal')}>
+              Save reference and exit
+            </Button>
+          ) : null}
         </div>
       </Card>
     </div>

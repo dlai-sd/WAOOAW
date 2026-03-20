@@ -36,6 +36,8 @@ from api.feature_flags_proxy import router as feature_flags_proxy_router  # E2-S
 from api.cp_profile import router as cp_profile_router  # E4-S1 (CP-NAV-1 It-2)
 from api.cp_catalog import router as cp_catalog_router
 from api.cp_youtube_connections import router as cp_youtube_connections_router
+from api.cp_hired_agent_studio import router as cp_hired_agent_studio_router
+from api.digital_marketing_activation import router as digital_marketing_activation_router
 from middleware.security import SecurityMiddleware
 from core.config import Settings as _Settings
 from core.dependencies import require_correlation_id  # P-2: global correlation ID
@@ -108,6 +110,8 @@ app.include_router(feature_flags_proxy_router, prefix="/api")  # E2-S2 (It-7)
 app.include_router(cp_profile_router, prefix="/api")  # E4-S1 (CP-NAV-1 It-2)
 app.include_router(cp_catalog_router, prefix="/api")
 app.include_router(cp_youtube_connections_router, prefix="/api")
+app.include_router(cp_hired_agent_studio_router, prefix="/api")
+app.include_router(digital_marketing_activation_router, prefix="/api")
 
 # CP-SKILLS-1: Skills, platform connections, performance proxy
 from api.cp_skills import router as cp_skills_router

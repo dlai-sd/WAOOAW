@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlencode
+import os
 import secrets
 
 import httpx
@@ -53,7 +54,18 @@ class YouTubeConnectionService:
         self._db = db
         self._secret_manager = secret_manager or get_secret_manager_service()
 
+    def _oauth_client_id(self) -> str:
+        return str(settings.google_client_id or "").strip()
+
+    def _oauth_client_secret(self) -> str:
+        return str(os.getenv("GOOGLE_CLIENT_SECRET") or "").strip()
+
+    def _ensure_oauth_configured(self) -> None:
+        if not self._oauth_client_id() or not self._oauth_client_secret():
+            raise YouTubeConnectionError("youtube_oauth_not_configured")
+
     async def start_connect(self, *, customer_id: str, redirect_uri: str) -> StartConnectResult:
+        self._ensure_oauth_configured()
         now = datetime.now(timezone.utc)
         state = secrets.token_urlsafe(32)
         nonce = secrets.token_urlsafe(24)
@@ -73,7 +85,7 @@ class YouTubeConnectionService:
         await self._db.commit()
 
         params = {
-            "client_id": settings.youtube_client_id,
+            "client_id": self._oauth_client_id(),
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "access_type": "offline",
@@ -226,10 +238,11 @@ class YouTubeConnectionService:
         return session
 
     async def _exchange_code_for_tokens(self, *, code: str, redirect_uri: str) -> dict[str, Any]:
+        self._ensure_oauth_configured()
         payload = {
             "code": code,
-            "client_id": settings.youtube_client_id,
-            "client_secret": settings.youtube_client_secret,
+            "client_id": self._oauth_client_id(),
+            "client_secret": self._oauth_client_secret(),
             "redirect_uri": redirect_uri,
             "grant_type": "authorization_code",
         }

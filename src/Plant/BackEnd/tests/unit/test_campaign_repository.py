@@ -232,6 +232,151 @@ async def test_delete_campaign_returns_false():
     session.delete.assert_not_called()
 
 
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_get_active_draft_campaign_by_hired_instance_returns_single_latest_draft():
+    """E2-S1-T1: same hired instance reuses one active draft campaign."""
+    session = _make_mock_session()
+    latest_campaign = _make_campaign("CAM-LATEST")
+    mock_result = MagicMock()
+    mock_result.scalars.return_value.first.return_value = latest_campaign
+    session.execute = AsyncMock(return_value=mock_result)
+
+    repo = CampaignRepository(session)
+    result = await repo.get_active_draft_campaign_by_hired_instance("hired-001")
+
+    assert result is latest_campaign
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_replace_theme_items_removes_old_and_persists_new():
+    """E2-S1-T2: replacing theme items deletes old rows before inserting new ones."""
+    session = _make_mock_session()
+    repo = CampaignRepository(session)
+
+    existing_item = _make_theme_item("THM-OLD")
+    repo.create_theme_item = AsyncMock(
+        side_effect=[
+            _make_theme_item("THM-NEW-1"),
+            _make_theme_item("THM-NEW-2"),
+        ]
+    )
+
+    with patch.object(repo, "list_theme_items_by_campaign", AsyncMock(return_value=[existing_item])):
+        items = await repo.replace_theme_items(
+            "CAM-001",
+            [
+                {
+                    "day_number": 1,
+                    "scheduled_date": date(2026, 3, 7),
+                    "theme_title": "New 1",
+                    "theme_description": "New theme 1",
+                    "dimensions": ["weekly"],
+                },
+                {
+                    "day_number": 2,
+                    "scheduled_date": date(2026, 3, 8),
+                    "theme_title": "New 2",
+                    "theme_description": "New theme 2",
+                    "dimensions": ["weekly"],
+                },
+            ],
+        )
+
+    session.execute.assert_awaited()
+    assert [item.theme_item_id for item in items] == ["THM-NEW-1", "THM-NEW-2"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_upsert_draft_campaign_with_theme_items_reuses_existing_campaign_id():
+    """E2-S1-T1: repeated DMA setup saves reuse the same active draft campaign."""
+    session = _make_mock_session()
+    repo = CampaignRepository(session)
+    existing_campaign = _make_campaign("CAM-REUSED")
+
+    with patch.object(
+        repo,
+        "get_active_draft_campaign_by_hired_instance",
+        AsyncMock(side_effect=[None, existing_campaign]),
+    ), patch.object(
+        repo,
+        "create_campaign",
+        AsyncMock(return_value=existing_campaign),
+    ) as create_campaign, patch.object(
+        repo,
+        "update_campaign_brief",
+        AsyncMock(return_value=existing_campaign),
+    ) as update_campaign_brief, patch.object(
+        repo,
+        "replace_theme_items",
+        AsyncMock(return_value=[]),
+    ) as replace_theme_items:
+        first = await repo.upsert_draft_campaign_with_theme_items(
+            hired_instance_id="hired-001",
+            customer_id="cust-001",
+            brief=BRIEF,
+            cost_estimate=COST_ESTIMATE,
+            theme_items=[],
+        )
+        second = await repo.upsert_draft_campaign_with_theme_items(
+            hired_instance_id="hired-001",
+            customer_id="cust-001",
+            brief={**BRIEF, "theme": "Updated theme"},
+            cost_estimate=COST_ESTIMATE,
+            theme_items=[],
+        )
+
+    assert first.campaign_id == "CAM-REUSED"
+    assert second.campaign_id == "CAM-REUSED"
+    create_campaign.assert_awaited_once()
+    update_campaign_brief.assert_awaited_once()
+    assert replace_theme_items.await_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_upsert_draft_campaign_with_theme_items_replaces_theme_rows():
+    """E2-S1-T2: the upsert helper replaces theme items on the reused draft."""
+    session = _make_mock_session()
+    repo = CampaignRepository(session)
+    existing_campaign = _make_campaign("CAM-REUSED")
+    replacement_items = [
+        {
+            "day_number": 1,
+            "scheduled_date": date(2026, 3, 7),
+            "theme_title": "New 1",
+            "theme_description": "Replacement theme",
+            "dimensions": ["weekly"],
+        }
+    ]
+
+    with patch.object(
+        repo,
+        "get_active_draft_campaign_by_hired_instance",
+        AsyncMock(return_value=existing_campaign),
+    ), patch.object(
+        repo,
+        "update_campaign_brief",
+        AsyncMock(return_value=existing_campaign),
+    ), patch.object(
+        repo,
+        "replace_theme_items",
+        AsyncMock(return_value=[_make_theme_item("THM-NEW")]),
+    ) as replace_theme_items:
+        result = await repo.upsert_draft_campaign_with_theme_items(
+            hired_instance_id="hired-001",
+            customer_id="cust-001",
+            brief=BRIEF,
+            cost_estimate=COST_ESTIMATE,
+            theme_items=replacement_items,
+        )
+
+    assert result.campaign_id == "CAM-REUSED"
+    replace_theme_items.assert_awaited_once_with("CAM-REUSED", replacement_items)
+
+
 # ── CampaignRepository — DailyThemeItem ───────────────────────────────────────
 
 @pytest.mark.asyncio

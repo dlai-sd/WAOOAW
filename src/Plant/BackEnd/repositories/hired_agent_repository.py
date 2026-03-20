@@ -225,6 +225,39 @@ class HiredAgentRepository:
         await self.session.refresh(existing)
         return existing
 
+    async def update_config(
+        self,
+        hired_instance_id: str,
+        *,
+        config: dict[str, Any],
+        configured: bool | None = None,
+    ) -> HiredAgentModel:
+        """Persist a full config payload for an existing hired agent.
+
+        Args:
+            hired_instance_id: Unique identifier for hired agent
+            config: Full config document to persist
+            configured: Optional configured flag to store alongside config
+
+        Returns:
+            Updated hired agent model
+
+        Raises:
+            ValueError: If hired_instance_id is not found
+        """
+        existing = await self.get_by_id(hired_instance_id)
+        if not existing:
+            raise ValueError(f"Hired agent instance {hired_instance_id} not found")
+
+        existing.config = config
+        if configured is not None:
+            existing.configured = configured
+        existing.updated_at = datetime.now(timezone.utc)
+
+        await self.session.flush()
+        await self.session.refresh(existing)
+        return existing
+
     async def deactivate_by_subscription_id(self, subscription_id: str) -> HiredAgentModel | None:
         existing = await self.get_by_subscription_id(subscription_id)
         if not existing:

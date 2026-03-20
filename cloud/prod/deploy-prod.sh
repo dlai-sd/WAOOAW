@@ -83,7 +83,7 @@ gcloud run deploy $BACKEND_SERVICE \
   --max-instances 50 \
   --cpu-throttling \
   --set-env-vars "ENV=$ENV" \
-  --set-secrets "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,JWT_SECRET=JWT_SECRET:latest,DATABASE_URL=DATABASE_URL_PROD:latest,REDIS_URL=REDIS_URL_PROD:latest" \
+        --set-secrets "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,JWT_SECRET=JWT_SECRET:latest,DATABASE_URL=DATABASE_URL_PROD:latest,REDIS_URL=REDIS_URL_PROD:latest" \
   --no-traffic
 
 BACKEND_URL=$(gcloud run services describe $BACKEND_SERVICE --region $REGION --format 'value(status.url)')

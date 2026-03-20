@@ -40,6 +40,44 @@ function AgentDetailInPortal({
   )
 }
 
+function HireSetupInPortal({
+  theme,
+  toggleTheme,
+  handleLogout,
+}: {
+  theme: 'light' | 'dark'
+  toggleTheme: () => void
+  handleLogout: () => void
+}) {
+  return (
+    <AuthenticatedPortal
+      theme={theme}
+      toggleTheme={toggleTheme}
+      onLogout={handleLogout}
+      initialPage="hire-setup"
+    />
+  )
+}
+
+function HireReceiptInPortal({
+  theme,
+  toggleTheme,
+  handleLogout,
+}: {
+  theme: 'light' | 'dark'
+  toggleTheme: () => void
+  handleLogout: () => void
+}) {
+  return (
+    <AuthenticatedPortal
+      theme={theme}
+      toggleTheme={toggleTheme}
+      onLogout={handleLogout}
+      initialPage="hire-receipt"
+    />
+  )
+}
+
 function AppContent() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const { isAuthenticated, isLoading, logout } = useAuth()
@@ -194,10 +232,11 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <>
-                <Header theme={theme} toggleTheme={toggleTheme} />
-                <HireSetupWizard />
-              </>
+              <HireSetupInPortal
+                theme={theme}
+                toggleTheme={toggleTheme}
+                handleLogout={handleLogout}
+              />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}
@@ -212,10 +251,11 @@ function AppContent() {
                 <Spinner size="large" />
               </div>
             ) : isAuthenticated ? (
-              <>
-                <Header theme={theme} toggleTheme={toggleTheme} />
-                <HireReceipt />
-              </>
+              <HireReceiptInPortal
+                theme={theme}
+                toggleTheme={toggleTheme}
+                handleLogout={handleLogout}
+              />
             ) : (
               <Navigate
                 to={`/signin?next=${encodeURIComponent(location.pathname + location.search)}`}

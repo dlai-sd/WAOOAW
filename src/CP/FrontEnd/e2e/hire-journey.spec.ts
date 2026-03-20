@@ -60,23 +60,29 @@ test.describe('CP hire journey', () => {
         return
       }
 
-      if (path.endsWith('/api/v1/agents')) {
+      if (path.endsWith('/api/cp/catalog/agents')) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify([
             {
+              release_id: 'CAR-DMA-001',
               id: agentId,
-              name: 'Digital Marketing Agent',
-              description: 'Captures Theme Discovery, generates drafts, and keeps YouTube publish gated by exact customer approval.',
-              job_role_id: jobRoleId,
-              industry: 'marketing',
-              entity_type: 'agent',
-              status: 'active',
-              created_at: '2026-03-01T09:00:00Z',
+              public_name: 'Digital Marketing Agent',
+              short_description: 'Captures Theme Discovery, generates drafts, and keeps YouTube publish gated by exact customer approval.',
+              industry_name: 'Marketing',
+              job_role_label: 'Digital Marketing Strategist',
+              monthly_price_inr: 12000,
               trial_days: 7,
               allowed_durations: ['monthly'],
-              price: 12000,
+              supported_channels: ['youtube'],
+              approval_mode: 'manual_review',
+              agent_type_id: 'marketing.digital_marketing.v1',
+              internal_definition_version_id: '1.0.0',
+              external_catalog_version: 'v1',
+              lifecycle_state: 'live_on_cp',
+              approved_for_new_hire: true,
+              retired_from_catalog_at: null,
             },
           ]),
         })
@@ -178,6 +184,32 @@ test.describe('CP hire journey', () => {
 
       if (path.endsWith(`/api/cp/hire/wizard/by-subscription/${subscriptionId}`)) {
         await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: 'Draft not found' }) })
+        return
+      }
+
+      if (path.endsWith('/api/cp/youtube-connections') && method === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 'cred-youtube-001',
+              customer_id: 'cp-hire-journey-user',
+              platform_key: 'youtube',
+              display_name: 'Clinic Growth Studio',
+              granted_scopes: ['youtube.upload'],
+              verification_status: 'verified',
+              connection_status: 'connected',
+              created_at: '2026-03-10T09:00:00Z',
+              updated_at: '2026-03-10T09:00:00Z',
+            },
+          ]),
+        })
+        return
+      }
+
+      if (path.endsWith('/attach') && path.includes('/api/cp/youtube-connections/') && method === 'POST') {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ attached: true }) })
         return
       }
 
@@ -292,6 +324,53 @@ test.describe('CP hire journey', () => {
             configured: true,
             goals_completed: true,
             trial_status: 'active',
+          }),
+        })
+        return
+      }
+
+      if (path.endsWith(`/api/cp/hired-agents/${hiredInstanceId}/studio`)) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            hired_instance_id: hiredInstanceId,
+            subscription_id: subscriptionId,
+            agent_id: agentId,
+            agent_type_id: 'marketing.digital_marketing.v1',
+            customer_id: 'cp-hire-journey-user',
+            mode: 'edit',
+            selection_required: false,
+            current_step: 'review',
+            steps: [
+              { key: 'identity', title: 'Identity and voice', complete: true, blocked: false, summary: 'Business-facing name and theme are ready.' },
+              { key: 'connection', title: 'Connection', complete: true, blocked: false, summary: 'YouTube connection verified and ready.' },
+              { key: 'operating_plan', title: 'Operating plan', complete: true, blocked: false, summary: 'Operating plan is in place.' },
+              { key: 'review', title: 'Review edits', complete: true, blocked: false, summary: 'Runtime is ready for review.' },
+            ],
+            identity: { nickname: 'YouTube Growth Desk', theme: 'dark', complete: true },
+            connection: {
+              platform_key: 'youtube',
+              skill_id: 'default',
+              connection_id: null,
+              customer_platform_credential_id: 'cred-youtube-001',
+              status: 'connected',
+              complete: true,
+              summary: 'Clinic Growth Studio is connected and verified.',
+            },
+            operating_plan: {
+              complete: true,
+              goals_completed: true,
+              goal_count: 1,
+              skill_config_count: 1,
+              summary: 'Theme Discovery and cadence are configured.',
+            },
+            review: { complete: true, summary: 'Runtime is ready.' },
+            configured: true,
+            goals_completed: true,
+            trial_status: 'active',
+            subscription_status: 'trialing',
+            updated_at: '2026-03-10T10:00:00Z',
           }),
         })
         return
@@ -453,38 +532,14 @@ test.describe('CP hire journey', () => {
     await expect(page.getByTestId('cp-hire-receipt-page')).toBeVisible()
     await page.getByTestId('cp-hire-receipt-continue').click()
 
-    await page.waitForURL(new RegExp(`/hire/setup/${subscriptionId}`))
-    await expect(page.getByTestId('cp-hire-setup-page')).toBeVisible()
-
-    await page.getByTestId('cp-hire-setup-nickname').fill('YouTube Growth Desk')
-    await page.getByTestId('cp-hire-setup-next').click()
-    await page.getByTestId('cp-hire-setup-theme').selectOption('dark')
-    await page.getByTestId('cp-hire-setup-next').click()
-    await page.getByTestId('cp-hire-setup-platform').selectOption('youtube')
-    await page.getByTestId('cp-hire-setup-posting-identity').fill('ClinicGrowthStudio')
-    await page.getByTestId('cp-hire-setup-access-token').fill('token-123')
-    await page.getByTestId('cp-hire-setup-refresh-token').fill('refresh-123')
-    await page.getByTestId('cp-hire-setup-next').click()
-    await page.getByTestId('cp-hire-setup-goals-completed').click()
-    await page.getByTestId('cp-hire-setup-activate').click()
-
     await page.waitForURL(/\/portal/)
     await expect(page.getByTestId('cp-portal-entry-banner')).toBeVisible()
-    await expect(page.getByText(`${agentId} is now in runtime setup`)).toBeVisible()
-    await expect(page.getByText('You landed in My Agents because that is the first truthful place to confirm the runtime, monitor hydration, and continue operating without guessing.')).toBeVisible()
-
-    await page.locator('button').filter({ hasText: 'Goal Setting' }).click()
-    await expect(page.getByText('Saved Theme Discovery brief')).toBeVisible()
-    await expect(page.getByText('Business name')).toBeVisible()
-    await expect(page.getByText('Clinic Growth Studio')).toBeVisible()
-    await expect(page.getByText('Drafts (1)')).toBeVisible()
-    await page.locator('button').filter({ hasText: 'Review' }).click()
-
+    await expect(page.getByText('Setup is still required for Digital Marketing Agent')).toBeVisible()
+    await expect(page.getByText('My Agents')).toBeVisible()
+    await page.getByTestId('cp-portal-entry-primary').click()
+    await page.getByRole('button', { name: /Review and activate/i }).click()
+    await page.getByRole('button', { name: 'Open YouTube setup' }).click()
+    await expect(page.getByText(/platform connections/i)).toBeVisible()
     await expect(page.getByText('YouTube channel status')).toBeVisible()
-    await expect(page.getByText('Publish readiness')).toBeVisible()
-    await expect(page.getByText('Youtube not connected')).toBeVisible()
-    await expect(page.getByText('Blocked by approval')).toBeVisible()
-    await expect(page.getByText('Customer approval', { exact: true })).toBeVisible()
-    await expect(page.getByText('Approve exact deliverable')).toBeVisible()
   })
 })

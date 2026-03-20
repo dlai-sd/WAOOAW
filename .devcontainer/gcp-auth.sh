@@ -9,19 +9,35 @@
 # What this does:
 #   1. Writes SA JSON to /root/.gcp/waooaw-sa.json (persisted, never committed)
 #   2. Activates it with gcloud + sets project waooaw-oauth
-#   3. Starts Cloud SQL Auth Proxy in background (port 15432 → plant-sql-demo)
+#   3. Starts Cloud SQL Auth Proxy in background (port 15432 by default)
 #   4. Reads DB_USER + DB_PASSWORD from Secret Manager → /root/.env.db
 #   5. Prints connection hint
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
 
+TARGET_ENV="${WAOOAW_CLOUDSQL_ENV:-demo}"
+PROJECT_ID="${WAOOAW_GCP_PROJECT_ID:-waooaw-oauth}"
+REGION="${WAOOAW_GCP_REGION:-asia-south1}"
+
+case "$TARGET_ENV" in
+    demo|uat|prod)
+        ;;
+    *)
+        echo "❌ Unsupported WAOOAW_CLOUDSQL_ENV: ${TARGET_ENV}"
+        echo "   Allowed values: demo, uat, prod"
+        exit 1
+        ;;
+esac
+
 GCP_DIR="/root/.gcp"
 KEY_FILE="${GCP_DIR}/waooaw-sa.json"
 DB_ENV_FILE="/root/.env.db"
 PROXY_LOG="/tmp/cloud-sql-proxy.log"
-INSTANCE="waooaw-oauth:asia-south1:plant-sql-demo"
-PROXY_PORT=15432
+INSTANCE_NAME="${WAOOAW_CLOUDSQL_INSTANCE_NAME:-plant-sql-${TARGET_ENV}}"
+INSTANCE="${PROJECT_ID}:${REGION}:${INSTANCE_NAME}"
+PROXY_PORT="${WAOOAW_CLOUDSQL_PROXY_PORT:-15432}"
+DATABASE_URL_SECRET="${WAOOAW_DB_URL_SECRET:-${TARGET_ENV}-plant-database-url}"
 
 # ── 1. Auth ──────────────────────────────────────────────────────────────────
 if [[ -z "${GCP_SA_KEY:-}" ]]; then
@@ -36,8 +52,20 @@ printf '%s' "$GCP_SA_KEY" > "$KEY_FILE"
 chmod 600 "$KEY_FILE"
 
 gcloud auth activate-service-account --key-file="$KEY_FILE" --quiet
-gcloud config set project waooaw-oauth --quiet
+gcloud config set project "$PROJECT_ID" --quiet
 echo "✅ GCP auth active: $(gcloud config get-value account 2>/dev/null)"
+echo "   Target env: ${TARGET_ENV} | Instance: ${INSTANCE} | Secret: ${DATABASE_URL_SECRET}"
+
+PUBLIC_IP_ENABLED=$(gcloud sql instances describe "$INSTANCE_NAME" \
+    --project="$PROJECT_ID" \
+    --format='value(settings.ipConfiguration.ipv4Enabled)' 2>/dev/null || true)
+
+if [[ "$PUBLIC_IP_ENABLED" != "True" && "$PUBLIC_IP_ENABLED" != "true" ]]; then
+    echo "❌ Cloud SQL public IP is disabled for ${INSTANCE_NAME}."
+    echo "   Codespaces uses the public-IP-backed Auth Proxy path documented in docs/CONTEXT_AND_INDEX.md."
+    echo "   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=${PROJECT_ID} --quiet"
+    exit 1
+fi
 
 # ── 2. Cloud SQL Auth Proxy ───────────────────────────────────────────────────
 PROXY_BIN="/usr/local/bin/cloud-sql-proxy"
@@ -67,14 +95,18 @@ if kill -0 "$PROXY_PID" 2>/dev/null && grep -q "ready for new connections" "$PRO
 else
     echo "❌ Cloud SQL Proxy failed to start — check $PROXY_LOG"
     cat "$PROXY_LOG" || true
+    if grep -q 'instance does not have IP of type "PUBLIC"' "$PROXY_LOG"; then
+        echo "   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=${PROJECT_ID} --quiet"
+    fi
+    exit 1
 fi
 
 # ── 3. DB credentials from Secret Manager ────────────────────────────────────
 echo "🔑 Reading DB credentials from Secret Manager..."
 
 DB_URL=$(gcloud secrets versions access latest \
-    --secret="demo-plant-database-url" \
-    --project=waooaw-oauth 2>/dev/null) || true
+    --secret="$DATABASE_URL_SECRET" \
+    --project="$PROJECT_ID" 2>/dev/null) || true
 
 if [[ -n "$DB_URL" ]]; then
     # Parse user/password/db from postgresql+asyncpg://user:pass@/db?host=...
@@ -95,9 +127,11 @@ export PGDATABASE=${DB_NAME}
 EOF
     chmod 600 "$DB_ENV_FILE"
     echo "✅ DB ready — connect: source ${DB_ENV_FILE} && psql"
-    echo "   Instance: plant-sql-demo | DB: ${DB_NAME} | User: ${DB_USER}"
+    echo "   Environment: ${TARGET_ENV} | Instance: ${INSTANCE_NAME} | DB: ${DB_NAME} | User: ${DB_USER}"
 else
     echo "⚠️  Could not read DB credentials from Secret Manager."
     echo "   SA may need roles/secretmanager.secretAccessor"
-    echo "   Once granted, re-run: bash .devcontainer/gcp-auth.sh"
+    echo "   Expected secret: ${DATABASE_URL_SECRET}"
+    echo "   Once granted or corrected, re-run: bash .devcontainer/gcp-auth.sh"
+    exit 1
 fi

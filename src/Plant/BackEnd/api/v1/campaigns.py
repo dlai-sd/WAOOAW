@@ -20,8 +20,9 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import date, timedelta
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Literal, Optional
+from typing import Any, AsyncGenerator, Literal, Optional
 
 from fastapi import Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
@@ -200,6 +201,136 @@ def _build_publish_input(post: ContentPost) -> PublishInput:
         visibility=str(metadata.get("visibility") or "private"),
         public_release_requested=bool(metadata.get("public_release_requested", False)),
     )
+
+
+def _normalize_activation_platforms(payload: dict[str, Any]) -> list[str]:
+    raw = payload.get("selected_platforms")
+    if not isinstance(raw, list):
+        return ["youtube"]
+    normalized = [str(item or "").strip().lower() for item in raw]
+    deduped = [item for item in normalized if item]
+    return deduped or ["youtube"]
+
+
+def build_campaign_brief_from_activation_payload(payload: dict[str, Any]) -> CampaignBrief:
+    """Map Digital Marketing activation data into the shared CampaignBrief model."""
+    induction = dict(payload.get("induction") or {})
+    theme_plan = dict(payload.get("theme_plan") or {})
+    schedule_payload = dict(payload.get("schedule") or {})
+
+    selected_platforms = _normalize_activation_platforms(payload)
+
+    raw_hours = schedule_payload.get("preferred_hours_utc")
+    hours_input = raw_hours if isinstance(raw_hours, list) else [9]
+    preferred_hours: list[int] = []
+    for hour in hours_input:
+        try:
+            preferred_hours.append(int(hour))
+        except Exception:
+            continue
+    preferred_hours = preferred_hours or [9]
+
+    raw_days = schedule_payload.get("preferred_days")
+    preferred_days = [str(day) for day in raw_days] if isinstance(raw_days, list) else []
+
+    start_date_raw = str(schedule_payload.get("start_date") or "").strip()
+    start_date_value = date.fromisoformat(start_date_raw) if start_date_raw else date.today()
+
+    derived_themes = list(theme_plan.get("derived_themes") or [])
+    duration_days = max(len(derived_themes), 1)
+    try:
+        posts_per_week_value = max(int(schedule_payload.get("posts_per_week") or duration_days), 1)
+    except Exception:
+        posts_per_week_value = max(duration_days, 1)
+
+    offerings = induction.get("offerings_services")
+    offer_text = (
+        ", ".join(str(item).strip() for item in offerings if str(item).strip())
+        if isinstance(offerings, list)
+        else str(offerings or "").strip()
+    )
+
+    return CampaignBrief(
+        theme=str(theme_plan.get("master_theme") or "Digital marketing activation").strip() or "Digital marketing activation",
+        start_date=start_date_value,
+        duration_days=duration_days,
+        destinations=[
+            {
+                "destination_type": platform,
+                "metadata": {"activation_step": "digital_marketing_activation"},
+            }
+            for platform in selected_platforms
+        ],
+        schedule={
+            "times_per_day": 1,
+            "preferred_hours_utc": preferred_hours,
+        },
+        brand_name=str(induction.get("brand_name") or "").strip(),
+        audience=str(induction.get("target_audience") or induction.get("brand_name") or "Business audience").strip() or "Business audience",
+        tone=str(induction.get("theme") or "professional").strip() or "professional",
+        language=str(induction.get("primary_language") or "en").strip() or "en",
+        approval_mode="per_item",
+        theme_discovery={
+            "business_background": str(induction.get("brand_name") or induction.get("business_background") or "Customer activation workspace").strip() or "Customer activation workspace",
+            "objective": str(theme_plan.get("master_theme") or "Create a runtime-ready digital marketing campaign").strip(),
+            "industry": "Digital Marketing",
+            "locality": str(induction.get("location") or "Unknown").strip() or "Unknown",
+            "target_audience": str(induction.get("target_audience") or induction.get("brand_name") or "Business audience").strip() or "Business audience",
+            "persona": str(induction.get("nickname") or "Digital marketing agent").strip() or "Digital marketing agent",
+            "tone": str(induction.get("theme") or "professional").strip() or "professional",
+            "offer": offer_text or "Digital marketing services",
+            "channel_intent": {
+                "primary_destination": selected_platforms[0],
+                "supported_live_destinations": selected_platforms,
+                "content_formats": [],
+                "call_to_action": "",
+            },
+            "posting_cadence": {
+                "posts_per_week": posts_per_week_value,
+                "preferred_days": preferred_days,
+                "preferred_hours_utc": preferred_hours,
+            },
+            "success_metrics": [],
+        },
+        additional_context=str(induction.get("notes") or "").strip(),
+    )
+
+
+def build_theme_items_from_activation_payload(
+    *,
+    campaign_id: str,
+    payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build persisted theme-item rows from activation theme-plan payload."""
+    theme_plan = dict(payload.get("theme_plan") or {})
+    schedule_payload = dict(payload.get("schedule") or {})
+    derived_themes = list(theme_plan.get("derived_themes") or [])
+    start_date_raw = str(schedule_payload.get("start_date") or "").strip()
+    start_date_value = date.fromisoformat(start_date_raw) if start_date_raw else date.today()
+
+    if not derived_themes:
+        derived_themes = [
+            {
+                "title": str(theme_plan.get("master_theme") or "Digital marketing theme").strip() or "Digital marketing theme",
+                "description": "Draft activation theme.",
+                "frequency": "weekly",
+            }
+        ]
+
+    items: list[dict[str, Any]] = []
+    for index, row in enumerate(derived_themes, start=1):
+        row_dict = dict(row or {})
+        items.append(
+            {
+                "campaign_id": campaign_id,
+                "day_number": index,
+                "scheduled_date": start_date_value + timedelta(days=index - 1),
+                "theme_title": str(row_dict.get("title") or f"Theme {index}").strip() or f"Theme {index}",
+                "theme_description": str(row_dict.get("description") or "").strip() or "Derived campaign theme.",
+                "dimensions": [str(row_dict.get("frequency") or "").strip()] if str(row_dict.get("frequency") or "").strip() else [],
+            }
+        )
+    return items
 
 
 def _build_approval_state(posts: list[ContentPost]) -> CampaignApprovalState:

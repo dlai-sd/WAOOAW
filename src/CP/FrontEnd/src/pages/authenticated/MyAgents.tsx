@@ -1815,10 +1815,14 @@ export default function MyAgents({
   onNavigateToDiscover,
   initialSubscriptionId,
   initialSection = 'configure',
+  initialStudioStep,
+  initialStudioFocus,
 }: {
   onNavigateToDiscover?: () => void
   initialSubscriptionId?: string
   initialSection?: MyAgentsSection
+  initialStudioStep?: string
+  initialStudioFocus?: string
 } = {}) {
   const navigate = useNavigate()
 
@@ -1940,7 +1944,19 @@ export default function MyAgents({
 
   const renderTrialBanner = (instance: MyAgentInstanceSummary) => {
     const configured = Boolean(instance.configured)
+    const runtimeReady = configured && Boolean(instance.goals_completed)
     const status = String(instance.trial_status || '').toLowerCase()
+
+    if (runtimeReady) {
+      return (
+        <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
+          <div style={{ fontWeight: 600 }}>Runtime-ready</div>
+          <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
+            This hire has completed setup and is ready for campaign runtime handoff.
+          </div>
+        </div>
+      )
+    }
 
     if (!configured) {
       return (

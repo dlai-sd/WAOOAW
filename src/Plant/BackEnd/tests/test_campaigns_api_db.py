@@ -318,6 +318,41 @@ async def test_get_campaign_db(client: httpx.AsyncClient, monkeypatch: pytest.Mo
     assert r2.json()["status"] == "draft"
 
 
+def test_build_campaign_brief_from_activation_payload_maps_theme_cadence_and_destinations() -> None:
+    brief = camp_module.build_campaign_brief_from_activation_payload(
+        {
+            "induction": {
+                "brand_name": "WAOOAW",
+                "location": "Pune",
+                "offerings_services": ["Digital marketing retainers"],
+            },
+            "selected_platforms": ["youtube", "instagram"],
+            "theme_plan": {
+                "master_theme": "AI agents that earn trust first",
+                "derived_themes": [
+                    {"title": "Customer proof", "description": "Proof-based campaign", "frequency": "weekly"},
+                    {"title": "Behind the scenes", "description": "Ops campaign", "frequency": "weekly"},
+                ],
+            },
+            "schedule": {
+                "start_date": "2026-03-22",
+                "posts_per_week": 3,
+                "preferred_days": ["mon", "wed", "fri"],
+                "preferred_hours_utc": [9, 17],
+            },
+        }
+    )
+
+    assert brief.theme == "AI agents that earn trust first"
+    assert brief.start_date.isoformat() == "2026-03-22"
+    assert brief.schedule.preferred_hours_utc == [9, 17]
+    assert brief.theme_discovery is not None
+    assert brief.theme_discovery.posting_cadence.posts_per_week == 3
+    assert brief.theme_discovery.posting_cadence.preferred_days == ["mon", "wed", "fri"]
+    assert brief.theme_discovery.posting_cadence.preferred_hours_utc == [9, 17]
+    assert [destination.destination_type for destination in brief.destinations] == ["youtube", "instagram"]
+
+
 async def test_approve_theme_items_db(client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Batch-approve all theme items → 200 with all items approved."""
     monkeypatch.setenv("EXECUTOR_BACKEND", "deterministic")

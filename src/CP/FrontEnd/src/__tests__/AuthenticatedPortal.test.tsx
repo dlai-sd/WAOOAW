@@ -3,9 +3,9 @@
  * Verifies the 8 sidebar items per the UX analysis navigation spec.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import AuthenticatedPortal from '../pages/AuthenticatedPortal'
 import { getMyAgentsSummary } from '../services/myAgentsSummary.service'
 import { listHiredAgentDeliverables } from '../services/hiredAgentDeliverables.service'
@@ -85,11 +85,23 @@ vi.mock('../pages/authenticated/CommandCentre', () => ({
   default: () => <div data-testid="page-command-centre">Command Centre Page</div>,
 }))
 vi.mock('../pages/authenticated/MyAgents', () => ({
-  default: ({ initialSubscriptionId, initialSection }: { initialSubscriptionId?: string; initialSection?: string }) => (
+  default: ({
+    initialSubscriptionId,
+    initialSection,
+    initialStudioStep,
+    initialStudioFocus,
+  }: {
+    initialSubscriptionId?: string
+    initialSection?: string
+    initialStudioStep?: string
+    initialStudioFocus?: string
+  }) => (
     <div data-testid="page-my-agents">
       <div>My Agents Page</div>
-      <div data-testid="page-my-agents-initial-subscription">{initialSubscriptionId || 'none'}</div>
+      <div data-testid="page-my-agents-subscription">{initialSubscriptionId || 'none'}</div>
       <div data-testid="page-my-agents-initial-section">{initialSection || 'none'}</div>
+      <div data-testid="page-my-agents-step">{initialStudioStep || 'none'}</div>
+      <div data-testid="page-my-agents-focus">{initialStudioFocus || 'none'}</div>
     </div>
   ),
 }))
@@ -127,6 +139,12 @@ vi.mock('../pages/AgentDiscovery', () => ({
 vi.mock('../pages/AgentDetail', () => ({
   default: ({ agentIdProp }: { agentIdProp?: string }) => <div data-testid="page-agent-detail">Agent Detail {agentIdProp}</div>,
 }))
+vi.mock('../pages/HireSetupWizard', () => ({
+  default: () => <div data-testid="page-hire-setup">Hire Setup Wizard</div>,
+}))
+vi.mock('../pages/HireReceipt', () => ({
+  default: () => <div data-testid="page-hire-receipt">Hire Receipt</div>,
+}))
 
 const navigateMock = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -137,16 +155,19 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-async function renderPortal(props?: Partial<React.ComponentProps<typeof AuthenticatedPortal>>) {
+async function renderPortal(
+  props?: Partial<React.ComponentProps<typeof AuthenticatedPortal>>,
+  portalEntry?: Record<string, unknown>
+) {
   const view = render(
-    <BrowserRouter>
+    <MemoryRouter initialEntries={[{ pathname: '/portal', state: portalEntry ? { portalEntry } : undefined } as any]}>
       <AuthenticatedPortal
         theme="light"
         toggleTheme={() => {}}
         onLogout={() => {}}
         {...props}
       />
-    </BrowserRouter>
+    </MemoryRouter>
   )
 
   await waitFor(() => {
@@ -158,6 +179,10 @@ async function renderPortal(props?: Partial<React.ComponentProps<typeof Authenti
 }
 
 describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
+  beforeEach(() => {
+    navigateMock.mockReset()
+  })
+
   it('renders Command Centre as the default page', async () => {
     await renderPortal()
     expect(screen.getByTestId('page-command-centre')).toBeTruthy()
@@ -294,6 +319,22 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('cp-nav-discover').className).toContain('active')
   })
 
+  it('renders hire receipt inside the portal shell and keeps My Agents highlighted', async () => {
+    await renderPortal({ initialPage: 'hire-receipt' as any })
+
+    expect(screen.getByTestId('cp-portal-root')).toBeTruthy()
+    expect(screen.getByTestId('page-hire-receipt')).toBeTruthy()
+    expect(screen.getByTestId('cp-nav-my-agents').className).toContain('active')
+  })
+
+  it('renders hire setup inside the portal shell and keeps My Agents highlighted', async () => {
+    await renderPortal({ initialPage: 'hire-setup' as any })
+
+    expect(screen.getByTestId('cp-portal-root')).toBeTruthy()
+    expect(screen.getByTestId('page-hire-setup')).toBeTruthy()
+    expect(screen.getByTestId('cp-nav-my-agents').className).toContain('active')
+  })
+
   it('uses truthful shell copy instead of fake runtime counters', async () => {
     await renderPortal()
 
@@ -321,10 +362,35 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
 
     fireEvent.click(screen.getByTestId('cp-portal-entry-primary'))
 
+    expect(navigateMock).not.toHaveBeenCalledWith(expect.stringContaining('/hire/setup/'))
+    expect(screen.getByTestId('page-my-agents-subscription')).toHaveTextContent('SUB-123')
+    expect(screen.getByTestId('page-my-agents-initial-section')).toHaveTextContent('configure')
+    expect(screen.getByTestId('page-my-agents-step')).toHaveTextContent('identity')
+  })
+
+  it('keeps My Agents selected and preserves requested subscription and step from portal entry', async () => {
+    await renderPortal(undefined, {
+      page: 'my-agents',
+      agentId: 'AGT-MKT-001',
+      subscriptionId: 'SUB-123',
+      source: 'payment-confirmed',
+      studioStep: 'identity',
+      studioFocus: 'identity',
+    })
+
     expect(screen.getByTestId('page-my-agents')).toBeTruthy()
-    expect(screen.getByTestId('page-my-agents-initial-subscription').textContent).toBe('SUB-123')
-    expect(screen.getByTestId('page-my-agents-initial-section').textContent).toBe('configure')
-    expect(navigateMock).not.toHaveBeenCalledWith('/hire/setup/SUB-123?agentId=AGT-MKT-001')
+    expect(screen.getByTestId('page-my-agents-subscription')).toHaveTextContent('SUB-123')
+    expect(screen.getByTestId('page-my-agents-step')).toHaveTextContent('identity')
+    expect(screen.getByTestId('cp-nav-my-agents').className).toContain('active')
+  })
+
+  it('keeps existing My Agents landing behavior when no studio metadata is provided', async () => {
+    await renderPortal({ initialPage: 'my-agents' })
+
+    expect(screen.getByTestId('page-my-agents')).toBeTruthy()
+    expect(screen.getByTestId('page-my-agents-subscription')).toHaveTextContent('none')
+    expect(screen.getByTestId('page-my-agents-initial-section')).toHaveTextContent('configure')
+    expect(screen.getByTestId('page-my-agents-step')).toHaveTextContent('none')
   })
 
   it('lands on My Agents with truthful post-activation guidance', async () => {

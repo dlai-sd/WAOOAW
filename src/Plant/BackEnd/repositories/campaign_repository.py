@@ -13,7 +13,7 @@ from datetime import date, datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.campaign import CampaignModel, ContentPostModel, DailyThemeItemModel
@@ -82,6 +82,19 @@ class CampaignRepository:
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_active_draft_campaign_by_hired_instance(
+        self, hired_instance_id: str
+    ) -> CampaignModel | None:
+        """Return the newest draft campaign for a hired instance, if any."""
+        stmt = (
+            select(CampaignModel)
+            .where(CampaignModel.hired_instance_id == hired_instance_id)
+            .where(CampaignModel.status == "draft")
+            .order_by(CampaignModel.updated_at.desc(), CampaignModel.created_at.desc())
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
 
     async def create_campaign(
         self,
@@ -173,6 +186,69 @@ class CampaignRepository:
         await self.session.flush()
         await self.session.refresh(existing)
         return existing
+
+    async def update_campaign_brief(
+        self,
+        campaign_id: str,
+        *,
+        brief: dict[str, Any],
+        cost_estimate: dict[str, Any] | None = None,
+        workflow_state: str | None = None,
+        brief_summary: dict[str, Any] | None = None,
+    ) -> CampaignModel:
+        """Replace the persisted brief for an existing campaign."""
+        existing = await self.get_campaign_by_id(campaign_id)
+        if existing is None:
+            raise ValueError(f"Campaign {campaign_id!r} not found")
+        existing.brief = brief
+        if cost_estimate is not None:
+            existing.cost_estimate = cost_estimate
+        if workflow_state is not None:
+            existing.workflow_state = workflow_state
+        if brief_summary is not None:
+            existing.brief_summary = brief_summary
+        existing.updated_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        await self.session.refresh(existing)
+        return existing
+
+    async def upsert_draft_campaign_with_theme_items(
+        self,
+        *,
+        hired_instance_id: str,
+        customer_id: str,
+        brief: dict[str, Any],
+        cost_estimate: dict[str, Any],
+        theme_items: list[dict[str, Any]],
+        workflow_state: str = "brief_captured",
+        brief_summary: dict[str, Any] | None = None,
+    ) -> CampaignModel:
+        """Create or update the single active draft campaign for a hired instance.
+
+        This keeps DMA setup on one reusable draft campaign while replacing the
+        derived theme list in the same session transaction.
+        """
+        existing = await self.get_active_draft_campaign_by_hired_instance(hired_instance_id)
+        if existing is None:
+            campaign = await self.create_campaign(
+                hired_instance_id=hired_instance_id,
+                customer_id=customer_id,
+                brief=brief,
+                cost_estimate=cost_estimate,
+                workflow_state=workflow_state,
+                brief_summary=brief_summary,
+            )
+        else:
+            campaign = await self.update_campaign_brief(
+                existing.campaign_id,
+                brief=brief,
+                cost_estimate=cost_estimate,
+                workflow_state=workflow_state,
+                brief_summary=brief_summary,
+            )
+
+        await self.replace_theme_items(campaign.campaign_id, theme_items)
+        return campaign
 
     async def delete_campaign(self, campaign_id: str) -> bool:
         """Delete a campaign and its dependent rows (cascade).
@@ -296,6 +372,32 @@ class CampaignRepository:
         await self.session.flush()
         await self.session.refresh(existing)
         return existing
+
+    async def replace_theme_items(
+        self,
+        campaign_id: str,
+        items: list[dict[str, Any]],
+    ) -> list[DailyThemeItemModel]:
+        """Replace all theme items for a campaign in one transaction."""
+        await self.session.execute(
+            delete(DailyThemeItemModel).where(DailyThemeItemModel.campaign_id == campaign_id)
+        )
+        await self.session.flush()
+
+        persisted: list[DailyThemeItemModel] = []
+        for item in items:
+            persisted.append(
+                await self.create_theme_item(
+                    campaign_id=campaign_id,
+                    day_number=int(item["day_number"]),
+                    scheduled_date=item["scheduled_date"],
+                    theme_title=str(item["theme_title"]),
+                    theme_description=str(item["theme_description"]),
+                    dimensions=list(item.get("dimensions") or []),
+                    theme_item_id=item.get("theme_item_id"),
+                )
+            )
+        return persisted
 
     # ── ContentPost ───────────────────────────────────────────────────────
 

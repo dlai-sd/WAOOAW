@@ -46,6 +46,7 @@ module "plant_database" {
   enable_pitr         = var.db_enable_pitr
   max_connections     = var.db_max_connections
   private_network_id  = var.private_network_id
+  enable_public_ip    = var.db_enable_public_ip
   database_name       = "plant"
   database_user       = "plant_app"
   database_password   = var.database_password
@@ -124,6 +125,7 @@ module "plant_backend" {
       GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
       GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
       JWT_SECRET           = "JWT_SECRET:latest"
+      XAI_API_KEY          = "${var.xai_api_key_secret_name}:latest"
       SMTP_USERNAME        = "${var.smtp_username_secret}:latest"
       SMTP_PASSWORD        = "${var.smtp_password_secret}:latest"
     } : {},

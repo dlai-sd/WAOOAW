@@ -21,13 +21,15 @@ db_availability_type   = "ZONAL"
 db_disk_size_gb        = 20
 db_enable_pitr         = false
 db_max_connections     = "50"
+db_enable_public_ip    = true  # Required for the documented Codespaces Cloud SQL Auth Proxy path.
 db_deletion_protection = false # Allow easy cleanup for demo
 
 # OTP email delivery — runtime-injected SMTP config (NOT baked into image)
 # smtp_host and smtp_port use module defaults (smtp.gmail.com:587)
-smtp_from_email      = "customersupport@dlaisd.com"
-smtp_username_secret = "CP_OTP_SMTP_USERNAME" # Secret Manager secret name (no version suffix)
-smtp_password_secret = "CP_OTP_SMTP_PASSWORD" # Secret Manager secret name (no version suffix)
+smtp_from_email         = "customersupport@dlaisd.com"
+smtp_username_secret    = "CP_OTP_SMTP_USERNAME" # Secret Manager secret name (no version suffix)
+smtp_password_secret    = "CP_OTP_SMTP_PASSWORD" # Secret Manager secret name (no version suffix)
+xai_api_key_secret_name = "XAI_API_KEY"
 
 # Payments — demo runs Razorpay (test-mode keys, rzp_test_*, no real money moves)
 # alongside the WAOOAW100 coupon free-trial flow.  Both flows are live.
