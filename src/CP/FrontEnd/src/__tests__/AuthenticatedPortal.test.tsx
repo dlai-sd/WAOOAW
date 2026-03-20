@@ -143,8 +143,6 @@ async function renderPortal(props?: Partial<React.ComponentProps<typeof Authenti
       <AuthenticatedPortal
         theme="light"
         toggleTheme={() => {}}
-        showHelpBoxes={true}
-        toggleHelpBoxes={() => {}}
         onLogout={() => {}}
         {...props}
       />
@@ -248,14 +246,11 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('page-billing')).toBeTruthy()
   })
 
-  it('calls the help toggle from the portal header', async () => {
-    const toggleHelpBoxes = vi.fn()
-    await renderPortal({ showHelpBoxes: true, toggleHelpBoxes })
+  it('does not render the old portal help toggle', async () => {
+    await renderPortal()
 
-    fireEvent.click(screen.getByTestId('cp-portal-help-toggle'))
-
-    expect(toggleHelpBoxes).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: 'Hide help boxes' })).toBeTruthy()
+    expect(screen.queryByTestId('cp-portal-help-toggle')).toBeNull()
+    expect(screen.queryByRole('button', { name: /help boxes/i })).toBeNull()
   })
 
   it('opens the mobile drawer and closes it from the overlay', async () => {

@@ -36,8 +36,6 @@ import { getPlatformConnectionSummary, listPlatformConnections, type PlatformCon
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
   toggleTheme: () => void
-  showHelpBoxes: boolean
-  toggleHelpBoxes: () => void
   onLogout: () => void
   initialPage?: Page
   initialAgentId?: string
@@ -139,8 +137,6 @@ function toInboxItem(
 export default function AuthenticatedPortal({
   theme,
   toggleTheme,
-  showHelpBoxes,
-  toggleHelpBoxes,
   onLogout,
   initialPage,
   initialAgentId,
@@ -507,15 +503,6 @@ export default function AuthenticatedPortal({
             <div className="portal-header-controls">
               <Button
                 appearance="subtle"
-                className="portal-help-toggle"
-                onClick={toggleHelpBoxes}
-                aria-label={showHelpBoxes ? 'Hide help boxes' : 'Show help boxes'}
-                data-testid="cp-portal-help-toggle"
-              >
-                {showHelpBoxes ? 'Hide Help' : 'Show Help'}
-              </Button>
-              <Button
-                appearance="subtle"
                 className="portal-theme-toggle"
                 icon={theme === 'light' ? <WeatherMoon20Regular /> : <WeatherSunny20Regular />}
                 onClick={toggleTheme}
@@ -547,7 +534,7 @@ export default function AuthenticatedPortal({
 
       <div className="portal-layout">
         <aside className={`portal-sidebar ${sidebarCollapsed ? 'collapsed' : ''} ${mobileNavOpen ? 'open' : ''}`}>
-          <div className="portal-sidebar-card" data-help-box="true">
+          <div className="portal-sidebar-card">
             <div className="portal-sidebar-card-label">Workspace</div>
             {!sidebarCollapsed && (
               <>

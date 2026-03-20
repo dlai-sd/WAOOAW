@@ -369,7 +369,7 @@ export default function GoalsSetup() {
                   values={values}
                 />
 
-                <Card style={{ padding: '1rem 1.1rem' }} data-help-box="true">
+                <Card style={{ padding: '1rem 1.1rem' }}>
                   <div style={{ fontWeight: 600 }}>Why this matters</div>
                   <div style={{ marginTop: '0.5rem', opacity: 0.82, lineHeight: 1.6 }}>
                     Theme Discovery is the customer-approved source of truth for the Digital Marketing Agent. Better brief quality here reduces generic drafts and false-positive publish readiness later.
