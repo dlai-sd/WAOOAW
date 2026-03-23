@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 
 const mockedNavigate = vi.fn()
 
@@ -10,6 +10,10 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
+beforeEach(() => {
+  mockedNavigate.mockReset()
+  window.localStorage.clear()
+})
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { FluentProvider } from '@fluentui/react-components'
 import { MemoryRouter } from 'react-router-dom'
@@ -367,7 +371,7 @@ describe('MyAgents Component', () => {
       updated_at: '2026-03-19T12:05:00Z',
     })
 
-    renderWithProvider(<MyAgents initialSection="goals" />)
+    renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
       expect(screen.getByText('Digital Marketing activation')).toBeInTheDocument()
@@ -411,12 +415,12 @@ describe('MyAgents Component', () => {
   })
 
   it('displays hire new agent button', () => {
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
     expect(screen.getByText('+ Hire New Agent')).toBeInTheDocument()
   })
 
   it('does not render dead View Dashboard or Settings actions', async () => {
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
 
     await waitFor(() => {
       expect(screen.getByText('AGT-TRD-DELTA-001')).toBeInTheDocument()
@@ -682,9 +686,9 @@ describe('MyAgents Component', () => {
     })
 
     vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValueOnce([])
-  vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([])
+    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([])
 
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
 
     await waitFor(() => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
@@ -875,7 +879,7 @@ describe('MyAgents Component', () => {
       }
     ] as any)
 
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
 
     await waitFor(() => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
