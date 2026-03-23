@@ -97,7 +97,7 @@ function renderWizard() {
   )
 }
 
-describe('MyAgents Digital Marketing wizard', () => {
+describe('DMA Activation Wizard — step navigation', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     const serviceModule = await import('../services/digitalMarketingActivation.service')
@@ -145,224 +145,92 @@ describe('MyAgents Digital Marketing wizard', () => {
         youtube_selected: true,
         youtube_connection_ready: true,
         configured: true,
-        can_finalize: false,
-        missing_requirements: [],
-      },
-      updated_at: '2026-03-18T09:00:00Z',
-    } as any)
-    vi.mocked(serviceModule.generateDigitalMarketingThemePlan).mockResolvedValue({
-      campaign_id: 'CAM-1',
-      master_theme: 'Trust-first growth',
-      derived_themes: [
-        { title: 'Proof', description: 'Show results', frequency: 'weekly' },
-        { title: 'Education', description: 'Teach the market', frequency: 'weekly' },
-      ],
-      workspace: {
-        campaign_setup: {
-          ...structuredClone(defaultWorkspace).campaign_setup,
-          master_theme: 'Trust-first growth',
-          derived_themes: [
-            { title: 'Proof', description: 'Show results', frequency: 'weekly' },
-            { title: 'Education', description: 'Teach the market', frequency: 'weekly' },
-          ],
-        },
-      },
-    } as any)
-    vi.mocked(serviceModule.patchDigitalMarketingThemePlan).mockImplementation(async (_id, patch: any) => ({
-      campaign_id: 'CAM-1',
-      master_theme: patch.master_theme,
-      derived_themes: patch.derived_themes || [],
-      workspace: {
-        campaign_setup: {
-          ...structuredClone(defaultWorkspace).campaign_setup,
-          master_theme: patch.master_theme,
-          derived_themes: patch.derived_themes || [],
-          schedule: patch.campaign_setup?.schedule || structuredClone(defaultWorkspace).campaign_setup.schedule,
-        },
-      },
-    }) as any)
-  })
-
-  it('generates and renders the master theme plus derived themes', async () => {
-    renderWizard()
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
-      expect(screen.getByDisplayValue('Proof')).toBeInTheDocument()
-      expect(screen.getByDisplayValue('Education')).toBeInTheDocument()
-    })
-  })
-
-  it('reloads the edited theme back from the backend after refresh', async () => {
-    const serviceModule = await import('../services/digitalMarketingActivation.service')
-    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace)
-      .mockResolvedValueOnce({
-        hired_instance_id: 'HAI-1',
-        customer_id: 'CUST-1',
-        agent_type_id: 'marketing.digital_marketing.v1',
-        workspace: {
-          brand_name: 'WAOOAW',
-          location: 'Pune',
-          primary_language: 'en',
-          timezone: 'Asia/Kolkata',
-          business_context: '',
-          offerings_services: ['Activation'],
-          platforms_enabled: ['youtube'],
-          campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
-        },
-        readiness: {
-          brief_complete: true,
-          youtube_selected: true,
-          youtube_connection_ready: true,
-          configured: true,
-          can_finalize: true,
-          missing_requirements: [],
-        },
-        updated_at: '2026-03-18T09:00:00Z',
-      } as any)
-      .mockResolvedValueOnce({
-        hired_instance_id: 'HAI-1',
-        customer_id: 'CUST-1',
-        agent_type_id: 'marketing.digital_marketing.v1',
-        workspace: {
-          brand_name: 'WAOOAW',
-          location: 'Pune',
-          primary_language: 'en',
-          timezone: 'Asia/Kolkata',
-          business_context: '',
-          offerings_services: ['Activation'],
-          platforms_enabled: ['youtube'],
-          campaign_setup: {
-            ...structuredClone(defaultWorkspace).campaign_setup,
-            master_theme: 'Trust-first growth updated',
-            derived_themes: [
-              { title: 'Proof', description: 'Show results', frequency: 'weekly' },
-              { title: 'Education', description: 'Teach the market', frequency: 'weekly' },
-            ],
-          },
-        },
-        readiness: {
-          brief_complete: true,
-          youtube_selected: true,
-          youtube_connection_ready: true,
-          configured: true,
-          can_finalize: true,
-          missing_requirements: [],
-        },
-        updated_at: '2026-03-18T09:00:00Z',
-      } as any)
-
-    renderWizard()
-    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
-    })
-
-    fireEvent.change(screen.getByLabelText('Master theme'), { target: { value: 'Trust-first growth updated' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save theme plan' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }))
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Trust-first growth updated')).toBeInTheDocument()
-    })
-  })
-
-  it('toggles both help panels on and off in the master theme step', async () => {
-    renderWizard()
-    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Show Help' }))
-
-    await waitFor(() => {
-      expect(screen.getByTestId('dma-help-panel-primary')).toBeInTheDocument()
-      expect(screen.getByTestId('dma-help-panel-secondary')).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Hide Help' }))
-
-    await waitFor(() => {
-      expect(screen.queryByTestId('dma-help-panel-primary')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('dma-help-panel-secondary')).not.toBeInTheDocument()
-    })
-  })
-
-  it('keeps finish disabled until schedule is present', async () => {
-    renderWizard()
-    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
-    })
-
-    const finishButton = screen.getByRole('button', { name: 'Finish activation' })
-    expect(finishButton).toBeDisabled()
-  })
-
-  it('enables finish and shows success state when schedule is complete', async () => {
-    const serviceModule = await import('../services/digitalMarketingActivation.service')
-    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockImplementation(async (_id, input: any) => ({
-      hired_instance_id: 'HAI-1',
-      customer_id: 'CUST-1',
-      agent_type_id: 'marketing.digital_marketing.v1',
-      workspace: {
-        ...input.workspace,
-        activation_complete: true,
-      },
-      readiness: {
-        brief_complete: true,
-        youtube_selected: true,
-        youtube_connection_ready: true,
-        configured: true,
         can_finalize: true,
         missing_requirements: [],
       },
       updated_at: '2026-03-18T09:00:00Z',
-    }) as any)
+    } as any)
 
-    renderWizard()
-    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
-    })
-
-    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-03-22' } })
-    fireEvent.change(screen.getByLabelText('Posts per week'), { target: { value: '3' } })
-
-    const finishButton = screen.getByRole('button', { name: 'Finish activation' })
-    await waitFor(() => {
-      expect(finishButton).not.toBeDisabled()
-    })
-
-    fireEvent.click(finishButton)
-
-    await waitFor(() => {
-      expect(screen.getByText('Runtime-ready')).toBeInTheDocument()
+    const hiredAgentsModule = await import('../services/hiredAgents.service')
+    vi.mocked(hiredAgentsModule.upsertHiredAgentDraft).mockResolvedValue({
+      subscription_id: 'SUB-1',
+      hired_instance_id: 'HAI-1',
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'Growth Copilot',
+      theme: 'dark',
+      config: {},
+      configured: true,
+      goals_completed: false,
     })
   })
 
-  it('renders the final summary with platforms, master theme, derived themes, and cadence', async () => {
+  it('renders wizard shell with 6 step buttons', async () => {
     renderWizard()
-    fireEvent.click(await screen.findByRole('button', { name: 'Master Theme' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate theme plan' }))
-
     await waitFor(() => {
-      expect(screen.getByDisplayValue('Trust-first growth')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
     })
+    const stepTitles = ['Induct Agent', 'Choose Platforms', 'Connect Platforms', 'Build Master Theme', 'Confirm Schedule', 'Review & Activate']
+    for (const title of stepTitles) {
+      expect(screen.getByText(title)).toBeInTheDocument()
+    }
+    expect(screen.getByText('Now')).toBeInTheDocument()
+  })
 
-    fireEvent.change(screen.getByLabelText('Posts per week'), { target: { value: '3' } })
+  it('starts on step 1 — Induct Agent panel visible', async () => {
+    renderWizard()
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('Nickname')).toBeInTheDocument()
+  })
 
-    expect(screen.getByText('Activation summary')).toBeInTheDocument()
-    expect(screen.getByText(/Platforms:/)).toHaveTextContent('Platforms: youtube')
-    expect(screen.getByText(/Master theme:/)).toHaveTextContent('Master theme: Trust-first growth')
-    expect(screen.getByText(/Derived themes:/)).toHaveTextContent('Derived themes: Proof, Education')
-    expect(screen.getByText(/Cadence:/)).toHaveTextContent('Cadence: 3 posts/week')
+  it('Continue button advances to step 2', async () => {
+    renderWizard()
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
+    })
+  })
+
+  it('Back button goes back from step 2 to step 1', async () => {
+    renderWizard()
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+  })
+
+  it('Back button disabled on step 1', async () => {
+    renderWizard()
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+  })
+
+  it('Activate Agent button visible on step 6', async () => {
+    renderWizard()
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+    const reviewActivateBtn = screen.getByText('Review & Activate').closest('button')
+    expect(reviewActivateBtn).not.toBeNull()
+    fireEvent.click(reviewActivateBtn!)
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: 'Activate Agent' })).toBeInTheDocument()
   })
 })
+

@@ -3366,3 +3366,229 @@ section[id] {
     align-items: flex-start;
   }
 }
+
+/* ── DMA Activation Wizard Shell (CP-STUDIO-3) ─────────────────── */
+.dma-wizard-page {
+  padding-bottom: 32px;
+}
+
+.dma-wizard-shell {
+  --dma-wizard-pane-height: min(76vh, 860px);
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.dma-wizard-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 24px;
+  height: var(--dma-wizard-pane-height);
+  min-height: var(--dma-wizard-pane-height);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.dma-wizard-rail-card,
+.dma-wizard-canvas-card {
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.dma-wizard-rail > .dma-wizard-rail-card:first-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dma-wizard-step-list {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+.dma-wizard-canvas {
+  min-height: 0;
+}
+
+.dma-wizard-canvas-card {
+  height: var(--dma-wizard-pane-height);
+  min-height: var(--dma-wizard-pane-height);
+  display: flex;
+  flex-direction: column;
+}
+
+.dma-wizard-canvas-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: -4px -4px 0;
+  padding: 0 4px 14px;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  background: linear-gradient(180deg, rgba(24,24,27,0.98) 0%, rgba(24,24,27,0.94) 74%, rgba(24,24,27,0) 100%);
+}
+
+.dma-wizard-canvas-header-card {
+  padding: 0;
+}
+
+.dma-wizard-canvas-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 6px 8px 0;
+}
+
+.dma-wizard-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--colorNeutralStroke2);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.dma-wizard-action-bar-left,
+.dma-wizard-action-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dma-wizard-step-button {
+  width: 100%;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: rgba(255,255,255,0.03);
+  color: inherit;
+  border-radius: 16px;
+  text-align: left;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.dma-wizard-step-button.is-active {
+  border-color: rgba(0,242,254,0.6);
+  box-shadow: 0 0 0 1px rgba(0,242,254,0.25);
+  background: rgba(0,242,254,0.08);
+}
+
+.dma-wizard-step-button.is-done {
+  border-color: rgba(16,185,129,0.35);
+  background: rgba(16,185,129,0.05);
+}
+
+.dma-wizard-step-index {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.dma-wizard-step-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.dma-wizard-step-title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.dma-wizard-step-description {
+  display: block;
+  color: var(--colorNeutralForeground2);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.dma-wizard-step-state {
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dma-wizard-step-state--active { color: #00f2fe; }
+.dma-wizard-step-state--done   { color: #10b981; }
+
+.dma-wizard-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.dma-wizard-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.dma-wizard-platform-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.dma-wizard-platform-card.is-selected {
+  border-color: rgba(0,242,254,0.6);
+  background: rgba(0,242,254,0.08);
+}
+
+.dma-wizard-section-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  opacity: 0.65;
+  margin-bottom: 4px;
+}
+
+.dma-wizard-review-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--colorNeutralStroke2);
+  gap: 12px;
+}
+
+.dma-wizard-review-row:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 768px) {
+  .dma-wizard-shell {
+    grid-template-columns: 1fr;
+  }
+  .dma-wizard-rail {
+    position: static;
+    height: auto;
+    min-height: 0;
+  }
+  .dma-wizard-canvas-card {
+    height: auto;
+    min-height: 60vh;
+  }
+}
