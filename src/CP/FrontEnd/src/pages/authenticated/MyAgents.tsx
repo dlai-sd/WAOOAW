@@ -1912,6 +1912,11 @@ export default function MyAgents({
     return instances.find((x) => x.subscription_id === selectedSubscriptionId) || null
   }, [instances, selectedSubscriptionId])
 
+  const selectedIsDigitalMarketing = useMemo(() => {
+    if (!selectedInstance) return false
+    return isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id)
+  }, [selectedInstance])
+
   const getStatusBadge = (status: string) => {
     const statusMap = {
       active: { appearance: 'filled' as const, color: 'success' as const, label: 'Active' },
@@ -2042,6 +2047,12 @@ export default function MyAgents({
     return nowMs <= endMs + RETENTION_DAYS_AFTER_END * 24 * 60 * 60 * 1000
   }, [selectedInstance, selectedReadOnlyExpired, nowMs])
 
+  const selectedAgentHelperText = selectedReadOnlyExpired
+    ? "This agent's trial has ended. Select another hire or review retained access."
+    : 'View and manage your hired agents'
+
+  const selectedIsReadOnly = selectedReadOnlyExpired || selectedInReadOnlyRetention
+
   return (
     <div className="my-agents-page">
       <div className="page-header">
@@ -2076,90 +2087,96 @@ export default function MyAgents({
 
       {instances.length > 0 ? (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 0, width: '100%', maxWidth: '500px', flex: '1 1 260px' }}>
-              <AgentSelector
-                agents={instances}
-                selectedId={selectedSubscriptionId}
-                onChange={setSelectedSubscriptionId}
-                loading={loading}
-                disabled={loading}
-                label="Selected Agent"
-                helperText={selectedReadOnlyExpired ? "This agent's trial has ended. Select another hire or review retained access." : "View and manage your hired agents"}
-              />
+          {!selectedIsDigitalMarketing ? (
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0, width: '100%', maxWidth: '500px', flex: '1 1 260px' }}>
+                <AgentSelector
+                  agents={instances}
+                  selectedId={selectedSubscriptionId}
+                  onChange={setSelectedSubscriptionId}
+                  loading={loading}
+                  disabled={loading}
+                  label="Selected Agent"
+                  helperText={selectedAgentHelperText}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  appearance={activeSection === 'configure' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('configure')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Configure
+                </Button>
+                <Button
+                  appearance={activeSection === 'goals' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('goals')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Goal Setting
+                </Button>
+                <Button
+                  appearance={activeSection === 'skills' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('skills')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Skills
+                </Button>
+                <Button
+                  appearance={activeSection === 'performance' ? 'primary' : 'outline'}
+                  onClick={() => setActiveSection('performance')}
+                  disabled={selectedReadOnlyExpired}
+                >
+                  Performance
+                </Button>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              <Button
-                appearance={activeSection === 'configure' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('configure')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Configure
-              </Button>
-              <Button
-                appearance={activeSection === 'goals' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('goals')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Goal Setting
-              </Button>
-              <Button
-                appearance={activeSection === 'skills' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('skills')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Skills
-              </Button>
-              <Button
-                appearance={activeSection === 'performance' ? 'primary' : 'outline'}
-                onClick={() => setActiveSection('performance')}
-                disabled={selectedReadOnlyExpired}
-              >
-                Performance
-              </Button>
-            </div>
-          </div>
+          ) : null}
 
           {selectedInstance ? (
             <div style={{ marginTop: '1rem' }}>
-              <div className="agent-header">
-                <div className="agent-title">
-                  <h2>{selectedInstance.nickname || selectedInstance.agent_id}</h2>
-                  {getStatusBadge(selectedInstance.status)}
-                  {getLifecycleBadge(selectedInstance.catalog_status_at_hire)}
-                  {selectedInstance.external_catalog_version ? (
-                    <Badge appearance="outline" size="small">{selectedInstance.external_catalog_version}</Badge>
-                  ) : null}
-                </div>
-                <div className="agent-meta">
-                  <span className="agent-rating">
-                    <Star20Filled style={{ color: '#f59e0b' }} />
-                  </span>
-                  <span> | Plan: {selectedInstance.duration} | Next billing: {formatDate(selectedInstance.current_period_end)}</span>
-                </div>
-              </div>
-
-              <div className="agent-goals">
-                <h3>Subscription:</h3>
-                <div className="goal-progress">
-                  <span style={{ opacity: 0.8 }}>ID: {selectedInstance.subscription_id}</span>
-                </div>
-              </div>
-
-              {(selectedInstance.catalog_status_at_hire || selectedInstance.external_catalog_version) && (
-                <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
-                  <div style={{ fontWeight: 600 }}>Catalog lifecycle</div>
-                  <div style={{ marginTop: '0.25rem', opacity: 0.9 }}>
-                    {selectedInstance.catalog_status_at_hire === 'servicing_only' || selectedInstance.catalog_status_at_hire === 'retired_from_catalog'
-                      ? 'This agent is no longer available for new hire, but your active service continues on the release you already purchased.'
-                      : 'This hire is attached to the approved catalog release captured at activation time.'}
+              {!selectedIsDigitalMarketing ? (
+                <>
+                  <div className="agent-header">
+                    <div className="agent-title">
+                      <h2>{selectedInstance.nickname || selectedInstance.agent_id}</h2>
+                      {getStatusBadge(selectedInstance.status)}
+                      {getLifecycleBadge(selectedInstance.catalog_status_at_hire)}
+                      {selectedInstance.external_catalog_version ? (
+                        <Badge appearance="outline" size="small">{selectedInstance.external_catalog_version}</Badge>
+                      ) : null}
+                    </div>
+                    <div className="agent-meta">
+                      <span className="agent-rating">
+                        <Star20Filled style={{ color: '#f59e0b' }} />
+                      </span>
+                      <span> | Plan: {selectedInstance.duration} | Next billing: {formatDate(selectedInstance.current_period_end)}</span>
+                    </div>
                   </div>
-                  <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {selectedInstance.external_catalog_version ? <span>Version: {selectedInstance.external_catalog_version}</span> : null}
-                    {formatLifecycleLabel(selectedInstance.catalog_status_at_hire) ? <span>Lifecycle: {formatLifecycleLabel(selectedInstance.catalog_status_at_hire)}</span> : null}
+
+                  <div className="agent-goals">
+                    <h3>Subscription:</h3>
+                    <div className="goal-progress">
+                      <span style={{ opacity: 0.8 }}>ID: {selectedInstance.subscription_id}</span>
+                    </div>
                   </div>
-                </div>
-              )}
+
+                  {(selectedInstance.catalog_status_at_hire || selectedInstance.external_catalog_version) && (
+                    <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
+                      <div style={{ fontWeight: 600 }}>Catalog lifecycle</div>
+                      <div style={{ marginTop: '0.25rem', opacity: 0.9 }}>
+                        {selectedInstance.catalog_status_at_hire === 'servicing_only' || selectedInstance.catalog_status_at_hire === 'retired_from_catalog'
+                          ? 'This agent is no longer available for new hire, but your active service continues on the release you already purchased.'
+                          : 'This hire is attached to the approved catalog release captured at activation time.'}
+                      </div>
+                      <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {selectedInstance.external_catalog_version ? <span>Version: {selectedInstance.external_catalog_version}</span> : null}
+                        {formatLifecycleLabel(selectedInstance.catalog_status_at_hire) ? <span>Lifecycle: {formatLifecycleLabel(selectedInstance.catalog_status_at_hire)}</span> : null}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : null}
 
               {selectedReadOnlyExpired && (
                 <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
@@ -2211,7 +2228,51 @@ export default function MyAgents({
                     {isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
                       <DigitalMarketingActivationWizard
                         instance={selectedInstance}
-                        readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                        readOnly={selectedIsReadOnly}
+                        summaryPanel={(
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+                            <div style={{ minWidth: 0, width: '100%' }}>
+                              <AgentSelector
+                                agents={instances}
+                                selectedId={selectedSubscriptionId}
+                                onChange={setSelectedSubscriptionId}
+                                loading={loading}
+                                disabled={loading}
+                                label="Selected Agent"
+                                helperText={selectedAgentHelperText}
+                              />
+                            </div>
+
+                            <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{selectedInstance.nickname || selectedInstance.agent_id}</div>
+                                    {getStatusBadge(selectedInstance.status)}
+                                    {getLifecycleBadge(selectedInstance.catalog_status_at_hire)}
+                                    {selectedInstance.external_catalog_version ? (
+                                      <Badge appearance="outline" size="small">{selectedInstance.external_catalog_version}</Badge>
+                                    ) : null}
+                                  </div>
+                                  <div style={{ opacity: 0.82 }}>
+                                    Plan: {selectedInstance.duration} | Next billing: {formatDate(selectedInstance.current_period_end)}
+                                  </div>
+                                  <div style={{ opacity: 0.72, fontSize: '0.9rem' }}>
+                                    Subscription ID: {selectedInstance.subscription_id}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {(selectedInstance.catalog_status_at_hire || selectedInstance.external_catalog_version) ? (
+                                <div style={{ opacity: 0.82, lineHeight: 1.5 }}>
+                                  {selectedInstance.catalog_status_at_hire === 'servicing_only' || selectedInstance.catalog_status_at_hire === 'retired_from_catalog'
+                                    ? 'This agent is no longer available for new hire, but your active service continues on the release you already purchased.'
+                                    : 'This hire is attached to the approved catalog release captured at activation time.'}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        )}
                         onSaved={(updated) => {
                           setInstances((prev) =>
                             prev.map((x) =>
@@ -2237,7 +2298,7 @@ export default function MyAgents({
                       <>
                         <ConfigureAgentPanel
                           instance={selectedInstance}
-                          readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                          readOnly={selectedIsReadOnly}
                           onSaved={(updated) => {
                             setInstances((prev) =>
                               prev.map((x) =>
@@ -2268,7 +2329,7 @@ export default function MyAgents({
                             </div>
                             <PlatformConnectionsPanel
                               hiredInstanceId={String(selectedInstance.hired_instance_id)}
-                              readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                              readOnly={selectedIsReadOnly}
                             />
                           </div>
                         )}
@@ -2288,7 +2349,7 @@ export default function MyAgents({
                       </div>
                     )}
 
-                    <GoalSettingPanel instance={selectedInstance} readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention} />
+                    <GoalSettingPanel instance={selectedInstance} readOnly={selectedIsReadOnly} />
                   </>
                 ) : activeSection === 'skills' ? (
                   <>
@@ -2298,7 +2359,7 @@ export default function MyAgents({
                     </div>
                     <SkillsPanel
                       hiredInstanceId={String(selectedInstance.hired_instance_id || '').trim()}
-                      readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                      readOnly={selectedIsReadOnly}
                     />
                   </>
                 ) : (

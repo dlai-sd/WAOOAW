@@ -255,13 +255,11 @@ describe('MyAgents Component', () => {
       }
     ] as any)
 
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
 
     await waitFor(() => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
       expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
@@ -369,11 +367,18 @@ describe('MyAgents Component', () => {
       updated_at: '2026-03-19T12:05:00Z',
     })
 
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
 
     await waitFor(() => {
       expect(screen.getByText('Digital Marketing activation')).toBeInTheDocument()
     })
+
+    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    expect(screen.getByText('Subscription ID: SUB-DM-1')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Configure' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Goal Setting' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Skills' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Performance' })).not.toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Offerings and services'), { target: { value: 'SEO\nContent' } })
     fireEvent.click(screen.getByRole('checkbox', { name: 'YouTube' }))
@@ -399,7 +404,7 @@ describe('MyAgents Component', () => {
     })
   })
   it('renders page title with agent count', async () => {
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
     await waitFor(() => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
@@ -685,8 +690,6 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
-
     await waitFor(() => {
       expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
     })
@@ -783,13 +786,11 @@ describe('MyAgents Component', () => {
       }
     ] as any)
 
-    renderWithProvider(<MyAgents />)
+    renderWithProvider(<MyAgents initialSection="goals" />)
 
     await waitFor(() => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
       expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
@@ -879,8 +880,6 @@ describe('MyAgents Component', () => {
     await waitFor(() => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
 
     await waitFor(() => {
       expect(screen.getByText('Drafts (1)')).toBeInTheDocument()

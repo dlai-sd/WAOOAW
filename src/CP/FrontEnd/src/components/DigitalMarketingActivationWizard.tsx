@@ -1,6 +1,6 @@
 import { Badge, Button, Card, Checkbox, Input, Textarea } from '@fluentui/react-components'
 import { useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { FeedbackMessage, LoadingIndicator, ProgressIndicator, SaveIndicator } from './FeedbackIndicators'
 import { PlatformConnectionsPanel } from './PlatformConnectionsPanel'
@@ -35,6 +35,7 @@ type DigitalMarketingActivationWizardProps = {
   instance?: MyAgentInstanceSummary | null
   selectedInstance?: MyAgentInstanceSummary | null
   readOnly: boolean
+  summaryPanel?: ReactNode
   onSaved?: (updated: HiredAgentInstance) => void
   onSavedInstance?: (patch: {
     nickname?: string | null
@@ -89,7 +90,7 @@ function buildFallbackDraft(instance: MyAgentInstanceSummary): HiredAgentInstanc
   }
 }
 
-export function DigitalMarketingActivationWizard({ instance, selectedInstance, readOnly, onSaved, onSavedInstance }: DigitalMarketingActivationWizardProps) {
+export function DigitalMarketingActivationWizard({ instance, selectedInstance, readOnly, summaryPanel, onSaved, onSavedInstance }: DigitalMarketingActivationWizardProps) {
   const navigate = useNavigate()
   const activeInstance = instance ?? selectedInstance ?? null
 
@@ -506,6 +507,12 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
           <h4 style={{ margin: '0.35rem 0 0' }}>Induct Agent</h4>
           <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Set the identity this customer will see and preserve the draft-backed configured state.</div>
         </div>
+
+        {summaryPanel ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {summaryPanel}
+          </div>
+        ) : null}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
