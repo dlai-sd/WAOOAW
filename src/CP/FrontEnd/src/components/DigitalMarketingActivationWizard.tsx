@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Checkbox, Input, Textarea } from '@fluentui/react-components'
+import { Badge, Button, Card, CardHeader, Spinner, Text, Input, Textarea } from '@fluentui/react-components'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -21,6 +21,15 @@ import {
 } from '../services/digitalMarketingActivation.service'
 
 const DIGITAL_MARKETING_AGENT_TYPE_ID = 'marketing.digital_marketing.v1'
+
+const DMA_STEPS = [
+  { id: 'induct',    title: 'Induct Agent',        description: 'Set the agent nickname and brand identity.' },
+  { id: 'platforms', title: 'Choose Platforms',     description: 'Select which social channels this agent will manage.' },
+  { id: 'connect',   title: 'Connect Platforms',    description: 'Authorise each selected platform channel.' },
+  { id: 'theme',     title: 'Build Master Theme',   description: 'Define brand brief and generate an AI content strategy.' },
+  { id: 'schedule',  title: 'Confirm Schedule',     description: 'Set posting frequency and preferred days.' },
+  { id: 'activate',  title: 'Review & Activate',    description: 'Check readiness then activate the agent.' },
+] as const
 
 const PLATFORM_OPTIONS = [
   { key: 'youtube', label: 'YouTube', description: 'Channel uploads and video publishing approvals.' },
@@ -99,6 +108,8 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showHelp, setShowHelp] = useState(false)
   const [activeMilestone, setActiveMilestone] = useState<'induct' | 'prepare' | 'theme' | 'schedule'>('induct')
+  const [activeStepIndex, setActiveStepIndex] = useState(0)
+  const currentStep = DMA_STEPS[activeStepIndex]
 
   const [draft, setDraft] = useState<HiredAgentInstance | null>(null)
   const [activation, setActivation] = useState<DigitalMarketingActivationResponse | null>(null)
@@ -297,6 +308,11 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
     }
   }
 
+  async function handleContinue() {
+    await saveWorkspace()
+    setActiveStepIndex(i => Math.min(DMA_STEPS.length - 1, i + 1))
+  }
+
   const togglePlatform = (platformKey: string, checked: boolean) => {
     setSelectedPlatforms((prev) => {
       const next = new Set(prev)
@@ -439,322 +455,450 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <h3 style={{ margin: 0 }}>Digital Marketing activation</h3>
-              <Badge appearance="tint" color={readiness.can_finalize ? 'success' : 'informative'}>
-                {readiness.can_finalize ? 'Ready to run' : 'In setup'}
-              </Badge>
+    <div className="dma-wizard-page">
+      <div className="dma-wizard-shell">
+        {/* LEFT RAIL */}
+        <aside className="dma-wizard-rail">
+          <Card className="dma-wizard-rail-card">
+            <Text as="h2" size={500} weight="semibold">Activation steps</Text>
+            <div className="dma-wizard-step-list">
+              {DMA_STEPS.map((step, index) => {
+                const isActive = index === activeStepIndex
+                const isDone = index < activeStepIndex
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    className={`dma-wizard-step-button${isActive ? ' is-active' : ''}${isDone ? ' is-done' : ''}`}
+                    onClick={() => setActiveStepIndex(index)}
+                  >
+                    <span className="dma-wizard-step-index">0{index + 1}</span>
+                    <span className="dma-wizard-step-copy">
+                      <span className="dma-wizard-step-title">{step.title}</span>
+                      <span className="dma-wizard-step-description">{step.description}</span>
+                    </span>
+                    {isDone ? <span className="dma-wizard-step-state dma-wizard-step-state--done">Done</span> : null}
+                    {isActive ? <span className="dma-wizard-step-state dma-wizard-step-state--active">Now</span> : null}
+                  </button>
+                )
+              })}
             </div>
-            <div style={{ opacity: 0.8, maxWidth: '60ch', lineHeight: 1.5 }}>
-              Induct the agent, capture the business brief, and attach live channels without sending this hire back through the older setup flow.
+          </Card>
+        </aside>
+
+        {/* CANVAS */}
+        <section className="dma-wizard-canvas">
+          <Card className="dma-wizard-canvas-card">
+            {/* STICKY HEADER */}
+            <div className="dma-wizard-canvas-header">
+              <CardHeader
+                className="dma-wizard-canvas-header-card"
+                header={
+                  <div>
+                    <Text as="h2" size={600} weight="semibold">{currentStep.title}</Text>
+                    <Text as="p" size={300}>{currentStep.description}</Text>
+                  </div>
+                }
+              />
             </div>
-          </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
-            <Button appearance="subtle" onClick={() => setShowHelp((value) => !value)}>
-              {showHelp ? 'Hide Help' : 'Show Help'}
-            </Button>
-            <Button appearance="secondary" onClick={() => void loadState()}>
-              Refresh status
-            </Button>
-            <Button appearance="primary" onClick={() => void saveWorkspace()} disabled={readOnly || saveStatus === 'saving'}>
-              {saveStatus === 'saving' ? 'Saving activation...' : 'Save activation'}
-            </Button>
-          </div>
-        </div>
+            {/* SCROLLABLE BODY */}
+            <div className="dma-wizard-canvas-body">
 
-        <ProgressIndicator current={completedMilestones} total={4} label="Activation milestones" />
-
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {[
-            ['induct', 'Induct Agent'],
-            ['prepare', 'Prepare Agent'],
-            ['theme', 'Master Theme'],
-            ['schedule', 'Confirm Schedule'],
-          ].map(([key, label]) => (
-            <Button
-              key={key}
-              appearance={activeMilestone === key ? 'primary' : 'secondary'}
-              onClick={() => setActiveMilestone(key as 'induct' | 'prepare' | 'theme' | 'schedule')}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-
-        {showHelp ? (
-          <div data-testid="dma-help-panel-primary" style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
-            Save this workspace whenever you update the business brief or channel choices. If YouTube is selected, use the setup shortcut below once and then refresh this page so the backend can verify the channel attachment for this hire.
-          </div>
-        ) : null}
-
-        {saveError ? <FeedbackMessage intent="error" title="Activation save failed" message={saveError} /> : null}
-
-        {readOnly ? (
-          <FeedbackMessage intent="warning" title="Read-only access" message="This hire has ended, so the activation workspace can be viewed but not edited." />
-        ) : null}
-      </Card>
-
-      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Step 1</div>
-          <h4 style={{ margin: '0.35rem 0 0' }}>Induct Agent</h4>
-          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Set the identity this customer will see and preserve the draft-backed configured state.</div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Nickname</span>
-            <Input aria-label="Nickname" value={nickname} onChange={(_, data) => setNickname(data.value)} disabled={readOnly} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Theme</span>
-            <Input aria-label="Theme" value={theme} onChange={(_, data) => setTheme(data.value)} disabled={readOnly} />
-          </label>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Badge appearance="outline" color={readiness.configured ? 'success' : 'warning'}>
-            {readiness.configured ? 'Agent identity configured' : 'Nickname and theme still required'}
-          </Badge>
-          {hiredInstanceId ? <span style={{ opacity: 0.72, fontSize: '0.9rem' }}>Hire instance: {hiredInstanceId}</span> : null}
-        </div>
-      </Card>
-
-      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Step 2</div>
-          <h4 style={{ margin: '0.35rem 0 0' }}>Capture business brief</h4>
-          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>These fields feed the marketing brief that the backend materializes into the hired-agent config.</div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Brand name</span>
-            <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Location</span>
-            <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Primary language</span>
-            <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Timezone</span>
-            <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} />
-          </label>
-        </div>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          <span>Offerings and services</span>
-          <Textarea
-            aria-label="Offerings and services"
-            value={offeringsText}
-            onChange={(_, data) => setOfferingsText(data.value)}
-            disabled={readOnly}
-            resize="vertical"
-            rows={4}
-          />
-        </label>
-
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          <span>Business context</span>
-          <Textarea
-            aria-label="Business context"
-            value={businessContext}
-            onChange={(_, data) => setBusinessContext(data.value)}
-            disabled={readOnly}
-            resize="vertical"
-            rows={4}
-          />
-        </label>
-
-        {missingProfileFields.length > 0 ? (
-          <div style={{ border: '1px solid var(--colorPaletteYellowBorder2)', borderRadius: '12px', padding: '0.85rem 1rem', background: 'var(--colorPaletteYellowBackground1)' }}>
-            Add the remaining business details before the hire can be treated as fully briefed: {missingProfileFields.join(', ')}.
-          </div>
-        ) : (
-          <Badge appearance="filled" color="success">Business brief complete</Badge>
-        )}
-      </Card>
-
-      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Step 3</div>
-          <h4 style={{ margin: '0.35rem 0 0' }}>Prepare agent channels</h4>
-          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Choose where the agent will work, then attach the channel credentials the backend needs to verify.</div>
-        </div>
-
-        <div style={{ display: 'grid', gap: '0.75rem' }}>
-          {PLATFORM_OPTIONS.map((platform) => {
-            const checked = selectedPlatforms.includes(platform.key)
-            return (
-              <div key={platform.key} style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem' }}>
-                <Checkbox
-                  label={platform.label}
-                  checked={checked}
-                  disabled={readOnly}
-                  onChange={(_, data) => togglePlatform(platform.key, Boolean(data.checked))}
-                />
-                <div style={{ marginTop: '0.35rem', opacity: 0.78, paddingLeft: '1.8rem' }}>{platform.description}</div>
-              </div>
-            )
-          })}
-        </div>
-
-        {selectedPlatforms.includes('youtube') ? (
-          <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>YouTube readiness</div>
-                <div style={{ marginTop: '0.25rem', opacity: 0.8 }}>
-                  {readiness.youtube_connection_ready
-                    ? 'This hire has a verified YouTube attachment.'
-                    : 'This hire still needs a verified YouTube attachment before uploads can run.'}
+              {/* STEP 1 — Induct Agent */}
+              {currentStep.id === 'induct' && (
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-induct">
+                  <div style={{ display: 'grid', gap: '1.25rem' }}>
+                    <div>
+                      <div className="dma-wizard-section-label">Agent identity</div>
+                      <div className="dma-wizard-form-grid">
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Nickname</span>
+                          <Input
+                            aria-label="Nickname"
+                            value={nickname}
+                            onChange={(_, data) => setNickname(data.value)}
+                            disabled={readOnly}
+                            placeholder="e.g. Growth Copilot"
+                          />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Theme</span>
+                          <Input
+                            aria-label="Theme"
+                            value={theme}
+                            onChange={(_, data) => setTheme(data.value)}
+                            disabled={readOnly}
+                            placeholder="e.g. dark"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <Badge appearance="outline" color={readiness.configured ? 'success' : 'warning'}>
+                        {readiness.configured ? 'Identity configured ✓' : 'Nickname and theme required'}
+                      </Badge>
+                      {hiredInstanceId ? (
+                        <span style={{ opacity: 0.65, fontSize: '0.85rem' }}>
+                          Hire ID: {hiredInstanceId}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {/* STEP 2 — Choose Platforms */}
+              {currentStep.id === 'platforms' && (
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-platforms">
+                  <div style={{ display: 'grid', gap: '1.25rem' }}>
+                    <div>
+                      <div className="dma-wizard-section-label">Select the channels for this agent to manage</div>
+                      <div className="dma-wizard-platform-grid">
+                        {[
+                          { key: 'youtube',   label: 'YouTube' },
+                          { key: 'instagram', label: 'Instagram' },
+                          { key: 'facebook',  label: 'Facebook' },
+                          { key: 'linkedin',  label: 'LinkedIn' },
+                          { key: 'whatsapp',  label: 'WhatsApp' },
+                          { key: 'x',        label: 'X (Twitter)' },
+                        ].map(({ key, label }) => {
+                          const isSelected = selectedPlatforms.includes(key)
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              className={`dma-wizard-platform-card${isSelected ? ' is-selected' : ''}`}
+                              onClick={() => {
+                                if (readOnly) return
+                                setSelectedPlatforms(prev =>
+                                  isSelected ? prev.filter(p => p !== key) : [...prev, key]
+                                )
+                              }}
+                              disabled={readOnly}
+                              aria-pressed={isSelected}
+                              data-testid={`platform-toggle-${key}`}
+                            >
+                              <span style={{ fontWeight: 600 }}>{label}</span>
+                              {isSelected ? <span style={{ color: '#00f2fe', marginLeft: 'auto' }}>✓</span> : null}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {selectedPlatforms.length > 0 ? (
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {selectedPlatforms.map(p => (
+                          <Badge key={p} appearance="outline" color="informative">{p}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>Select at least one platform to continue.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3 — Connect Platforms */}
+              {currentStep.id === 'connect' && (
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-connect">
+                  {selectedPlatforms.length === 0 ? (
+                    <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.7 }}>
+                      <div style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>No platforms selected yet.</div>
+                      <Button appearance="secondary" onClick={() => setActiveStepIndex(1)}>
+                        Go back to Choose Platforms
+                      </Button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '1.5rem' }}>
+                      {readiness.youtube_selected && !readiness.youtube_connection_ready ? (
+                        <FeedbackMessage
+                          intent="warning"
+                          title="YouTube not connected"
+                          message="Connect YouTube below before continuing. The agent needs channel access to publish."
+                        />
+                      ) : null}
+                      <PlatformConnectionsPanel
+                        hiredInstanceId={hiredInstanceId ?? ''}
+                        requiredPlatformKeys={selectedPlatforms}
+                        readOnly={readOnly}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 4 — Build Master Theme */}
+              {currentStep.id === 'theme' && (
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-theme">
+                  <div style={{ display: 'grid', gap: '1.75rem' }}>
+                    {/* Business brief */}
+                    <div>
+                      <div className="dma-wizard-section-label">Business brief</div>
+                      <div className="dma-wizard-form-grid" style={{ marginBottom: '0.85rem' }}>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Brand name</span>
+                          <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Location</span>
+                          <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Primary language</span>
+                          <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Timezone</span>
+                          <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} placeholder="e.g. Asia/Kolkata" />
+                        </label>
+                      </div>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.85rem' }}>
+                        <span>Offerings and services</span>
+                        <Textarea
+                          aria-label="Offerings and services"
+                          value={offeringsText}
+                          onChange={(_, data) => setOfferingsText(data.value)}
+                          disabled={readOnly}
+                          resize="vertical"
+                          rows={3}
+                          placeholder="Comma-separated list of what you sell or offer"
+                        />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <span>Business context</span>
+                        <Textarea
+                          aria-label="Business context"
+                          value={businessContext}
+                          onChange={(_, data) => setBusinessContext(data.value)}
+                          disabled={readOnly}
+                          resize="vertical"
+                          rows={3}
+                          placeholder="Describe your business, target audience, key differentiators"
+                        />
+                      </label>
+                    </div>
+
+                    {/* AI theme generation */}
+                    <div>
+                      <div className="dma-wizard-section-label">AI-generated content strategy</div>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
+                        <Button
+                          appearance="primary"
+                          onClick={() => void generateThemePlan()}
+                          disabled={readOnly || themePlanLoading || !brandName.trim()}
+                        >
+                          {themePlanLoading ? 'Generating…' : 'Generate with AI'}
+                        </Button>
+                        {themePlanLoading ? <Spinner size="tiny" /> : null}
+                        {!brandName.trim() ? <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>Enter brand name first</span> : null}
+                      </div>
+                      {masterTheme ? (
+                        <div style={{ display: 'grid', gap: '1rem' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span style={{ fontWeight: 600 }}>Master theme</span>
+                            <Input
+                              aria-label="Master theme"
+                              value={masterTheme}
+                              onChange={(_, data) => setMasterTheme(data.value)}
+                              disabled={readOnly}
+                            />
+                          </label>
+                          {derivedThemes.length > 0 ? (
+                            <div>
+                              <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Derived themes ({derivedThemes.length})</div>
+                              <div style={{ display: 'grid', gap: '0.6rem' }}>
+                                {derivedThemes.map((dt, idx) => (
+                                  <div key={idx} style={{ padding: '0.75rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
+                                    <div style={{ fontWeight: 600 }}>{dt.title}</div>
+                                    {dt.description ? <div style={{ opacity: 0.75, fontSize: '0.85rem', marginTop: '0.2rem' }}>{dt.description}</div> : null}
+                                    {dt.frequency ? <div style={{ opacity: 0.5, fontSize: '0.78rem', marginTop: '0.2rem' }}>Frequency: {dt.frequency}</div> : null}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>
+                          Fill in the brief above then click &ldquo;Generate with AI&rdquo; to create a tailored content strategy.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 5 — Confirm Schedule */}
+              {currentStep.id === 'schedule' && (
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-schedule">
+                  <div style={{ display: 'grid', gap: '1.25rem' }}>
+                    <div>
+                      <div className="dma-wizard-section-label">Posting schedule</div>
+                      <div className="dma-wizard-form-grid">
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Start date</span>
+                          <Input
+                            type="date"
+                            aria-label="Start date"
+                            value={scheduleStartDate}
+                            onChange={(_, data) => setScheduleStartDate(data.value)}
+                            disabled={readOnly}
+                          />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Posts per week</span>
+                          <Input
+                            type="number"
+                            aria-label="Posts per week"
+                            value={postsPerWeek}
+                            onChange={(_, data) => setPostsPerWeek(data.value)}
+                            disabled={readOnly}
+                            min="1"
+                            max="21"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="dma-wizard-section-label">Preferred days</div>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                          const selectedDays = parseListTextarea(preferredDaysText)
+                          const isSelected = selectedDays.includes(day)
+                          return (
+                            <button
+                              key={day}
+                              type="button"
+                              style={{
+                                padding: '0.4rem 0.9rem',
+                                borderRadius: '999px',
+                                border: `1px solid ${isSelected ? 'rgba(0,242,254,0.5)' : 'var(--colorNeutralStroke2)'}`,
+                                background: isSelected ? 'rgba(0,242,254,0.1)' : 'rgba(255,255,255,0.03)',
+                                color: 'inherit',
+                                cursor: readOnly ? 'default' : 'pointer',
+                                fontWeight: isSelected ? 700 : 400,
+                              }}
+                              onClick={() => {
+                                if (readOnly) return
+                                const current = parseListTextarea(preferredDaysText)
+                                const next = isSelected ? current.filter(d => d !== day) : [...current, day]
+                                setPreferredDaysText(next.join(', '))
+                              }}
+                              aria-pressed={isSelected}
+                            >
+                              {day}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {scheduleStartDate ? (
+                      <Badge appearance="outline" color="success">
+                        Schedule set: {postsPerWeek || '3'}×/week from {scheduleStartDate}
+                      </Badge>
+                    ) : (
+                      <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>Set a start date to confirm the schedule.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 6 — Review & Activate */}
+              {currentStep.id === 'activate' && (
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-activate">
+                  <div style={{ display: 'grid', gap: '1.5rem' }}>
+                    {/* Readiness checklist */}
+                    <div>
+                      <div className="dma-wizard-section-label">Activation readiness</div>
+                      <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '14px', overflow: 'hidden' }}>
+                        {[
+                          { label: 'Agent identity configured',   ok: readiness.configured },
+                          { label: 'Business brief complete',      ok: readiness.brief_complete },
+                          { label: 'Platform connections ready',   ok: !readiness.youtube_selected || readiness.youtube_connection_ready },
+                          { label: 'Campaign theme generated',     ok: Boolean(masterTheme) },
+                        ].map(({ label, ok }) => (
+                          <div key={label} className="dma-wizard-review-row" style={{ padding: '0.85rem 1rem' }}>
+                            <span>{label}</span>
+                            <Badge appearance="outline" color={ok ? 'success' : 'warning'}>
+                              {ok ? '✓ Ready' : 'Incomplete'}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Missing requirements */}
+                    {readiness.missing_requirements?.length > 0 ? (
+                      <FeedbackMessage
+                        intent="warning"
+                        title="Complete these before activating"
+                        message={readiness.missing_requirements.join(' · ')}
+                      />
+                    ) : null}
+
+                    {/* Activation status */}
+                    {readiness.can_finalize ? (
+                      <div style={{ display: 'grid', gap: '0.6rem' }}>
+                        <div style={{ color: '#10b981', fontWeight: 600 }}>
+                          ✓ Agent is ready to activate
+                        </div>
+                        {readOnly ? (
+                          <Badge appearance="outline" color="informative">This hire has ended — activation workspace is read-only.</Badge>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>
+                        Complete the missing items above, then return to this step to activate.
+                      </div>
+                    )}
+
+                    {saveError ? <FeedbackMessage intent="error" title="Save failed" message={saveError} /> : null}
+                    {finishError ? <FeedbackMessage intent="error" title="Activation failed" message={finishError} /> : null}
+                    {finishStatus === 'success' || activation?.workspace.activation_complete ? (
+                      <FeedbackMessage intent="success" title="Runtime-ready" message="This hire now has channels, theme plan, and schedule confirmed." />
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+            </div>
+
+            {/* STICKY FOOTER — Back / Continue / Activate */}
+            <div className="dma-wizard-action-bar">
+              <div className="dma-wizard-action-bar-left">
+                <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
               </div>
-              <Badge appearance={readiness.youtube_connection_ready ? 'filled' : 'tint'} color={readiness.youtube_connection_ready ? 'success' : 'warning'}>
-                {readiness.youtube_connection_ready ? 'Connected' : 'Needs setup'}
-              </Badge>
+              <div className="dma-wizard-action-bar-right">
+                <Button
+                  appearance="subtle"
+                  onClick={() => setActiveStepIndex(i => Math.max(0, i - 1))}
+                  disabled={activeStepIndex === 0}
+                >
+                  Back
+                </Button>
+                {activeStepIndex < DMA_STEPS.length - 1 ? (
+                  <Button
+                    appearance="primary"
+                    onClick={() => void handleContinue()}
+                    disabled={saveStatus === 'saving'}
+                  >
+                    {saveStatus === 'saving' ? 'Saving…' : 'Continue'}
+                  </Button>
+                ) : (
+                  <Button
+                    appearance="primary"
+                    onClick={() => void finishActivation()}
+                    disabled={readOnly || finishStatus === 'saving' || !readiness.can_finalize}
+                  >
+                    {finishStatus === 'saving' ? 'Activating…' : 'Activate Agent'}
+                  </Button>
+                )}
+              </div>
             </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <Button
-                appearance="primary"
-                onClick={() => navigate(`/hire/setup/${encodeURIComponent(activeInstance.subscription_id)}?agentId=${encodeURIComponent(activeInstance.agent_id)}&agentTypeId=${encodeURIComponent(String(activeInstance.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID))}&step=3&focus=youtube`)}
-              >
-                Open YouTube setup
-              </Button>
-              <Button appearance="secondary" onClick={() => void loadState()}>
-                I connected YouTube
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        {hiredInstanceId ? (
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Platform connections</div>
-            <div style={{ marginBottom: '0.65rem', opacity: 0.78 }}>
-              Use the shared platform-connection controls for any channel that needs a credential or reconnection.
-            </div>
-            <PlatformConnectionsPanel hiredInstanceId={hiredInstanceId} readOnly={readOnly} />
-          </div>
-        ) : null}
-      </Card>
-
-      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Step 4</div>
-          <h4 style={{ margin: '0.35rem 0 0' }}>Master Theme</h4>
-          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Generate a persisted campaign theme plan, review the derived themes, and save manual revisions back through the activation API.</div>
-        </div>
-
-        {showHelp ? (
-          <div data-testid="dma-help-panel-secondary" style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '0.9rem 1rem', lineHeight: 1.6, background: 'var(--colorNeutralBackground2)' }}>
-            Generate a first draft from the saved induction brief, then edit the master theme or derived themes before saving. Use Refresh status after saving to confirm the persisted plan reloads from the backend.
-          </div>
-        ) : null}
-
-        {themePlanLoading ? <LoadingIndicator message="Generating theme plan..." size="small" /> : null}
-        {!themePlanLoading && themePlanError ? <FeedbackMessage intent="error" title="Theme plan unavailable" message={themePlanError} /> : null}
-
-        {!themePlanLoading ? (
-          <DigitalMarketingThemePlanCard
-            masterTheme={masterTheme}
-            derivedThemes={derivedThemes}
-            editable={!readOnly}
-            saving={themePlanSaving}
-            error={themePlanError}
-            onMasterThemeChange={setMasterTheme}
-            onDerivedThemeChange={updateDerivedTheme}
-            onAddDerivedTheme={addDerivedTheme}
-            onGenerate={() => void generateThemePlan()}
-            onRegenerate={masterTheme.trim() || derivedThemes.length > 0 ? () => void generateThemePlan() : undefined}
-            onSave={() => void saveThemePlan()}
-          />
-        ) : null}
-      </Card>
-
-      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div>
-          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.7 }}>Final step</div>
-          <h4 style={{ margin: '0.35rem 0 0' }}>Confirm Schedule</h4>
-          <div style={{ marginTop: '0.35rem', opacity: 0.8 }}>Confirm cadence and finish setup so this hire stays runtime-ready inside My Agents.</div>
-        </div>
-
-        <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', padding: '1rem', display: 'grid', gap: '0.6rem' }}>
-          <div style={{ fontWeight: 600 }}>Activation summary</div>
-          <div>Platforms: {selectedPlatforms.length > 0 ? selectedPlatforms.join(', ') : 'No platforms selected yet'}</div>
-          <div>Master theme: {masterTheme.trim() || 'No master theme yet'}</div>
-          <div>Derived themes: {derivedThemes.length > 0 ? derivedThemes.map((theme) => theme.title).join(', ') : 'No derived themes yet'}</div>
-          <div>Cadence: {postsPerWeek.trim() ? `${postsPerWeek} posts/week` : 'Posts per week not set'}</div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Start date</span>
-            <Input aria-label="Start date" type="date" value={scheduleStartDate} onChange={(_, data) => setScheduleStartDate(data.value)} disabled={readOnly} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Posts per week</span>
-            <Input aria-label="Posts per week" type="number" value={postsPerWeek} onChange={(_, data) => setPostsPerWeek(data.value)} disabled={readOnly} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Preferred days</span>
-            <Input aria-label="Preferred days" value={preferredDaysText} onChange={(_, data) => setPreferredDaysText(data.value)} disabled={readOnly} />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            <span>Preferred hours (UTC)</span>
-            <Input aria-label="Preferred hours UTC" value={preferredHoursText} onChange={(_, data) => setPreferredHoursText(data.value)} disabled={readOnly} />
-          </label>
-        </div>
-
-        {finishError ? <FeedbackMessage intent="error" title="Finish activation failed" message={finishError} /> : null}
-        {finishStatus === 'success' || activation?.workspace.activation_complete ? (
-          <FeedbackMessage intent="success" title="Runtime-ready" message="This hire now has channels, theme plan, and schedule confirmed. My Agents will keep showing it as ready to run." />
-        ) : null}
-
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Button appearance="primary" onClick={() => void finishActivation()} disabled={!canFinish || finishStatus === 'saving' || readOnly}>
-            {finishStatus === 'saving' ? 'Finishing activation...' : 'Finish activation'}
-          </Button>
-          <Badge appearance={canFinish ? 'filled' : 'outline'} color={canFinish ? 'success' : 'warning'}>
-            {canFinish ? 'Ready to finish' : 'Finish is blocked until platform prep, theme setup, and schedule are complete'}
-          </Badge>
-        </div>
-      </Card>
-
-      <Card style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div>
-            <h4 style={{ margin: 0 }}>Activation readiness</h4>
-            <div style={{ marginTop: '0.3rem', opacity: 0.8 }}>This comes directly from the backend readiness contract.</div>
-          </div>
-          <Badge appearance={readiness.can_finalize ? 'filled' : 'outline'} color={readiness.can_finalize ? 'success' : 'warning'}>
-            {readiness.can_finalize ? 'Ready for runtime handoff' : 'More setup required'}
-          </Badge>
-        </div>
-
-        {readiness.missing_requirements.length > 0 ? (
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {readiness.missing_requirements.map((requirement) => (
-              <Badge key={requirement} appearance="tint" color="warning">
-                {requirement.replace(/_/g, ' ')}
-              </Badge>
-            ))}
-          </div>
-        ) : (
-          <Badge appearance="filled" color="success">All activation checks satisfied</Badge>
-        )}
-      </Card>
+          </Card>
+        </section>
+      </div>
     </div>
   )
 }
