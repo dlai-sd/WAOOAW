@@ -39,6 +39,39 @@ vi.mock('../components/PlatformConnectionsPanel', () => ({
   PlatformConnectionsPanel: () => <div>Platform connections panel</div>,
 }))
 
+vi.mock('../services/youtubeConnections.service', () => ({
+  listYouTubeConnections: vi.fn().mockResolvedValue([]),
+  startYouTubeConnection: vi.fn(),
+  finalizeYouTubeConnection: vi.fn(),
+  attachYouTubeConnection: vi.fn(),
+}))
+
+const mockInstance = {
+  subscription_id: 'SUB-1',
+  agent_id: 'AGT-MKT-DMA-001',
+  agent_type_id: 'marketing.digital_marketing.v1',
+  duration: 'monthly',
+  status: 'active',
+  current_period_start: '2026-03-01T00:00:00Z',
+  current_period_end: '2026-04-01T00:00:00Z',
+  cancel_at_period_end: false,
+  hired_instance_id: 'HAI-1',
+  nickname: 'Growth Copilot',
+}
+
+const mockInstance2 = {
+  subscription_id: 'SUB-2',
+  agent_id: 'AGT-MKT-DMA-001',
+  agent_type_id: 'marketing.digital_marketing.v1',
+  duration: 'monthly',
+  status: 'active',
+  current_period_start: '2026-03-01T00:00:00Z',
+  current_period_end: '2026-04-01T00:00:00Z',
+  cancel_at_period_end: false,
+  hired_instance_id: 'HAI-2',
+  nickname: 'SEO Pilot',
+}
+
 const defaultWorkspace = {
   hired_instance_id: 'HAI-1',
   help_visible: false,
@@ -73,23 +106,14 @@ const defaultWorkspace = {
   updated_at: '2026-03-18T09:00:00Z',
 }
 
+// Renders with 1 instance → auto-advances past step 0 to step 1 (Induct Agent)
 function renderWizard() {
   return render(
     <MemoryRouter>
       <FluentProvider theme={waooawLightTheme}>
         <DigitalMarketingActivationWizard
-          selectedInstance={{
-            subscription_id: 'SUB-1',
-            agent_id: 'AGT-MKT-DMA-001',
-            agent_type_id: 'marketing.digital_marketing.v1',
-            duration: 'monthly',
-            status: 'active',
-            current_period_start: '2026-03-01T00:00:00Z',
-            current_period_end: '2026-04-01T00:00:00Z',
-            cancel_at_period_end: false,
-            hired_instance_id: 'HAI-1',
-            nickname: 'Growth Copilot',
-          }}
+          instances={[mockInstance]}
+          selectedInstance={mockInstance}
           readOnly={false}
         />
       </FluentProvider>
@@ -163,21 +187,24 @@ describe('DMA Activation Wizard — step navigation', () => {
       configured: true,
       goals_completed: false,
     })
+
+    const ytModule = await import('../services/youtubeConnections.service')
+    vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([])
   })
 
-  it('renders wizard shell with 6 step buttons', async () => {
+  it('renders wizard shell with 7 step buttons', async () => {
     renderWizard()
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
     })
-    const stepTitles = ['Induct Agent', 'Choose Platforms', 'Connect Platforms', 'Build Master Theme', 'Confirm Schedule', 'Review & Activate']
+    const stepTitles = ['Select Agent', 'Induct Agent', 'Choose Platforms', 'Connect Platforms', 'Build Master Theme', 'Confirm Schedule', 'Review & Activate']
     for (const title of stepTitles) {
       expect(screen.getByText(title)).toBeInTheDocument()
     }
     expect(screen.getByText('Now')).toBeInTheDocument()
   })
 
-  it('starts on step 1 — Induct Agent panel visible', async () => {
+  it('starts on step 1 — Induct Agent panel visible (auto-advanced from step 0 with 1 instance)', async () => {
     renderWizard()
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
@@ -211,15 +238,27 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
   })
 
-  it('Back button disabled on step 1', async () => {
-    renderWizard()
+  it('Back button disabled on step 0 (Select Agent)', async () => {
+    const onSelectedInstanceChange = vi.fn()
+    render(
+      <MemoryRouter>
+        <FluentProvider theme={waooawLightTheme}>
+          <DigitalMarketingActivationWizard
+            instances={[mockInstance, mockInstance2]}
+            selectedInstance={null}
+            readOnly={false}
+            onSelectedInstanceChange={onSelectedInstanceChange}
+          />
+        </FluentProvider>
+      </MemoryRouter>
+    )
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-select')).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
   })
 
-  it('Activate Agent button visible on step 6', async () => {
+  it('Activate Agent button visible on step 7', async () => {
     renderWizard()
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
@@ -231,6 +270,32 @@ describe('DMA Activation Wizard — step navigation', () => {
       expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'Activate Agent' })).toBeInTheDocument()
+  })
+
+  it('renders Step 0 agent select panel when instances provided', async () => {
+    const onSelectedInstanceChange = vi.fn()
+    render(
+      <MemoryRouter>
+        <FluentProvider theme={waooawLightTheme}>
+          <DigitalMarketingActivationWizard
+            instances={[mockInstance, mockInstance2]}
+            selectedInstance={null}
+            readOnly={false}
+            onSelectedInstanceChange={onSelectedInstanceChange}
+          />
+        </FluentProvider>
+      </MemoryRouter>
+    )
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-select')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Growth Copilot')).toBeInTheDocument()
+    expect(screen.getByText('SEO Pilot')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Growth Copilot').closest('button')!)
+    expect(onSelectedInstanceChange).toHaveBeenCalledWith('SUB-1')
+    await waitFor(() => {
+      expect(screen.queryByTestId('dma-step-panel-select')).not.toBeInTheDocument()
+    })
   })
 })
 

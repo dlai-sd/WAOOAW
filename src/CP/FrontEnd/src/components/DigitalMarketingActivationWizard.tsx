@@ -2,8 +2,7 @@ import { Badge, Button, Card, CardHeader, Spinner, Text, Input, Textarea } from 
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
-import { FeedbackMessage, LoadingIndicator, ProgressIndicator, SaveIndicator } from './FeedbackIndicators'
-import { PlatformConnectionsPanel } from './PlatformConnectionsPanel'
+import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
 import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
@@ -19,16 +18,23 @@ import {
   type DigitalMarketingDerivedTheme,
   type DigitalMarketingActivationResponse,
 } from '../services/digitalMarketingActivation.service'
+import {
+  startYouTubeConnection,
+  finalizeYouTubeConnection,
+  attachYouTubeConnection,
+  listYouTubeConnections,
+} from '../services/youtubeConnections.service'
 
 const DIGITAL_MARKETING_AGENT_TYPE_ID = 'marketing.digital_marketing.v1'
 
 const DMA_STEPS = [
-  { id: 'induct',    title: 'Induct Agent',        description: 'Set the agent nickname and brand identity.' },
-  { id: 'platforms', title: 'Choose Platforms',     description: 'Select which social channels this agent will manage.' },
-  { id: 'connect',   title: 'Connect Platforms',    description: 'Authorise each selected platform channel.' },
-  { id: 'theme',     title: 'Build Master Theme',   description: 'Define brand brief and generate an AI content strategy.' },
-  { id: 'schedule',  title: 'Confirm Schedule',     description: 'Set posting frequency and preferred days.' },
-  { id: 'activate',  title: 'Review & Activate',    description: 'Check readiness then activate the agent.' },
+  { id: 'select',    title: 'Select Agent',         description: 'Choose which hired agent to configure.' },
+  { id: 'induct',    title: 'Induct Agent',          description: 'Set the agent nickname and brand identity.' },
+  { id: 'platforms', title: 'Choose Platforms',      description: 'Select which social channels this agent will manage.' },
+  { id: 'connect',   title: 'Connect Platforms',     description: 'Authorise each selected platform channel.' },
+  { id: 'theme',     title: 'Build Master Theme',    description: 'Define brand brief and generate an AI content strategy.' },
+  { id: 'schedule',  title: 'Confirm Schedule',      description: 'Set posting frequency and preferred days.' },
+  { id: 'activate',  title: 'Review & Activate',     description: 'Check readiness then activate the agent.' },
 ] as const
 
 const PLATFORM_OPTIONS = [
@@ -41,6 +47,7 @@ const PLATFORM_OPTIONS = [
 ]
 
 type DigitalMarketingActivationWizardProps = {
+  instances?: MyAgentInstanceSummary[]
   instance?: MyAgentInstanceSummary | null
   selectedInstance?: MyAgentInstanceSummary | null
   readOnly: boolean
@@ -52,6 +59,7 @@ type DigitalMarketingActivationWizardProps = {
     hired_instance_id?: string | null
     agent_type_id?: string | null
   }) => void
+  onSelectedInstanceChange?: (subscriptionId: string) => void
 }
 
 function normalizeText(value: unknown): string {
@@ -98,7 +106,7 @@ function buildFallbackDraft(instance: MyAgentInstanceSummary): HiredAgentInstanc
   }
 }
 
-export function DigitalMarketingActivationWizard({ instance, selectedInstance, readOnly, onSaved, onSavedInstance }: DigitalMarketingActivationWizardProps) {
+export function DigitalMarketingActivationWizard({ instances = [], instance, selectedInstance, readOnly, onSaved, onSavedInstance, onSelectedInstanceChange }: DigitalMarketingActivationWizardProps) {
   const navigate = useNavigate()
   const activeInstance = instance ?? selectedInstance ?? null
 
@@ -134,11 +142,66 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   const [preferredHoursText, setPreferredHoursText] = useState('')
   const [finishStatus, setFinishStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [finishError, setFinishError] = useState<string | null>(null)
+  const [youtubeConnected, setYoutubeConnected] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState(false)
+  const [oauthError, setOauthError] = useState<string | null>(null)
 
   const hiredInstanceId = useMemo(
     () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
     [draft?.hired_instance_id, activeInstance?.hired_instance_id]
   )
+
+  // Auto-select + advance if only one instance and we are on step 0
+  useEffect(() => {
+    if (activeStepIndex === 0 && instances.length === 1) {
+      onSelectedInstanceChange?.(instances[0].subscription_id)
+      setActiveStepIndex(1)
+    }
+  }, [instances, activeStepIndex, onSelectedInstanceChange])
+
+  // OAuth callback — detect ?code&state on mount and finalize connection
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+    if (!code || !state) return
+
+    const storedState = sessionStorage.getItem('yt_oauth_state')
+    if (!storedState || storedState !== state) {
+      // State mismatch — do not process (CSRF protection)
+      return
+    }
+
+    const redirectUri = window.location.origin + window.location.pathname
+    const hiredInstanceIdForOauth = activeInstance?.hired_instance_id ?? ''
+    const skillId = ''
+
+    ;(async () => {
+      try {
+        setOauthLoading(true)
+        const connection = await finalizeYouTubeConnection({ state, code, redirect_uri: redirectUri })
+        await attachYouTubeConnection(connection.id, {
+          hired_instance_id: hiredInstanceIdForOauth,
+          skill_id: skillId,
+        })
+        sessionStorage.removeItem('yt_oauth_state')
+        window.history.replaceState({}, '', window.location.pathname)
+        setYoutubeConnected(true)
+        setActiveStepIndex(DMA_STEPS.findIndex((s) => s.id === 'connect'))
+      } catch (err) {
+        setOauthError('YouTube connection failed. Please try again.')
+      } finally {
+        setOauthLoading(false)
+      }
+    })()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps — intentionally runs once on mount
+
+  // Load existing YouTube connections on mount
+  useEffect(() => {
+    listYouTubeConnections().then((connections) => {
+      if (connections.length > 0) setYoutubeConnected(true)
+    }).catch(() => {/* silently ignore — not connected is the default */})
+  }, [])
 
   const campaignSetup = activation?.workspace.campaign_setup || {}
   const schedule = campaignSetup.schedule || {}
@@ -309,8 +372,24 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
   }
 
   async function handleContinue() {
-    await saveWorkspace()
+    if (currentStep.id !== 'select') {
+      await saveWorkspace()
+    }
     setActiveStepIndex(i => Math.min(DMA_STEPS.length - 1, i + 1))
+  }
+
+  async function handleConnectYouTube() {
+    setOauthLoading(true)
+    setOauthError(null)
+    try {
+      const redirectUri = window.location.origin + window.location.pathname
+      const { state, authorization_url } = await startYouTubeConnection(redirectUri)
+      sessionStorage.setItem('yt_oauth_state', state)
+      window.location.href = authorization_url
+    } catch (err) {
+      setOauthError('Could not start YouTube connection. Please try again.')
+      setOauthLoading(false)
+    }
   }
 
   const togglePlatform = (platformKey: string, checked: boolean) => {
@@ -442,15 +521,15 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
     }
   }
 
-  if (!activeInstance) {
+  if (!activeInstance && (currentStep.id !== 'select' || instances.length === 0)) {
     return <FeedbackMessage intent="warning" title="Activation unavailable" message="Select a hired agent before opening the digital marketing activation workspace." />
   }
 
-  if (loading) {
+  if (loading && currentStep.id !== 'select') {
     return <LoadingIndicator message="Loading digital marketing activation..." size="medium" />
   }
 
-  if (error) {
+  if (error && currentStep.id !== 'select') {
     return <FeedbackMessage intent="error" title="Activation unavailable" message={error} action={{ label: 'Retry', onClick: () => void loadState() }} />
   }
 
@@ -504,6 +583,36 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
 
             {/* SCROLLABLE BODY */}
             <div className="dma-wizard-canvas-body">
+
+              {/* STEP 0 — Select Agent */}
+              {currentStep.id === 'select' && (
+                <div data-testid="dma-step-panel-select" className="dma-wizard-canvas-body-inner">
+                  {instances.length === 0 ? (
+                    <div>No agents found.</div>
+                  ) : (
+                    <div className="dma-wizard-agent-select-grid">
+                      {instances.map((inst) => (
+                        <button
+                          key={inst.subscription_id}
+                          type="button"
+                          className={`dma-wizard-agent-card${inst.subscription_id === activeInstance?.subscription_id ? ' is-selected' : ''}`}
+                          onClick={() => {
+                            onSelectedInstanceChange?.(inst.subscription_id)
+                            setActiveStepIndex(1)
+                          }}
+                        >
+                          <div className="dma-wizard-agent-card-name">
+                            {inst.nickname || inst.agent_id}
+                          </div>
+                          <div className="dma-wizard-agent-card-meta">
+                            {inst.status}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* STEP 1 — Induct Agent */}
               {currentStep.id === 'induct' && (
@@ -601,30 +710,48 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
 
               {/* STEP 3 — Connect Platforms */}
               {currentStep.id === 'connect' && (
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-connect">
-                  {selectedPlatforms.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center', opacity: 0.7 }}>
-                      <div style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>No platforms selected yet.</div>
-                      <Button appearance="secondary" onClick={() => setActiveStepIndex(1)}>
-                        Go back to Choose Platforms
-                      </Button>
+                <div data-testid="dma-step-panel-connect" className="dma-wizard-canvas-body-inner">
+                  <div className="dma-wizard-platform-connect-list">
+
+                    {/* YouTube */}
+                    <div className="dma-wizard-platform-connect-row">
+                      <div className="dma-wizard-platform-connect-info">
+                        <span className="dma-wizard-platform-connect-name">YouTube</span>
+                        <span className="dma-wizard-platform-connect-desc">
+                          Connect your YouTube channel to allow the agent to manage uploads and publishing.
+                        </span>
+                      </div>
+                      <div className="dma-wizard-platform-connect-action">
+                        {youtubeConnected ? (
+                          <span className="dma-wizard-connected-badge">✓ Connected</span>
+                        ) : (
+                          <Button
+                            appearance="primary"
+                            disabled={oauthLoading || readOnly}
+                            onClick={() => void handleConnectYouTube()}
+                          >
+                            {oauthLoading ? 'Connecting…' : 'Connect with Google'}
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div style={{ display: 'grid', gap: '1.5rem' }}>
-                      {readiness.youtube_selected && !readiness.youtube_connection_ready ? (
-                        <FeedbackMessage
-                          intent="warning"
-                          title="YouTube not connected"
-                          message="Connect YouTube below before continuing. The agent needs channel access to publish."
-                        />
-                      ) : null}
-                      <PlatformConnectionsPanel
-                        hiredInstanceId={hiredInstanceId ?? ''}
-                        requiredPlatformKeys={selectedPlatforms}
-                        readOnly={readOnly}
-                      />
-                    </div>
-                  )}
+
+                    {oauthError && (
+                      <div className="dma-wizard-oauth-error">{oauthError}</div>
+                    )}
+
+                    {/* Other platforms — coming soon */}
+                    {(['Instagram', 'Facebook', 'LinkedIn', 'WhatsApp', 'X'] as const).map((name) => (
+                      <div key={name} className="dma-wizard-platform-connect-row dma-wizard-platform-connect-row--disabled">
+                        <div className="dma-wizard-platform-connect-info">
+                          <span className="dma-wizard-platform-connect-name">{name}</span>
+                        </div>
+                        <div className="dma-wizard-platform-connect-action">
+                          <span className="dma-wizard-coming-soon-badge">Coming soon</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

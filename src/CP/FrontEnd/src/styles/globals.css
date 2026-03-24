@@ -3592,3 +3592,126 @@ section[id] {
     min-height: 60vh;
   }
 }
+
+/* ── DMA Wizard Agent Select Step (CP-STUDIO-4 E1) ─────────────── */
+.dma-wizard-fullwidth-card {
+  padding: 0;
+}
+
+.dma-wizard-agent-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.dma-wizard-agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.dma-wizard-agent-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(0, 242, 254, 0.35);
+  transform: translateY(-2px);
+}
+
+.dma-wizard-agent-card.is-selected {
+  border-color: rgba(0, 242, 254, 0.6);
+  background: rgba(0, 242, 254, 0.08);
+  box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.25);
+}
+
+.dma-wizard-agent-card-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.dma-wizard-agent-card-meta {
+  font-size: 0.78rem;
+  color: var(--colorNeutralForeground3);
+  text-transform: capitalize;
+}
+
+/* ── DMA Wizard YouTube OAuth Connect (CP-STUDIO-4 E2) ─────────── */
+.dma-wizard-platform-connect-list {
+  display: grid;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.dma-wizard-platform-connect-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dma-wizard-platform-connect-row--disabled {
+  opacity: 0.55;
+}
+
+.dma-wizard-platform-connect-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dma-wizard-platform-connect-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.dma-wizard-platform-connect-desc {
+  font-size: 0.78rem;
+  color: var(--colorNeutralForeground3);
+}
+
+.dma-wizard-platform-connect-action {
+  flex-shrink: 0;
+}
+
+.dma-wizard-connected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.dma-wizard-coming-soon-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--colorNeutralForeground3);
+  font-size: 0.78rem;
+}
+
+.dma-wizard-oauth-error {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  font-size: 0.85rem;
+}
+
