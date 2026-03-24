@@ -216,6 +216,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-0',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-0',
+          agent_id: 'AGT-TRD-DELTA-010',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-0',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -258,7 +269,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
@@ -346,7 +357,7 @@ describe('MyAgents Component', () => {
       updated_at: '2026-03-19T12:00:00Z',
     })
 
-    vi.mocked(activationModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+    vi.mocked(activationModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValue({
       hired_instance_id: 'HIRED-DM-1',
       agent_type_id: 'marketing.digital_marketing.v1',
       workspace: {
@@ -372,30 +383,32 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('Digital Marketing activation')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
     })
 
-    fireEvent.change(screen.getByLabelText('Offerings and services'), { target: { value: 'SEO\nContent' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'YouTube' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save activation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
 
     await waitFor(() => {
-      expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
     })
 
-    expect(activationModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenCalledWith('HIRED-1', {
+    fireEvent.click(screen.getByTestId('platform-toggle-youtube'))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
+    })
+
+    expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledTimes(2)
+
+    expect(activationModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenLastCalledWith('HIRED-1', {
       workspace: expect.objectContaining({
         brand_name: 'WAOOAW',
-        offerings_services: ['SEO', 'Content'],
         platforms_enabled: ['youtube'],
         platform_bindings: {
           youtube: { skill_id: 'default' },
         },
       }),
-    })
-
-    await waitFor(() => {
-      expect(screen.getByText('Needs setup')).toBeInTheDocument()
     })
   })
   it('renders page title with agent count', async () => {
@@ -643,6 +656,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-1',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-1',
+          agent_id: 'AGT-TRD-DELTA-011',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-1',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -682,7 +706,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
@@ -722,6 +746,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-2',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-2',
+          agent_id: 'AGT-TRD-DELTA-012',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-2',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -786,7 +821,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
@@ -798,8 +833,10 @@ describe('MyAgents Component', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
 
     await waitFor(() => {
-      expect(screen.getByText('WAOOAW Launch Channel connected')).toBeInTheDocument()
+      expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
+      expect(screen.getByText('Ready for upload')).toBeInTheDocument()
     })
+    expect(screen.queryByRole('button', { name: 'Open YouTube setup' })).not.toBeInTheDocument()
   })
 
   it('shows reconnect-required state for stale YouTube credentials', async () => {
@@ -820,6 +857,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-3',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-3',
+          agent_id: 'AGT-TRD-DELTA-013',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-3',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -877,7 +925,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))

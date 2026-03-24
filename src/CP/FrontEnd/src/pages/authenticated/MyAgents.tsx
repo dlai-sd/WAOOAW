@@ -1,7 +1,7 @@
 import { Card, Button, Badge, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Input, Textarea, Checkbox } from '@fluentui/react-components'
 import { Star20Filled } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AgentSelector } from '../../components/AgentSelector'
 import { LoadingIndicator, SaveIndicator, FeedbackMessage, ValidationFeedback } from '../../components/FeedbackIndicators'
@@ -1912,6 +1912,34 @@ export default function MyAgents({
     return instances.find((x) => x.subscription_id === selectedSubscriptionId) || null
   }, [instances, selectedSubscriptionId])
 
+  const refreshAfterStaleSelection = useCallback(async () => {
+    try {
+      const summary = await getMyAgentsSummary()
+      const nextInstances = summary?.instances || []
+      const nextSelectedSubscriptionId = nextInstances[0]?.subscription_id || ''
+
+      setInstances(nextInstances)
+      setSelectedSubscriptionId(nextSelectedSubscriptionId)
+      setError(
+        nextInstances.length > 0
+          ? 'Your previously selected hire is no longer available. The list has been refreshed.'
+          : 'Your previously selected hire is no longer available.'
+      )
+
+      try {
+        if (nextSelectedSubscriptionId) {
+          localStorage.setItem(SELECTED_SUBSCRIPTION_STORAGE_KEY, nextSelectedSubscriptionId)
+        } else {
+          localStorage.removeItem(SELECTED_SUBSCRIPTION_STORAGE_KEY)
+        }
+      } catch {
+        // ignore
+      }
+    } catch {
+      setError('Your previously selected hire is no longer available. Please reload My Agents.')
+    }
+  }, [SELECTED_SUBSCRIPTION_STORAGE_KEY])
+
   const getStatusBadge = (status: string) => {
     const statusMap = {
       active: { appearance: 'filled' as const, color: 'success' as const, label: 'Active' },
@@ -2247,6 +2275,9 @@ export default function MyAgents({
                       <DigitalMarketingActivationWizard
                         instance={selectedInstance}
                         readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                        onStaleReference={async () => {
+                          await refreshAfterStaleSelection()
+                        }}
                         onSaved={(updated) => {
                           setInstances((prev) =>
                             prev.map((x) =>
