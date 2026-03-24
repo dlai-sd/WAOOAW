@@ -216,6 +216,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-0',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-0',
+          agent_id: 'AGT-TRD-DELTA-010',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-0',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -258,7 +269,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
@@ -645,6 +656,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-1',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-1',
+          agent_id: 'AGT-TRD-DELTA-011',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-1',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -684,7 +706,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
@@ -724,6 +746,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-2',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-2',
+          agent_id: 'AGT-TRD-DELTA-012',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-2',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -788,7 +821,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
@@ -800,8 +833,10 @@ describe('MyAgents Component', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
 
     await waitFor(() => {
-      expect(screen.getByText('WAOOAW Launch Channel connected')).toBeInTheDocument()
+      expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
+      expect(screen.getByText('Ready for upload')).toBeInTheDocument()
     })
+    expect(screen.queryByRole('button', { name: 'Open YouTube setup' })).not.toBeInTheDocument()
   })
 
   it('shows reconnect-required state for stale YouTube credentials', async () => {
@@ -822,6 +857,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-3',
           agent_type_id: 'marketing.digital_marketing.v1'
+        },
+        {
+          subscription_id: 'SUB-TRD-3',
+          agent_id: 'AGT-TRD-DELTA-013',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-3',
+          agent_type_id: 'trading.share_trader.v1'
         }
       ]
     })
@@ -879,7 +925,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
