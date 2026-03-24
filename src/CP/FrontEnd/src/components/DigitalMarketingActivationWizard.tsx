@@ -17,6 +17,7 @@ import {
   type DigitalMarketingCampaignSchedule,
   type DigitalMarketingDerivedTheme,
   type DigitalMarketingActivationResponse,
+  type UpsertDigitalMarketingActivationInput,
 } from '../services/digitalMarketingActivation.service'
 import {
   startYouTubeConnection,
@@ -368,6 +369,29 @@ export function DigitalMarketingActivationWizard({
     return items
   }, [brandName, location, offeringsText, primaryLanguage, timezone])
 
+  const saveActivationWorkspaceWithRecovery = async (
+    initialHiredInstanceId: string,
+    payload: UpsertDigitalMarketingActivationInput,
+  ): Promise<{ activation: DigitalMarketingActivationResponse; draft: HiredAgentInstance | null }> => {
+    try {
+      const savedActivation = await upsertDigitalMarketingActivationWorkspace(initialHiredInstanceId, payload)
+      return { activation: savedActivation, draft: null }
+    } catch (error: any) {
+      if (!isNotFoundError(error) || !activeInstance?.subscription_id) {
+        throw error
+      }
+
+      const refreshedDraft = await getHiredAgentBySubscription(activeInstance.subscription_id)
+      const refreshedHiredInstanceId = String(refreshedDraft?.hired_instance_id || '').trim()
+      if (!refreshedHiredInstanceId || refreshedHiredInstanceId === initialHiredInstanceId) {
+        throw error
+      }
+
+      const savedActivation = await upsertDigitalMarketingActivationWorkspace(refreshedHiredInstanceId, payload)
+      return { activation: savedActivation, draft: refreshedDraft }
+    }
+  }
+
   const saveWorkspace = async (): Promise<boolean> => {
     if (readOnly) return true
 
@@ -395,7 +419,7 @@ export function DigitalMarketingActivationWizard({
         'default'
       )
 
-      const savedActivation = await upsertDigitalMarketingActivationWorkspace(savedDraft.hired_instance_id, {
+      const activationPayload: UpsertDigitalMarketingActivationInput = {
         workspace: {
           brand_name: brandName.trim(),
           location: location.trim(),
@@ -406,10 +430,16 @@ export function DigitalMarketingActivationWizard({
           platforms_enabled: selectedPlatforms,
           platform_bindings: platformBindings,
         },
-      })
+      }
+
+      const { activation: savedActivation, draft: recoveredDraft } = await saveActivationWorkspaceWithRecovery(
+        savedDraft.hired_instance_id,
+        activationPayload,
+      )
 
       const refreshedDraft = await getHiredAgentBySubscription(activeInstance.subscription_id).catch(() => ({
         ...savedDraft,
+        ...(recoveredDraft || {}),
         configured: savedActivation.readiness.configured,
       }))
 
@@ -553,7 +583,7 @@ export function DigitalMarketingActivationWizard({
     setFinishStatus('saving')
     setFinishError(null)
     try {
-      const savedActivation = await upsertDigitalMarketingActivationWorkspace(hiredInstanceId, {
+      const activationPayload: UpsertDigitalMarketingActivationInput = {
         workspace: {
           ...(activation?.workspace || {}),
           help_visible: showHelp,
@@ -566,14 +596,21 @@ export function DigitalMarketingActivationWizard({
             schedule: normalizedSchedule,
           },
         },
-      })
+      }
+
+      const { activation: savedActivation, draft: recoveredDraft } = await saveActivationWorkspaceWithRecovery(
+        hiredInstanceId,
+        activationPayload,
+      )
+
       setActivation(savedActivation)
       applyThemePlanState(savedActivation.workspace)
       setFinishStatus('success')
 
-      const updatedDraft = draft
+      const resolvedDraft = recoveredDraft || draft
+      const updatedDraft = resolvedDraft
         ? {
-            ...draft,
+            ...resolvedDraft,
             configured: true,
             goals_completed: true,
             hired_instance_id: savedActivation.hired_instance_id,
