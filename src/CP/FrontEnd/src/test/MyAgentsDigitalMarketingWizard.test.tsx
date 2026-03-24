@@ -344,5 +344,111 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.queryByTestId('dma-step-panel-platforms')).not.toBeInTheDocument()
     expect(onStaleReference).toHaveBeenCalledWith({ subscriptionId: 'SUB-1', hiredInstanceId: 'HAI-1' })
   })
+
+  it('re-resolves the hire by subscription and retries the save before showing a stale error', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const hiredAgentsModule = await import('../services/hiredAgents.service')
+
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace)
+      .mockRejectedValueOnce({ status: 404 })
+      .mockResolvedValueOnce({
+        hired_instance_id: 'HAI-2',
+        customer_id: 'CUST-1',
+        agent_type_id: 'marketing.digital_marketing.v1',
+        workspace: {
+          brand_name: 'WAOOAW',
+          location: 'Pune',
+          primary_language: 'en',
+          timezone: 'Asia/Kolkata',
+          business_context: '',
+          offerings_services: ['Activation'],
+          platforms_enabled: ['youtube'],
+          activation_complete: false,
+          campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+        },
+        readiness: {
+          brief_complete: true,
+          youtube_selected: true,
+          youtube_connection_ready: true,
+          configured: true,
+          can_finalize: true,
+          missing_requirements: [],
+        },
+        updated_at: '2026-03-18T09:00:00Z',
+      } as any)
+
+    vi.mocked(hiredAgentsModule.getHiredAgentBySubscription)
+      .mockResolvedValueOnce({
+        subscription_id: 'SUB-1',
+        hired_instance_id: 'HAI-1',
+        agent_id: 'AGT-MKT-DMA-001',
+        agent_type_id: 'marketing.digital_marketing.v1',
+        nickname: 'Growth Copilot',
+        theme: 'dark',
+        config: {},
+        configured: false,
+        goals_completed: false,
+      })
+      .mockResolvedValueOnce({
+        subscription_id: 'SUB-1',
+        hired_instance_id: 'HAI-2',
+        agent_id: 'AGT-MKT-DMA-001',
+        agent_type_id: 'marketing.digital_marketing.v1',
+        nickname: 'Growth Copilot',
+        theme: 'dark',
+        config: {},
+        configured: true,
+        goals_completed: false,
+      })
+      .mockResolvedValueOnce({
+        subscription_id: 'SUB-1',
+        hired_instance_id: 'HAI-2',
+        agent_id: 'AGT-MKT-DMA-001',
+        agent_type_id: 'marketing.digital_marketing.v1',
+        nickname: 'Growth Copilot',
+        theme: 'dark',
+        config: {},
+        configured: true,
+        goals_completed: false,
+      })
+
+    const onStaleReference = vi.fn()
+
+    render(
+      <MemoryRouter>
+        <FluentProvider theme={waooawLightTheme}>
+          <DigitalMarketingActivationWizard
+            instances={[mockInstance]}
+            selectedInstance={mockInstance}
+            readOnly={false}
+            onStaleReference={onStaleReference}
+          />
+        </FluentProvider>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
+    })
+
+    expect(serviceModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenNthCalledWith(
+      1,
+      'HAI-1',
+      expect.any(Object),
+    )
+    expect(serviceModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenNthCalledWith(
+      2,
+      'HAI-2',
+      expect.any(Object),
+    )
+    expect(onStaleReference).not.toHaveBeenCalled()
+    expect(screen.queryByText('This hire is no longer available. Please select another agent.')).not.toBeInTheDocument()
+  })
 })
 
