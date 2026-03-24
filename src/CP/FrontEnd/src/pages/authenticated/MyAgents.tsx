@@ -1912,16 +1912,21 @@ export default function MyAgents({
     return instances.find((x) => x.subscription_id === selectedSubscriptionId) || null
   }, [instances, selectedSubscriptionId])
 
-  const refreshAfterStaleSelection = useCallback(async () => {
+  const refreshAfterStaleSelection = useCallback(async (preferredSubscriptionId?: string) => {
     try {
       const summary = await getMyAgentsSummary()
       const nextInstances = summary?.instances || []
-      const nextSelectedSubscriptionId = nextInstances[0]?.subscription_id || ''
+      const preferredInstance = preferredSubscriptionId
+        ? nextInstances.find((instance) => instance.subscription_id === preferredSubscriptionId) || null
+        : null
+      const nextSelectedSubscriptionId = preferredInstance?.subscription_id || nextInstances[0]?.subscription_id || ''
 
       setInstances(nextInstances)
       setSelectedSubscriptionId(nextSelectedSubscriptionId)
       setError(
-        nextInstances.length > 0
+        preferredInstance
+          ? 'Your hire reference changed in the background. The page has been refreshed to the latest agent record.'
+          : nextInstances.length > 0
           ? 'Your previously selected hire is no longer available. The list has been refreshed.'
           : 'Your previously selected hire is no longer available.'
       )
@@ -2114,6 +2119,9 @@ export default function MyAgents({
               instances={instances}
               instance={selectedInstance}
               readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+              onStaleReference={async ({ subscriptionId }) => {
+                await refreshAfterStaleSelection(subscriptionId)
+              }}
               onSaved={(updated) => {
                 setInstances((prev) =>
                   prev.map((x) =>
@@ -2275,8 +2283,8 @@ export default function MyAgents({
                       <DigitalMarketingActivationWizard
                         instance={selectedInstance}
                         readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-                        onStaleReference={async () => {
-                          await refreshAfterStaleSelection()
+                        onStaleReference={async ({ subscriptionId }) => {
+                          await refreshAfterStaleSelection(subscriptionId)
                         }}
                         onSaved={(updated) => {
                           setInstances((prev) =>
