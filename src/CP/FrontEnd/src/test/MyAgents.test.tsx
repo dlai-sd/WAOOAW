@@ -346,7 +346,7 @@ describe('MyAgents Component', () => {
       updated_at: '2026-03-19T12:00:00Z',
     })
 
-    vi.mocked(activationModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+    vi.mocked(activationModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValue({
       hired_instance_id: 'HIRED-DM-1',
       agent_type_id: 'marketing.digital_marketing.v1',
       workspace: {
@@ -372,30 +372,32 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('Digital Marketing activation')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
     })
 
-    fireEvent.change(screen.getByLabelText('Offerings and services'), { target: { value: 'SEO\nContent' } })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'YouTube' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Save activation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
 
     await waitFor(() => {
-      expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
     })
 
-    expect(activationModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenCalledWith('HIRED-1', {
+    fireEvent.click(screen.getByTestId('platform-toggle-youtube'))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
+    })
+
+    expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledTimes(2)
+
+    expect(activationModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenLastCalledWith('HIRED-1', {
       workspace: expect.objectContaining({
         brand_name: 'WAOOAW',
-        offerings_services: ['SEO', 'Content'],
         platforms_enabled: ['youtube'],
         platform_bindings: {
           youtube: { skill_id: 'default' },
         },
       }),
-    })
-
-    await waitFor(() => {
-      expect(screen.getByText('Needs setup')).toBeInTheDocument()
     })
   })
   it('renders page title with agent count', async () => {

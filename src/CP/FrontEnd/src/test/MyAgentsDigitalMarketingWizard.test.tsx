@@ -172,7 +172,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
     const stepTitles = ['Induct Agent', 'Choose Platforms', 'Connect Platforms', 'Build Master Theme', 'Confirm Schedule', 'Review & Activate']
     for (const title of stepTitles) {
-      expect(screen.getByText(title)).toBeInTheDocument()
+      expect(screen.getAllByText(title).length).toBeGreaterThan(0)
     }
     expect(screen.getByText('Now')).toBeInTheDocument()
   })
@@ -231,6 +231,63 @@ describe('DMA Activation Wizard — step navigation', () => {
       expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'Activate Agent' })).toBeInTheDocument()
+  })
+
+  it('treats a missing activation workspace as a blank wizard state instead of a fatal error', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockRejectedValueOnce({ status: 404 })
+
+    renderWizard()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText('Activation unavailable')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Nickname')).toBeInTheDocument()
+  })
+
+  it('does not advance and requests refresh when save hits a stale hire reference', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockRejectedValueOnce({ status: 404 })
+    const onStaleReference = vi.fn()
+
+    render(
+      <MemoryRouter>
+        <FluentProvider theme={waooawLightTheme}>
+          <DigitalMarketingActivationWizard
+            selectedInstance={{
+              subscription_id: 'SUB-1',
+              agent_id: 'AGT-MKT-DMA-001',
+              agent_type_id: 'marketing.digital_marketing.v1',
+              duration: 'monthly',
+              status: 'active',
+              current_period_start: '2026-03-01T00:00:00Z',
+              current_period_end: '2026-04-01T00:00:00Z',
+              cancel_at_period_end: false,
+              hired_instance_id: 'HAI-1',
+              nickname: 'Growth Copilot',
+            }}
+            readOnly={false}
+            onStaleReference={onStaleReference}
+          />
+        </FluentProvider>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('This hire is no longer available. Please select another agent.')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+    expect(screen.queryByTestId('dma-step-panel-platforms')).not.toBeInTheDocument()
+    expect(onStaleReference).toHaveBeenCalledWith({ subscriptionId: 'SUB-1', hiredInstanceId: 'HAI-1' })
   })
 })
 

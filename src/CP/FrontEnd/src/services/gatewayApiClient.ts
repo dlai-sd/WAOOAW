@@ -36,6 +36,47 @@ const DEBUG_TRACE_STORAGE_KEY = 'waooaw_debug_trace'
 const AUTH_CHANGED_EVENT = 'waooaw:auth-changed'
 const AUTH_EXPIRED_FLAG = 'waooaw:auth-expired'
 
+function normalizeProblemMessage(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string') {
+    const normalized = detail.trim()
+    return normalized || fallback
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((entry) => normalizeProblemMessage(entry, ''))
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+    return messages.length > 0 ? messages.join(' | ') : fallback
+  }
+
+  if (detail && typeof detail === 'object') {
+    const problemObject = detail as Record<string, unknown>
+    const directMessage = [problemObject.detail, problemObject.message, problemObject.msg, problemObject.error]
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .find(Boolean)
+    if (directMessage) return directMessage
+
+    if (Array.isArray(problemObject.loc) || typeof problemObject.loc === 'string') {
+      const location = Array.isArray(problemObject.loc)
+        ? problemObject.loc.map((segment) => String(segment || '').trim()).filter(Boolean).join(' -> ')
+        : String(problemObject.loc || '').trim()
+      const msg = typeof problemObject.msg === 'string' ? problemObject.msg.trim() : ''
+      if (location && msg) return `${location}: ${msg}`
+      if (msg) return msg
+    }
+
+    try {
+      const serialized = JSON.stringify(problemObject)
+      if (serialized && serialized !== '{}') return serialized
+    } catch {
+      // Ignore serialization failures and fall through to the fallback.
+    }
+  }
+
+  return fallback
+}
+
 function isTokenExpiredProblem(problem?: ApiProblemDetails): boolean {
   const type = String(problem?.type || '').toLowerCase()
   const title = String(problem?.title || '').toLowerCase()
@@ -152,7 +193,8 @@ export async function gatewayRequestJson<T>(
 
   if (!res.ok) {
     const problem = await parseProblemDetails(res)
-    const detail = problem?.detail || `${res.status} ${res.statusText}`
+    const fallbackDetail = `${res.status} ${res.statusText}`
+    const detail = normalizeProblemMessage(problem?.detail, fallbackDetail)
     let message = detail
 
     if (res.status === 401) {

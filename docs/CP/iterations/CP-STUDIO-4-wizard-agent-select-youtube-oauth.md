@@ -914,3 +914,58 @@ Post the PR URL. HALT.
 - [x] CSS namespace: all new classes use `dma-wizard-` prefix
 - [x] Stories ordered correctly: S1 (MyAgents) → S2 (Wizard props) → S3 (CSS) → S4 (OAuth button) → S5 (callback) → S6 (CSS + tests)
 - [x] Backend pre-flight verified: all OAuth routes + GCP secrets confirmed present
+
+---
+
+## Defect Addendum — Live RCA From GCP Logs (2026-03-24)
+
+### Defect
+
+The deployed DMA wizard is still trying to load and save activation state against stale hired-agent and subscription records that no longer exist for customer `33eb5ebb-69f6-4341-b16e-f73ae2537d00` (`yogeshk7377@gmail.com`). That stale client-side selection then cascades into two visible failures:
+
+1. DMA workspace load/save calls hit 404 on deleted `hired_instance_id` values.
+2. The UI surfaces the backend failure poorly as `[object Object]` instead of a human-readable recovery message.
+3. The YouTube OAuth callback reaches the backend, but finalize is rejected with 400 and the user is left in a broken connect flow.
+
+### RCA
+
+| Root cause | Impact | Best possible solution/fix |
+|---|---|---|
+| Wizard state is holding stale `subscription_id` / `hired_instance_id` values after old hires were deleted from live GCP SQL. | Every workspace read or save against that stale hire returns 404, so the activation wizard cannot load readiness, save progress, or continue the flow. | Rehydrate wizard state from the latest `instances` prop on mount and whenever instance lookup fails; if `by-subscription` or `digital-marketing-activation` returns 404, clear the stale selection, force the new in-wizard Step 0 agent picker, and never keep a deleted `hired_instance_id` in local state. |
+| Frontend error normalization is weak, so structured API problem details are coerced into a string and rendered as `[object Object]`. | User sees `Activation unavailable[object Object]Retry` instead of a clear message like `This agent record no longer exists. Please reselect your hired agent.` | Normalize `GatewayApiError.problem.detail` into a readable string in the shared gateway client, and map 404 stale-hire responses to a targeted recovery message plus a reset action. |
+| YouTube OAuth finalize is reaching Plant successfully, but the callback/finalize step is not completing with a valid payload in the live wizard flow. | User can start OAuth, return from Google, and still end up with a failed YouTube connect state because finalize is rejected with 400. | Implement the full frontend callback flow described in E2-S4 and E2-S5: persist `yt_oauth_state`, validate returned `state`, use `redirect_uri = window.location.origin + window.location.pathname`, call `finalizeYouTubeConnection`, then `attachYouTubeConnection` only after a valid active hire is selected. |
+
+### Evidence
+
+#### Confirmed stale-hire / stale-subscription evidence
+
+- `2026-03-24T09:14:22.816943Z` — `waooaw-cp-backend-demo` proxied `GET .../api/v1/hired-agents/by-subscription/SUB-230ec0ee-91a4-4aa9-bd11-a31679fda7d3?customer_id=33eb5ebb-69f6-4341-b16e-f73ae2537d00` and received `404 Not Found`.
+- `2026-03-24T09:14:22.841652Z` — `waooaw-cp-backend-demo` proxied `GET .../api/v1/hired-agents/by-subscription/SUB-a28327bc-6813-4677-a78d-8ff6d789db90?...` and received `404 Not Found`.
+- `2026-03-24T09:14:22.893288Z` — `waooaw-cp-backend-demo` proxied `GET .../api/v1/hired-agents/by-subscription/SUB-f80d06ab-15d5-47e4-bd82-4b34290062de?...` and received `404 Not Found`.
+- `2026-03-24T09:14:23.376154Z` — `waooaw-cp-backend-demo` proxied `GET https://waooaw-plant-gateway-demo-.../api/v1/hired-agents/HAI-42539934-e996-4a6e-8a03-ae24b3834fc8/digital-marketing-activation?...` and received `404 Not Found`.
+- `2026-03-24T10:31:19.537538Z` — `waooaw-cp-backend-demo` proxied `GET https://waooaw-plant-gateway-demo-.../api/v1/hired-agents/HAI-9c2878bd-2140-4a4b-ba99-20423eedc51c/digital-marketing-activation?...` and received `404 Not Found`.
+- `2026-03-24T10:31:19.477527Z` — `waooaw-plant-gateway-demo` logged `Authenticated user 33eb5ebb-69f6-4341-b16e-f73ae2537d00 for GET /api/v1/hired-agents/HAI-9c2878bd-2140-4a4b-ba99-20423eedc51c/digital-marketing-activation`, proving this is not primarily an auth failure.
+
+#### Confirmed YouTube finalize evidence
+
+- `2026-03-24T10:29:22.978500Z` — `waooaw-cp-backend-demo` returned `POST /api/cp/youtube-connections/connect/finalize HTTP/1.1` → `400 Bad Request`.
+- `2026-03-24T10:29:22.964404Z` — `waooaw-plant-backend-demo` returned `POST /api/v1/customer-platform-connections/youtube/connect/finalize HTTP/1.1` → `400 Bad Request`.
+- `2026-03-24T10:31:01.298679Z` and `2026-03-24T10:31:19.466630Z` — the same CP finalize endpoint kept returning `400 Bad Request` on repeated retries.
+- `2026-03-24T10:29:22.623205Z` and `2026-03-24T10:31:19.287983Z` — `waooaw-plant-gateway-demo` logged `Authenticated user 33eb5ebb-69f6-4341-b16e-f73ae2537d00 for POST /api/v1/customer-platform-connections/youtube/connect/finalize`, again showing the request is authenticated and reaching the backend.
+
+#### UX evidence
+
+- Browser symptom reported during the same window: `Activation unavailable[object Object]Retry`.
+- This aligns with the 404 chain above and indicates the UI is rendering a structured backend error object directly instead of translating it into a readable message.
+
+### Best Solution
+
+1. Treat stale-hire recovery as the first fix, not the YouTube OAuth UI as the first fix.
+2. Make the wizard source of truth the live `instances` list passed from My Agents, with Step 0 selection inside the wizard.
+3. On any `404` from `by-subscription`, `deliverables`, or `digital-marketing-activation`, clear the selected hire, reset to Step 0, and show a plain-English recovery message.
+4. After stale-hire recovery is in place, implement the full YouTube OAuth callback contract from E2-S4 and E2-S5 so finalize cannot run with missing or mismatched callback state.
+5. Fix shared API error formatting so users never see `[object Object]` again.
+
+### Plain-English Summary
+
+The main break is not Google login itself. The wizard is still pointing at old hired-agent records that were deleted, so the backend correctly returns 404 and the UI turns that into `[object Object]`. The YouTube callback is also reaching the backend, but finalize is being rejected with 400, most likely because the wizard is not completing the callback state and attach flow cleanly after redirect. The best fix is to reset stale agent selection first, then complete the OAuth callback flow, and finally clean up the shared error messages.

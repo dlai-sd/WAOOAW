@@ -40,6 +40,53 @@ const PLATFORM_OPTIONS = [
   { key: 'x', label: 'X', description: 'Short-form social publishing and promotion.' },
 ]
 
+
+function isNotFoundError(error: unknown): error is { status: number } {
+  return Boolean(error) && typeof error === 'object' && Number((error as { status?: number }).status) === 404
+}
+
+function buildEmptyActivationResponse(
+  hiredInstanceId: string,
+  agentTypeId: string,
+): DigitalMarketingActivationResponse {
+  return {
+    hired_instance_id: hiredInstanceId,
+    customer_id: null,
+    agent_type_id: agentTypeId,
+    workspace: {
+      help_visible: false,
+      activation_complete: false,
+      brand_name: '',
+      location: '',
+      primary_language: '',
+      timezone: '',
+      business_context: '',
+      offerings_services: [],
+      platforms_enabled: [],
+      platform_bindings: {},
+      campaign_setup: {
+        campaign_id: null,
+        master_theme: '',
+        derived_themes: [],
+        schedule: {
+          start_date: '',
+          posts_per_week: 0,
+          preferred_days: [],
+          preferred_hours_utc: [],
+        },
+      },
+    },
+    readiness: {
+      brief_complete: false,
+      youtube_selected: false,
+      youtube_connection_ready: false,
+      configured: false,
+      can_finalize: false,
+      missing_requirements: [],
+    },
+    updated_at: new Date().toISOString(),
+  }
+}
 type DigitalMarketingActivationWizardProps = {
   instance?: MyAgentInstanceSummary | null
   selectedInstance?: MyAgentInstanceSummary | null
@@ -52,6 +99,7 @@ type DigitalMarketingActivationWizardProps = {
     hired_instance_id?: string | null
     agent_type_id?: string | null
   }) => void
+  onStaleReference?: (details: { subscriptionId: string; hiredInstanceId?: string | null }) => void | Promise<void>
 }
 
 function normalizeText(value: unknown): string {
@@ -98,7 +146,14 @@ function buildFallbackDraft(instance: MyAgentInstanceSummary): HiredAgentInstanc
   }
 }
 
-export function DigitalMarketingActivationWizard({ instance, selectedInstance, readOnly, onSaved, onSavedInstance }: DigitalMarketingActivationWizardProps) {
+export function DigitalMarketingActivationWizard({
+  instance,
+  selectedInstance,
+  readOnly,
+  onSaved,
+  onSavedInstance,
+  onStaleReference,
+}: DigitalMarketingActivationWizardProps) {
   const navigate = useNavigate()
   const activeInstance = instance ?? selectedInstance ?? null
 
@@ -181,9 +236,15 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
       }
 
       const nextHiredInstanceId = String(nextDraft.hired_instance_id || activeInstance?.hired_instance_id || '').trim()
-      let nextActivation: DigitalMarketingActivationResponse | null = null
+      const resolvedAgentTypeId = String(nextDraft.agent_type_id || activeInstance?.agent_type_id || DIGITAL_MARKETING_AGENT_TYPE_ID).trim() || DIGITAL_MARKETING_AGENT_TYPE_ID
+      let nextActivation: DigitalMarketingActivationResponse | null = buildEmptyActivationResponse(nextHiredInstanceId, resolvedAgentTypeId)
       if (nextHiredInstanceId) {
-        nextActivation = await getDigitalMarketingActivationWorkspace(nextHiredInstanceId)
+        try {
+          nextActivation = await getDigitalMarketingActivationWorkspace(nextHiredInstanceId)
+        } catch (activationError: any) {
+          if (!isNotFoundError(activationError)) throw activationError
+          nextActivation = buildEmptyActivationResponse(nextHiredInstanceId, resolvedAgentTypeId)
+        }
       }
 
       setDraft(nextDraft)
@@ -242,8 +303,8 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
     return items
   }, [brandName, location, offeringsText, primaryLanguage, timezone])
 
-  const saveWorkspace = async () => {
-    if (readOnly) return
+  const saveWorkspace = async (): Promise<boolean> => {
+    if (readOnly) return true
 
     setSaveStatus('saving')
     setSaveError(null)
@@ -302,14 +363,27 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
         hired_instance_id: savedActivation.hired_instance_id,
         agent_type_id: refreshedDraft.agent_type_id,
       })
+      return true
     } catch (e: any) {
+      if (isNotFoundError(e)) {
+        const message = 'This hire is no longer available. Please select another agent.'
+        setSaveError(message)
+        setSaveStatus('error')
+        await onStaleReference?.({
+          subscriptionId: activeInstance?.subscription_id || '',
+          hiredInstanceId,
+        })
+        return false
+      }
       setSaveError(e?.message || 'Failed to save activation workspace')
       setSaveStatus('error')
+      return false
     }
   }
 
   async function handleContinue() {
-    await saveWorkspace()
+    const saved = await saveWorkspace()
+    if (!saved) return
     setActiveStepIndex(i => Math.min(DMA_STEPS.length - 1, i + 1))
   }
 
@@ -437,6 +511,16 @@ export function DigitalMarketingActivationWizard({ instance, selectedInstance, r
       })
       setActiveMilestone('schedule')
     } catch (e: any) {
+      if (isNotFoundError(e)) {
+        const message = 'This hire is no longer available. Please select another agent.'
+        setFinishStatus('error')
+        setFinishError(message)
+        await onStaleReference?.({
+          subscriptionId: activeInstance?.subscription_id || '',
+          hiredInstanceId,
+        })
+        return
+      }
       setFinishStatus('error')
       setFinishError(e?.message || 'Failed to finish activation.')
     }
