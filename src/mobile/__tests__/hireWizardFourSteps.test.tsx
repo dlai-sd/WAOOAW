@@ -246,7 +246,7 @@ describe('HireWizardScreen — 4-step wizard (MOBILE-COMP-1 E1-S2)', () => {
     fireEvent.press(getByText('Credit / Debit Card'));
     fireEvent.press(getByText(/I accept the/));
 
-    fireEvent.press(getByText('Start Trial'));
+    fireEvent.press(getAllByText('Start Trial').at(-1)!);
 
     await waitFor(() => {
       // Should navigate to MyAgentsTab > TrialDashboard with the real subscription_id

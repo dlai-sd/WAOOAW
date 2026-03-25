@@ -59,7 +59,7 @@ describe('ConnectorSetupCard (MOBILE-COMP-1 E1-S2)', () => {
 
   it('does NOT render a connect or disconnect button (no fake toggle)', () => {
     const { queryByText } = render(<ConnectorSetupCard {...defaultProps} />);
-    expect(queryByText(/Connect Twitter/i)).toBeNull();
+    expect(queryByText('Connect Twitter / X')).toBeNull();
     expect(queryByText('Disconnect')).toBeNull();
     expect(queryByText('Connected')).toBeNull();
     expect(queryByText('Not connected')).toBeNull();

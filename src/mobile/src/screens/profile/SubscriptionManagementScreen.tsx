@@ -32,6 +32,7 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
   const activeSub = hiredAgents?.find(
     (a) => a.status === 'active' || a.status === 'past_due',
   ) ?? null;
+  const renewalPlanType = activeSub?.duration === 'yearly' ? 'annual' : 'monthly';
 
   // Only trigger Razorpay with real identifiers — never with placeholders
   const handleRenew = async () => {
@@ -39,7 +40,7 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
     try {
       await processPayment({
         agentId: activeSub.hired_instance_id,
-        planType: activeSub.duration ?? 'monthly',
+        planType: renewalPlanType,
         amount: 0, // amount must come from a billing API; guard here until that is wired
       });
     } catch {
