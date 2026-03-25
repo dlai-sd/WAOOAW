@@ -148,10 +148,9 @@ const Step1ChooseAgent = ({ agent, onNext, onCancel }: any) => {
   );
 };
 
-// Step 2: Connect Platform
+// Step 2: Connect Platform — preflight guidance only (no fake connection toggle)
 const Step2ConnectPlatform = ({ agent, onNext, onBack }: any) => {
   const { colors, spacing } = useTheme();
-  const [isConnected, setIsConnected] = useState(false);
 
   // Derive required credentials from agent industry
   const getPlatformConfig = () => {
@@ -187,16 +186,13 @@ const Step2ConnectPlatform = ({ agent, onNext, onBack }: any) => {
         Connect Platform
       </Text>
       <Text style={[styles.stepSubtitle, { color: colors.textSecondary, marginTop: spacing.sm }]}>
-        Link your account so the agent can get to work
+        Review what you will connect after your trial starts
       </Text>
 
       <View style={{ marginTop: spacing.lg }}>
         <ConnectorSetupCard
           platformName={platformName}
           requiredCredentials={requiredCredentials}
-          isConnected={isConnected}
-          onConnect={() => setIsConnected(true)}
-          onDisconnect={() => setIsConnected(false)}
         />
       </View>
 
@@ -877,16 +873,18 @@ export const HireWizardScreen = () => {
       });
 
       if (result) {
-        // Payment successful, navigate to confirmation
-        console.log('Payment successful:', result);
-        (navigation.navigate as any)('HireConfirmation', {
-          agentId,
-          trialId: result.subscription_id,
-          subscriptionId: result.subscription_id,
-          paymentId: result.payment_id,
-          trialData,
-          paymentData,
-        });
+        // Navigate to real trial runtime using returned subscription identifier
+        const parentNavigation = (navigation as any).getParent?.();
+        if (parentNavigation) {
+          parentNavigation.navigate('MyAgentsTab', {
+            screen: 'TrialDashboard',
+            params: { trialId: result.subscription_id },
+          });
+        } else {
+          (navigation.navigate as any)('TrialDashboard', {
+            trialId: result.subscription_id,
+          });
+        }
       }
     } catch (error) {
       console.error('Payment failed:', error);
