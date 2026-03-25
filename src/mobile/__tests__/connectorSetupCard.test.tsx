@@ -1,27 +1,23 @@
 /**
- * ConnectorSetupCard Component Tests (CP-MOULD-1 E4-S1)
+ * ConnectorSetupCard Component Tests (MOBILE-COMP-1 E1-S2)
  *
  * Coverage:
  * - Renders platform name
- * - Shows "Not connected" status and credentials list when isConnected=false
- * - Shows "Connect" button when isConnected=false
- * - Shows "Connected" status and "Disconnect" button when isConnected=true
- * - onConnect is called on button press
- * - onDisconnect is called on button press
+ * - Shows "Setup after trial starts" guidance status
+ * - Shows credentials list (preflight, not live)
+ * - Shows guidance note explaining connection happens after runtime creation
+ * - No fake connected/disconnected toggle or persisted state
  */
 
 import React from 'react';
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 import { ConnectorSetupCard } from '@/components/ConnectorSetupCard';
 
-describe('ConnectorSetupCard (CP-MOULD-1 E4-S1)', () => {
+describe('ConnectorSetupCard (MOBILE-COMP-1 E1-S2)', () => {
   const defaultProps = {
     platformName: 'Twitter / X',
     requiredCredentials: ['API Key', 'API Secret'],
-    isConnected: false,
-    onConnect: jest.fn(),
-    onDisconnect: jest.fn(),
   };
 
   beforeEach(() => {
@@ -33,57 +29,21 @@ describe('ConnectorSetupCard (CP-MOULD-1 E4-S1)', () => {
     expect(getByText('Twitter / X')).toBeTruthy();
   });
 
-  it('shows "Not connected" status chip when isConnected=false', () => {
+  it('shows "Setup after trial starts" guidance status (not connected/disconnected)', () => {
     const { getByText } = render(<ConnectorSetupCard {...defaultProps} />);
-    expect(getByText('Not connected')).toBeTruthy();
+    expect(getByText('Setup after trial starts')).toBeTruthy();
   });
 
-  it('shows required credentials list when isConnected=false', () => {
+  it('shows guidance note explaining real connection happens after runtime creation', () => {
     const { getByText } = render(<ConnectorSetupCard {...defaultProps} />);
-    expect(getByText("You'll need:")).toBeTruthy();
+    expect(getByText(/connection happens after/i)).toBeTruthy();
+  });
+
+  it('shows required credentials label and list as preflight guidance', () => {
+    const { getByText } = render(<ConnectorSetupCard {...defaultProps} />);
+    expect(getByText('You will need:')).toBeTruthy();
     expect(getByText('• API Key')).toBeTruthy();
     expect(getByText('• API Secret')).toBeTruthy();
-  });
-
-  it('shows connect button when isConnected=false', () => {
-    const { getByText } = render(<ConnectorSetupCard {...defaultProps} />);
-    expect(getByText('Connect Twitter / X')).toBeTruthy();
-  });
-
-  it('calls onConnect when connect button is pressed', () => {
-    const { getByText } = render(<ConnectorSetupCard {...defaultProps} />);
-    fireEvent.press(getByText('Connect Twitter / X'));
-    expect(defaultProps.onConnect).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows "Connected" status chip when isConnected=true', () => {
-    const { getByText } = render(
-      <ConnectorSetupCard {...defaultProps} isConnected={true} />
-    );
-    expect(getByText('Connected')).toBeTruthy();
-  });
-
-  it('shows disconnect button when isConnected=true', () => {
-    const { getByText } = render(
-      <ConnectorSetupCard {...defaultProps} isConnected={true} />
-    );
-    expect(getByText('Disconnect')).toBeTruthy();
-  });
-
-  it('does not show credentials list when isConnected=true', () => {
-    const { queryByText } = render(
-      <ConnectorSetupCard {...defaultProps} isConnected={true} />
-    );
-    expect(queryByText("You'll need:")).toBeNull();
-    expect(queryByText('• API Key')).toBeNull();
-  });
-
-  it('calls onDisconnect when disconnect button is pressed', () => {
-    const { getByText } = render(
-      <ConnectorSetupCard {...defaultProps} isConnected={true} />
-    );
-    fireEvent.press(getByText('Disconnect'));
-    expect(defaultProps.onDisconnect).toHaveBeenCalledTimes(1);
   });
 
   it('renders all required credentials', () => {
@@ -95,5 +55,13 @@ describe('ConnectorSetupCard (CP-MOULD-1 E4-S1)', () => {
     expect(getByText('• API Key')).toBeTruthy();
     expect(getByText('• API Secret')).toBeTruthy();
     expect(getByText('• Access Token')).toBeTruthy();
+  });
+
+  it('does NOT render a connect or disconnect button (no fake toggle)', () => {
+    const { queryByText } = render(<ConnectorSetupCard {...defaultProps} />);
+    expect(queryByText(/Connect Twitter/i)).toBeNull();
+    expect(queryByText('Disconnect')).toBeNull();
+    expect(queryByText('Connected')).toBeNull();
+    expect(queryByText('Not connected')).toBeNull();
   });
 });

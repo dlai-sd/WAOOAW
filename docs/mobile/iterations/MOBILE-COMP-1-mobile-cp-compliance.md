@@ -23,12 +23,12 @@ This plan uses the previously identified mobile-vs-CP defect set as the authorit
 
 | Epic | Story | Title | Tracking status | Branch | Test plan / doc update |
 |---|---|---|---|---|---|
-| E1 | E1-S1 | Restore hire-route and navigation parity | Not started | `feat/MOBILE-COMP-1-it1-e1` | Extend mobile navigation and hire journey tests |
-| E1 | E1-S2 | Replace fake platform connect with truthful hire handoff | Not started | `feat/MOBILE-COMP-1-it1-e1` | Extend hire wizard and connector tests |
-| E2 | E2-S1 | Replace demo notifications with live actionable inbox | Not started | `feat/MOBILE-COMP-1-it1-e2` | Extend notifications screen tests |
-| E2 | E2-S2 | Turn home into a live mobile cockpit | Not started | `feat/MOBILE-COMP-1-it1-e2` | Extend home and hook tests |
-| E3 | E3-S1 | Make billing and subscription state truthful | Not started | `feat/MOBILE-COMP-1-it1-e3` | Extend subscription and payment hook tests |
-| E3 | E3-S2 | Align shell parity across Android and iOS and close iteration docs | Not started | `feat/MOBILE-COMP-1-it1-e3` | Update mobile test assets doc after iteration PR |
+| E1 | E1-S1 | Restore hire-route and navigation parity | Done | `feat/MOBILE-COMP-1-it1-e1` | Extend mobile navigation and hire journey tests |
+| E1 | E1-S2 | Replace fake platform connect with truthful hire handoff | Done | `feat/MOBILE-COMP-1-it1-e1` | Extend hire wizard and connector tests |
+| E2 | E2-S1 | Replace demo notifications with live actionable inbox | Done | `feat/MOBILE-COMP-1-it1-e2` | Extend notifications screen tests |
+| E2 | E2-S2 | Turn home into a live mobile cockpit | Done | `feat/MOBILE-COMP-1-it1-e2` | Extend home and hook tests |
+| E3 | E3-S1 | Make billing and subscription state truthful | Done | `feat/MOBILE-COMP-1-it1-e3` | Extend subscription and payment hook tests |
+| E3 | E3-S2 | Align shell parity across Android and iOS and close iteration docs | Done | `feat/MOBILE-COMP-1-it1-e3` | Update mobile test assets doc after iteration PR |
 
 ---
 

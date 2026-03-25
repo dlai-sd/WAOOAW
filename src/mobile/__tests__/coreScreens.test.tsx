@@ -31,7 +31,7 @@ jest.mock('../src/hooks/useTheme', () => ({
       lg: 24,
       xl: 32,
       xxl: 48,
-      screenPadding: 20,
+      screenPadding: { horizontal: 20, vertical: 20 },
     },
     typography: {
       fontFamily: {
@@ -46,10 +46,24 @@ jest.mock('../src/hooks/useTheme', () => ({
 // Mock navigation (ProfileScreen uses useNavigation after E5-S1)
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate }),
+  useNavigation: () => ({
+    navigate: mockNavigate,
+    getParent: () => ({ navigate: mockNavigate }),
+  }),
 }));
 
 jest.mock('../src/store/authStore');
+
+// Mock useHiredAgents — HomeScreen now uses this for live state (MOBILE-COMP-1 E2-S2)
+jest.mock('../src/hooks/useHiredAgents', () => ({
+  useHiredAgents: jest.fn(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+    refetch: jest.fn(),
+    isFetching: false,
+  })),
+}));
 
 // Mock Alert
 jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -78,7 +92,7 @@ describe('Core Screens', () => {
     it('should render correctly', () => {
       const { getByText } = render(<HomeScreen />);
 
-      expect(getByText('Good Morning')).toBeTruthy(); // Or Good Afternoon/Evening
+      expect(getByText(/Good (Morning|Afternoon|Evening)/)).toBeTruthy();
       expect(getByText('Test User')).toBeTruthy();
       expect(getByText('WAOOAW')).toBeTruthy();
       expect(getByText('Agents Earn Your Business')).toBeTruthy();
@@ -107,24 +121,28 @@ describe('Core Screens', () => {
 
       expect(getByText('Quick Actions')).toBeTruthy();
       expect(getByText('Discover Agents')).toBeTruthy();
-      expect(getByText('Start Trial')).toBeTruthy();
+      expect(getByText('Open Ops')).toBeTruthy();
     });
 
-    it('should display activity stats', () => {
-      const { getByText, getAllByText } = render(<HomeScreen />);
-
-      expect(getByText('Your Activity')).toBeTruthy();
-      expect(getByText('Active Trials')).toBeTruthy();
-      expect(getByText('Hired Agents')).toBeTruthy();
-      expect(getAllByText('0').length).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should display featured agents placeholder', () => {
+    it('should display activity stats with live counts', () => {
       const { getByText } = render(<HomeScreen />);
 
-      expect(getByText('Featured Agents')).toBeTruthy();
-      expect(getByText('Featured agents will appear here')).toBeTruthy();
-      expect(getByText('Coming in Story 2.2')).toBeTruthy();
+      expect(getByText('Your Activity')).toBeTruthy();
+      expect(getByText('Active hires')).toBeTruthy();
+      expect(getByText('Trials live')).toBeTruthy();
+    });
+
+    it('should display empty state with discover CTA when no hires', () => {
+      const { getByText } = render(<HomeScreen />);
+
+      expect(getByText('No active hires yet')).toBeTruthy();
+      expect(getByText('Browse agents →')).toBeTruthy();
+    });
+
+    it('should show today priorities section', () => {
+      const { getByText } = render(<HomeScreen />);
+
+      expect(getByText("Today's priorities")).toBeTruthy();
     });
   });
 

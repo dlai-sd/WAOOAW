@@ -1,63 +1,43 @@
 /**
- * ConnectorSetupCard Component (CP-MOULD-1 E4-S1)
+ * ConnectorSetupCard Component (MOBILE-COMP-1 E1-S2)
  *
- * Shows platform connection status in the HireWizard "Connect Platform" step.
- * Displays required credentials and connect / disconnect actions.
+ * Preflight guidance card shown in HireWizard step 2.
+ * Shows required credentials and explains that real platform connection
+ * happens after the runtime (hired agent instance) is created — not before.
+ * This replaces the previous fake local-state toggle.
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface ConnectorSetupCardProps {
   platformName: string;
   requiredCredentials: string[];
-  isConnected: boolean;
-  onConnect: () => void;
-  onDisconnect: () => void;
 }
 
 export function ConnectorSetupCard({
   platformName,
   requiredCredentials,
-  isConnected,
-  onConnect,
-  onDisconnect,
 }: ConnectorSetupCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.platformName}>{platformName}</Text>
-        <View
-          style={[
-            styles.statusChip,
-            isConnected ? styles.statusConnected : styles.statusDisconnected,
-          ]}
-        >
-          <Text style={styles.statusText}>
-            {isConnected ? 'Connected' : 'Not connected'}
-          </Text>
+        <View style={[styles.statusChip, styles.statusPending]}>
+          <Text style={styles.statusText}>Setup after trial starts</Text>
         </View>
       </View>
 
-      {!isConnected && (
-        <>
-          <Text style={styles.credentialsLabel}>You'll need:</Text>
-          {requiredCredentials.map((cred) => (
-            <Text key={cred} style={styles.credentialItem}>
-              • {cred}
-            </Text>
-          ))}
-          <TouchableOpacity style={styles.connectButton} onPress={onConnect}>
-            <Text style={styles.connectButtonText}>Connect {platformName}</Text>
-          </TouchableOpacity>
-        </>
-      )}
+      <Text style={styles.guidanceNote}>
+        You will connect {platformName} after your trial runtime is created. No credentials are stored before you start.
+      </Text>
 
-      {isConnected && (
-        <TouchableOpacity style={styles.disconnectButton} onPress={onDisconnect}>
-          <Text style={styles.disconnectButtonText}>Disconnect</Text>
-        </TouchableOpacity>
-      )}
+      <Text style={styles.credentialsLabel}>You will need:</Text>
+      {requiredCredentials.map((cred) => (
+        <Text key={cred} style={styles.credentialItem}>
+          • {cred}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -86,15 +66,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  statusConnected: {
-    backgroundColor: '#10b98122',
-  },
-  statusDisconnected: {
-    backgroundColor: '#ef444422',
+  statusPending: {
+    backgroundColor: '#f59e0b22',
   },
   statusText: {
-    color: '#ffffff',
+    color: '#f59e0b',
     fontSize: 12,
+  },
+  guidanceNote: {
+    color: '#a1a1aa',
+    fontSize: 13,
+    marginBottom: 12,
+    lineHeight: 18,
   },
   credentialsLabel: {
     color: '#a1a1aa',
@@ -105,33 +88,5 @@ const styles = StyleSheet.create({
     color: '#a1a1aa',
     fontSize: 13,
     marginBottom: 4,
-  },
-  connectButton: {
-    backgroundColor: '#00f2fe22',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#00f2fe',
-  },
-  connectButtonText: {
-    color: '#00f2fe',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  disconnectButton: {
-    backgroundColor: '#ef444422',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#ef4444',
-  },
-  disconnectButtonText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
