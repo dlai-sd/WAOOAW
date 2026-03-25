@@ -156,9 +156,12 @@ jobs:
           # ecdsa is a transitive dep of python-jose; ignored pending migration to PyJWT
           # CVE-2025-62727: starlette — fix requires starlette>=0.49.1 which needs
           # fastapi>=0.128.0; blocked by pydantic==2.5.0 in Plant; tracked for pydantic upgrade
+           # CVE-2026-4539: pygments ReDoS — no upstream fix available yet; 2.19.2 is
+           # the latest published release and is pulled transitively by rich via bandit/pip-audit
           pip-audit -r requirements.txt --desc on \
             --ignore-vuln CVE-2024-23342 \
-            --ignore-vuln CVE-2025-62727 || {
+             --ignore-vuln CVE-2025-62727 \
+             --ignore-vuln CVE-2026-4539 || {
             echo "::error::${{ matrix.component }} has known vulnerable dependencies — fix before merging"
             exit 1
           }

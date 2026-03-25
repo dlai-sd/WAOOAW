@@ -63,7 +63,8 @@ def test_get_workspace_proxy_returns_identical_payload(client, auth_headers, mon
     assert response.json() == payload
     assert fake.calls[0]["method"] == "GET"
     assert fake.calls[0]["path"] == "api/v1/hired-agents/HAI-1/digital-marketing-activation"
-    assert fake.calls[0]["params"]["customer_id"].startswith("CUST-")
+    assert fake.calls[0]["params"]["customer_id"]
+    assert not fake.calls[0]["params"]["customer_id"].startswith("CUST-")
     app.dependency_overrides.clear()
 
 
@@ -98,7 +99,8 @@ def test_generate_theme_plan_proxy_returns_identical_payload(client, auth_header
     assert fake.calls[0]["method"] == "POST"
     assert fake.calls[0]["path"] == "api/v1/digital-marketing-activation/HAI-1/generate-theme-plan"
     assert fake.calls[0]["json"]["campaign_setup"]["schedule"]["posts_per_week"] == 3
-    assert fake.calls[0]["json"]["customer_id"].startswith("CUST-")
+    assert fake.calls[0]["json"]["customer_id"]
+    assert not fake.calls[0]["json"]["customer_id"].startswith("CUST-")
     assert fake.calls[0]["headers"]["X-Correlation-ID"] == "corr-123"
     app.dependency_overrides.clear()
 
@@ -139,7 +141,8 @@ def test_update_theme_plan_proxy_returns_identical_payload(client, auth_headers,
     assert fake.calls[0]["method"] == "PATCH"
     assert fake.calls[0]["path"] == "api/v1/digital-marketing-activation/HAI-1/theme-plan"
     assert fake.calls[0]["json"]["master_theme"] == "Trust-first growth revised"
-    assert fake.calls[0]["json"]["customer_id"].startswith("CUST-")
+    assert fake.calls[0]["json"]["customer_id"]
+    assert not fake.calls[0]["json"]["customer_id"].startswith("CUST-")
     app.dependency_overrides.clear()
 
 

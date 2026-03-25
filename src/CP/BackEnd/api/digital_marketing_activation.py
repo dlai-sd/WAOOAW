@@ -16,7 +16,7 @@ router = waooaw_router(prefix="/cp/digital-marketing-activation", tags=["cp-digi
 
 
 def _customer_id_from_user(user: User) -> str:
-    return f"CUST-{user.id}"
+    return str(user.id)
 
 
 def get_plant_gateway_client() -> PlantGatewayClient:
