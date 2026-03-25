@@ -492,3 +492,56 @@ Added by CP-SKILLS-2 + test gap execution 2026-03-03:
 | File | Type | Purpose |
 |---|---|---|
 | *(consumer pact files)* | Contract (Pact) | CP→Plant Gateway consumer contracts |
+
+---
+
+## 8. CP Web YouTube OAuth Validation — CP-YT-CONN-1
+
+> **Iteration**: CP-YT-CONN-1 — YouTube Connection Unblock
+> **Added**: 2026-03-25
+
+### Google OAuth Operator Checklist (E1-S1)
+
+Before final merge validation, the operator must confirm the following Google Console items for the demo OAuth app:
+
+| # | Item | How to verify | Evidence required |
+|---|---|---|---|
+| 1 | OAuth app name and support email are set | Google Cloud Console → APIs & Services → OAuth consent screen | Screenshot-free textual confirmation: "app name = WAOOAW, support email = [operator email]" |
+| 2 | Demo redirect URI registered | OAuth consent screen → Authorized redirect URIs | Confirm the exact URI used by CP web (e.g. `https://cp.demo.waooaw.com/oauth/youtube/callback`) is listed |
+| 3 | Required YouTube scopes declared | OAuth consent screen → Scopes | Confirm these scopes are listed: `https://www.googleapis.com/auth/youtube.readonly`, `https://www.googleapis.com/auth/youtube.upload`, `https://www.googleapis.com/auth/youtube.force-ssl` |
+| 4 | Test user added | OAuth consent screen → Test users | Confirm the demo account email is in the test-user list |
+| 5 | Warning screen absent | Complete sign-in as the test user | Confirm "Google hasn't verified this app" warning does NOT appear |
+
+**Note**: Steps 1–4 are manual Google Console changes. They are not repo code. The operator must complete them before any demo validation run against the live CP web deployment.
+
+**Required rollout evidence (post-deployment):**
+- Confirmed client ID in use (`GOOGLE_CLIENT_ID` env var)
+- Confirmed redirect URI registered and matching the runtime CP web callback URL
+- Confirmed sign-in completes without the unverified-app warning screen
+
+---
+
+### CP Backend YouTube Proxy — Raw Customer ID Contract (E1-S2)
+
+| File | Tier | Type | Purpose |
+|---|---|---|---|
+| `src/CP/BackEnd/tests/test_cp_youtube_connections_routes.py` | T1 | API | All five YouTube proxy routes (start, finalize, list, get, attach) forward the raw WAOOAW customer ID with no CUST- prefix |
+
+---
+
+### CP Web YouTube Connect-Once Reuse — Iteration Regression (E3-S2)
+
+| File | Tier | Type | Purpose |
+|---|---|---|---|
+| `src/CP/FrontEnd/src/test/HireSetupWizard.test.tsx` | T1 | UI | Callback finalize sets selected credential, clears query params; attach-on-save called on continue/activate with connected credential; blocked when credential not connected |
+| `src/CP/FrontEnd/src/test/MyAgents.test.tsx` | T1 | UI | My Agents YouTube readiness: not-connected, ready-to-attach, connected, reconnect-required states |
+| `src/CP/FrontEnd/e2e/hire-journey.spec.ts` | T3 | E2E | CP web hire journey: YouTube setup entry → saved credential selection → attach success → ready-for-upload runtime state |
+
+**Prove-it path for "connect once, publish later":**
+
+After deployment the operator must confirm all four of the following are visible end-to-end:
+
+1. **Google warning page absent** — sign-in completes without "Google hasn't verified this app"
+2. **Callback completes** — returning from Google with `code` + `state` sets the selected channel in the wizard
+3. **Saved channel visible** — the selected channel name is shown in the Hire Setup wizard step 3
+4. **Attached state visible** — My Agents shows "connected" (green) for the YouTube channel after the hire is saved
