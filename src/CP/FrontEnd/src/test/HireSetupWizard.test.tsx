@@ -380,4 +380,244 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
     })
     expect(screen.getByText(/needs to be reconnected before continuing/i)).toBeInTheDocument()
   })
+
+  it('finalizing YouTube OAuth callback sets selected credential and clears code/state params', async () => {
+    const svc = await import('../services/hireWizard.service')
+    const plantSvc = await import('../services/plant.service')
+    const youtubeSvc = await import('../services/youtubeConnections.service')
+
+    vi.mocked(plantSvc.plantAPIService.getCatalogAgent).mockResolvedValueOnce({
+      release_id: 'CAR-CB-1',
+      id: 'AGENT-CB-001',
+      public_name: 'Digital Marketing Agent',
+      short_description: 'Hire-ready',
+      industry_name: 'Marketing',
+      job_role_label: 'Digital Marketer',
+      monthly_price_inr: 12000,
+      trial_days: 7,
+      allowed_durations: ['monthly'],
+      supported_channels: ['youtube'],
+      approval_mode: 'manual_review',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      internal_definition_version_id: '1.0.0',
+      external_catalog_version: 'v1',
+      lifecycle_state: 'live_on_cp',
+      approved_for_new_hire: true,
+      retired_from_catalog_at: null,
+    } as any)
+    vi.mocked(svc.getHireWizardDraftBySubscription).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-CB-1',
+      subscription_id: 'SUB-CB-1',
+      agent_id: 'AGENT-CB-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'Clinic Marketer',
+      theme: 'dark',
+      config: { platforms: [] },
+      configured: false,
+      goals_completed: false,
+      trial_status: 'not_started',
+      trial_start_at: null,
+      trial_end_at: null,
+    } as any)
+
+    const finalizedCredential = {
+      id: 'cred-cb-001',
+      customer_id: 'CUST-CB-1',
+      platform_key: 'youtube',
+      display_name: 'Callback Channel',
+      granted_scopes: ['youtube.upload'],
+      verification_status: 'verified',
+      connection_status: 'connected',
+      created_at: '2026-03-25T10:00:00Z',
+      updated_at: '2026-03-25T10:00:00Z',
+    } as any
+
+    vi.mocked(youtubeSvc.finalizeYouTubeConnection).mockResolvedValueOnce(finalizedCredential)
+    vi.mocked(youtubeSvc.listYouTubeConnections)
+      .mockResolvedValueOnce([]) // initial load
+      .mockResolvedValueOnce([finalizedCredential]) // after finalize
+
+    renderWizard(
+      '/hire/setup/SUB-CB-1?agentId=AGENT-CB-001&agentTypeId=marketing.digital_marketing.v1&code=google-auth-code-123&state=oauth-state-abc'
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 3 of 4')).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(youtubeSvc.finalizeYouTubeConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'google-auth-code-123', state: 'oauth-state-abc' })
+      )
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText(/Connected Callback Channel/i)).toBeInTheDocument()
+    })
+  })
+
+  it('save-and-continue calls attachYouTubeConnection when a connected credential is selected', async () => {
+    const svc = await import('../services/hireWizard.service')
+    const plantSvc = await import('../services/plant.service')
+    const youtubeSvc = await import('../services/youtubeConnections.service')
+
+    vi.mocked(plantSvc.plantAPIService.getCatalogAgent).mockResolvedValueOnce({
+      release_id: 'CAR-ATT-1',
+      id: 'AGENT-ATT-001',
+      public_name: 'Digital Marketing Agent',
+      short_description: 'Hire-ready',
+      industry_name: 'Marketing',
+      job_role_label: 'Digital Marketer',
+      monthly_price_inr: 12000,
+      trial_days: 7,
+      allowed_durations: ['monthly'],
+      supported_channels: ['youtube'],
+      approval_mode: 'manual_review',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      internal_definition_version_id: '1.0.0',
+      external_catalog_version: 'v1',
+      lifecycle_state: 'live_on_cp',
+      approved_for_new_hire: true,
+      retired_from_catalog_at: null,
+    } as any)
+    vi.mocked(svc.getHireWizardDraftBySubscription).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-ATT-1',
+      subscription_id: 'SUB-ATT-1',
+      agent_id: 'AGENT-ATT-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'Attach Tester',
+      theme: 'dark',
+      config: {
+        platforms: [
+          {
+            platform: 'youtube',
+            customer_platform_credential_id: 'cred-att-001',
+            display_name: 'Attach Channel',
+          },
+        ],
+      },
+      configured: true,
+      goals_completed: false,
+      trial_status: 'not_started',
+      trial_start_at: null,
+      trial_end_at: null,
+    } as any)
+    vi.mocked(youtubeSvc.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-att-001',
+        customer_id: 'CUST-ATT-1',
+        platform_key: 'youtube',
+        display_name: 'Attach Channel',
+        granted_scopes: ['youtube.upload'],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        created_at: '2026-03-25T10:00:00Z',
+        updated_at: '2026-03-25T10:00:00Z',
+      } as any,
+    ])
+
+    vi.mocked(svc.upsertHireWizardDraft).mockResolvedValue({
+      hired_instance_id: 'HAI-ATT-1',
+      subscription_id: 'SUB-ATT-1',
+      agent_id: 'AGENT-ATT-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'Attach Tester',
+      theme: 'dark',
+      config: {},
+      configured: true,
+      goals_completed: false,
+      trial_status: 'not_started',
+      trial_start_at: null,
+      trial_end_at: null,
+    } as any)
+
+    vi.mocked(youtubeSvc.attachYouTubeConnection).mockResolvedValue({ attached: true })
+
+    renderWizard(
+      '/hire/setup/SUB-ATT-1?agentId=AGENT-ATT-001&agentTypeId=marketing.digital_marketing.v1&step=3&focus=youtube'
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 3 of 4')).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cp-hire-setup-next')).not.toBeDisabled()
+    })
+
+    fireEvent.click(screen.getByTestId('cp-hire-setup-next'))
+
+    await waitFor(() => {
+      expect(youtubeSvc.attachYouTubeConnection).toHaveBeenCalledWith(
+        'cred-att-001',
+        expect.objectContaining({ hired_instance_id: 'HAI-ATT-1', skill_id: 'default', platform_key: 'youtube' })
+      )
+    })
+  })
+
+  it('does not call attachYouTubeConnection when no YouTube credential is selected', async () => {
+    const svc = await import('../services/hireWizard.service')
+    const youtubeSvc = await import('../services/youtubeConnections.service')
+
+    vi.mocked(svc.getHireWizardDraftBySubscription).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-NOATT-1',
+      subscription_id: 'SUB-NOATT-1',
+      agent_id: 'agent-noatt-1',
+      nickname: 'No Attach',
+      theme: 'dark',
+      config: {},
+      configured: true,
+      goals_completed: true,
+      trial_status: 'active',
+      trial_start_at: null,
+      trial_end_at: null,
+    } as any)
+
+    vi.mocked(svc.upsertHireWizardDraft).mockResolvedValue({
+      hired_instance_id: 'HAI-NOATT-1',
+      subscription_id: 'SUB-NOATT-1',
+      agent_id: 'agent-noatt-1',
+      nickname: 'No Attach',
+      theme: 'dark',
+      config: {},
+      configured: true,
+      goals_completed: true,
+      trial_status: 'active',
+      trial_start_at: null,
+      trial_end_at: null,
+    } as any)
+
+    vi.mocked(svc.finalizeHireWizard).mockResolvedValue({
+      hired_instance_id: 'HAI-NOATT-1',
+      subscription_id: 'SUB-NOATT-1',
+      agent_id: 'agent-noatt-1',
+      nickname: 'No Attach',
+      theme: 'dark',
+      config: {},
+      configured: true,
+      goals_completed: true,
+      trial_status: 'active',
+      trial_start_at: null,
+      trial_end_at: null,
+    } as any)
+
+    renderWizard('/hire/setup/SUB-NOATT-1?agentId=agent-noatt-1&step=4')
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 4 of 4')).toBeInTheDocument()
+    })
+
+    // goalsCompleted is already true from the loaded draft — button is enabled
+    await waitFor(() => {
+      expect(screen.getByTestId('cp-hire-setup-activate')).not.toBeDisabled()
+    })
+
+    fireEvent.click(screen.getByTestId('cp-hire-setup-activate'))
+
+    await waitFor(() => {
+      expect(svc.finalizeHireWizard).toHaveBeenCalled()
+    })
+
+    expect(youtubeSvc.attachYouTubeConnection).not.toHaveBeenCalled()
+  })
 })

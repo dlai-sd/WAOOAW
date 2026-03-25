@@ -63,7 +63,8 @@ def test_start_youtube_connect_proxies_authenticated_customer(client, auth_heade
     assert resp.status_code == 201
     assert resp.json()["state"] == "state-123"
     assert fake.calls[0]["path"] == "api/v1/customer-platform-connections/youtube/connect/start"
-    assert fake.calls[0]["json"]["customer_id"].startswith("CUST-")
+    customer_id = fake.calls[0]["json"]["customer_id"]
+    assert not customer_id.startswith("CUST-"), f"customer_id must be raw WAOOAW user ID, got: {customer_id}"
     app.dependency_overrides.clear()
 
 
@@ -96,6 +97,8 @@ def test_finalize_youtube_connect_proxies_code_exchange(client, auth_headers, mo
     assert resp.status_code == 200
     assert resp.json()["id"] == "cred-1"
     assert fake.calls[0]["json"]["code"] == "google-auth-code"
+    customer_id = fake.calls[0]["json"]["customer_id"]
+    assert not customer_id.startswith("CUST-"), f"finalize must forward raw WAOOAW customer ID, got: {customer_id}"
     app.dependency_overrides.clear()
 
 
@@ -118,6 +121,7 @@ def test_list_youtube_connections_forwards_customer_scope(client, auth_headers, 
     assert resp.json()[0]["id"] == "cred-1"
     assert fake.calls[0]["method"] == "GET"
     assert fake.calls[0]["params"] == {"platform_key": "youtube"}
+    assert "CUST-" not in fake.calls[0]["path"], f"list path must use raw customer ID, got: {fake.calls[0]['path']}"
     app.dependency_overrides.clear()
 
 
@@ -137,6 +141,7 @@ def test_get_youtube_connection_proxies_single_connection(client, auth_headers, 
     assert resp.status_code == 200
     assert resp.json()["id"] == "cred-1"
     assert fake.calls[0]["path"].endswith("/cred-1")
+    assert "CUST-" not in fake.calls[0]["path"], f"get path must use raw customer ID, got: {fake.calls[0]['path']}"
     app.dependency_overrides.clear()
 
 
@@ -170,6 +175,8 @@ def test_attach_youtube_connection_proxies_hired_agent_binding(client, auth_head
     assert resp.json()["id"] == "conn-1"
     assert fake.calls[0]["path"] == "api/v1/customer-platform-connections/cred-1/attach"
     assert fake.calls[0]["json"]["platform_key"] == "youtube"
+    customer_id = fake.calls[0]["json"]["customer_id"]
+    assert not customer_id.startswith("CUST-"), f"attach must forward raw WAOOAW customer ID, got: {customer_id}"
     app.dependency_overrides.clear()
 
 
