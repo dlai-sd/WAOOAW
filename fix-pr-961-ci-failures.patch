@@ -1,0 +1,80 @@
+From a0c057e57ca23106d0760d343c76a38a09451e94 Mon Sep 17 00:00:00 2001
+From: "copilot-swe-agent[bot]" <198982749+Copilot@users.noreply.github.com>
+Date: Wed, 25 Mar 2026 16:55:53 +0000
+Subject: [PATCH] =?UTF-8?q?fix(MOBILE-COMP-1):=20fix=203=20CI=20failures?=
+ =?UTF-8?q?=20=E2=80=94=20TS2322,=20Found=20multiple=20Start=20Trial,=20co?=
+ =?UTF-8?q?nnection=20happens=20after?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ src/mobile/__tests__/hireWizardFourSteps.test.tsx             | 4 ++--
+ src/mobile/src/components/ConnectorSetupCard.tsx              | 2 +-
+ src/mobile/src/screens/hire/HireWizardScreen.tsx              | 1 +
+ .../src/screens/profile/SubscriptionManagementScreen.tsx      | 2 +-
+ 4 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/src/mobile/__tests__/hireWizardFourSteps.test.tsx b/src/mobile/__tests__/hireWizardFourSteps.test.tsx
+index 6a258e7e..437f775d 100644
+--- a/src/mobile/__tests__/hireWizardFourSteps.test.tsx
++++ b/src/mobile/__tests__/hireWizardFourSteps.test.tsx
+@@ -215,7 +215,7 @@ describe('HireWizardScreen — 4-step wizard (MOBILE-COMP-1 E1-S2)', () => {
+   });
+ 
+   it('routes to TrialDashboard in MyAgentsTab using the returned subscription_id after successful trial start', async () => {
+-    const { getByText, getAllByText, getByPlaceholderText } = render(<HireWizardScreen />, {
++    const { getByText, getAllByText, getByPlaceholderText, getByTestId } = render(<HireWizardScreen />, {
+       wrapper: createWrapper(),
+     });
+ 
+@@ -246,7 +246,7 @@ describe('HireWizardScreen — 4-step wizard (MOBILE-COMP-1 E1-S2)', () => {
+     fireEvent.press(getByText('Credit / Debit Card'));
+     fireEvent.press(getByText(/I accept the/));
+ 
+-    fireEvent.press(getByText('Start Trial'));
++    fireEvent.press(getByTestId('start-trial-button'));
+ 
+     await waitFor(() => {
+       // Should navigate to MyAgentsTab > TrialDashboard with the real subscription_id
+diff --git a/src/mobile/src/components/ConnectorSetupCard.tsx b/src/mobile/src/components/ConnectorSetupCard.tsx
+index b4f22b3d..d9406b31 100644
+--- a/src/mobile/src/components/ConnectorSetupCard.tsx
++++ b/src/mobile/src/components/ConnectorSetupCard.tsx
+@@ -29,7 +29,7 @@ export function ConnectorSetupCard({
+       </View>
+ 
+       <Text style={styles.guidanceNote}>
+-        You will connect {platformName} after your trial runtime is created. No credentials are stored before you start.
++        Real connection happens after your trial runtime is created — no credentials are stored before you start.
+       </Text>
+ 
+       <Text style={styles.credentialsLabel}>You will need:</Text>
+diff --git a/src/mobile/src/screens/hire/HireWizardScreen.tsx b/src/mobile/src/screens/hire/HireWizardScreen.tsx
+index 1107a385..fbb1999f 100644
+--- a/src/mobile/src/screens/hire/HireWizardScreen.tsx
++++ b/src/mobile/src/screens/hire/HireWizardScreen.tsx
+@@ -785,6 +785,7 @@ const Step4Trial = ({
+               backgroundColor: isProcessingPayment ? colors.textSecondary : colors.neonCyan,
+             },
+           ]}
++          testID="start-trial-button"
+           onPress={handleComplete}
+           disabled={isProcessingPayment}
+         >
+diff --git a/src/mobile/src/screens/profile/SubscriptionManagementScreen.tsx b/src/mobile/src/screens/profile/SubscriptionManagementScreen.tsx
+index 2a92ed84..be960036 100644
+--- a/src/mobile/src/screens/profile/SubscriptionManagementScreen.tsx
++++ b/src/mobile/src/screens/profile/SubscriptionManagementScreen.tsx
+@@ -39,7 +39,7 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
+     try {
+       await processPayment({
+         agentId: activeSub.hired_instance_id,
+-        planType: activeSub.duration ?? 'monthly',
++        planType: (activeSub.duration ?? 'monthly') as 'trial' | 'monthly' | 'annual',
+         amount: 0, // amount must come from a billing API; guard here until that is wired
+       });
+     } catch {
+-- 
+2.53.0
+
