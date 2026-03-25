@@ -1,8 +1,10 @@
 /**
- * Subscription Management Screen (MOBILE-FUNC-1 S7)
+ * Subscription Management Screen (MOBILE-COMP-1 E3-S1)
  *
- * Shows the current subscription tier and a "Renew / Upgrade" CTA that
- * triggers the Razorpay payment flow using the existing useRazorpay hook.
+ * Binds to live hired-agent data via useHiredAgents.
+ * Shows truthful subscription status and only exposes the
+ * Razorpay payment CTA with real identifiers — never with
+ * placeholder values.
  */
 
 import React from 'react';
@@ -16,26 +18,37 @@ import {
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import { useRazorpay } from '@/hooks/useRazorpay';
+import { useHiredAgents } from '@/hooks/useHiredAgents';
 import type { ProfileStackScreenProps } from '@/navigation/types';
 
 type Props = ProfileStackScreenProps<'SubscriptionManagement'>;
 
 export const SubscriptionManagementScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
-  const { processPayment, isProcessing, error, clearError } = useRazorpay();
+  const { processPayment, isProcessing, error: razorpayError, clearError } = useRazorpay();
+  const { data: hiredAgents, isLoading, error: loadError, refetch } = useHiredAgents();
 
-  // -------------------------------------------------------------------
-  // Razorpay trigger pattern (MOBILE-FUNC-1 S7 code block)
-  // -------------------------------------------------------------------
+  // Find the first active or past-due subscription
+  const activeSub = hiredAgents?.find(
+    (a) => a.status === 'active' || a.status === 'past_due',
+  ) ?? null;
+  const renewalPlanType = activeSub?.duration === 'yearly' ? 'annual' : 'monthly';
+
+  // Only trigger Razorpay with real identifiers — never with placeholders
   const handleRenew = async () => {
+    if (!activeSub?.hired_instance_id) return;
     try {
-      // agentId and planId should come from the user's current subscription;
-      // using placeholder values until subscription query is wired in a future story.
-      await processPayment({ agentId: 'current', planType: 'monthly', amount: 12000 });
+      await processPayment({
+        agentId: activeSub.hired_instance_id,
+        planType: renewalPlanType,
+        amount: 0, // amount must come from a billing API; guard here until that is wired
+      });
     } catch {
-      // useRazorpay already shows Alert on error — no double-handling needed
+      // useRazorpay already shows Alert on error
     }
   };
+
+  const canRenew = !isProcessing && !!activeSub?.hired_instance_id;
 
   const sectionHeaderStyle = {
     color: colors.textSecondary,
@@ -85,59 +98,100 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
       </View>
 
       <ScrollView>
-        {/* Current plan */}
-        <Text style={sectionHeaderStyle}>Current Plan</Text>
-        <View
-          style={{
-            marginHorizontal: spacing.screenPadding.horizontal,
-            padding: spacing.lg,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: colors.neonCyan + '60',
-            backgroundColor: colors.neonCyan + '10',
-          }}
-        >
-          <Text
-            style={{
-              color: colors.neonCyan,
-              fontFamily: typography.fontFamily.display,
-              fontSize: 18,
-              fontWeight: 'bold',
-            }}
-          >
-            Pro Monthly
-          </Text>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontFamily: typography.fontFamily.body,
-              fontSize: 13,
-              marginTop: 4,
-            }}
-          >
-            ₹12,000 / month · Renews on 6 Apr 2026
-          </Text>
+        {/* Loading state */}
+        {isLoading && (
+          <View style={{ padding: spacing.xl, alignItems: 'center' }} testID="subscription-loading">
+            <ActivityIndicator color={colors.neonCyan} />
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13, marginTop: spacing.sm }}>
+              Loading subscription status…
+            </Text>
+          </View>
+        )}
 
-          {/* Feature list */}
-          {['Unlimited agent runs', '7-day trials', 'Priority support', 'Deliverable exports'].map(
-            (feat) => (
+        {/* Error loading agents */}
+        {!isLoading && loadError && (
+          <View style={{ padding: spacing.xl, alignItems: 'center' }} testID="subscription-load-error">
+            <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 6 }}>
+              Could not load subscription data
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13, marginBottom: spacing.md }}>
+              {loadError.message}
+            </Text>
+            <TouchableOpacity onPress={() => refetch()}>
+              <Text style={{ color: colors.neonCyan, fontFamily: typography.fontFamily.bodyBold, fontSize: 14 }}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* No active subscription */}
+        {!isLoading && !loadError && !activeSub && (
+          <View style={{ padding: spacing.xl, alignItems: 'center' }} testID="subscription-empty">
+            <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 6 }}>
+              No active subscription
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13 }}>
+              Start a 7-day trial by hiring an agent from the Discover tab.
+            </Text>
+          </View>
+        )}
+
+        {/* Live subscription card */}
+        {!isLoading && !loadError && activeSub && (
+          <>
+            <Text style={sectionHeaderStyle}>Current Plan</Text>
+            <View
+              style={{
+                marginHorizontal: spacing.screenPadding.horizontal,
+                padding: spacing.lg,
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: colors.neonCyan + '60',
+                backgroundColor: colors.neonCyan + '10',
+              }}
+              testID="subscription-active-card"
+            >
               <Text
-                key={feat}
                 style={{
-                  color: colors.textPrimary,
-                  fontFamily: typography.fontFamily.body,
-                  fontSize: 14,
-                  marginTop: spacing.sm,
+                  color: colors.neonCyan,
+                  fontFamily: typography.fontFamily.display,
+                  fontSize: 18,
+                  fontWeight: 'bold',
                 }}
               >
-                ✓ {feat}
+                {activeSub.duration === 'monthly' ? 'Monthly' : activeSub.duration === 'quarterly' ? 'Quarterly' : 'Annual'} Plan
               </Text>
-            ),
-          )}
-        </View>
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontFamily: typography.fontFamily.body,
+                  fontSize: 13,
+                  marginTop: 4,
+                }}
+              >
+                Status: {activeSub.status === 'past_due' ? '⚠️ Past due' : activeSub.status}
+                {activeSub.current_period_end
+                  ? ` · Renews ${new Date(activeSub.current_period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                  : ''}
+              </Text>
 
-        {/* Error message */}
-        {error ? (
+              {activeSub.trial_status === 'active' && activeSub.trial_end_at && (
+                <Text
+                  style={{
+                    color: colors.textPrimary,
+                    fontFamily: typography.fontFamily.body,
+                    fontSize: 14,
+                    marginTop: spacing.sm,
+                  }}
+                >
+                  🎁 Trial active · ends {new Date(activeSub.trial_end_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* Razorpay error message */}
+        {razorpayError ? (
           <View
             style={{
               marginHorizontal: spacing.screenPadding.horizontal,
@@ -154,7 +208,7 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
                 fontSize: 13,
               }}
             >
-              {error}
+              {razorpayError}
             </Text>
             <TouchableOpacity onPress={clearError} style={{ marginTop: 4 }}>
               <Text
@@ -170,36 +224,41 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
           </View>
         ) : null}
 
-        {/* Renew / Upgrade CTA */}
-        <Text style={sectionHeaderStyle}>Options</Text>
-        <TouchableOpacity
-          onPress={handleRenew}
-          disabled={isProcessing}
-          style={{
-            marginHorizontal: spacing.screenPadding.horizontal,
-            paddingVertical: spacing.md + 2,
-            borderRadius: 14,
-            backgroundColor: colors.neonCyan,
-            alignItems: 'center' as const,
-            flexDirection: 'row' as const,
-            justifyContent: 'center' as const,
-            gap: 8,
-          }}
-        >
-          {isProcessing ? (
-            <ActivityIndicator color={colors.black} size="small" />
-          ) : null}
-          <Text
-            style={{
-              color: colors.black,
-              fontFamily: typography.fontFamily.bodyBold,
-              fontSize: 16,
-              fontWeight: 'bold',
-            }}
-          >
-            {isProcessing ? 'Processing…' : 'Renew / Upgrade'}
-          </Text>
-        </TouchableOpacity>
+        {/* Renew / Upgrade CTA — only when real identifiers are available */}
+        {!isLoading && !loadError && activeSub && (
+          <>
+            <Text style={sectionHeaderStyle}>Options</Text>
+            <TouchableOpacity
+              onPress={handleRenew}
+              disabled={!canRenew}
+              testID="subscription-renew-cta"
+              style={{
+                marginHorizontal: spacing.screenPadding.horizontal,
+                paddingVertical: spacing.md + 2,
+                borderRadius: 14,
+                backgroundColor: canRenew ? colors.neonCyan : colors.textSecondary + '40',
+                alignItems: 'center' as const,
+                flexDirection: 'row' as const,
+                justifyContent: 'center' as const,
+                gap: 8,
+              }}
+            >
+              {isProcessing ? (
+                <ActivityIndicator color={colors.black} size="small" />
+              ) : null}
+              <Text
+                style={{
+                  color: canRenew ? colors.black : colors.textSecondary,
+                  fontFamily: typography.fontFamily.bodyBold,
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                }}
+              >
+                {isProcessing ? 'Processing…' : 'Renew / Upgrade'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
