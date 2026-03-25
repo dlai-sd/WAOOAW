@@ -1,12 +1,13 @@
 /**
- * Notifications Screen (MOBILE-FUNC-1 S5)
+ * Notifications Screen (MOBILE-COMP-1 E2-S1)
  *
- * Push notification preferences — UI-only placeholder.
- * FCM token registration is wired in S8b (Iteration 3).
+ * Derives a live actionable inbox from useHiredAgents data.
+ * Replaces the previous hard-coded demo array with truthful
+ * loading, empty, and error states.
  *
- * CP-MOULD-1 E6-S1: Added agent-aware notification deep-links.
- * Tapping an agent notification navigates to AgentOperationsScreen
- * with the relevant focusSection pre-selected.
+ * CP-MOULD-1 E6-S1: Agent-aware notification deep-links preserved.
+ * Tapping an alert navigates to AgentOperationsScreen with the
+ * relevant focusSection pre-selected.
  */
 
 import React, { useState } from 'react';
@@ -17,9 +18,12 @@ import {
   ScrollView,
   Switch,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
+import { useHiredAgents } from '@/hooks/useHiredAgents';
 import { registerPushToken } from '../../services/notifications/pushNotifications.service';
+import type { MyAgentInstanceSummary } from '@/types/hiredAgents.types';
 import type {
   AgentOperationsFocusSection,
   MyAgentsStackParamList,
@@ -149,6 +153,63 @@ export function resolveNavigationTarget(
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+/** Derive a truthful list of actionable notifications from live hired-agent data. */
+export function deriveActionableNotifications(
+  agents: MyAgentInstanceSummary[],
+): Notification[] {
+  const notifications: Notification[] = [];
+  const now = Date.now();
+
+  agents.forEach((agent) => {
+    const runtimeId = agent.hired_instance_id ?? undefined;
+
+    // Configuration incomplete
+    if (agent.configured === false || agent.goals_completed === false) {
+      notifications.push({
+        id: `setup-${agent.hired_instance_id ?? agent.subscription_id}`,
+        type: 'approval_required',
+        title: 'Agent setup incomplete',
+        body: 'Complete platform connection and goals so this agent can start working for you.',
+        hired_instance_id: runtimeId,
+        hired_agent_id: agent.hired_instance_id ?? undefined,
+        created_at: agent.trial_start_at ?? undefined,
+      });
+    }
+
+    // Trial ending within 3 days
+    if (agent.trial_status === 'active' && agent.trial_end_at) {
+      const msUntilEnd = new Date(agent.trial_end_at).getTime() - now;
+      const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+      if (msUntilEnd > 0 && msUntilEnd <= threeDaysMs) {
+        notifications.push({
+          id: `trial-ending-${agent.hired_instance_id ?? agent.subscription_id}`,
+          type: 'trial_ending',
+          title: 'Trial ending soon',
+          body: 'Your trial is ending in less than 3 days. Review spend and decide whether to continue.',
+          hired_instance_id: runtimeId,
+          hired_agent_id: agent.hired_instance_id ?? undefined,
+          created_at: agent.trial_end_at,
+        });
+      }
+    }
+
+    // Past-due subscription → credential/health warning
+    if (agent.subscription_status === 'past_due') {
+      notifications.push({
+        id: `billing-${agent.subscription_id}`,
+        type: 'credential_expiring',
+        title: 'Billing action needed',
+        body: 'Your subscription payment is past due. Update your payment method to keep this agent running.',
+        hired_instance_id: runtimeId,
+        hired_agent_id: agent.hired_instance_id ?? undefined,
+        created_at: agent.current_period_end,
+      });
+    }
+  });
+
+  return notifications;
+}
+
 export const NotificationsScreen = ({ navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
   const parentNavigation = navigation.getParent() as any;
@@ -156,48 +217,11 @@ export const NotificationsScreen = ({ navigation }: Props) => {
   const [trialUpdates, setTrialUpdates] = useState(true);
   const [deliverableAlerts, setDeliverableAlerts] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(false);
-  const actionableNotifications: Notification[] = [
-    {
-      id: 'demo-approval',
-      type: 'approval_required',
-      title: 'Approval waiting',
-      body: 'A deliverable needs your sign-off before publication can continue.',
-      hired_instance_id: 'demo-hired-agent-1',
-      created_at: 'Just now',
-    },
-    {
-      id: 'demo-approved',
-      type: 'deliverable_approved',
-      title: 'Deliverable approved and queued to publish',
-      body: 'Your approved draft is moving into the runtime stream so you can verify the publication outcome.',
-      hired_instance_id: 'demo-hired-agent-1',
-      created_at: '42m ago',
-    },
-    {
-      id: 'demo-publish-ready',
-      type: 'publish_ready',
-      title: 'YouTube upload is ready to proceed',
-      body: 'Approval and channel readiness are satisfied, so you can confirm the latest publishing state from runtime progress.',
-      hired_instance_id: 'demo-hired-agent-1',
-      created_at: '1h ago',
-    },
-    {
-      id: 'demo-publish-blocked',
-      type: 'publish_blocked',
-      title: 'YouTube publish blocked by connection state',
-      body: 'The agent is approved to continue, but the connected YouTube channel still needs attention before upload can happen.',
-      hired_instance_id: 'demo-hired-agent-1',
-      created_at: '90m ago',
-    },
-    {
-      id: 'demo-rejected',
-      type: 'deliverable_rejected',
-      title: 'Revision requested on a deliverable',
-      body: 'A deliverable was not approved. Open activity to see what changed before the next revision arrives.',
-      hired_instance_id: 'demo-hired-agent-2',
-      created_at: '2h ago',
-    },
-  ];
+
+  const { data: hiredAgents, isLoading, error, refetch } = useHiredAgents();
+  const actionableNotifications: Notification[] = hiredAgents
+    ? deriveActionableNotifications(hiredAgents)
+    : [];
 
   const handlePushToggle = (value: boolean) => {
     setPushEnabled(value);
@@ -323,7 +347,38 @@ export const NotificationsScreen = ({ navigation }: Props) => {
             Tap an alert preview below to jump into the agent operations hub with the relevant section already opened for the event that just changed.
           </Text>
         </View>
-        {actionableNotifications.map((notification) => (
+        {isLoading && (
+          <View style={{ padding: spacing.xl, alignItems: 'center' }} testID="mobile-notifications-loading">
+            <ActivityIndicator color={colors.neonCyan} />
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13, marginTop: spacing.sm }}>
+              Loading your agent alerts…
+            </Text>
+          </View>
+        )}
+        {!isLoading && error && (
+          <View style={{ padding: spacing.xl, alignItems: 'center' }} testID="mobile-notifications-error">
+            <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 6 }}>
+              Could not load alerts
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13, marginBottom: spacing.md }}>
+              {error.message}
+            </Text>
+            <TouchableOpacity onPress={() => refetch()}>
+              <Text style={{ color: colors.neonCyan, fontFamily: typography.fontFamily.bodyBold, fontSize: 14 }}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!isLoading && !error && actionableNotifications.length === 0 && (
+          <View style={{ padding: spacing.xl, alignItems: 'center' }} testID="mobile-notifications-empty">
+            <Text style={{ color: colors.textPrimary, fontFamily: typography.fontFamily.bodyBold, fontSize: 15, marginBottom: 6 }}>
+              No action items right now
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13 }}>
+              When an agent needs attention or your trial status changes, alerts will appear here.
+            </Text>
+          </View>
+        )}
+        {!isLoading && !error && actionableNotifications.map((notification) => (
           <TouchableOpacity
             key={notification.id}
             style={{

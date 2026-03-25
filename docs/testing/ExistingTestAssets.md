@@ -28,7 +28,7 @@ This document catalogues every test file in the repository, its location, tier, 
 
 | Component | Unit/API | Integration | Property/BDD | Contract/E2E/Perf | Total |
 |---|---|---|---|---|---|
-| Mobile (Jest) | 40 | 1 folder | — | Playwright (web) | ~40+ |
+| Mobile (Jest) | 44 | 1 folder | — | Playwright (web) | ~44+ |
 | Plant BackEnd | 93 | 20 | 3+1 BDD | Pact provider, E2E (6), Perf (2), Security | ~127 |
 | Plant Gateway | 8 | — | — | Pact provider (1) | ~9 |
 | CP BackEnd | 43 | 2 | 1 BDD | Pact consumer | ~47 |
@@ -37,7 +37,7 @@ This document catalogues every test file in the repository, its location, tier, 
 | CP FrontEnd (Vitest) | 21 | — | — | Playwright | ~21 |
 | **Total** | | | | | **~269** |
 
-> **Last sync**: PR #840 (CP-SKILLS-2 tracking) + test gaps execution 2026-03-03. Delta since v1.1 (PR #758): +83 test files/specs.
+> **Last sync**: PR #840 (CP-SKILLS-2 tracking) + test gaps execution 2026-03-03 + MOBILE-COMP-1 Iteration 1 (2026-03-25). Delta since v1.1 (PR #758): +83 test files/specs + MOBILE-COMP-1 additions.
 
 ---
 
@@ -72,7 +72,10 @@ Tooling: **Jest** + **React Native Testing Library**. Run with: `cd src/mobile &
 | `OTPInput.test.tsx` | T1 | UI | Reusable OTP digit-box input component — keypress, paste, backspace |
 | `MyAgentsScreen.test.tsx` | T1 | UI | Hired agents list renders, shows empty state, navigates to detail |
 | `hireConfirmationScreen.test.tsx` | T1 | UI | Hire confirmation modal shows agent and plan details, confirm/cancel |
-| `hireWizardScreen.test.tsx` | T1 | UI | Hire wizard steps render in order, validates required fields per step |
+| `hireWizardScreen.test.tsx` | T1 | UI | Hire wizard 4-step flow: agent selection, connect platform preflight, goals form, payment form |
+| `hireWizardFourSteps.test.tsx` | T1 | UI | 4-step wizard: step labels, preflight guidance card (E1-S2), post-hire navigation to TrialDashboard using real subscription_id |
+| `connectorSetupCard.test.tsx` | T1 | UI | ConnectorSetupCard shows preflight guidance, "Setup after trial starts" chip, no fake connected toggle (E1-S2) |
+| `NotificationsScreen.test.tsx` | T1 | UI | `resolveNavigationTarget` routing table; `deriveActionableNotifications` derives live alerts from hired-agent data — no demo IDs (E2-S1) |
 | `agentCard.test.tsx` | T1 | UI | Agent card renders avatar, name, rating, status badge correctly |
 | `agentDetailScreen.test.tsx` | T1 | UI | Agent detail screen loads agent data, shows hire CTA |
 | `discoverScreen.test.tsx` | T1 | UI | Discover/browse screen renders agent list, supports search filter |
@@ -109,7 +112,7 @@ Tooling: **Jest** + **React Native Testing Library**. Run with: `cd src/mobile &
 
 | File | Tier | Type | One-line Purpose |
 |---|---|---|---|
-| `navigation.test.ts` | T1 | UI | `RootNavigator` respects auth state (guest vs. authenticated routes) |
+| `navigation.test.ts` | T1 | UI | `RootNavigator` respects auth state; asserts `HireWizard` is registered in DiscoverNavigator and deep-link config is aligned (E1-S1) |
 | `RootNavigator.test.tsx` | T1 | UI | Root navigator renders correct stack based on auth store state |
 | `oauth.config.test.ts` | T1 | UT | OAuth config object has correct Android/iOS client IDs per env |
 | `offlineCache.test.ts` | T1 | UT | Offline cache read/write/expire for agent data |
