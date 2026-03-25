@@ -779,6 +779,7 @@ const Step4Trial = ({
       {/* Action Buttons */}
       <View style={{ marginTop: spacing.xl }}>
         <TouchableOpacity
+          testID="submit-trial-btn"
           style={[
             styles.primaryButton,
             {

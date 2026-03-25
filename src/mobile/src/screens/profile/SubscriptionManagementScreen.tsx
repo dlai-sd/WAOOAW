@@ -34,12 +34,15 @@ export const SubscriptionManagementScreen = ({ navigation }: Props) => {
   ) ?? null;
 
   // Only trigger Razorpay with real identifiers — never with placeholders
+  const toPlanType = (d: string | undefined): 'monthly' | 'trial' | 'annual' =>
+    d === 'yearly' ? 'annual' : d === 'trial' ? 'trial' : 'monthly';
+
   const handleRenew = async () => {
     if (!activeSub?.hired_instance_id) return;
     try {
       await processPayment({
         agentId: activeSub.hired_instance_id,
-        planType: activeSub.duration ?? 'monthly',
+        planType: toPlanType(activeSub.duration),
         amount: 0, // amount must come from a billing API; guard here until that is wired
       });
     } catch {

@@ -29,7 +29,7 @@ export function ConnectorSetupCard({
       </View>
 
       <Text style={styles.guidanceNote}>
-        You will connect {platformName} after your trial runtime is created. No credentials are stored before you start.
+        Your {platformName} connection happens after your trial runtime is created. No credentials are stored before you start.
       </Text>
 
       <Text style={styles.credentialsLabel}>You will need:</Text>

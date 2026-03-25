@@ -215,7 +215,7 @@ describe('HireWizardScreen — 4-step wizard (MOBILE-COMP-1 E1-S2)', () => {
   });
 
   it('routes to TrialDashboard in MyAgentsTab using the returned subscription_id after successful trial start', async () => {
-    const { getByText, getAllByText, getByPlaceholderText } = render(<HireWizardScreen />, {
+    const { getByText, getAllByText, getByTestId, getByPlaceholderText } = render(<HireWizardScreen />, {
       wrapper: createWrapper(),
     });
 
@@ -246,7 +246,8 @@ describe('HireWizardScreen — 4-step wizard (MOBILE-COMP-1 E1-S2)', () => {
     fireEvent.press(getByText('Credit / Debit Card'));
     fireEvent.press(getByText(/I accept the/));
 
-    fireEvent.press(getByText('Start Trial'));
+    // Press the submit button via its stable testID
+    fireEvent.press(getByTestId('submit-trial-btn'));
 
     await waitFor(() => {
       // Should navigate to MyAgentsTab > TrialDashboard with the real subscription_id
