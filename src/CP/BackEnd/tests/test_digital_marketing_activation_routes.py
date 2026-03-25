@@ -52,7 +52,7 @@ def test_get_activation_workspace_proxies_customer_scope(client, auth_headers, m
     fake = _FakePlantClient(
         response_json={
             "hired_instance_id": "HIRED-1",
-            "customer_id": "CUST-user-1",
+            "customer_id": "user-1",
             "agent_type_id": "marketing.digital_marketing.v1",
             "workspace": {"brand_name": "WAOOAW"},
             "readiness": {
@@ -73,7 +73,8 @@ def test_get_activation_workspace_proxies_customer_scope(client, auth_headers, m
     assert resp.status_code == 200
     assert resp.json()["workspace"]["brand_name"] == "WAOOAW"
     assert fake.calls[0]["path"] == "api/v1/hired-agents/HIRED-1/digital-marketing-activation"
-    assert fake.calls[0]["params"]["customer_id"].startswith("CUST-")
+    assert fake.calls[0]["params"]["customer_id"]
+    assert not fake.calls[0]["params"]["customer_id"].startswith("CUST-")
     app.dependency_overrides.clear()
 
 
@@ -86,7 +87,7 @@ def test_put_activation_workspace_proxies_workspace_payload(client, auth_headers
     fake = _FakePlantClient(
         response_json={
             "hired_instance_id": "HIRED-1",
-            "customer_id": "CUST-user-1",
+            "customer_id": "user-1",
             "agent_type_id": "marketing.digital_marketing.v1",
             "workspace": {"brand_name": "WAOOAW", "platforms_enabled": ["youtube"]},
             "readiness": {
@@ -111,5 +112,6 @@ def test_put_activation_workspace_proxies_workspace_payload(client, auth_headers
     assert resp.status_code == 200
     assert resp.json()["readiness"]["youtube_connection_ready"] is False
     assert fake.calls[0]["json"]["workspace"]["platforms_enabled"] == ["youtube"]
-    assert fake.calls[0]["json"]["customer_id"].startswith("CUST-")
+    assert fake.calls[0]["json"]["customer_id"]
+    assert not fake.calls[0]["json"]["customer_id"].startswith("CUST-")
     app.dependency_overrides.clear()
