@@ -23,6 +23,7 @@ import { View, Text } from "react-native";
 import { HomeScreen } from "../screens/home/HomeScreen";
 import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
 import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
+import { HireWizardScreen } from "../screens/hire/HireWizardScreen";
 import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
@@ -70,6 +71,7 @@ const DiscoverNavigator = () => {
     >
       <DiscoverStack.Screen name="Discover" component={DiscoverScreen} />
       <DiscoverStack.Screen name="AgentDetail" component={AgentDetailScreen} />
+      <DiscoverStack.Screen name="HireWizard" component={HireWizardScreen} />
       <DiscoverStack.Screen name="SearchResults" component={require('../screens/discover/SearchResultsScreen').default} />
       <DiscoverStack.Screen name="FilterAgents" component={require('../screens/discover/FilterAgentsScreen').default} />
     </DiscoverStack.Navigator>

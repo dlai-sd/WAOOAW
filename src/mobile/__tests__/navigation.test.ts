@@ -5,6 +5,19 @@
 import { linking } from '../src/navigation/types';
 
 describe('Navigation Configuration', () => {
+  describe('navigator source registration', () => {
+    it('registers HireWizard in DiscoverNavigator', () => {
+      const fs = require('fs');
+      const path = require('path');
+      const src = fs.readFileSync(
+        path.join(__dirname, '../src/navigation/MainNavigator.tsx'),
+        'utf8',
+      );
+      expect(src).toContain('name="HireWizard"');
+      expect(src).toContain('HireWizardScreen');
+    });
+  });
+
   describe('deep linking', () => {
     it('should have correct prefixes', () => {
       expect(linking.prefixes).toContain('waooaw://');
