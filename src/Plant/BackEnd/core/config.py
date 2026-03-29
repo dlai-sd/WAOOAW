@@ -5,10 +5,20 @@ Loads from .env file with validation
 
 from typing import Optional, List
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 import json
+
+
+def _is_local_redis_url(redis_url: str) -> bool:
+    normalized = (redis_url or "").strip().lower()
+    return normalized.startswith((
+        "redis://localhost",
+        "redis://127.0.0.1",
+        "rediss://localhost",
+        "rediss://127.0.0.1",
+    ))
 
 
 class Settings(BaseSettings):
@@ -172,6 +182,15 @@ class Settings(BaseSettings):
                 return json.loads(raw_val)
             return [origin.strip() for origin in raw_val.split(',')]
         return raw_val
+
+    @model_validator(mode="after")
+    def validate_deployed_runtime_dependencies(self) -> "Settings":
+        env = (self.environment or "").strip().lower()
+        if env in {"demo", "uat", "prod", "production"} and _is_local_redis_url(self.redis_url):
+            raise ValueError(
+                "redis_url must not point to localhost in deployed environments; set REDIS_URL to the shared runtime Redis service"
+            )
+        return self
     
     class Config:
         env_file = ".env"

@@ -94,6 +94,7 @@ module "plant_backend" {
   env_vars = {
     ENVIRONMENT               = var.environment
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
+    REDIS_URL                 = var.redis_url
     LOG_LEVEL                 = "info"
     DEBUG_VERBOSE             = "false"
 
@@ -182,11 +183,11 @@ module "plant_gateway" {
     PLANT_BACKEND_URL          = module.plant_backend.service_url
     PLANT_BACKEND_USE_ID_TOKEN = "true"
     PLANT_BACKEND_AUDIENCE     = module.plant_backend.service_url
+    REDIS_URL                  = var.redis_url
     LOG_LEVEL                  = "info"
     DEBUG_VERBOSE              = "false"
     OPA_URL                    = module.plant_opa.service_url
     OPA_SERVICE_URL            = module.plant_opa.service_url # Back-compat alias
-    REDIS_HOST                 = "10.0.0.3"                   # TODO: Create Redis instance
     CLOUD_SQL_CONNECTION_NAME  = module.plant_database.instance_connection_name
     JWT_ISSUER                 = "waooaw.com"
     JWT_ALGORITHM              = "HS256"
