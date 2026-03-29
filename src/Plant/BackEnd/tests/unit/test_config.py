@@ -72,8 +72,21 @@ class TestSettings:
         dev_settings = Settings(environment="development")
         assert dev_settings.environment == "development"
         
-        prod_settings = Settings(environment="production")
+        prod_settings = Settings(
+            environment="production",
+            redis_url="redis://memorystore.internal:6379/0",
+        )
         assert prod_settings.environment == "production"
+
+    def test_deployed_env_rejects_localhost_redis(self):
+        """Deployed environments must not silently fall back to localhost Redis."""
+        with pytest.raises(ValidationError):
+            Settings(environment="demo", redis_url="redis://localhost:6379/0")
+
+    def test_development_allows_localhost_redis(self):
+        """Local development may use localhost Redis."""
+        settings = Settings(environment="development", redis_url="redis://localhost:6379/0")
+        assert settings.redis_url == "redis://localhost:6379/0"
     
     def test_observability_flags(self):
         """Test observability feature flags."""

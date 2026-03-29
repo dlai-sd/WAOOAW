@@ -57,6 +57,12 @@ variable "attach_secret_manager_secrets" {
   default     = true
 }
 
+variable "redis_url" {
+  description = "Redis connection string shared by Plant Backend and Plant Gateway. Must point at the deployed Redis service, not localhost, in demo/uat/prod."
+  type        = string
+  default     = "redis://10.0.0.3:6379/0"
+}
+
 # Database Configuration
 variable "private_network_id" {
   description = "VPC network ID for private IP (format: projects/PROJECT/global/networks/NETWORK)"
