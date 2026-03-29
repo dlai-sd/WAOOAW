@@ -58,8 +58,6 @@ module.exports = (context = {}) => {
   return {
     expo: {
       ...expoConfig,
-      // Explicitly preserve critical EAS fields from app.json
-      projectId: expoConfig.projectId,
       owner: expoConfig.owner,
       slug: expoConfig.slug,
       name: expoConfig.name,
@@ -72,7 +70,7 @@ module.exports = (context = {}) => {
         BUILD_PROFILE: environment,
         // Explicitly preserve EAS project ID at canonical location for EAS CLI v18
         eas: {
-          projectId: expoConfig.projectId || (expoConfig.extra && expoConfig.extra.eas && expoConfig.extra.eas.projectId),
+          projectId: expoConfig.extra?.eas?.projectId,
         },
       },
       // iOS configuration
