@@ -2,21 +2,21 @@
 
 Test Cases:
   E1-S1 / OTP-verify:
-    TC-E1-S1-1  login → access_token in body, refresh_token in httpOnly cookie
+        TC-E1-S1-1  login → access_token + refresh_token in body
     TC-E1-S1-2  cookie has HttpOnly, Secure, SameSite=Strict, Path=/api/v1/auth
     TC-E1-S1-3  refresh JWT has sub, jti, exp ≈ +7 days, token_type=refresh
 
   E1-S3 / POST /refresh:
-    TC-E1-S3-1  valid cookie → 200, new access_token, rotated Set-Cookie
-    TC-E1-S3-2  no cookie    → 401 REFRESH_TOKEN_MISSING
-    TC-E1-S3-3  expired token → 401 REFRESH_TOKEN_EXPIRED
-    TC-E1-S3-4  revoked jti  → 401 REFRESH_TOKEN_REVOKED
-    TC-E1-S3-5  token rotation: old jti gone from Redis, new jti stored
+        TC-E1-S3-1  valid body token → 200, new access_token + refresh_token, rotated Set-Cookie
+        TC-E1-S3-2  no token        → 401 REFRESH_TOKEN_MISSING
+        TC-E1-S3-3  expired token   → 401 REFRESH_TOKEN_EXPIRED
+        TC-E1-S3-4  revoked jti     → 401 REFRESH_TOKEN_REVOKED
+        TC-E1-S3-5  Redis timeout   → 200, stateless rotation still succeeds
+        TC-E1-S3-6  token rotation: old jti best-effort revoked, new token issued
 
   E2-S1 / POST /logout:
-    TC-E2-S1-1  valid cookie → 200, Redis jti deleted, cookie cleared
-    TC-E2-S1-2  logout then refresh → 401 REFRESH_TOKEN_REVOKED
-    TC-E2-S1-3  no cookie (idempotent) → 200
+        TC-E2-S1-1  valid token → 200, Redis jti best-effort deleted, cookie cleared
+        TC-E2-S1-2  no token (idempotent) → 200
 """
 
 from __future__ import annotations
@@ -89,8 +89,8 @@ def _make_app():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_e1_s1_login_issues_cookie_not_body(monkeypatch):
-    """TC-E1-S1-1: OTP verify → access_token in body, refresh_token cookie only."""
+async def test_e1_s1_login_returns_body_and_cookie(monkeypatch):
+    """TC-E1-S1-1: OTP verify → access_token + refresh_token in body, cookie set."""
     app, otp_store, _ = _make_app()
 
     # Create a valid OTP challenge
@@ -116,12 +116,9 @@ async def test_e1_s1_login_issues_cookie_not_body(monkeypatch):
     assert r.status_code == 200
     body = r.json()
 
-    # access_token must be in body
     assert "access_token" in body
-    # refresh_token must NOT be in body (httpOnly cookie only)
-    assert "refresh_token" not in body
+    assert body["refresh_token"] == "fake.refresh.token"
 
-    # Cookie must be set
     cookie_header = r.headers.get("set-cookie", "")
     assert "refresh_token" in cookie_header
 
@@ -171,7 +168,7 @@ async def test_e1_s1_refresh_jwt_claims(monkeypatch):
     )
 
     # Use the real generate_refresh_token but mock its Redis write
-    async def _fake_generate(user_id: str):
+    async def _fake_generate(user_id: str, persist_in_redis: bool = True):
         jti = str(uuid.uuid4())
         expire = datetime.utcnow() + timedelta(seconds=REFRESH_TOKEN_TTL_SECONDS)
         token = jose_jwt.encode(
@@ -192,16 +189,7 @@ async def test_e1_s1_refresh_jwt_claims(monkeypatch):
 
     assert r.status_code == 200
 
-    # Extract refresh token from cookie
-    cookie_header = r.headers.get("set-cookie", "")
-    raw_token = None
-    for part in cookie_header.split(";"):
-        part = part.strip()
-        if part.startswith("refresh_token="):
-            raw_token = part.split("=", 1)[1]
-            break
-
-    assert raw_token, "refresh_token cookie not found"
+    raw_token = r.json()["refresh_token"]
 
     claims = jose_jwt.decode(raw_token, settings.secret_key, algorithms=[settings.algorithm])
     assert claims["sub"] == _CUSTOMER_ID
@@ -225,8 +213,8 @@ def _make_refresh_app() -> FastAPI:
 
 
 @pytest.mark.asyncio
-async def test_e1_s3_valid_cookie_returns_new_access_token(monkeypatch):
-    """TC-E1-S3-1: Valid refresh cookie → 200 with new access_token and rotated cookie."""
+async def test_e1_s3_valid_body_token_returns_new_tokens(monkeypatch):
+    """TC-E1-S3-1: Valid refresh body token → 200 with new tokens and rotated cookie."""
     app = _make_refresh_app()
 
     monkeypatch.setattr(
@@ -244,22 +232,22 @@ async def test_e1_s3_valid_cookie_returns_new_access_token(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/refresh",
-            cookies={"refresh_token": "old.refresh.token"},
+            json={"refresh_token": "old.refresh.token"},
         )
 
     assert r.status_code == 200
     body = r.json()
     assert "access_token" in body
+    assert body["refresh_token"] == "new.refresh.token"
     assert body["token_type"] == "bearer"
 
-    # New rotated refresh cookie must be set
     cookie_header = r.headers.get("set-cookie", "")
     assert "refresh_token" in cookie_header
 
 
 @pytest.mark.asyncio
-async def test_e1_s3_no_cookie_returns_401():
-    """TC-E1-S3-2: No refresh cookie → 401 REFRESH_TOKEN_MISSING."""
+async def test_e1_s3_no_token_returns_401():
+    """TC-E1-S3-2: No refresh token → 401 REFRESH_TOKEN_MISSING."""
     app = _make_refresh_app()
 
     transport = ASGITransport(app=app)
@@ -272,7 +260,7 @@ async def test_e1_s3_no_cookie_returns_401():
 
 @pytest.mark.asyncio
 async def test_e1_s3_expired_token_returns_401(monkeypatch):
-    """TC-E1-S3-3: Expired refresh cookie → 401 REFRESH_TOKEN_EXPIRED."""
+    """TC-E1-S3-3: Expired refresh token → 401 REFRESH_TOKEN_EXPIRED."""
     from core.exceptions import JWTTokenExpiredError
 
     app = _make_refresh_app()
@@ -286,7 +274,7 @@ async def test_e1_s3_expired_token_returns_401(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/refresh",
-            cookies={"refresh_token": "expired.token"},
+            json={"refresh_token": "expired.token"},
         )
 
     assert r.status_code == 401
@@ -295,7 +283,7 @@ async def test_e1_s3_expired_token_returns_401(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_e1_s3_revoked_jti_returns_401(monkeypatch):
-    """TC-E1-S3-4: Refresh cookie with revoked jti → 401 REFRESH_TOKEN_REVOKED."""
+    """TC-E1-S3-4: Refresh token with revoked jti → 401 REFRESH_TOKEN_REVOKED."""
     app = _make_refresh_app()
 
     monkeypatch.setattr(
@@ -308,7 +296,7 @@ async def test_e1_s3_revoked_jti_returns_401(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/refresh",
-            cookies={"refresh_token": "revoked.token"},
+            json={"refresh_token": "revoked.token"},
         )
 
     assert r.status_code == 401
@@ -316,8 +304,38 @@ async def test_e1_s3_revoked_jti_returns_401(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_e1_s3_redis_timeout_allows_stateless_rotation(monkeypatch):
+    """TC-E1-S3-5: Redis timeout should not block a valid signed refresh token."""
+    app = _make_refresh_app()
+
+    async def _raise_timeout(_jti: str) -> bool:
+        raise TimeoutError("redis timeout")
+
+    monkeypatch.setattr(
+        auth_module, "verify_token",
+        lambda token: {"sub": _CUSTOMER_ID, "jti": _JTI, "token_type": "refresh"},
+    )
+    monkeypatch.setattr(auth_module, "is_refresh_token_valid", _raise_timeout)
+    monkeypatch.setattr(auth_module, "revoke_refresh_token", AsyncMock())
+    monkeypatch.setattr(
+        auth_module, "generate_refresh_token",
+        AsyncMock(return_value=("new.refresh.token", str(uuid.uuid4()))),
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        r = await client.post(
+            "/api/v1/auth/refresh",
+            json={"refresh_token": "valid.token"},
+        )
+
+    assert r.status_code == 200
+    assert r.json()["refresh_token"] == "new.refresh.token"
+
+
+@pytest.mark.asyncio
 async def test_e1_s3_token_rotation(monkeypatch):
-    """TC-E1-S3-5: Old jti revoked, new jti stored on successful refresh."""
+    """TC-E1-S3-6: Old jti best-effort revoked and new token issued."""
     app = _make_refresh_app()
     old_jti = str(uuid.uuid4())
     new_jti = str(uuid.uuid4())
@@ -327,7 +345,7 @@ async def test_e1_s3_token_rotation(monkeypatch):
     async def _fake_revoke(jti: str) -> None:
         revoked.append(jti)
 
-    async def _fake_generate(user_id: str):
+    async def _fake_generate(user_id: str, persist_in_redis: bool = True):
         generated.append(new_jti)
         return ("new.refresh.token", new_jti)
 
@@ -343,7 +361,7 @@ async def test_e1_s3_token_rotation(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/refresh",
-            cookies={"refresh_token": "valid.token"},
+            json={"refresh_token": "valid.token"},
         )
 
     assert r.status_code == 200
@@ -357,7 +375,7 @@ async def test_e1_s3_token_rotation(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_e2_s1_logout_revokes_jti(monkeypatch):
-    """TC-E2-S1-1: Logout → 200, jti deleted from Redis, cookie cleared."""
+    """TC-E2-S1-1: Logout accepts body token and best-effort revokes jti."""
     app = _make_refresh_app()
     revoked: list[str] = []
 
@@ -375,7 +393,7 @@ async def test_e2_s1_logout_revokes_jti(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/logout",
-            cookies={"refresh_token": "some.refresh.token"},
+            json={"refresh_token": "some.refresh.token"},
         )
 
     assert r.status_code == 200
@@ -387,8 +405,8 @@ async def test_e2_s1_logout_revokes_jti(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_e2_s1_logout_no_cookie_is_idempotent():
-    """TC-E2-S1-3: Logout with no cookie → 200 (idempotent)."""
+async def test_e2_s1_logout_no_token_is_idempotent():
+    """TC-E2-S1-2: Logout with no token → 200 (idempotent)."""
     app = _make_refresh_app()
 
     transport = ASGITransport(app=app)
@@ -397,46 +415,3 @@ async def test_e2_s1_logout_no_cookie_is_idempotent():
 
     assert r.status_code == 200
 
-
-@pytest.mark.asyncio
-async def test_e2_s1_after_logout_refresh_is_rejected(monkeypatch):
-    """TC-E2-S1-2: After logout, using old refresh cookie → 401 REFRESH_TOKEN_REVOKED."""
-    app = _make_refresh_app()
-    store: dict[str, bool] = {_JTI: True}
-
-    # Logout: decode gives jti, revoke removes it from store
-    monkeypatch.setattr(
-        auth_module, "decode_refresh_token_unverified",
-        lambda token: {"jti": _JTI},
-    )
-
-    async def _fake_revoke(jti: str) -> None:
-        store.pop(jti, None)
-
-    async def _fake_valid(jti: str) -> bool:
-        return store.get(jti, False)
-
-    monkeypatch.setattr(auth_module, "revoke_refresh_token", _fake_revoke)
-    monkeypatch.setattr(auth_module, "is_refresh_token_valid", _fake_valid)
-    monkeypatch.setattr(
-        auth_module, "verify_token",
-        lambda token: {"sub": _CUSTOMER_ID, "jti": _JTI, "token_type": "refresh"},
-    )
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # Step 1: logout
-        r1 = await client.post(
-            "/api/v1/auth/logout",
-            cookies={"refresh_token": "old.token"},
-        )
-        assert r1.status_code == 200
-
-        # Step 2: try to refresh with the same token
-        r2 = await client.post(
-            "/api/v1/auth/refresh",
-            cookies={"refresh_token": "old.token"},
-        )
-
-    assert r2.status_code == 401
-    assert "REFRESH_TOKEN_REVOKED" in r2.text

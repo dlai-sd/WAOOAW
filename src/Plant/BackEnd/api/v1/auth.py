@@ -11,7 +11,7 @@ import functools
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi import Body, Depends, HTTPException, Request, Response, status
 from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,8 +46,10 @@ from services.customer_service import CustomerService
 from services.security_audit import SecurityAuditRecord, SecurityAuditStore, get_security_audit_store
 from services.security_throttle import SecurityThrottle, get_security_throttle
 from services.otp_service import OtpStore, get_otp_store
+from core.observability import get_logger
 
 router = waooaw_router(prefix="/auth", tags=["auth"])
+logger = get_logger(__name__)
 
 def get_customer_service(db: AsyncSession = Depends(get_db_session)) -> CustomerService:
     return CustomerService(db)
@@ -338,12 +340,104 @@ class GoogleMobileVerifyRequest(BaseModel):
     source: str = "mobile"
     totp_code: Optional[str] = None
 
-@router.post("/google/verify", tags=["auth", "mobile"])
+
+class MobileTokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+    expires_in: int
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        "refresh_token",
+        refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        path="/api/v1/auth",
+        max_age=REFRESH_TOKEN_TTL_SECONDS,
+    )
+
+
+async def _prime_token_version_cache(customer_id: str, token_version: int) -> None:
+    try:
+        await cache_token_version(customer_id, token_version)
+    except Exception as exc:
+        logger.warning(
+            "Token version cache unavailable during mobile auth",
+            extra={"customer_id": customer_id, "error": str(exc)},
+        )
+
+
+async def _issue_mobile_tokens(
+    response: Response,
+    customer_id: str,
+    email: str,
+    token_version: int,
+) -> MobileTokenResponse:
+    now = datetime.utcnow()
+    issued_at = int(now.timestamp())
+    access_expire = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    base_claims: dict = {
+        "sub": customer_id,
+        "user_id": customer_id,
+        "customer_id": customer_id,
+        "email": email,
+        "roles": ["user"],
+        "iss": "waooaw.com",
+        "iat": issued_at,
+        "token_version": token_version,
+    }
+
+    access_token = create_access_token(base_claims.copy(), expires_delta=access_expire)
+    refresh_token_str, _jti = await generate_refresh_token(
+        customer_id,
+        persist_in_redis=False,
+    )
+
+    await _prime_token_version_cache(customer_id, token_version)
+    _set_refresh_cookie(response, refresh_token_str)
+
+    return MobileTokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token_str,
+        token_type="bearer",
+        expires_in=int(access_expire.total_seconds()),
+    )
+
+
+async def _refresh_token_is_revoked(jti: str) -> bool:
+    try:
+        return not await is_refresh_token_valid(jti)
+    except Exception as exc:
+        logger.warning(
+            "Refresh token revocation check skipped because Redis is unavailable",
+            extra={"jti": jti, "error": str(exc)},
+        )
+        return False
+
+
+async def _best_effort_revoke_refresh_token(jti: str) -> None:
+    try:
+        await revoke_refresh_token(jti)
+    except Exception as exc:
+        logger.warning(
+            "Refresh token revoke skipped because Redis is unavailable",
+            extra={"jti": jti, "error": str(exc)},
+        )
+
+@router.post("/google/verify", tags=["auth", "mobile"], response_model=MobileTokenResponse)
 async def google_verify_mobile(
     payload: GoogleMobileVerifyRequest,
     response: Response,
     service: CustomerService = Depends(get_customer_service),
-) -> dict:
+) -> MobileTokenResponse:
     """
     Mobile Google OAuth2 login (AUTH-MOBILE-1).
 
@@ -417,45 +511,12 @@ async def google_verify_mobile(
 
     # ---- Step 3: Issue JWT pair ------------------------------------------
     customer_id = str(customer.id)
-    now = datetime.utcnow()
-    issued_at = int(now.timestamp())
-    access_expire = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    base_claims: dict = {
-        "sub": customer_id,
-        "user_id": customer_id,
-        "customer_id": customer_id,
-        "email": email,
-        "roles": ["user"],
-        "iss": "waooaw.com",
-        "iat": issued_at,
-        "token_version": getattr(customer, "token_version", 1),  # E2-S3
-    }
-
-    access_token = create_access_token(
-        base_claims.copy(), expires_delta=access_expire
+    return await _issue_mobile_tokens(
+        response=response,
+        customer_id=customer_id,
+        email=email,
+        token_version=getattr(customer, "token_version", 1),
     )
-    refresh_token_str, _jti = await generate_refresh_token(customer_id)
-
-    # E2-S3: prime token_version cache so Gateway can check without a DB call
-    await cache_token_version(customer_id, base_claims["token_version"])
-
-    # E1-S1/E1-S2: set refresh token as httpOnly cookie, NOT in response body
-    response.set_cookie(
-        "refresh_token",
-        refresh_token_str,
-        httponly=True,
-        secure=True,
-        samesite="strict",
-        path="/api/v1/auth",
-        max_age=REFRESH_TOKEN_TTL_SECONDS,
-    )
-
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": int(access_expire.total_seconds()),
-    }
 
 # ---------------------------------------------------------------------------
 # Mobile customer registration  (AUTH-MOBILE-REG-1)
@@ -692,7 +753,7 @@ class OtpVerifyRequest(BaseModel):
     otp_id: str
     code: str
 
-@router.post("/otp/verify", tags=["auth", "mobile"])
+@router.post("/otp/verify", tags=["auth", "mobile"], response_model=MobileTokenResponse)
 async def otp_verify(
     request: Request,
     payload: OtpVerifyRequest,
@@ -700,7 +761,7 @@ async def otp_verify(
     service: CustomerService = Depends(get_customer_service),
     otp_store: OtpStore = Depends(get_otp_store),
     audit: SecurityAuditStore = Depends(get_security_audit_store),
-) -> dict:
+) -> MobileTokenResponse:
     """Verify OTP and issue WAOOAW JWT tokens (AUTH-MOBILE-OTP-1).
 
     Public endpoint — no JWT required.  On success returns an access/refresh
@@ -747,39 +808,8 @@ async def otp_verify(
             detail="Customer account not found",
         )
 
-    # Issue JWT pair — same structure as POST /auth/google/verify.
     customer_id = str(customer.id)
-    now = datetime.utcnow()
-    issued_at = int(now.timestamp())
-    access_expire = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    base_claims: dict = {
-        "sub": customer_id,
-        "user_id": customer_id,
-        "customer_id": customer_id,
-        "email": customer.email,
-        "roles": ["user"],
-        "iss": "waooaw.com",
-        "iat": issued_at,
-        "token_version": getattr(customer, "token_version", 1),  # E2-S3
-    }
-
-    access_token = create_access_token(base_claims.copy(), expires_delta=access_expire)
-    refresh_token_str, _jti = await generate_refresh_token(customer_id)
-
-    # E2-S3: prime token_version cache
-    await cache_token_version(customer_id, base_claims["token_version"])
-
-    # E1-S1/E1-S2: set refresh token as httpOnly cookie, NOT in response body
-    response.set_cookie(
-        "refresh_token",
-        refresh_token_str,
-        httponly=True,
-        secure=True,
-        samesite="strict",
-        path="/api/v1/auth",
-        max_age=REFRESH_TOKEN_TTL_SECONDS,
-    )
+    token_version = getattr(customer, "token_version", 1)
 
     audit.append(
         SecurityAuditRecord(
@@ -794,29 +824,32 @@ async def otp_verify(
         )
     )
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": int(access_expire.total_seconds()),
-    }
+    return await _issue_mobile_tokens(
+        response=response,
+        customer_id=customer_id,
+        email=customer.email,
+        token_version=token_version,
+    )
 
 # ---------------------------------------------------------------------------
 # Silent refresh  (E1-S3)
 # ---------------------------------------------------------------------------
 
-@router.post("/refresh", tags=["auth"])
+@router.post("/refresh", tags=["auth"], response_model=MobileTokenResponse)
 async def refresh_access_token(
     request: Request,
     response: Response,
-) -> dict:
-    """Issue a new access token using the httpOnly refresh token cookie.
+    payload: Optional[RefreshTokenRequest] = Body(default=None),
+) -> MobileTokenResponse:
+    """Issue a new access token using a refresh token from body or cookie.
 
-    E1-S3: Validates refresh token JWT and Redis presence, rotates the refresh
-    token (old jti deleted, new jti stored), returns a fresh access token.
+    Mobile callers send the refresh token in the JSON body to match CP-style
+    stateless auth. Cookie fallback is still accepted for older callers.
 
-    Public endpoint — carries its own auth via the httpOnly cookie.
+    Redis-backed revocation is best-effort only. If Redis is unavailable, a
+    valid signed refresh token can still rotate successfully.
     """
-    raw_token = request.cookies.get("refresh_token")
+    raw_token = (payload.refresh_token if payload else None) or request.cookies.get("refresh_token")
     if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -852,37 +885,30 @@ async def refresh_access_token(
             detail="REFRESH_TOKEN_INVALID",
         )
 
-    # Check Redis presence (revocation check)
-    if not await is_refresh_token_valid(jti):
+    if await _refresh_token_is_revoked(jti):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="REFRESH_TOKEN_REVOKED",
         )
 
-    # Token rotation: revoke old jti, issue new refresh token
-    await revoke_refresh_token(jti)
-    new_refresh_token, _new_jti = await generate_refresh_token(user_id)
-
-    # Set new refresh token cookie
-    response.set_cookie(
-        "refresh_token",
-        new_refresh_token,
-        httponly=True,
-        secure=True,
-        samesite="strict",
-        path="/api/v1/auth",
-        max_age=REFRESH_TOKEN_TTL_SECONDS,
+    await _best_effort_revoke_refresh_token(jti)
+    new_refresh_token, _new_jti = await generate_refresh_token(
+        user_id,
+        persist_in_redis=False,
     )
+
+    _set_refresh_cookie(response, new_refresh_token)
 
     # Issue new access token
     access_expire = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token({"sub": user_id}, expires_delta=access_expire)
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "expires_in": int(access_expire.total_seconds()),
-    }
+    return MobileTokenResponse(
+        access_token=access_token,
+        refresh_token=new_refresh_token,
+        token_type="bearer",
+        expires_in=int(access_expire.total_seconds()),
+    )
 
 # ---------------------------------------------------------------------------
 # Logout  (E2-S1)
@@ -892,19 +918,20 @@ async def refresh_access_token(
 async def logout(
     request: Request,
     response: Response,
+    payload: Optional[RefreshTokenRequest] = Body(default=None),
 ) -> dict:
     """Invalidate the current refresh token and clear the cookie.
 
     E2-S1: Idempotent — always returns 200 even if no cookie is present.
     Public endpoint — user may have an expired access token at logout time.
     """
-    raw_token = request.cookies.get("refresh_token")
+    raw_token = (payload.refresh_token if payload else None) or request.cookies.get("refresh_token")
     if raw_token:
         # Best-effort: extract jti without full validation (token may be expired)
         claims = decode_refresh_token_unverified(raw_token)
         jti = claims.get("jti")
         if jti:
-            await revoke_refresh_token(jti)
+            await _best_effort_revoke_refresh_token(jti)
 
     # Clear the cookie regardless
     response.delete_cookie("refresh_token", path="/api/v1/auth")
