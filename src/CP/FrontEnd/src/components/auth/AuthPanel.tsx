@@ -8,6 +8,7 @@ import {
 } from '@fluentui/react-components'
 import { Dismiss24Regular } from '@fluentui/react-icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import CaptchaWidget from './CaptchaWidget'
 import GoogleLoginButton from './GoogleLoginButton'
 import authService from '../../services/auth.service'
@@ -1114,7 +1115,7 @@ export default function AuthPanel({
             </div>
 
             <div className={styles.legalText}>
-              By signing in, you agree to our Terms of Service and Privacy Policy.
+              By signing in, you agree to our <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
             </div>
           </div>
         ) : (
@@ -1492,7 +1493,11 @@ export default function AuthPanel({
                       <Checkbox
                         checked={formData.consent}
                         onChange={(_, data) => setFormData((p) => ({ ...p, consent: Boolean(data.checked) }))}
-                        label="I agree to the Terms of Service and Privacy Policy"
+                        label={
+                          <span>
+                            I agree to the <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>
+                          </span>
+                        }
                       />
                       {errors.consent && <div className="field-error">{errors.consent}</div>}
                     </div>

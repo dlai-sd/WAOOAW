@@ -16,6 +16,8 @@ import AgentDetail from './pages/AgentDetail'
 import TrialDashboard from './pages/TrialDashboard'
 import HireSetupWizard from './pages/HireSetupWizard'
 import HireReceipt from './pages/HireReceipt'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
 
 // Wrapper that reads :agentId from the URL and opens the portal at agent-detail page.
 // Must be a named component (not inline) so useParams is called inside a Route renderer.
@@ -150,6 +152,24 @@ function AppContent() {
             }
           />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route
+            path="/privacy"
+            element={
+              <>
+                <Header theme={theme} toggleTheme={toggleTheme} />
+                <PrivacyPolicy />
+              </>
+            }
+          />
+          <Route
+            path="/terms"
+            element={
+              <>
+                <Header theme={theme} toggleTheme={toggleTheme} />
+                <TermsOfService />
+              </>
+            }
+          />
 
           {/* Protected routes */}
           <Route path="/portal" element={
