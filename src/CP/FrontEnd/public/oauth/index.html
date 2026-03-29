@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WAOOAW Platform - App Information</title>
+    <meta
+      name="description"
+      content="WAOOAW Platform app information for Google OAuth consent, including support, privacy policy, and terms of service."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0a0a;
+        --panel: #18181b;
+        --panel-soft: rgba(255, 255, 255, 0.04);
+        --text: #f4f4f5;
+        --muted: #a1a1aa;
+        --line: rgba(255, 255, 255, 0.12);
+        --cyan: #00f2fe;
+        --green: #10b981;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Inter", Arial, sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(0, 242, 254, 0.12), transparent 32%),
+          linear-gradient(180deg, #0a0a0a 0%, #111216 100%);
+        color: var(--text);
+      }
+
+      .page {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 48px 20px 72px;
+      }
+
+      .hero,
+      .card {
+        background: var(--panel-soft);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        backdrop-filter: blur(10px);
+      }
+
+      .hero {
+        padding: 32px;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        color: var(--cyan);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      h1, h2 {
+        font-family: "Space Grotesk", "Inter", Arial, sans-serif;
+        margin: 0 0 12px;
+      }
+
+      p {
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+      }
+
+      .card {
+        padding: 24px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      a {
+        color: var(--cyan);
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(16, 185, 129, 0.12);
+        color: #d1fae5;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .footer {
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          padding-top: 28px;
+        }
+
+        .hero,
+        .card {
+          border-radius: 18px;
+          padding: 20px;
+        }
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="eyebrow">WAOOAW Platform</div>
+        <h1>Google OAuth app information</h1>
+        <p>
+          WAOOAW Platform helps customers trial, hire, and operate AI agents. When a customer chooses to connect a
+          platform such as YouTube, Google OAuth is used so WAOOAW can perform only the actions the customer has
+          explicitly approved inside the product workflow.
+        </p>
+        <div class="status">Support contact: yogeshkhandge@gmail.com</div>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>What the app does</h2>
+          <ul>
+            <li>Lets businesses configure AI agents for marketing and publishing workflows</li>
+            <li>Shows connection status for approved third-party channels</li>
+            <li>Uses granted permissions only for customer-requested actions</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Public legal pages</h2>
+          <ul>
+            <li><a href="/privacy/">Privacy Policy</a></li>
+            <li><a href="/terms/">Terms of Service</a></li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Authorized domain</h2>
+          <p>
+            This app is operated under the WAOOAW domain. Public app information and consent-screen legal pages are
+            hosted at cp.demo.waooaw.com.
+          </p>
+        </article>
+      </section>
+
+      <div class="footer">
+        Last updated: March 29, 2026
+      </div>
+    </main>
+  </body>
+  </html>
