@@ -216,7 +216,7 @@ async def test_otp_start_rate_limit_blocks_after_max_requests():
 
 @pytest.mark.asyncio
 async def test_otp_verify_correct_code_returns_tokens():
-    """Correct code → 200, access_token in body, refresh_token set as httpOnly cookie."""
+    """Correct code → 200, access_token and refresh_token in body, cookie still set."""
     audit_store = InMemorySecurityAuditStore()
     otp_store = OtpStore()
 
@@ -243,11 +243,9 @@ async def test_otp_verify_correct_code_returns_tokens():
     assert r.status_code == 200, r.text
     body = r.json()
     assert "access_token" in body
-    # refresh_token is now an httpOnly cookie, not in the response body
-    assert "refresh_token" not in body
+    assert body["refresh_token"] == "fake-refresh-token-value"
     assert body["token_type"] == "bearer"
     assert body["expires_in"] > 0
-    # Verify the httpOnly cookie was set
     set_cookie = r.headers.get("set-cookie", "")
     assert "refresh_token" in set_cookie
 
