@@ -158,3 +158,40 @@ That drift created two separate failures at once: Codespaces `psql` access broke
 ## Recommended Follow-up
 
 The next hardening step is an automated drift check focused specifically on `settings.ipConfiguration.ipv4Enabled` for `plant-sql-demo`. That converts this from a recurring hidden infrastructure surprise into a small, reviewable config diff caught before it blocks deployment or DB debugging.
+
+---
+
+# Tech Debt: CP Customer OAuth Is Out Of Compliance With Mobile And Central Plant Auth
+
+## Story
+
+Customer sign-in currently follows two different backend paths depending on channel. The mobile app uses the Plant-auth path through Gateway, while CP still verifies Google login and mints customer tokens inside CP Backend.
+
+That split means customer auth is no longer governed by one backend source of truth. Web and mobile can behave differently under failure, session rotation, logout, refresh-token revocation, and future auth changes even when the user identity is the same.
+
+## Why This Matters
+
+- Customer auth behavior should be consistent across CP web and mobile.
+- Duplicated token-issuing logic increases regression risk and debugging cost.
+- CP can appear healthy even when the real Plant-backed customer session path is broken.
+
+## Debt Item
+
+**Name:** Converge CP customer OAuth onto centralized Plant auth
+
+**Problem:** CP Backend still owns a separate customer OAuth and token-issuance implementation instead of using the same centralized Plant auth flow as mobile.
+
+**Impact:** Customer sign-in, refresh, logout, and revocation behavior can drift between web and mobile, creating inconsistent session behavior and harder production debugging.
+
+**Root cause:** CP auth was implemented locally as a practical web flow, but it was never later consolidated onto the platform's central customer auth path.
+
+## What Is Needed To Pay This Debt Down
+
+1. Move CP customer sign-in and refresh handling onto the same Plant-backed auth contract used by mobile.
+2. Remove CP-local customer token minting so Plant becomes the single source of truth for customer sessions.
+3. Preserve the existing CP UI while refactoring only the backend auth ownership and token flow.
+4. Add regression coverage for login, refresh, logout, 2FA, and token revocation across both CP and mobile.
+
+## Recommended Follow-up
+
+Treat this as a focused auth migration, not a UI project. The right target state is one customer auth authority for both CP and mobile, with CP acting as a thin client or thin proxy instead of a second customer-auth server.
