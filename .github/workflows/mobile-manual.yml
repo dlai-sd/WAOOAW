@@ -33,6 +33,9 @@ on:
           - preview
           - production
 
+env:
+  ENABLE_IOS_RELEASE: 'false'
+
 permissions:
   contents: read
 
@@ -92,7 +95,7 @@ jobs:
 
     strategy:
       matrix:
-        platform: ${{ inputs.build_platform == 'all' && fromJSON('["ios", "android"]') || fromJSON(format('["{0}"]', inputs.build_platform)) }}
+        platform: ${{ fromJSON(inputs.build_platform == 'all' && (env.ENABLE_IOS_RELEASE == 'true' && '["ios", "android"]' || '["android"]') || format('["{0}"]', inputs.build_platform)) }}
 
     steps:
       - name: Checkout code
@@ -116,7 +119,14 @@ jobs:
           cd src/mobile
           npm ci --legacy-peer-deps
 
+      - name: Validate iOS build toggle
+        if: matrix.platform == 'ios' && env.ENABLE_IOS_RELEASE != 'true'
+        run: |
+          echo "❌ iOS manual builds are disabled until Apple Developer and App Store Connect ownership is ready."
+          exit 1
+
       - name: EAS Build - ${{ matrix.platform }}
+        if: matrix.platform != 'ios' || env.ENABLE_IOS_RELEASE == 'true'
         run: |
           cd src/mobile
           eas build --platform ${{ matrix.platform }} --profile ${{ inputs.build_profile }} --non-interactive
