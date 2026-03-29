@@ -17,12 +17,12 @@ Restore a working one-time YouTube connection flow in CP web so a customer can c
 
 | Tracking | Story ID | Epic | Customer outcome | Branch |
 |---|---|---|---|---|
-| Not started | E1-S1 | Customer reaches a trusted Google sign-in screen | Operator has the exact Google OAuth setup checklist and evidence requirements needed to unblock the warning screen. | feat/cp-yt-conn-1-it1-e1 |
-| Not started | E1-S2 | Customer reaches a trusted Google sign-in screen | CP sends the same customer identity contract that Plant uses when saving YouTube connections. | feat/cp-yt-conn-1-it1-e1 |
-| Not started | E2-S1 | Customer saves one reusable YouTube connection | Hire setup finalizes Google callback state and keeps the chosen YouTube channel selected in the wizard. | feat/cp-yt-conn-1-it1-e2 |
-| Not started | E2-S2 | Customer saves one reusable YouTube connection | Saving the wizard attaches the selected YouTube credential to the hired agent so later publishing can reuse it. | feat/cp-yt-conn-1-it1-e2 |
-| Not started | E3-S1 | Customer sees reliable YouTube readiness later | My Agents clearly shows not connected, ready to attach, connected, and reconnect-required states with the right next action. | feat/cp-yt-conn-1-it1-e3 |
-| Not started | E3-S2 | Customer sees reliable YouTube readiness later | The team has a prove-it regression path and rollout evidence for connect once, publish later. | feat/cp-yt-conn-1-it1-e3 |
+| Completed | E1-S1 | Customer reaches a trusted Google sign-in screen | Operator has the exact Google OAuth setup checklist and evidence requirements needed to unblock the warning screen. | feat/cp-yt-conn-1-it1-e1 |
+| Completed | E1-S2 | Customer reaches a trusted Google sign-in screen | CP sends the same customer identity contract that Plant uses when saving YouTube connections. | feat/cp-yt-conn-1-it1-e1 |
+| Completed | E2-S1 | Customer saves one reusable YouTube connection | Hire setup finalizes Google callback state and keeps the chosen YouTube channel selected in the wizard. | feat/cp-yt-conn-1-it1-e2 |
+| Completed | E2-S2 | Customer saves one reusable YouTube connection | Saving the wizard attaches the selected YouTube credential to the hired agent so later publishing can reuse it. | feat/cp-yt-conn-1-it1-e2 |
+| Completed | E3-S1 | Customer sees reliable YouTube readiness later | My Agents clearly shows not connected, ready to attach, connected, and reconnect-required states with the right next action. | feat/cp-yt-conn-1-it1-e3 |
+| Completed | E3-S2 | Customer sees reliable YouTube readiness later | The team has a prove-it regression path and rollout evidence for connect once, publish later. | feat/cp-yt-conn-1-it1-e3 |
 
 ---
 

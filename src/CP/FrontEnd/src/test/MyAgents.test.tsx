@@ -941,4 +941,84 @@ describe('MyAgents Component', () => {
     })
     expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
   })
+
+  it('shows ready-to-attach state when a saved credential exists but is not attached to this hire', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
+    const connectionsModule = await import('../services/platformConnections.service')
+    const youtubeModule = await import('../services/youtubeConnections.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-MKT-RTA',
+          agent_id: 'AGT-MKT-YT-RTA',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-MKT-RTA',
+          agent_type_id: 'marketing.digital_marketing.v1',
+        },
+      ],
+    })
+
+    vi.mocked(deliverablesModule.listHiredAgentDeliverables).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-MKT-RTA',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-MKT-RTA',
+          hired_instance_id: 'HIRED-MKT-RTA',
+          goal_instance_id: 'GOAL-MKT-RTA',
+          goal_template_id: 'marketing.theme_discovery.v1',
+          title: 'YouTube draft awaiting channel attach',
+          payload: { destination: { destination_type: 'youtube' } },
+          review_status: 'pending_review',
+          review_notes: null,
+          approval_id: null,
+          execution_status: 'not_executed',
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+    })
+
+    // No platform connection attached to this hire
+    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValue([])
+    // But a connected credential exists in the customer account
+    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-yt-rta',
+        customer_id: 'CUST-RTA',
+        platform_key: 'youtube',
+        display_name: 'Ready Channel',
+        granted_scopes: ['youtube.upload'],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        created_at: '2026-03-20T10:00:00Z',
+        updated_at: '2026-03-20T10:00:00Z',
+      },
+    ] as any)
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
+      expect(screen.getByText('Ready Channel ready to attach')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+  })
 })
