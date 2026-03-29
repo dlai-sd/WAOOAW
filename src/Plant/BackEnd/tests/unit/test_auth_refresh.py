@@ -104,7 +104,6 @@ async def test_e1_s1_login_returns_body_and_cookie(monkeypatch):
         auth_module, "generate_refresh_token",
         AsyncMock(return_value=("fake.refresh.token", _JTI)),
     )
-    monkeypatch.setattr(auth_module, "cache_token_version", AsyncMock())
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -137,7 +136,6 @@ async def test_e1_s1_cookie_flags(monkeypatch):
         auth_module, "generate_refresh_token",
         AsyncMock(return_value=("fake.refresh.token", _JTI)),
     )
-    monkeypatch.setattr(auth_module, "cache_token_version", AsyncMock())
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -178,8 +176,6 @@ async def test_e1_s1_refresh_jwt_claims(monkeypatch):
         return token, jti
 
     monkeypatch.setattr(auth_module, "generate_refresh_token", _fake_generate)
-    monkeypatch.setattr(auth_module, "cache_token_version", AsyncMock())
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.post(

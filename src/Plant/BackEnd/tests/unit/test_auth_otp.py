@@ -230,9 +230,7 @@ async def test_otp_verify_correct_code_returns_tokens():
     app = _make_test_app(audit_store, otp_store)
 
     transport = ASGITransport(app=app)
-    # Mock Redis-dependent helpers so the test passes without a live Redis.
-    with patch("api.v1.auth.generate_refresh_token", new_callable=AsyncMock) as mock_gen, \
-         patch("api.v1.auth.cache_token_version", new_callable=AsyncMock):
+    with patch("api.v1.auth.generate_refresh_token", new_callable=AsyncMock) as mock_gen:
         mock_gen.return_value = ("fake-refresh-token-value", "fake-jti-001")
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             r = await client.post(

@@ -27,7 +27,6 @@ from core.security import (
     is_refresh_token_valid,
     revoke_refresh_token,
     decode_refresh_token_unverified,
-    cache_token_version,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_TTL_SECONDS,
 )
@@ -364,16 +363,6 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
-async def _prime_token_version_cache(customer_id: str, token_version: int) -> None:
-    try:
-        await cache_token_version(customer_id, token_version)
-    except Exception as exc:
-        logger.warning(
-            "Token version cache unavailable during mobile auth",
-            extra={"customer_id": customer_id, "error": str(exc)},
-        )
-
-
 async def _issue_mobile_tokens(
     response: Response,
     customer_id: str,
@@ -400,8 +389,6 @@ async def _issue_mobile_tokens(
         customer_id,
         persist_in_redis=False,
     )
-
-    await _prime_token_version_cache(customer_id, token_version)
     _set_refresh_cookie(response, refresh_token_str)
 
     return MobileTokenResponse(
