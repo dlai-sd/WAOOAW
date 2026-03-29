@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 
 _sync_client: Optional[redis.Redis] = None
 _async_client: Optional[aioredis.Redis] = None
+REDIS_CONNECT_TIMEOUT_SECONDS = 2
+REDIS_SOCKET_TIMEOUT_SECONDS = 2
 
 
 def get_redis() -> redis.Redis:
@@ -31,6 +33,8 @@ def get_redis() -> redis.Redis:
         _sync_client = redis.Redis.from_url(
             settings.redis_url,
             decode_responses=True,
+            socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECONDS,
+            socket_timeout=REDIS_SOCKET_TIMEOUT_SECONDS,
         )
     return _sync_client
 
@@ -46,5 +50,7 @@ def get_async_redis() -> aioredis.Redis:
         _async_client = aioredis.Redis.from_url(
             settings.redis_url,
             decode_responses=True,
+            socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECONDS,
+            socket_timeout=REDIS_SOCKET_TIMEOUT_SECONDS,
         )
     return _async_client
