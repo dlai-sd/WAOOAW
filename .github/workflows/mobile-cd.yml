@@ -23,6 +23,9 @@ on:
           - ios
           - android
 
+env:
+  ENABLE_IOS_RELEASE: 'false'
+
 jobs:
   determine-environment:
     name: Determine Environment
@@ -100,8 +103,13 @@ jobs:
             echo "Unknown environment: $ENV" && exit 1
           fi
 
+      - name: iOS release disabled notice
+        if: env.ENABLE_IOS_RELEASE != 'true' && github.event.inputs.platform != 'android'
+        run: |
+          echo "::notice::iOS release is disabled until Apple Developer and App Store Connect ownership is ready."
+
       - name: Build iOS
-        if: github.event.inputs.platform != 'android'
+        if: env.ENABLE_IOS_RELEASE == 'true' && github.event.inputs.platform != 'android'
         working-directory: src/mobile
         run: |
           eas build \
@@ -168,14 +176,14 @@ jobs:
             **Build Date**: ${{ github.event.head_commit.timestamp }}
 
             ### 📱 Download Links
-            - **iOS**: [TestFlight](https://testflight.apple.com/join/YOUR_TESTFLIGHT_LINK)
+            - **iOS**: Release path temporarily disabled pending Apple account activation
             - **Android**: [Google Play](https://play.google.com/store/apps/details?id=com.waooaw.app)
 
             ### 📦 Build Status
             Check build progress: https://expo.dev/accounts/waooaw/projects/waooaw-mobile/builds
 
             ### 🚀 Deployment
-            - iOS submitted to App Store Connect
+            - iOS release path disabled pending Apple setup
             - Android submitted to Google Play Console
             - OTA update published to production channel
           draft: false

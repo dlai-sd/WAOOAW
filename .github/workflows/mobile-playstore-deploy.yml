@@ -167,6 +167,14 @@ jobs:
           echo "  eas.json cli.appVersionSource: $APP_VERSION_SOURCE"
           echo "  profile android.autoIncrement: $PROFILE_AUTO_INCREMENT"
 
+      - name: Validate EAS config
+        working-directory: src/mobile
+        run: |
+          npx eas-cli@latest config --platform android --profile ${{ needs.prepare.outputs.build-profile }} --non-interactive >/tmp/eas-config.json
+          echo "✅ EAS config is valid for Android build profile '${{ needs.prepare.outputs.build-profile }}'"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
       - name: Verify checked-out commit and plugin config
         working-directory: src/mobile
         run: |
