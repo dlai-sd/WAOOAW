@@ -178,8 +178,11 @@ def verify_token(token: str) -> Optional[dict]:
 
 # ── Refresh token helpers (E1-S1, E1-S3, E2-S1) ───────────────────────────────
 
-async def generate_refresh_token(user_id: str) -> tuple[str, str]:
-    """Create a signed refresh JWT and persist its jti in Redis.
+async def generate_refresh_token(
+    user_id: str,
+    persist_in_redis: bool = True,
+) -> tuple[str, str]:
+    """Create a signed refresh JWT and optionally persist its jti in Redis.
 
     Args:
         user_id: Customer UUID string.
@@ -187,8 +190,6 @@ async def generate_refresh_token(user_id: str) -> tuple[str, str]:
     Returns:
         (token, jti) — the signed JWT string and its unique identifier.
     """
-    from core.redis_client import get_async_redis
-
     jti = str(uuid4())
     expire = datetime.utcnow() + timedelta(seconds=REFRESH_TOKEN_TTL_SECONDS)
     claims = {
@@ -200,8 +201,11 @@ async def generate_refresh_token(user_id: str) -> tuple[str, str]:
     }
     token = jwt.encode(claims, settings.secret_key, algorithm=settings.algorithm)
 
-    r = get_async_redis()
-    await r.set(f"refresh_token:{jti}", user_id, ex=REFRESH_TOKEN_TTL_SECONDS)
+    if persist_in_redis:
+        from core.redis_client import get_async_redis
+
+        r = get_async_redis()
+        await r.set(f"refresh_token:{jti}", user_id, ex=REFRESH_TOKEN_TTL_SECONDS)
 
     return token, jti
 
