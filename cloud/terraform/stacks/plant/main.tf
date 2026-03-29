@@ -29,6 +29,7 @@ locals {
 
   # Prefer the actual Plant Gateway service account if it is set; otherwise fall back.
   plant_gateway_sa = try(module.plant_gateway.service_account, null) != null && try(module.plant_gateway.service_account, "") != "" ? module.plant_gateway.service_account : local.default_compute_sa
+  cp_backend_url  = var.cp_backend_url != "" ? var.cp_backend_url : (var.environment == "prod" ? "https://cp.waooaw.com" : "https://cp.${var.environment}.waooaw.com")
 }
 
 # Cloud SQL PostgreSQL Database
@@ -115,6 +116,7 @@ module "plant_backend" {
     # Same image is promoted demo → uat → prod; only this value changes.
     # 'coupon' = in-memory stub (no Razorpay calls). 'razorpay' = live checkout.
     PAYMENTS_MODE = var.payments_mode
+    CP_BACKEND_URL = local.cp_backend_url
 
     # Campaign persistence mode — "db" enables PostgreSQL via CampaignRepository (PLANT-CONTENT-2).
     # Default "memory" keeps backward compatibility until migration 026 is applied.
@@ -126,6 +128,7 @@ module "plant_backend" {
       GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
       GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
       JWT_SECRET           = "JWT_SECRET:latest"
+      PLANT_INTERNAL_API_KEY = "PLANT_INTERNAL_API_KEY:latest"
       XAI_API_KEY          = "${var.xai_api_key_secret_name}:latest"
       SMTP_USERNAME        = "${var.smtp_username_secret}:latest"
       SMTP_PASSWORD        = "${var.smtp_password_secret}:latest"

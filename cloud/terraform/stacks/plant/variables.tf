@@ -63,6 +63,12 @@ variable "redis_url" {
   default     = "redis://10.0.0.3:6379/0"
 }
 
+variable "cp_backend_url" {
+  description = "Base URL for CP Backend internal credential calls. Non-secret runtime config; override per environment if needed."
+  type        = string
+  default     = ""
+}
+
 # Database Configuration
 variable "private_network_id" {
   description = "VPC network ID for private IP (format: projects/PROJECT/global/networks/NETWORK)"

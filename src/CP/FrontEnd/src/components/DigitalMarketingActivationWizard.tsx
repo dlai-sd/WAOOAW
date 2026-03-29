@@ -24,7 +24,9 @@ import {
   finalizeYouTubeConnection,
   attachYouTubeConnection,
   listYouTubeConnections,
+  type YouTubeConnection,
 } from '../services/youtubeConnections.service'
+import { redirectTo } from '../utils/browserNavigation'
 
 const DIGITAL_MARKETING_AGENT_TYPE_ID = 'marketing.digital_marketing.v1'
 
@@ -201,13 +203,62 @@ export function DigitalMarketingActivationWizard({
   const [finishStatus, setFinishStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [finishError, setFinishError] = useState<string | null>(null)
   const [youtubeConnected, setYoutubeConnected] = useState(false)
+  const [savedYouTubeConnection, setSavedYouTubeConnection] = useState<YouTubeConnection | null>(null)
   const [oauthLoading, setOauthLoading] = useState(false)
   const [oauthError, setOauthError] = useState<string | null>(null)
+  const [oauthMessage, setOauthMessage] = useState<string | null>(null)
 
   const hiredInstanceId = useMemo(
     () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
     [draft?.hired_instance_id, activeInstance?.hired_instance_id]
   )
+
+  const youtubeSkillId = useMemo(() => {
+    const binding = activation?.workspace?.platform_bindings?.youtube
+    return String(binding?.skill_id || 'default').trim() || 'default'
+  }, [activation?.workspace?.platform_bindings])
+
+  function pickReusableYouTubeConnection(connections: YouTubeConnection[]): YouTubeConnection | null {
+    const now = Date.now()
+    for (const connection of connections) {
+      if (String(connection.platform_key || '').toLowerCase() !== 'youtube') continue
+      if (String(connection.connection_status || '').toLowerCase() !== 'connected') continue
+      const tokenExpiry = connection.token_expires_at ? Date.parse(connection.token_expires_at) : Number.NaN
+      if (Number.isFinite(tokenExpiry) && tokenExpiry <= now) continue
+      return connection
+    }
+    return null
+  }
+
+  function markYouTubeConnected(connection: YouTubeConnection | null, successMessage: string) {
+    setSavedYouTubeConnection(connection)
+    setYoutubeConnected(true)
+    setOauthMessage(successMessage)
+    setOauthError(null)
+    setActivation((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        workspace: {
+          ...current.workspace,
+          platform_bindings: {
+            ...(current.workspace.platform_bindings || {}),
+            youtube: {
+              ...(current.workspace.platform_bindings?.youtube || {}),
+              skill_id: youtubeSkillId,
+              customer_platform_credential_id: connection?.id,
+              credential_id: connection?.id,
+              connected: true,
+            },
+          },
+        },
+        readiness: {
+          ...current.readiness,
+          youtube_connection_ready: true,
+        },
+      }
+    })
+  }
 
   // Auto-select + advance if only one instance and we are on step 0
   useEffect(() => {
@@ -231,20 +282,21 @@ export function DigitalMarketingActivationWizard({
     }
 
     const redirectUri = window.location.origin + window.location.pathname
-    const hiredInstanceIdForOauth = activeInstance?.hired_instance_id ?? ''
-    const skillId = ''
+    const hiredInstanceIdForOauth = String(activeInstance?.hired_instance_id || hiredInstanceId || '').trim()
+    if (!hiredInstanceIdForOauth) return
 
     ;(async () => {
       try {
         setOauthLoading(true)
+        setOauthMessage(null)
         const connection = await finalizeYouTubeConnection({ state, code, redirect_uri: redirectUri })
         await attachYouTubeConnection(connection.id, {
           hired_instance_id: hiredInstanceIdForOauth,
-          skill_id: skillId,
+          skill_id: youtubeSkillId,
         })
         sessionStorage.removeItem('yt_oauth_state')
         window.history.replaceState({}, '', window.location.pathname)
-        setYoutubeConnected(true)
+        markYouTubeConnected(connection, 'YouTube connected successfully.')
         setActiveStepIndex(DMA_STEPS.findIndex((s) => s.id === 'connect'))
       } catch (err) {
         setOauthError('YouTube connection failed. Please try again.')
@@ -252,14 +304,22 @@ export function DigitalMarketingActivationWizard({
         setOauthLoading(false)
       }
     })()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps — intentionally runs once on mount
+  }, [activeInstance?.hired_instance_id, hiredInstanceId, youtubeSkillId])
 
-  // Load existing YouTube connections on mount
+  // Load existing saved YouTube connections for this customer
   useEffect(() => {
-    listYouTubeConnections().then((connections) => {
-      if (connections.length > 0) setYoutubeConnected(true)
-    }).catch(() => {/* silently ignore — not connected is the default */})
+    listYouTubeConnections()
+      .then((connections) => {
+        setSavedYouTubeConnection(pickReusableYouTubeConnection(connections))
+      })
+      .catch(() => {
+        setSavedYouTubeConnection(null)
+      })
   }, [])
+
+  useEffect(() => {
+    setYoutubeConnected(Boolean(activation?.readiness?.youtube_connection_ready))
+  }, [activation?.readiness?.youtube_connection_ready])
 
   const campaignSetup = activation?.workspace.campaign_setup || {}
   const schedule = campaignSetup.schedule || {}
@@ -487,13 +547,34 @@ export function DigitalMarketingActivationWizard({
   async function handleConnectYouTube() {
     setOauthLoading(true)
     setOauthError(null)
+    setOauthMessage(null)
     try {
+      if (!hiredInstanceId) {
+        setOauthError('This agent is not ready yet. Please reload the page and try again.')
+        return
+      }
+
+      const knownConnection = savedYouTubeConnection || pickReusableYouTubeConnection(await listYouTubeConnections())
+      if (knownConnection) {
+        try {
+          await attachYouTubeConnection(knownConnection.id, {
+            hired_instance_id: hiredInstanceId,
+            skill_id: youtubeSkillId,
+          })
+          markYouTubeConnected(knownConnection, 'Saved YouTube connection linked successfully.')
+          return
+        } catch {
+          setSavedYouTubeConnection(null)
+        }
+      }
+
       const redirectUri = window.location.origin + window.location.pathname
       const { state, authorization_url } = await startYouTubeConnection(redirectUri)
       sessionStorage.setItem('yt_oauth_state', state)
-      window.location.href = authorization_url
+      redirectTo(authorization_url)
     } catch (err) {
       setOauthError('Could not start YouTube connection. Please try again.')
+    } finally {
       setOauthLoading(false)
     }
   }
@@ -853,11 +934,19 @@ export function DigitalMarketingActivationWizard({
                             disabled={oauthLoading || readOnly}
                             onClick={() => void handleConnectYouTube()}
                           >
-                            {oauthLoading ? 'Connecting…' : 'Connect with Google'}
+                            {oauthLoading
+                              ? 'Connecting…'
+                              : savedYouTubeConnection
+                                ? 'Use saved YouTube connection'
+                                : 'Connect with Google'}
                           </Button>
                         )}
                       </div>
                     </div>
+
+                    {oauthMessage && (
+                      <div className="dma-wizard-oauth-success">{oauthMessage}</div>
+                    )}
 
                     {oauthError && (
                       <div className="dma-wizard-oauth-error">{oauthError}</div>

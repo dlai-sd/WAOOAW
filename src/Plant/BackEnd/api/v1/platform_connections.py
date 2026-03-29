@@ -155,6 +155,11 @@ def _raise_youtube_connection_error(exc: YouTubeConnectionError) -> None:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="YouTube OAuth is not configured on the Plant backend.",
         ) from exc
+    if detail == "credential_storage_failed":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="YouTube credential vault is unavailable.",
+        ) from exc
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from exc
 
 

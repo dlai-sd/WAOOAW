@@ -106,7 +106,7 @@ async def upsert_platform_credential(
     current_user: User = Depends(get_current_user),
     store: FilePlatformCredentialStore = Depends(get_platform_credential_store),
 ) -> PlatformCredentialResponse:
-    model = store.upsert(
+    model = await store.upsert(
         customer_id=_customer_id_from_user(current_user),
         platform=body.platform,
         posting_identity=body.posting_identity,
@@ -126,5 +126,5 @@ async def list_platform_credentials(
     current_user: User = Depends(get_current_user),
     store: FilePlatformCredentialStore = Depends(get_platform_credential_store),
 ) -> List[PlatformCredentialResponse]:
-    rows = store.list(customer_id=_customer_id_from_user(current_user), platform=platform, limit=limit)
+    rows = await store.list(customer_id=_customer_id_from_user(current_user), platform=platform, limit=limit)
     return [PlatformCredentialResponse(**r.model_dump()) for r in rows]

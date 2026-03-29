@@ -101,6 +101,7 @@ module "cp_backend" {
       GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
       GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
       JWT_SECRET           = "JWT_SECRET:latest"
+      PLANT_INTERNAL_API_KEY = "PLANT_INTERNAL_API_KEY:latest"
       TURNSTILE_SECRET_KEY = "TURNSTILE_SECRET_KEY:latest"
     } : {},
     {

@@ -12,6 +12,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -20,6 +21,8 @@ from typing import Any, Dict, List, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, Field
+
+from services.secret_manager import get_secret_manager_adapter
 
 
 def _utcnow() -> datetime:
@@ -57,7 +60,8 @@ class _PlatformCredentialRecord(BaseModel):
     platform: str
     posting_identity: Optional[str] = None
 
-    secrets_enc: str
+    secret_ref: Optional[str] = None
+    secrets_enc: str = ""
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     created_at: datetime = Field(default_factory=_utcnow)
@@ -73,6 +77,11 @@ class FilePlatformCredentialStore:
     def mint_credential_ref(self) -> str:
         return f"CRED-{secrets.token_urlsafe(12)}"
 
+    def _secret_id(self, *, customer_id: str, platform: str, credential_ref: str) -> str:
+        raw = f"cp-social-{customer_id}-{platform}-{credential_ref}".lower()
+        normalized = re.sub(r"[^a-z0-9_-]", "-", raw)
+        return normalized[:255]
+
     def _encrypt(self, payload: Dict[str, Any]) -> str:
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
         return _fernet().encrypt(raw.encode("utf-8")).decode("utf-8")
@@ -87,7 +96,7 @@ class FilePlatformCredentialStore:
             return {}
         return {}
 
-    def upsert(
+    async def upsert(
         self,
         *,
         customer_id: str,
@@ -103,12 +112,30 @@ class FilePlatformCredentialStore:
         if not credential_ref:
             credential_ref = self.mint_credential_ref()
 
+        existing = next((row for row in rows if row.credential_ref == credential_ref), None)
+        secret_ref = existing.secret_ref if existing is not None else None
+
+        if secrets_payload:
+            adapter = get_secret_manager_adapter()
+            if secret_ref:
+                secret_ref = await adapter.update_secret(secret_ref, secrets_payload)
+            else:
+                secret_ref = await adapter.write_secret(
+                    self._secret_id(
+                        customer_id=customer_id,
+                        platform=platform,
+                        credential_ref=credential_ref,
+                    ),
+                    secrets_payload,
+                )
+
         record = _PlatformCredentialRecord(
             credential_ref=credential_ref,
             customer_id=customer_id,
             platform=platform,
             posting_identity=posting_identity,
-            secrets_enc=self._encrypt(secrets_payload or {}),
+            secret_ref=secret_ref,
+            secrets_enc=self._encrypt(secrets_payload or {}) if not secret_ref else "",
             metadata=dict(metadata or {}),
             created_at=now,
             updated_at=now,
@@ -118,6 +145,10 @@ class FilePlatformCredentialStore:
         for idx, existing in enumerate(rows):
             if existing.credential_ref == record.credential_ref:
                 record.created_at = existing.created_at
+                if not record.secret_ref:
+                    record.secret_ref = existing.secret_ref
+                if not record.secrets_enc:
+                    record.secrets_enc = existing.secrets_enc
                 rows[idx] = record
                 replaced = True
                 break
@@ -128,18 +159,62 @@ class FilePlatformCredentialStore:
         self._write_records(rows)
         return self._to_public(record)
 
-    def list(self, *, customer_id: str, platform: Optional[str] = None, limit: int = 100) -> List[PlatformCredentialPublic]:
+    async def list(self, *, customer_id: str, platform: Optional[str] = None, limit: int = 100) -> List[PlatformCredentialPublic]:
         rows = [r for r in self._load_records() if r.customer_id == customer_id]
         if platform:
             rows = [r for r in rows if r.platform == platform]
         rows = rows[-max(1, int(limit)) :]
         return [self._to_public(r) for r in rows]
 
-    def get_secrets(self, *, customer_id: str, credential_ref: str) -> Dict[str, Any]:
+    async def get(self, *, customer_id: str, credential_ref: str) -> PlatformCredentialPublic | None:
         for rec in self._load_records():
             if rec.customer_id == customer_id and rec.credential_ref == credential_ref:
+                return self._to_public(rec)
+        return None
+
+    async def get_secrets(self, *, customer_id: str, credential_ref: str) -> Dict[str, Any]:
+        for rec in self._load_records():
+            if rec.customer_id == customer_id and rec.credential_ref == credential_ref:
+                if rec.secret_ref:
+                    adapter = get_secret_manager_adapter()
+                    return await adapter.read_secret(rec.secret_ref)
                 return self._decrypt(rec.secrets_enc)
         return {}
+
+    async def update_access_token(
+        self,
+        *,
+        customer_id: str,
+        credential_ref: str,
+        new_access_token: str,
+    ) -> bool:
+        rows = self._load_records()
+        for idx, rec in enumerate(rows):
+            if rec.customer_id != customer_id or rec.credential_ref != credential_ref:
+                continue
+
+            secrets_payload: Dict[str, Any]
+            if rec.secret_ref:
+                adapter = get_secret_manager_adapter()
+                secrets_payload = await adapter.read_secret(rec.secret_ref)
+                if not secrets_payload:
+                    return False
+                secrets_payload["access_token"] = new_access_token
+                rec.secret_ref = await adapter.update_secret(rec.secret_ref, secrets_payload)
+                rec.secrets_enc = ""
+            else:
+                secrets_payload = self._decrypt(rec.secrets_enc)
+                if not secrets_payload:
+                    return False
+                secrets_payload["access_token"] = new_access_token
+                rec.secrets_enc = self._encrypt(secrets_payload)
+
+            rec.updated_at = _utcnow()
+            rows[idx] = rec
+            self._write_records(rows)
+            return True
+
+        return False
 
     def _to_public(self, rec: _PlatformCredentialRecord) -> PlatformCredentialPublic:
         return PlatformCredentialPublic(
