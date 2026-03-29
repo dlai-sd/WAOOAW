@@ -217,6 +217,41 @@ def test_update_access_token_not_found(client, internal_headers):
     assert "not found" in update_response.json()["detail"].lower()
 
 
+def test_upsert_credential_success(client, internal_headers):
+    response = client.post(
+        "/api/internal/plant/credentials/upsert",
+        headers=internal_headers,
+        json={
+            "customer_id": "CUST-user123",
+            "platform": "youtube",
+            "posting_identity": "Channel One",
+            "access_token": "secret-access-token",
+            "refresh_token": "secret-refresh-token",
+            "metadata": {"provider_account_id": "channel-1"},
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["credential_ref"].startswith("CRED-")
+    assert body["customer_id"] == "CUST-user123"
+    assert body["platform"] == "youtube"
+
+    resolve_response = client.post(
+        "/api/internal/plant/credentials/resolve",
+        headers=internal_headers,
+        json={
+            "customer_id": "CUST-user123",
+            "credential_ref": body["credential_ref"],
+        },
+    )
+
+    assert resolve_response.status_code == 200
+    resolved = resolve_response.json()
+    assert resolved["access_token"] == "secret-access-token"
+    assert resolved["refresh_token"] == "secret-refresh-token"
+
+
 def test_resolve_credential_different_customer(client, internal_headers, auth_headers, monkeypatch):
     """Test that Plant cannot resolve credentials for wrong customer_id."""
     # Setup: Create credential for user123

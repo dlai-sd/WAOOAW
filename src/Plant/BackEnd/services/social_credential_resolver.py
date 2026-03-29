@@ -29,6 +29,16 @@ class ResolvedSocialCredentials:
 
 
 @dataclass(frozen=True)
+class StoredSocialCredentials:
+    credential_ref: str
+    customer_id: str
+    platform: str
+    posting_identity: Optional[str]
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
 class CredentialResolutionError(Exception):
     """Error resolving credentials from CP Backend."""
     message: str
@@ -166,6 +176,67 @@ class CPSocialCredentialResolver:
             raise CredentialResolutionError(
                 f"CP returned status {resp.status_code} for token update"
             )
+
+    async def upsert(
+        self,
+        *,
+        customer_id: str,
+        platform: str,
+        posting_identity: Optional[str],
+        access_token: str,
+        refresh_token: Optional[str],
+        credential_ref: Optional[str] = None,
+        metadata: Optional[Dict[str, str]] = None,
+        correlation_id: Optional[str] = None,
+    ) -> StoredSocialCredentials:
+        url = f"{self._cp_base_url}/api/internal/plant/credentials/upsert"
+        headers: Dict[str, str] = {
+            "X-Plant-Internal-Key": self._internal_api_key,
+            "Content-Type": "application/json",
+        }
+        if correlation_id:
+            headers["X-Correlation-ID"] = correlation_id
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client:
+                resp = await client.post(
+                    url,
+                    headers=headers,
+                    json={
+                        "customer_id": customer_id,
+                        "platform": platform,
+                        "posting_identity": posting_identity,
+                        "access_token": access_token,
+                        "refresh_token": refresh_token,
+                        "credential_ref": credential_ref,
+                        "metadata": metadata or {},
+                    },
+                )
+        except Exception as exc:  # noqa: BLE001
+            raise CredentialResolutionError(f"Failed to contact CP for credential upsert: {exc}") from exc
+
+        if resp.status_code != 200:
+            raise CredentialResolutionError(
+                f"CP returned status {resp.status_code} for credential upsert"
+            )
+
+        try:
+            data: Dict[str, Any] = resp.json()
+        except Exception as exc:  # noqa: BLE001
+            raise CredentialResolutionError("CP credential upsert response was not valid JSON") from exc
+
+        stored_ref = str(data.get("credential_ref") or "").strip()
+        if not stored_ref:
+            raise CredentialResolutionError("CP credential upsert returned empty credential_ref")
+
+        return StoredSocialCredentials(
+            credential_ref=stored_ref,
+            customer_id=str(data.get("customer_id") or customer_id),
+            platform=str(data.get("platform") or platform),
+            posting_identity=data.get("posting_identity"),
+            created_at=str(data.get("created_at") or ""),
+            updated_at=str(data.get("updated_at") or ""),
+        )
 
 
 def get_default_resolver() -> CPSocialCredentialResolver:

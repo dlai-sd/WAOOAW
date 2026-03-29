@@ -3715,3 +3715,11 @@ section[id] {
   font-size: 0.85rem;
 }
 
+.dma-wizard-oauth-success {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  font-size: 0.85rem;
+}
+

@@ -47,6 +47,25 @@ class UpdateTokenRequest(BaseModel):
     credential_ref: str
     new_access_token: str
 
+
+class UpsertCredentialRequest(BaseModel):
+    customer_id: str
+    platform: str
+    posting_identity: Optional[str] = None
+    access_token: str
+    refresh_token: Optional[str] = None
+    credential_ref: Optional[str] = None
+    metadata: Dict[str, str] | None = None
+
+
+class UpsertCredentialResponse(BaseModel):
+    credential_ref: str
+    customer_id: str
+    platform: str
+    posting_identity: Optional[str] = None
+    created_at: str
+    updated_at: str
+
 def _verify_internal_request(x_plant_internal_key: str = Header(...)) -> None:
     """Verify request comes from Plant Backend (not browser traffic).
     
@@ -73,7 +92,7 @@ async def resolve_credential(
     SECURITY: This endpoint MUST only be called by Plant Backend.
     """
     # Get encrypted secrets from store
-    secrets = store.get_secrets(
+    secrets = await store.get_secrets(
         customer_id=body.customer_id,
         credential_ref=body.credential_ref,
     )
@@ -85,8 +104,7 @@ async def resolve_credential(
         )
     
     # Get credential metadata
-    creds_list = store.list(customer_id=body.customer_id, limit=1000)
-    cred = next((c for c in creds_list if c.credential_ref == body.credential_ref), None)
+    cred = await store.get(customer_id=body.customer_id, credential_ref=body.credential_ref)
     
     if not cred:
         raise HTTPException(
@@ -117,38 +135,43 @@ async def update_access_token(
     SECURITY: This endpoint MUST only be called by Plant Backend.
     """
     # Get current secrets
-    secrets = store.get_secrets(
+    updated = await store.update_access_token(
         customer_id=body.customer_id,
         credential_ref=body.credential_ref,
+        new_access_token=body.new_access_token,
     )
-    
-    if not secrets:
+
+    if not updated:
         raise HTTPException(
             status_code=404,
             detail=f"Credential not found: {body.credential_ref}",
         )
-    
-    # Update access_token, keep refresh_token unchanged
-    secrets["access_token"] = body.new_access_token
-    
-    # Get credential metadata for upsert
-    creds_list = store.list(customer_id=body.customer_id, limit=1000)
-    cred = next((c for c in creds_list if c.credential_ref == body.credential_ref), None)
-    
-    if not cred:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Credential metadata not found: {body.credential_ref}",
-        )
-    
-    # Upsert with updated token
-    store.upsert(
+
+    return {"status": "success", "message": "Access token updated"}
+
+
+@router.post("/upsert", response_model=UpsertCredentialResponse, status_code=200)
+async def upsert_credential(
+    body: UpsertCredentialRequest,
+    store: FilePlatformCredentialStore = Depends(get_platform_credential_store),
+    _: None = Depends(_verify_internal_request),
+) -> UpsertCredentialResponse:
+    credential = await store.upsert(
         customer_id=body.customer_id,
-        platform=cred.platform,
-        posting_identity=cred.posting_identity,
-        secrets_payload=secrets,
-        metadata=cred.metadata,
+        platform=body.platform,
+        posting_identity=body.posting_identity,
+        secrets_payload={
+            "access_token": body.access_token,
+            "refresh_token": body.refresh_token,
+        },
+        metadata=dict(body.metadata or {}),
         credential_ref=body.credential_ref,
     )
-    
-    return {"status": "success", "message": "Access token updated"}
+    return UpsertCredentialResponse(
+        credential_ref=credential.credential_ref,
+        customer_id=credential.customer_id,
+        platform=credential.platform,
+        posting_identity=credential.posting_identity,
+        created_at=credential.created_at.isoformat(),
+        updated_at=credential.updated_at.isoformat(),
+    )

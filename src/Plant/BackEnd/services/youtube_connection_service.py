@@ -15,7 +15,7 @@ from core.config import settings
 from models.customer_platform_credential import CustomerPlatformCredentialModel
 from models.oauth_connection_session import OAuthConnectionSessionModel
 from models.platform_connection import PlatformConnectionModel
-from services.secret_manager_service import SecretManagerService, get_secret_manager_service
+from services.social_credential_resolver import CPSocialCredentialResolver, CredentialResolutionError, get_default_resolver
 
 
 class YouTubeConnectionError(Exception):
@@ -49,10 +49,10 @@ class YouTubeConnectionService:
         self,
         *,
         db: AsyncSession,
-        secret_manager: SecretManagerService | None = None,
+        credential_resolver: CPSocialCredentialResolver | None = None,
     ) -> None:
         self._db = db
-        self._secret_manager = secret_manager or get_secret_manager_service()
+        self._credential_resolver = credential_resolver or get_default_resolver()
 
     def _oauth_client_id(self) -> str:
         return str(settings.google_client_id or "").strip()
@@ -129,24 +129,38 @@ class YouTubeConnectionService:
         token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
         granted_scopes = sorted(set(str(token_payload.get("scope") or "").split()))
 
-        stored_secret = self._secret_manager.store_oauth_tokens(
+        existing_credential = await self._find_credential_by_provider_account(
             customer_id=customer_id,
-            platform_key="youtube",
             provider_account_id=provider_account_id,
-            payload={
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "scope": granted_scopes,
-                "token_expires_at": token_expires_at.isoformat(),
-            },
         )
+        existing_ref = None
+        if existing_credential is not None:
+            candidate_ref = str(existing_credential.secret_ref or "").strip()
+            if candidate_ref.startswith("CRED-"):
+                existing_ref = candidate_ref
+
+        try:
+            stored_secret = await self._credential_resolver.upsert(
+                customer_id=customer_id,
+                platform="youtube",
+                posting_identity=str(channel_snippet.get("title") or "YouTube Channel"),
+                access_token=access_token,
+                refresh_token=refresh_token,
+                credential_ref=existing_ref,
+                metadata={
+                    "provider_account_id": provider_account_id,
+                    "token_expires_at": token_expires_at.isoformat(),
+                },
+            )
+        except CredentialResolutionError as exc:
+            raise YouTubeConnectionError("credential_storage_failed") from exc
 
         credential = await self._upsert_customer_credential(
             customer_id=customer_id,
             provider_account_id=provider_account_id,
             display_name=str(channel_snippet.get("title") or "YouTube Channel"),
             granted_scopes=granted_scopes,
-            secret_ref=stored_secret.secret_ref,
+            secret_ref=stored_secret.credential_ref,
             token_expires_at=token_expires_at,
         )
 
@@ -157,7 +171,21 @@ class YouTubeConnectionService:
         await self._db.commit()
         await self._db.refresh(credential)
 
-        return FinalizedCredentialResult(credential=credential, secret_ref=stored_secret.secret_ref)
+        return FinalizedCredentialResult(credential=credential, secret_ref=stored_secret.credential_ref)
+
+    async def _find_credential_by_provider_account(
+        self,
+        *,
+        customer_id: str,
+        provider_account_id: str,
+    ) -> CustomerPlatformCredentialModel | None:
+        result = await self._db.execute(
+            select(CustomerPlatformCredentialModel)
+            .where(CustomerPlatformCredentialModel.customer_id == customer_id)
+            .where(CustomerPlatformCredentialModel.platform_key == "youtube")
+            .where(CustomerPlatformCredentialModel.provider_account_id == provider_account_id)
+        )
+        return result.scalars().first()
 
     async def list_credentials(self, *, customer_id: str, platform_key: str = "youtube") -> list[CustomerPlatformCredentialModel]:
         result = await self._db.execute(

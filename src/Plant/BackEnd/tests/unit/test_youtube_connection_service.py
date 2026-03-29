@@ -8,6 +8,7 @@ import pytest
 from core.config import settings
 from models.customer_platform_credential import CustomerPlatformCredentialModel
 from models.oauth_connection_session import OAuthConnectionSessionModel
+from services.social_credential_resolver import CredentialResolutionError, StoredSocialCredentials
 from services.youtube_connection_service import YouTubeConnectionError, YouTubeConnectionService
 
 
@@ -82,12 +83,27 @@ async def test_finalize_connect_creates_verified_customer_credential():
     pending_result = MagicMock()
     pending_result.scalars.return_value.first.return_value = session
 
+    existing_credential_result = MagicMock()
+    existing_credential_result.scalars.return_value.first.return_value = None
+
     upsert_result = MagicMock()
     upsert_result.scalars.return_value.first.return_value = None
 
-    db.execute = AsyncMock(side_effect=[pending_result, upsert_result])
+    db.execute = AsyncMock(side_effect=[pending_result, existing_credential_result, upsert_result])
 
-    service = YouTubeConnectionService(db=db)
+    resolver = MagicMock()
+    resolver.upsert = AsyncMock(
+        return_value=StoredSocialCredentials(
+            credential_ref="CRED-youtube-1",
+            customer_id="cust-1",
+            platform="youtube",
+            posting_identity="Channel One",
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
+        )
+    )
+
+    service = YouTubeConnectionService(db=db, credential_resolver=resolver)
     with patch.object(
         service,
         "_exchange_code_for_tokens",
@@ -115,6 +131,56 @@ async def test_finalize_connect_creates_verified_customer_credential():
     assert result.credential.connection_status == "connected"
     assert result.credential.verification_status == "verified"
     assert result.credential.provider_account_id == "channel-1"
+    assert result.credential.secret_ref == "CRED-youtube-1"
+    resolver.upsert.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_finalize_connect_returns_storage_error_when_cp_vault_fails():
+    db = AsyncMock()
+
+    session = OAuthConnectionSessionModel(
+        customer_id="cust-1",
+        platform_key="youtube",
+        state="state-123",
+        nonce="nonce-123",
+        redirect_uri="https://cp.demo.waooaw.com/oauth/youtube/callback",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+    )
+    pending_result = MagicMock()
+    pending_result.scalars.return_value.first.return_value = session
+
+    existing_credential_result = MagicMock()
+    existing_credential_result.scalars.return_value.first.return_value = None
+    db.execute = AsyncMock(side_effect=[pending_result, existing_credential_result])
+
+    resolver = MagicMock()
+    resolver.upsert = AsyncMock(side_effect=CredentialResolutionError("vault down"))
+
+    service = YouTubeConnectionService(db=db, credential_resolver=resolver)
+    with patch.object(
+        service,
+        "_exchange_code_for_tokens",
+        AsyncMock(
+            return_value={
+                "access_token": "access-token",
+                "refresh_token": "refresh-token",
+                "scope": "scope-a scope-b",
+                "expires_in": 3600,
+            }
+        ),
+    ), patch.object(
+        service,
+        "_fetch_channel",
+        AsyncMock(return_value={"id": "channel-1", "snippet": {"title": "Channel One"}}),
+    ):
+        with pytest.raises(YouTubeConnectionError, match="credential_storage_failed"):
+            await service.finalize_connect(
+                customer_id="cust-1",
+                state="state-123",
+                code="google-auth-code",
+                redirect_uri="https://cp.demo.waooaw.com/oauth/youtube/callback",
+            )
 
 
 @pytest.mark.asyncio

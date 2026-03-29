@@ -39,6 +39,10 @@ vi.mock('../components/PlatformConnectionsPanel', () => ({
   PlatformConnectionsPanel: () => <div>Platform connections panel</div>,
 }))
 
+vi.mock('../utils/browserNavigation', () => ({
+  redirectTo: vi.fn(),
+}))
+
 vi.mock('../services/youtubeConnections.service', () => ({
   listYouTubeConnections: vi.fn().mockResolvedValue([]),
   startYouTubeConnection: vi.fn(),
@@ -121,9 +125,24 @@ function renderWizard() {
   )
 }
 
+async function goToConnectStep() {
+  await waitFor(() => {
+    expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  await waitFor(() => {
+    expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  await waitFor(() => {
+    expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
+  })
+}
+
 describe('DMA Activation Wizard — step navigation', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    sessionStorage.clear()
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValue({
       hired_instance_id: 'HAI-1',
@@ -190,6 +209,7 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     const ytModule = await import('../services/youtubeConnections.service')
     vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([])
+    vi.mocked(ytModule.attachYouTubeConnection).mockResolvedValue({ status: 'connected' })
   })
 
   it('renders wizard shell with 7 step buttons', async () => {
@@ -449,6 +469,141 @@ describe('DMA Activation Wizard — step navigation', () => {
     )
     expect(onStaleReference).not.toHaveBeenCalled()
     expect(screen.queryByText('This hire is no longer available. Please select another agent.')).not.toBeInTheDocument()
+  })
+
+  it('reuses a saved YouTube connection before sending the user to Google', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const ytModule = await import('../services/youtubeConnections.service')
+    const disconnectedActivation = {
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: '',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        platform_bindings: { youtube: { skill_id: 'default' } },
+        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: false,
+        configured: true,
+        can_finalize: false,
+        missing_requirements: ['youtube_connection'],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValue(disconnectedActivation)
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValue(disconnectedActivation)
+    vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-youtube-1',
+        customer_id: 'CUST-1',
+        platform_key: 'youtube',
+        provider_account_id: 'channel-1',
+        display_name: 'Channel One',
+        granted_scopes: [],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        token_expires_at: null,
+        last_verified_at: '2026-03-18T09:00:00Z',
+        created_at: '2026-03-18T09:00:00Z',
+        updated_at: '2026-03-18T09:00:00Z',
+      },
+    ])
+
+    renderWizard()
+    await goToConnectStep()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Use saved YouTube connection' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use saved YouTube connection' }))
+
+    await waitFor(() => {
+      expect(ytModule.attachYouTubeConnection).toHaveBeenCalledWith('cred-youtube-1', {
+        hired_instance_id: 'HAI-1',
+        skill_id: 'default',
+      })
+    })
+
+    expect(ytModule.startYouTubeConnection).not.toHaveBeenCalled()
+    expect(screen.getByText('Saved YouTube connection linked successfully.')).toBeInTheDocument()
+    expect(screen.getByText('✓ Connected')).toBeInTheDocument()
+  })
+
+  it('falls back to Google when a saved YouTube connection cannot be reused', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const ytModule = await import('../services/youtubeConnections.service')
+    const browserModule = await import('../utils/browserNavigation')
+    const disconnectedActivation = {
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: '',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        platform_bindings: { youtube: { skill_id: 'default' } },
+        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: false,
+        configured: true,
+        can_finalize: false,
+        missing_requirements: ['youtube_connection'],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValue(disconnectedActivation)
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValue(disconnectedActivation)
+    vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-youtube-1',
+        customer_id: 'CUST-1',
+        platform_key: 'youtube',
+        provider_account_id: 'channel-1',
+        display_name: 'Channel One',
+        granted_scopes: [],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        token_expires_at: null,
+        last_verified_at: '2026-03-18T09:00:00Z',
+        created_at: '2026-03-18T09:00:00Z',
+        updated_at: '2026-03-18T09:00:00Z',
+      },
+    ])
+    vi.mocked(ytModule.attachYouTubeConnection).mockRejectedValueOnce(new Error('attach failed'))
+    vi.mocked(ytModule.startYouTubeConnection).mockResolvedValue({
+      state: 'yt-state-1',
+      authorization_url: 'https://accounts.google.com/o/oauth2/v2/auth?state=yt-state-1',
+      expires_at: '2026-03-18T10:00:00Z',
+    })
+
+    renderWizard()
+    await goToConnectStep()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use saved YouTube connection' }))
+
+    await waitFor(() => {
+      expect(ytModule.startYouTubeConnection).toHaveBeenCalled()
+    })
+
+    expect(browserModule.redirectTo).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=yt-state-1')
+    expect(sessionStorage.getItem('yt_oauth_state')).toBe('yt-state-1')
   })
 })
 

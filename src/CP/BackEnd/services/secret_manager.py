@@ -47,6 +47,14 @@ class SecretManagerAdapter(ABC):
                         or   "local://secrets/.../versions/latest"
         """
 
+    @abstractmethod
+    async def read_secret(self, secret_ref: str) -> dict:
+        """Read a secret payload from the secret store."""
+
+    @abstractmethod
+    async def update_secret(self, secret_ref: str, payload: dict) -> str:
+        """Write a new version for an existing secret and return its updated ref."""
+
 
 class GcpSecretManagerAdapter(SecretManagerAdapter):
     """GCP Secret Manager implementation.
@@ -98,6 +106,36 @@ class GcpSecretManagerAdapter(SecretManagerAdapter):
         # version.name: "projects/.../secrets/.../versions/N"
         return str(version.name)  # type: ignore[union-attr]
 
+    async def read_secret(self, secret_ref: str) -> dict:
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+
+        def _access() -> object:
+            return self._client.access_secret_version(request={"name": secret_ref})
+
+        response = await loop.run_in_executor(None, _access)
+        raw = response.payload.data.decode("utf-8")  # type: ignore[union-attr]
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+
+    async def update_secret(self, secret_ref: str, payload: dict) -> str:
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        parent = _gcp_secret_parent(secret_ref)
+
+        def _add_version() -> object:
+            return self._client.add_secret_version(
+                request={
+                    "parent": parent,
+                    "payload": {"data": json.dumps(payload).encode("utf-8")},
+                }
+            )
+
+        version = await loop.run_in_executor(None, _add_version)
+        return str(version.name)  # type: ignore[union-attr]
+
 
 class LocalSecretManagerAdapter(SecretManagerAdapter):
     """In-memory adapter for local development and CI.
@@ -113,6 +151,35 @@ class LocalSecretManagerAdapter(SecretManagerAdapter):
         self._store[secret_id] = json.dumps(payload)
         logger.debug("LocalSecretManagerAdapter: stored secret '%s'", secret_id)
         return ref
+
+    async def read_secret(self, secret_ref: str) -> dict:
+        secret_id = _local_secret_id(secret_ref)
+        raw = self._store.get(secret_id)
+        if not raw:
+            return {}
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+
+    async def update_secret(self, secret_ref: str, payload: dict) -> str:
+        secret_id = _local_secret_id(secret_ref)
+        self._store[secret_id] = json.dumps(payload)
+        logger.debug("LocalSecretManagerAdapter: updated secret '%s'", secret_id)
+        return secret_ref
+
+
+def _local_secret_id(secret_ref: str) -> str:
+    marker = "local://secrets/"
+    if not secret_ref.startswith(marker):
+        raise ValueError(f"Unsupported local secret ref: {secret_ref}")
+    tail = secret_ref[len(marker):]
+    return tail.split("/versions/", 1)[0]
+
+
+def _gcp_secret_parent(secret_ref: str) -> str:
+    marker = "/versions/"
+    if marker not in secret_ref:
+        raise ValueError(f"Unsupported GCP secret ref: {secret_ref}")
+    return secret_ref.split(marker, 1)[0]
 
 
 def get_secret_manager_adapter() -> SecretManagerAdapter:
