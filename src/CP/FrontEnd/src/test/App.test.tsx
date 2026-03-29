@@ -109,6 +109,20 @@ describe('App Component', () => {
     expect(await screen.findByText(/Sign in to WAOOAW/i)).toBeInTheDocument()
   })
 
+  it('renders the privacy policy page on the public route', async () => {
+    window.history.pushState({}, '', '/privacy')
+    renderWithProvider(<App />)
+    expect(await screen.findByTestId('legal-privacy-page')).toBeInTheDocument()
+    expect(screen.getByText(/How WAOOAW handles customer data/i)).toBeInTheDocument()
+  })
+
+  it('renders the terms page on the public route', async () => {
+    window.history.pushState({}, '', '/terms')
+    renderWithProvider(<App />)
+    expect(await screen.findByTestId('legal-terms-page')).toBeInTheDocument()
+    expect(screen.getByText(/Rules for using WAOOAW/i)).toBeInTheDocument()
+  })
+
   it('allows theme toggle', () => {
     renderWithProvider(<App />)
     const themeButton = screen.getByLabelText('Toggle theme')
