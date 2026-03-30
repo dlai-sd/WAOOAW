@@ -170,6 +170,9 @@ class ExecuteDraftPostResponse(BaseModel):
     allowed: bool
     decision_id: str
     post_id: str
+    execution_status: Optional[str] = None
+    provider_post_id: Optional[str] = None
+    provider_post_url: Optional[str] = None
 
 class ApproveDraftPostRequest(BaseModel):
     approval_id: Optional[str] = None
@@ -313,7 +316,7 @@ async def execute_draft_post(
     post_id: str,
     body: ExecuteDraftPostRequest,
     request: Request,
-    db: AsyncSession = Depends(get_read_db_session),
+    db: AsyncSession = Depends(get_db_session),
     policy_audit: PolicyDenialAuditStore = Depends(get_policy_denial_audit_store),
 ) -> ExecuteDraftPostResponse:
     store = DatabaseDraftBatchStore(db)
@@ -325,6 +328,7 @@ async def execute_draft_post(
             details={"post_id": post_id},
         )
 
+    batch, post = found
     correlation_id = body.correlation_id or str(uuid4())
 
     decision = default_hook_bus().emit(
@@ -363,6 +367,53 @@ async def execute_draft_post(
             reason=decision.reason,
             details=details,
         )
+
+    # For YouTube posts that are approved and have credential_ref, publish immediately.
+    if (
+        post.channel.value == "youtube"
+        and post.review_status == "approved"
+        and post.credential_ref
+    ):
+        try:
+            from integrations.social.youtube_client import YouTubeClient
+
+            client = YouTubeClient(customer_id=batch.customer_id)
+            result = await client.post_text(
+                credential_ref=post.credential_ref,
+                text=post.text,
+            )
+            provider_post_id = result.post_id
+            provider_post_url = result.post_url
+
+            await store.update_post(
+                post_id,
+                execution_status="posted",
+                provider_post_id=provider_post_id,
+                provider_post_url=provider_post_url,
+                last_error=None,
+            )
+            await db.commit()
+
+            return ExecuteDraftPostResponse(
+                allowed=True,
+                decision_id=decision.decision_id or "",
+                post_id=post_id,
+                execution_status="posted",
+                provider_post_id=provider_post_id,
+                provider_post_url=provider_post_url,
+            )
+        except Exception as exc:
+            await store.update_post(
+                post_id,
+                execution_status="failed",
+                last_error=str(exc),
+            )
+            await db.commit()
+            raise PolicyEnforcementError(
+                "YouTube publish failed",
+                reason="publish_failed",
+                details={"post_id": post_id, "error": str(exc)},
+            )
 
     return ExecuteDraftPostResponse(
         allowed=True,

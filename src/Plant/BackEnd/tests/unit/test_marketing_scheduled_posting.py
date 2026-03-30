@@ -8,6 +8,19 @@ from services.usage_events import InMemoryUsageEventStore, UsageEventType
 
 @pytest.mark.asyncio
 async def test_scheduled_posting_runs_due_post_once(test_client, in_memory_marketing_draft_store, monkeypatch):
+    from integrations.social.base import SocialPostResult
+
+    async def _fake_post_text(self, *, credential_ref, text, image_url=None):
+        return SocialPostResult(
+            success=True,
+            platform="youtube",
+            post_id=f"yt-{len(text)}",
+            post_url=f"https://www.youtube.com/post/yt-{len(text)}",
+        )
+
+    import integrations.social.youtube_client as yt_module
+    monkeypatch.setattr(yt_module.YouTubeClient, "post_text", _fake_post_text)
+
     create = test_client.post(
         "/api/v1/marketing/draft-batches",
         json={
@@ -100,3 +113,59 @@ async def test_scheduler_rejects_youtube_without_approval_or_credential_ref(test
     _batch, post = await in_memory_marketing_draft_store.find_post(post_id)  # type: ignore[assignment]
     assert post.execution_status == "failed"
     assert post.last_error == "credential_ref_required_for_youtube_publish"
+
+
+@pytest.mark.asyncio
+async def test_scheduler_youtube_uses_credential_aware_publish_path(
+    test_client, in_memory_marketing_draft_store, monkeypatch
+):
+    """Scheduler uses credential-aware YouTubeClient path for queued YouTube posts."""
+    from integrations.social.base import SocialPostResult
+
+    yt_calls = []
+
+    async def _fake_post_text(self, *, credential_ref, text, image_url=None):
+        yt_calls.append({"credential_ref": credential_ref, "text": text})
+        return SocialPostResult(
+            success=True,
+            platform="youtube",
+            post_id="yt-sched-001",
+            post_url="https://www.youtube.com/post/yt-sched-001",
+        )
+
+    import integrations.social.youtube_client as yt_module
+    monkeypatch.setattr(yt_module.YouTubeClient, "post_text", _fake_post_text)
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "customer_id": "CUST-001",
+            "theme": "Credential-aware YouTube post",
+            "brand_name": "Care Clinic",
+            "youtube_credential_ref": "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest",
+            "channels": ["youtube"],
+        },
+    )
+    assert create.status_code == 200
+    post_id = create.json()["posts"][0]["post_id"]
+
+    assert await in_memory_marketing_draft_store.update_post(
+        post_id,
+        review_status="approved",
+        approval_id="APR-SCHED-001",
+        execution_status="scheduled",
+        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
+    )
+
+    executed = await run_due_posts_once(db=object())
+    assert executed == 1
+
+    _batch, post = await in_memory_marketing_draft_store.find_post(post_id)  # type: ignore[assignment]
+    assert post.execution_status == "posted"
+    assert post.provider_post_id == "yt-sched-001"
+
+    # Verify the real YouTube client was called with the credential_ref
+    assert len(yt_calls) == 1
+    assert yt_calls[0]["credential_ref"] == "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
+

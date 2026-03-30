@@ -22,7 +22,7 @@ from services.plant_gateway_client import PlantGatewayClient
 router = waooaw_router(prefix="/cp/marketing", tags=["cp-marketing"])
 
 def _customer_id_from_user(user: User) -> str:
-    return f"CUST-{user.id}"
+    return str(user.id)
 
 def get_plant_gateway_client() -> PlantGatewayClient:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
@@ -179,6 +179,84 @@ async def reject_draft_post(
         reason=body.reason,
     )
     return RejectDraftPostResponse(post_id=body.post_id, decision="rejected")
+
+class CreateDraftBatchInput(BaseModel):
+    agent_id: str = Field(..., min_length=1)
+    hired_instance_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    theme: str
+    brand_name: str
+    brief_summary: Optional[str] = None
+    offer: Optional[str] = None
+    location: Optional[str] = None
+    audience: Optional[str] = None
+    tone: Optional[str] = None
+    language: Optional[str] = None
+    youtube_credential_ref: Optional[str] = None
+    youtube_visibility: str = "private"
+    public_release_requested: bool = False
+    channels: Optional[List[str]] = None
+
+
+@router.post("/draft-batches", response_model=Dict[str, Any])
+async def create_draft_batch(
+    body: CreateDraftBatchInput,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
+    customer_id = _customer_id_from_user(current_user)
+    json_body: Dict[str, Any] = {
+        **body.model_dump(exclude_none=True),
+        "customer_id": customer_id,
+    }
+    resp = await plant.request_json(
+        method="POST",
+        path="api/v1/marketing/draft-batches",
+        headers=_forward_headers(request),
+        json_body=json_body,
+    )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+    if resp.status_code not in (200, 201):
+        raise HTTPException(status_code=resp.status_code, detail=resp.json)
+    return resp.json if isinstance(resp.json, dict) else {}
+
+
+class ExecuteDraftPostInput(BaseModel):
+    post_id: str = Field(..., min_length=1)
+    agent_id: str = Field(..., min_length=1)
+    purpose: Optional[str] = None
+    intent_action: str = Field(default="publish", min_length=1)
+    approval_id: Optional[str] = None
+
+
+@router.post("/draft-posts/execute", response_model=Dict[str, Any])
+async def execute_draft_post(
+    body: ExecuteDraftPostInput,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
+    customer_id = _customer_id_from_user(current_user)
+    resp = await plant.request_json(
+        method="POST",
+        path=f"api/v1/marketing/draft-posts/{body.post_id}/execute",
+        headers=_forward_headers(request),
+        json_body={
+            "agent_id": body.agent_id,
+            "customer_id": customer_id,
+            "purpose": body.purpose,
+            "intent_action": body.intent_action,
+            "approval_id": body.approval_id,
+        },
+    )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+    if resp.status_code not in (200, 201):
+        raise HTTPException(status_code=resp.status_code, detail=resp.json)
+    return resp.json if isinstance(resp.json, dict) else {}
+
 
 class ScheduleDraftPostRequest(BaseModel):
     post_id: str = Field(..., min_length=1)

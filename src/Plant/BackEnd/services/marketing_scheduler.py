@@ -65,19 +65,33 @@ async def run_due_posts_once(
 
                     allowlist.ensure_allowed(post.channel)
 
-                    published = provider.publish_text(
-                        channel=post.channel,
-                        text=post.text,
-                        hashtags=post.hashtags,
-                    )
+                    if post.channel.value == "youtube" and post.credential_ref:
+                        from integrations.social.youtube_client import YouTubeClient
+
+                        yt_client = YouTubeClient(customer_id=batch.customer_id)
+                        yt_result = await yt_client.post_text(
+                            credential_ref=post.credential_ref,
+                            text=post.text,
+                        )
+                        provider_post_id = yt_result.post_id
+                        provider_post_url = yt_result.post_url
+                    else:
+                        published = provider.publish_text(
+                            channel=post.channel,
+                            text=post.text,
+                            hashtags=post.hashtags,
+                            credential_ref=post.credential_ref,
+                        )
+                        provider_post_id = published.provider_post_id
+                        provider_post_url = published.provider_post_url
 
                     await store.update_post(
                         post.post_id,
                         execution_status="posted",
                         attempts=attempt_count,
                         last_error=None,
-                        provider_post_id=published.provider_post_id,
-                        provider_post_url=published.provider_post_url,
+                        provider_post_id=provider_post_id,
+                        provider_post_url=provider_post_url,
                     )
 
                     if usage_events is not None:
