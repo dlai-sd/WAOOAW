@@ -111,6 +111,20 @@
     min-width: 100px;
     text-align: center;
   }
+
+  .portal-entry-banner {
+    grid-template-columns: 1fr;
+    padding: 18px;
+  }
+
+  .portal-entry-banner-actions {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .portal-entry-banner-actions button {
+    width: 100%;
+  }
 }
 
 /* Sidebar Navigation - Mobile */
