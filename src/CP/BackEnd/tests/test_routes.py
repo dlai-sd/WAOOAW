@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from api.auth.user_store import get_user_store
 from core.jwt_handler import create_tokens
+from models.user import UserCreate
 
 
 pytestmark = pytest.mark.unit
@@ -45,6 +46,18 @@ def test_refresh_restore_normalizes_user_id(client: TestClient):
 
     assert me_response.status_code == 200
     assert me_response.json()["id"] == "canonical-user-id"
+
+
+def test_refresh_accepts_cookie_and_rotates_refresh_token(client: TestClient):
+    """Refresh should work from the httpOnly cookie used by the frontend callback flow."""
+    tokens = create_tokens("cookie-user-id", "cookie@example.com")
+    client.cookies.set("refresh_token", tokens["refresh_token"])
+
+    refresh_response = client.post("/api/auth/refresh")
+
+    assert refresh_response.status_code == 200
+    assert refresh_response.json()["access_token"]
+    assert "refresh_token=" in refresh_response.headers["set-cookie"]
 
 
 def test_e2e_session_disabled_by_default(client: TestClient, monkeypatch):
@@ -91,6 +104,7 @@ def test_e2e_session_mints_refreshable_session(client: TestClient, monkeypatch):
 
     assert response.status_code == 200
     tokens = response.json()
+    assert "refresh_token=" in response.headers["set-cookie"]
 
     me_response = client.get(
         "/api/auth/me",
@@ -99,10 +113,7 @@ def test_e2e_session_mints_refreshable_session(client: TestClient, monkeypatch):
     assert me_response.status_code == 200
     assert me_response.json()["id"] == "cp-e2e-user"
 
-    refresh_response = client.post(
-        "/api/auth/refresh",
-        headers={"Authorization": f"Bearer {tokens['refresh_token']}"},
-    )
+    refresh_response = client.post("/api/auth/refresh")
     assert refresh_response.status_code == 200
 
 
@@ -125,6 +136,7 @@ def test_google_verify_normalizes_user_id_to_plant_uuid(mock_verify, mock_lookup
     )
 
     assert response.status_code == 200
+    assert "refresh_token=" in response.headers["set-cookie"]
     tokens = response.json()
 
     me_response = client.get(
@@ -134,6 +146,40 @@ def test_google_verify_normalizes_user_id_to_plant_uuid(mock_verify, mock_lookup
 
     assert me_response.status_code == 200
     assert me_response.json()["id"] == "plant-customer-123"
+
+
+@patch("api.auth.routes._lookup_plant_customer_id")
+@patch("api.auth.routes.verify_google_token")
+def test_google_verify_cookie_supports_followup_refresh(mock_verify, mock_lookup_plant_customer_id, client: TestClient):
+    """Google verify should issue a refresh cookie that powers silent refresh after a full-page redirect."""
+    mock_verify.return_value = {
+        "sub": "google-user-cookie",
+        "email": "cookie-flow@example.com",
+        "name": "Cookie Flow",
+        "picture": "https://example.com/photo.jpg",
+        "email_verified": True,
+    }
+    mock_lookup_plant_customer_id.return_value = "plant-customer-cookie"
+
+    verify_response = client.post(
+        "/api/auth/google/verify",
+        json={"id_token": "valid_google_id_token", "source": "cp"},
+    )
+
+    assert verify_response.status_code == 200
+    assert client.cookies.get("refresh_token")
+
+    refresh_response = client.post("/api/auth/refresh")
+
+    assert refresh_response.status_code == 200
+    refreshed = refresh_response.json()
+    me_response = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {refreshed['access_token']}"},
+    )
+
+    assert me_response.status_code == 200
+    assert me_response.json()["id"] == "plant-customer-cookie"
 
 
 def test_google_login_redirects_with_state(client: TestClient):
@@ -213,7 +259,32 @@ def test_google_callback_success_flow(mock_get_user, client: TestClient):
     location = callback_response.headers["location"]
     assert "access_token=" in location
     assert "refresh_token=" in location
+    assert "refresh_token=" in callback_response.headers["set-cookie"]
     mock_get_user.assert_called_once()
+
+
+def test_logout_clears_refresh_cookie(client: TestClient):
+    """Logout should revoke the session and clear the refresh cookie in the browser."""
+    store = get_user_store()
+    user = store.get_or_create_user(
+        UserCreate(
+            email="logout@example.com",
+            name="Logout User",
+            provider="google",
+            provider_id="logout-provider-id",
+        )
+    )
+    user = store.normalize_user_id(user, "logout-user-id")
+    tokens = create_tokens(user.id, user.email)
+    client.cookies.set("refresh_token", tokens["refresh_token"])
+
+    response = client.post(
+        "/api/auth/logout",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+
+    assert response.status_code == 200
+    assert "refresh_token=\"\"" in response.headers["set-cookie"] or "Max-Age=0" in response.headers["set-cookie"]
 
 
 @patch("api.auth.google_oauth.get_user_from_google")

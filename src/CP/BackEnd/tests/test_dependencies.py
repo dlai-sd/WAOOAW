@@ -5,6 +5,7 @@ Tests for authentication dependencies
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
+from starlette.requests import Request
 
 from api.auth.dependencies import (
     get_current_user,
@@ -17,6 +18,17 @@ from core.jwt_handler import create_tokens
 
 
 pytestmark = pytest.mark.unit
+
+
+def _request_with_cookies(cookies: dict[str, str] | None = None) -> Request:
+    scope = {
+        "type": "http",
+        "headers": [],
+    }
+    request = Request(scope)
+    if cookies:
+        request._cookies = cookies
+    return request
 
 
 @pytest.mark.asyncio
@@ -155,7 +167,7 @@ async def test_verify_refresh_token_success(user_store: UserStore):
     )
     
     # Verify refresh token
-    result = await verify_refresh_token(credentials)
+    result = await verify_refresh_token(_request_with_cookies(), credentials)
     
     assert result.user_id == user.id
     assert result.email == user.email
@@ -183,7 +195,7 @@ async def test_verify_refresh_token_with_access_token(user_store: UserStore):
     
     # Should raise exception
     with pytest.raises(HTTPException) as exc_info:
-        await verify_refresh_token(credentials)
+        await verify_refresh_token(_request_with_cookies(), credentials)
     
     assert exc_info.value.status_code == 401
     assert "refresh token required" in exc_info.value.detail
