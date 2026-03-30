@@ -13,11 +13,16 @@ import { upsertTradingStrategyConfig } from '../services/tradingStrategy.service
 import { upsertPlatformCredential } from '../services/platformCredentials.service'
 import {
   attachYouTubeConnection,
-  finalizeYouTubeConnection,
   listYouTubeConnections,
   startYouTubeConnection,
   type YouTubeConnection,
 } from '../services/youtubeConnections.service'
+import {
+  beginYouTubeOAuthFlow,
+  clearYouTubeOAuthResult,
+  getYouTubeOAuthCallbackUri,
+  readYouTubeOAuthResult,
+} from '../utils/youtubeOAuthFlow'
 
 type Step = 1 | 2 | 3 | 4
 
@@ -50,17 +55,6 @@ type ReviewSummaryItem = {
   actionLabel?: string
   actionStep?: Step
   action?: () => void
-}
-
-function buildRedirectUri(searchParams: URLSearchParams): string {
-  if (typeof window === 'undefined') return ''
-  const nextParams = new URLSearchParams(searchParams)
-  nextParams.delete('code')
-  nextParams.delete('state')
-  nextParams.delete('scope')
-  nextParams.delete('error')
-  const query = nextParams.toString()
-  return `${window.location.origin}${window.location.pathname}${query ? `?${query}` : ''}`
 }
 
 function getMarketingSkillId(): string {
@@ -102,6 +96,19 @@ function inferAgentTypeId(agentTypeId?: string | null, agentId?: string): string
   const resolved = resolveAgentTypeId(agentTypeId, agentId)
   if (resolved) return resolved
   return 'marketing.digital_marketing.v1'
+}
+
+function buildHireSetupReturnPath(subscriptionId: string | undefined, searchParams: URLSearchParams): string {
+  const nextParams = new URLSearchParams(searchParams)
+  nextParams.set('step', '3')
+  nextParams.set('focus', 'youtube')
+  nextParams.delete('code')
+  nextParams.delete('state')
+  nextParams.delete('scope')
+  nextParams.delete('error')
+
+  const query = nextParams.toString()
+  return `/hire/setup/${encodeURIComponent(subscriptionId || '')}${query ? `?${query}` : ''}`
 }
 
 function isTradingAgentType(agentTypeId?: string | null): boolean {
@@ -411,65 +418,23 @@ export default function HireSetupWizard() {
 
   useEffect(() => {
     if (!isMarketingAgent) return
-    const code = searchParams.get('code') || ''
-    const stateParam = searchParams.get('state') || ''
-    if (!code || !stateParam) return
+    const result = readYouTubeOAuthResult()
+    if (!result || result.source !== 'hire-setup') return
+    if (result.subscriptionId && subscriptionId && result.subscriptionId !== subscriptionId) return
 
-    let cancelled = false
-
-    const finalizeConnection = async () => {
-      setYouTubeConnectBusy(true)
-      setYouTubeConnectStatus('Finalizing YouTube connection…')
-      setError(null)
-      try {
-        const redirectUri = buildRedirectUri(searchParams)
-        const credential = await finalizeYouTubeConnection({
-          state: stateParam,
-          code,
-          redirect_uri: redirectUri,
-        })
-        if (cancelled) return
-        const nextConnections = await listYouTubeConnections()
-        if (cancelled) return
-        setYouTubeConnections(nextConnections)
-        setSelectedYouTubeConnectionId(credential.id)
-        setMarketingPlatform('youtube')
-        setMarketingPlatforms((prev) =>
-          upsertMarketingPlatformConfig(prev, {
-            platform: 'youtube',
-            customer_platform_credential_id: credential.id,
-            display_name: credential.display_name || 'YouTube Channel',
-            posting_identity: credential.display_name || null,
-          })
-        )
-        setYouTubeConnectStatus(`Connected ${credential.display_name || 'YouTube channel'}`)
-        const nextSearch = new URLSearchParams(searchParams)
-        nextSearch.delete('code')
-        nextSearch.delete('state')
-        nextSearch.delete('scope')
-        nextSearch.delete('error')
-        navigate(
-          {
-            pathname: `/hire/setup/${encodeURIComponent(subscriptionId || '')}`,
-            search: nextSearch.toString() ? `?${nextSearch.toString()}` : '',
-          },
-          { replace: true }
-        )
-      } catch (e: any) {
-        if (!cancelled) {
-          setError(e?.message || 'Failed to finalize YouTube connection')
-          setYouTubeConnectStatus(null)
-        }
-      } finally {
-        if (!cancelled) setYouTubeConnectBusy(false)
-      }
-    }
-
-    finalizeConnection()
-    return () => {
-      cancelled = true
-    }
-  }, [isMarketingAgent, navigate, searchParams, subscriptionId])
+    clearYouTubeOAuthResult()
+    setSelectedYouTubeConnectionId(result.connection.id)
+    setMarketingPlatform('youtube')
+    setMarketingPlatforms((prev) =>
+      upsertMarketingPlatformConfig(prev, {
+        platform: 'youtube',
+        customer_platform_credential_id: result.connection.id,
+        display_name: result.connection.display_name || 'YouTube Channel',
+        posting_identity: result.connection.display_name || undefined,
+      })
+    )
+    setYouTubeConnectStatus(result.message)
+  }, [isMarketingAgent, subscriptionId])
 
   const parseConfig = (): Record<string, unknown> => {
     if (isTradingAgent) {
@@ -949,8 +914,15 @@ export default function HireSetupWizard() {
                             setYouTubeConnectBusy(true)
                             setYouTubeConnectStatus(null)
                             try {
-                              const redirectUri = buildRedirectUri(searchParams)
+                              const redirectUri = getYouTubeOAuthCallbackUri()
                               const start = await startYouTubeConnection(redirectUri)
+                              beginYouTubeOAuthFlow({
+                                state: start.state,
+                                source: 'hire-setup',
+                                returnTo: buildHireSetupReturnPath(subscriptionId, searchParams),
+                                redirectUri,
+                                subscriptionId,
+                              })
                               if (typeof window !== 'undefined') {
                                 window.location.assign(start.authorization_url)
                               }

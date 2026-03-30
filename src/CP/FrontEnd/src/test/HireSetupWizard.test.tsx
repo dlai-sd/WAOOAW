@@ -5,6 +5,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 import { waooawLightTheme } from '../theme'
 import HireSetupWizard from '../pages/HireSetupWizard'
+import {
+  clearYouTubeOAuthResult,
+  storeYouTubeOAuthResult,
+} from '../utils/youtubeOAuthFlow'
 
 vi.mock('../services/hireWizard.service', () => {
   return {
@@ -43,6 +47,7 @@ const renderWizard = (initialEntry: string) => {
 describe('HireSetupWizard (HIRE-3.1)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    clearYouTubeOAuthResult()
   })
 
   it('resumes at step 1 when nickname missing', async () => {
@@ -381,10 +386,9 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
     expect(screen.getByText(/needs to be reconnected before continuing/i)).toBeInTheDocument()
   })
 
-  it('finalizing YouTube OAuth callback sets selected credential and clears code/state params', async () => {
+  it('hydrates YouTube success state after returning from the callback route', async () => {
     const svc = await import('../services/hireWizard.service')
     const plantSvc = await import('../services/plant.service')
-    const youtubeSvc = await import('../services/youtubeConnections.service')
 
     vi.mocked(plantSvc.plantAPIService.getCatalogAgent).mockResolvedValueOnce({
       release_id: 'CAR-CB-1',
@@ -432,23 +436,20 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
       updated_at: '2026-03-25T10:00:00Z',
     } as any
 
-    vi.mocked(youtubeSvc.finalizeYouTubeConnection).mockResolvedValueOnce(finalizedCredential)
-    vi.mocked(youtubeSvc.listYouTubeConnections)
-      .mockResolvedValueOnce([]) // initial load
-      .mockResolvedValueOnce([finalizedCredential]) // after finalize
+    storeYouTubeOAuthResult({
+      source: 'hire-setup',
+      returnTo: '/hire/setup/SUB-CB-1?agentId=AGENT-CB-001&agentTypeId=marketing.digital_marketing.v1&step=3&focus=youtube',
+      subscriptionId: 'SUB-CB-1',
+      connection: finalizedCredential,
+      message: 'Connected Callback Channel',
+    })
 
     renderWizard(
-      '/hire/setup/SUB-CB-1?agentId=AGENT-CB-001&agentTypeId=marketing.digital_marketing.v1&code=google-auth-code-123&state=oauth-state-abc'
+      '/hire/setup/SUB-CB-1?agentId=AGENT-CB-001&agentTypeId=marketing.digital_marketing.v1&step=3&focus=youtube'
     )
 
     await waitFor(() => {
       expect(screen.getByText('Step 3 of 4')).toBeInTheDocument()
-    })
-
-    await waitFor(() => {
-      expect(youtubeSvc.finalizeYouTubeConnection).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'google-auth-code-123', state: 'oauth-state-abc' })
-      )
     })
 
     await waitFor(() => {

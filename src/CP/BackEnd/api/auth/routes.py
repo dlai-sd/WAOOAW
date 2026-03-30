@@ -9,7 +9,7 @@ import secrets
 import uuid
 from typing import Optional
 
-from fastapi import Depends, Header, HTTPException, Query, Request, status
+from fastapi import Depends, Header, HTTPException, Query, Request, Response, status
 from core.routing import waooaw_router  # P-3
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
@@ -35,9 +35,36 @@ from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR I
 
 router = waooaw_router(prefix="/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
+REFRESH_COOKIE_NAME = "refresh_token"
 
 # In-memory state storage (use Redis in production)
 _state_store = {}
+
+
+def _refresh_cookie_secure() -> bool:
+    return settings.API_URL.startswith("https://") or settings.FRONTEND_URL.startswith("https://")
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        refresh_token,
+        httponly=True,
+        secure=_refresh_cookie_secure(),
+        samesite="lax",
+        path="/api/auth",
+        max_age=settings.refresh_token_expire_seconds,
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        REFRESH_COOKIE_NAME,
+        httponly=True,
+        secure=_refresh_cookie_secure(),
+        samesite="lax",
+        path="/api/auth",
+    )
 
 
 async def _lookup_plant_customer_id(email: str, correlation_id: str = "") -> Optional[str]:
@@ -187,10 +214,12 @@ async def google_callback(code: Optional[str], state: Optional[str], error: Opti
 
         tokens = create_tokens(jwt_subject, user.email)
 
-        return RedirectResponse(
+        response = RedirectResponse(
             url=f"{settings.FRONTEND_URL}/?access_token={tokens['access_token']}&refresh_token={tokens['refresh_token']}",
             status_code=302
         )
+        _set_refresh_cookie(response, tokens["refresh_token"])
+        return response
     except Exception:
         return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=auth_failed", status_code=302)
 
@@ -206,6 +235,7 @@ async def google_callback_route(code: Optional[str], state: Optional[str], error
 async def verify_google_id_token(
     request: GoogleTokenRequest,
     http_request: Request,
+    response: Response,
     user_store: UserStore = Depends(get_user_store),
     audit: AuditLogger = Depends(get_audit_logger),  # C2 (NFR It-2)
 ):
@@ -265,6 +295,7 @@ async def verify_google_id_token(
 
         # Create JWT tokens using Plant's stable UUID as sub
         tokens = create_tokens(jwt_subject, user.email)
+        _set_refresh_cookie(response, tokens["refresh_token"])
         await audit.log(
             "cp_auth",
             "google_login_success",
@@ -283,6 +314,7 @@ async def verify_google_id_token(
 
 @router.post("/refresh", response_model=Token)
 async def refresh_access_token(
+    response: Response,
     token_data=Depends(verify_refresh_token),
     user_store: UserStore = Depends(get_user_store),
 ):
@@ -316,11 +348,14 @@ async def refresh_access_token(
             )
         )
     user = user_store.normalize_user_id(user, token_data.user_id)
-    return Token(**create_tokens(user.id, user.email))
+    tokens = create_tokens(user.id, user.email)
+    _set_refresh_cookie(response, tokens["refresh_token"])
+    return Token(**tokens)
 
 
 @router.post("/e2e/session", response_model=Token)
 async def create_e2e_session(
+    response: Response,
     payload: E2ESessionRequest,
     user_store: UserStore = Depends(get_user_store),
     _: None = Depends(_verify_e2e_secret),
@@ -339,10 +374,13 @@ async def create_e2e_session(
         )
     )
     user = user_store.normalize_user_id(user, canonical_user_id)
-    return Token(**create_tokens(user.id, user.email))
+    tokens = create_tokens(user.id, user.email)
+    _set_refresh_cookie(response, tokens["refresh_token"])
+    return Token(**tokens)
 
 @router.post("/logout")
 async def logout(
+    response: Response,
     current_user: User = Depends(get_current_user),
     revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
 ):
@@ -357,6 +395,7 @@ async def logout(
         Success message
     """
     revocations.revoke_user(current_user.id)
+    _clear_refresh_cookie(response)
     return {"message": "Successfully logged out"}
 
 @router.get("/me", response_model=User)

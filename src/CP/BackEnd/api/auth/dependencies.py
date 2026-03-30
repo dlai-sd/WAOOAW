@@ -4,7 +4,7 @@ FastAPI dependencies for authentication
 
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.params import Depends as DependsParam
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -89,7 +89,8 @@ async def get_current_user_optional(
 
 
 async def verify_refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
     revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
 ) -> TokenData:
     """
@@ -104,7 +105,16 @@ async def verify_refresh_token(
     Raises:
         HTTPException: If token is invalid or not a refresh token
     """
-    token = credentials.credentials
+    token = credentials.credentials if credentials else None
+    if not token:
+        token = request.cookies.get("refresh_token")
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # Verify and decode token
     token_data: TokenData = verify_token(token)

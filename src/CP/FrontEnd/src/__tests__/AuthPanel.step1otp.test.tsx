@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FluentProvider } from '@fluentui/react-components'
+import { MemoryRouter } from 'react-router-dom'
 
 import { waooawLightTheme } from '../theme'
 import AuthPanel from '../components/auth/AuthPanel'
@@ -52,7 +53,11 @@ vi.mock('../components/auth/CaptchaWidget', () => ({
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 const wrap = (ui: React.ReactElement) =>
-  render(<FluentProvider theme={waooawLightTheme}>{ui}</FluentProvider>)
+  render(
+    <MemoryRouter>
+      <FluentProvider theme={waooawLightTheme}>{ui}</FluentProvider>
+    </MemoryRouter>
+  )
 
 const OTP_START_RESPONSE = {
   otp_id: 'OTP-1',
