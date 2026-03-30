@@ -72,7 +72,7 @@ export default function HireReceipt() {
         <div className="hire-wizard-bottom-grid" style={{ marginTop: '1.5rem' }}>
           <Card className="hire-wizard-bottom-card">
             <div className="hire-wizard-bottom-title">What happens next</div>
-            <p>Continue into My Agents, finish setup inline, and move into trial or runtime operations with fewer surprises.</p>
+            <p>Continue to My Agents, finish setup, and start managing this hire.</p>
           </Card>
           <Card className="hire-wizard-bottom-card">
             <div className="hire-wizard-bottom-title">If you stop here</div>

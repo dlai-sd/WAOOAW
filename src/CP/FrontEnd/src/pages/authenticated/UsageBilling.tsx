@@ -129,11 +129,10 @@ export default function UsageBilling() {
 
       <div className="usage-billing-overview">
         <Card className="usage-billing-overview-card usage-billing-overview-card--accent">
-          <div className="usage-billing-overview-kicker">Spend Confidence</div>
-          <h2>Track what changed before billing surprises you.</h2>
+          <div className="usage-billing-overview-kicker">Billing overview</div>
+          <h2>Track your subscriptions, invoices, and receipts.</h2>
           <p>
-            WAOOAW should make cost legible: what is active, what has already been billed,
-            and which receipts prove the work you approved or purchased.
+            Review what is active, what has been billed, and which payment records are available.
           </p>
         </Card>
 
@@ -260,19 +259,19 @@ export default function UsageBilling() {
       </Card>
 
       <Card className="usage-billing-confidence-card">
-        <div className="usage-billing-confidence-title">What a confident customer should always know</div>
+        <div className="usage-billing-confidence-title">Billing at a glance</div>
         <div className="usage-billing-confidence-grid">
           <div>
-            <strong>What is live</strong>
-            <p>Which subscriptions are actually active right now, not what the shell assumes should exist.</p>
+            <strong>Active subscriptions</strong>
+            <p>See which subscriptions are active right now.</p>
           </div>
           <div>
-            <strong>What was charged</strong>
-            <p>Invoices should only appear when a real billing event completed, and every record should map back to a subscription.</p>
+            <strong>Invoices</strong>
+            <p>Review billing records for completed charges.</p>
           </div>
           <div>
-            <strong>What proves payment</strong>
-            <p>Receipts should be one click away whenever finance or compliance asks for evidence of payment.</p>
+            <strong>Receipts</strong>
+            <p>Open payment receipts when you need proof of payment.</p>
           </div>
         </div>
       </Card>

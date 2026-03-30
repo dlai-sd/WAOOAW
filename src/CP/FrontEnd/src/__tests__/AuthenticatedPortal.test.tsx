@@ -335,12 +335,12 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('cp-nav-my-agents').className).toContain('active')
   })
 
-  it('uses truthful shell copy instead of fake runtime counters', async () => {
+  it('uses customer-facing shell copy instead of placeholder counters', async () => {
     await renderPortal()
 
-    expect(screen.getByText('Customer shell')).toBeTruthy()
-    expect(screen.getByText('Truthful state first')).toBeTruthy()
-    expect(screen.getByText('Open My Agents for runtime truth')).toBeTruthy()
+    expect(screen.getByText('Customer workspace')).toBeTruthy()
+    expect(screen.getByText('Open your agents, billing, and account tools.')).toBeTruthy()
+    expect(screen.getByText('Open My Agents')).toBeTruthy()
     expect(screen.queryByText('1 approval waiting')).toBeNull()
     expect(screen.queryByText('2 active hires')).toBeNull()
   })
@@ -393,7 +393,7 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     expect(screen.getByTestId('page-my-agents-step')).toHaveTextContent('none')
   })
 
-  it('lands on My Agents with truthful post-activation guidance', async () => {
+  it('lands on My Agents with customer-facing post-activation guidance', async () => {
     await renderPortal({
       initialPage: 'my-agents',
       initialAgentId: 'AGT-TRD-001',
@@ -407,7 +407,7 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     })
 
     expect(screen.getByTestId('page-my-agents')).toBeTruthy()
-    expect(screen.getByText('Share Trader Agent is now in runtime setup')).toBeTruthy()
+    expect(screen.getByText('Share Trader Agent is now in setup')).toBeTruthy()
     expect(screen.getByText('Agent: Share Trader Agent')).toBeTruthy()
     expect(screen.getByText('Version: v3')).toBeTruthy()
     expect(screen.getByText('Lifecycle: Servicing only')).toBeTruthy()
