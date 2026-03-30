@@ -5,6 +5,10 @@ import { MemoryRouter } from 'react-router-dom'
 
 import { DigitalMarketingActivationWizard } from '../components/DigitalMarketingActivationWizard'
 import { waooawLightTheme } from '../theme'
+import {
+  clearPendingYouTubeOAuthContext,
+  readPendingYouTubeOAuthContext,
+} from '../utils/youtubeOAuthFlow'
 
 vi.mock('../services/digitalMarketingActivation.service', () => ({
   getDigitalMarketingActivationWorkspace: vi.fn(),
@@ -143,6 +147,7 @@ describe('DMA Activation Wizard — step navigation', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
     sessionStorage.clear()
+    clearPendingYouTubeOAuthContext()
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValue({
       hired_instance_id: 'HAI-1',
@@ -603,7 +608,10 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
 
     expect(browserModule.redirectTo).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=yt-state-1')
-    expect(sessionStorage.getItem('yt_oauth_state')).toBe('yt-state-1')
+    const pending = readPendingYouTubeOAuthContext()
+    expect(pending?.state).toBe('yt-state-1')
+    expect(pending?.source).toBe('activation-wizard')
+    expect(pending?.returnTo).toBe('/my-agents')
   })
 })
 
