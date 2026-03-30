@@ -105,48 +105,48 @@ export default function ProfileSettings() {
         : 'Action needed'
 
   const businessProfileNote = loading
-    ? 'Loading the editable business profile from CP'
+    ? 'Loading your business profile'
     : profileCompletion >= 3
-      ? 'Core business identity is present and can be updated here.'
-      : 'Add or confirm business identity fields before relying on this workspace as your operating brief.'
+      ? 'Your business details are available to review and update here.'
+      : 'Add or confirm your business details here.'
 
-  const preferenceStatus = loading ? 'Loading…' : 'Partial today'
+  const preferenceStatus = loading ? 'Loading…' : 'Available'
   const preferenceNote = loading
-    ? 'Checking what preferences are actually customer-editable'
-    : 'Profile edits are live here today. Notification, language, and richer account controls are still separate future work.'
+    ? 'Loading your available settings'
+    : 'Review the settings currently available in your account.'
 
-  const supportStatus = loading ? 'Loading…' : 'Support email live'
+  const supportStatus = loading ? 'Loading…' : 'Available'
   const supportNote = loading
-    ? 'Checking current support routes'
-    : 'Direct support contact is available now. Help center and legal pages are not yet exposed as dedicated CP routes.'
+    ? 'Loading support options'
+    : 'Open support and legal resources from here.'
 
   const sections = [
     {
       title: 'Account',
       icon: '👤',
       items: [
-        { label: 'Edit Profile', action: handleEditClick, status: 'Action available' },
-        { label: 'Business Information', description: profile?.business_name ? `Current business: ${profile.business_name}` : 'Managed from your profile and hire setup details', status: profile?.business_name ? 'Loaded from CP' : 'Needs confirmation' },
-        { label: 'Team Members', description: 'Reserved for a later multi-user customer workspace flow', status: 'Planned next' },
+        { label: 'Edit Profile', action: handleEditClick, status: 'Available' },
+        { label: 'Business Information', description: profile?.business_name ? `Current business: ${profile.business_name}` : 'Business details can be added here.', status: profile?.business_name ? 'Available' : 'Needs review' },
+        { label: 'Team Members', description: 'Not available in this workspace yet.', status: 'Not available' },
       ],
     },
     {
       title: 'Preferences',
       icon: '⚙️',
       items: [
-        { label: 'Notification Settings', description: 'Customer notification tuning is grouped into the next account-control pass', status: 'Planned next' },
-        { label: 'Agent Preferences', description: 'Current agent behavior is configured inside hire setup and runtime screens', status: 'Available elsewhere' },
-        { label: 'Language & Region', description: 'Regional display controls are not yet exposed in CP', status: 'Planned next' },
+        { label: 'Notification Settings', description: 'Not available in this workspace yet.', status: 'Not available' },
+        { label: 'Agent Preferences', description: 'Manage these inside each agent workspace.', status: 'Available elsewhere' },
+        { label: 'Language & Region', description: 'Not available in this workspace yet.', status: 'Not available' },
       ],
     },
     {
       title: 'Support',
       icon: '💬',
       items: [
-        { label: 'Contact Support', action: openSupport, status: 'Action available' },
-        { label: 'Help Center', description: 'Guided help content will land in the next customer support pass', status: 'Planned next' },
-        { label: 'Privacy Policy', description: 'Legal copy is referenced in auth and will be surfaced as a dedicated CP page later', status: 'Planned next' },
-        { label: 'Terms of Service', description: 'Legal copy is referenced in auth and will be surfaced as a dedicated CP page later', status: 'Planned next' },
+        { label: 'Contact Support', action: openSupport, status: 'Available' },
+        { label: 'Help Center', description: 'Not available in this workspace yet.', status: 'Not available' },
+        { label: 'Privacy Policy', description: 'Available from the public legal pages.', status: 'Available' },
+        { label: 'Terms of Service', description: 'Available from the public legal pages.', status: 'Available' },
       ],
     },
   ]
@@ -156,17 +156,16 @@ export default function ProfileSettings() {
       <div className="page-header" style={{ marginBottom: '24px' }}>
         <h1>Profile & Settings</h1>
         <p style={{ color: 'var(--colorNeutralForeground2)', marginTop: '4px' }}>
-          Confirm what the customer profile actually knows today, then edit only the fields WAOOAW already supports.
+          Manage your account details and available settings.
         </p>
       </div>
 
       <div className="profile-settings-hero">
         <Card className="profile-settings-hero-card profile-settings-hero-card--accent">
           <div className="profile-settings-hero-kicker">Workspace Identity</div>
-          <h2>Keep your account aligned with how WAOOAW works for your business.</h2>
+          <h2>Keep your account details up to date.</h2>
           <p>
-            Customers should feel that their profile is the operating brief for their agent workforce,
-            but only when the data has actually been loaded and confirmed.
+            Review your business information, available settings, and support options.
           </p>
         </Card>
 
@@ -191,7 +190,7 @@ export default function ProfileSettings() {
 
       {loading && (
         <Card style={{ padding: '16px', marginBottom: '16px' }}>
-          Loading your current profile from CP before showing editable account truth.
+          Loading your current profile.
         </Card>
       )}
 
@@ -304,9 +303,9 @@ export default function ProfileSettings() {
               <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>{section.title}</h2>
             </div>
             <p style={{ color: 'var(--colorNeutralForeground2)', marginBottom: '14px', fontSize: '13px' }}>
-              {section.title === 'Account' && 'Identity, team readiness, and business context that power your hires.'}
-              {section.title === 'Preferences' && 'Tune how WAOOAW alerts you, how agents behave, and what operational defaults matter.'}
-              {section.title === 'Support' && 'Reach the help, policy, and trust surfaces customers need when something feels unclear.'}
+              {section.title === 'Account' && 'View and update your account details.'}
+              {section.title === 'Preferences' && 'Review the settings currently available in CP.'}
+              {section.title === 'Support' && 'Open support and legal resources.'}
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {section.items.map((item) => (

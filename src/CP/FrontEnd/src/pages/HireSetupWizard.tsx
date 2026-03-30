@@ -171,19 +171,19 @@ export default function HireSetupWizard() {
   const stepCopy: Record<Step, { title: string; body: string }> = {
     1: {
       title: 'Name the role you are hiring for',
-      body: 'Give the agent a business-facing identity so it feels like part of your operating team, not a generic tool.',
+      body: 'Choose the name this agent will use in your workspace.',
     },
     2: {
       title: 'Choose the working style',
-      body: 'Theme and working defaults shape how the agent presents itself in your runtime and customer surfaces.',
+      body: 'Set the theme and defaults for how this agent will work.',
     },
     3: {
       title: 'Connect the channel it needs',
-      body: 'Make setup feel deliberate: connect the right account, confirm the exact channel, and keep approval in front of every publish action.',
+      body: 'Connect the account or channel this agent needs to use.',
     },
     4: {
       title: 'Review before activation',
-      body: 'Customers should understand what they just configured, what happens next, and when the trial starts.',
+      body: 'Review the setup details before you activate this hire.',
     },
   }
 
@@ -823,7 +823,7 @@ export default function HireSetupWizard() {
           <>
             {isTradingAgent ? (
               <>
-                <div className="hire-wizard-inline-note">Connect the exchange once, then manage trading behaviour from the runtime view later.</div>
+                <div className="hire-wizard-inline-note">Connect the exchange account required for this hire.</div>
                 <div className="form-group">
                   <label>Exchange *</label>
                   <Select value={exchangeProvider} onChange={(_, data) => setExchangeProvider(String(data.value || 'delta_exchange_india'))} data-testid="cp-hire-setup-exchange-provider">
@@ -1152,12 +1152,12 @@ export default function HireSetupWizard() {
 
       <div className="hire-wizard-bottom-grid">
         <Card className="hire-wizard-bottom-card">
-          <div className="hire-wizard-bottom-title">What the customer should know next</div>
-          <p>After activation, WAOOAW should route them cleanly to hiring runtime, approvals, spend, and results.</p>
+          <div className="hire-wizard-bottom-title">What happens after activation</div>
+          <p>After activation, go to My Agents, approvals, billing, and results to manage this hire.</p>
         </Card>
         <Card className="hire-wizard-bottom-card">
-          <div className="hire-wizard-bottom-title">What the system should guarantee</div>
-          <p>Credentials stay protected, setup feels finite, and activation does not feel like a hidden background side effect.</p>
+          <div className="hire-wizard-bottom-title">What to expect</div>
+          <p>Your saved settings stay in place, and activation makes this hire available in your workspace.</p>
         </Card>
       </div>
     </div>

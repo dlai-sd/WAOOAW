@@ -204,7 +204,7 @@ function DigitalMarketingBriefPreview(props: { hiredInstanceId: string }) {
   return (
     <DigitalMarketingBriefSummaryCard
       title="Saved Theme Discovery brief"
-      subtitle="This structured brief is the current context driving content generation for this hire."
+      subtitle="This saved brief is currently used for this hire."
       fields={fields}
       values={values}
       emptyMessage="No brief has been saved yet. Use the Goals page to complete Theme Discovery before asking for drafts."
@@ -626,7 +626,7 @@ function ConfigureAgentPanel(props: {
       return (
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
-          <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>{field.description || 'Connect platforms; CP stores secrets and Plant receives only refs.'}</div>
+          <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>{field.description || 'Connect each selected platform here.'}</div>
           {enabledPlatforms.length === 0 ? (
             <div style={{ marginTop: '0.5rem', opacity: 0.85 }}>Select at least one platform above, then connect it here.</div>
           ) : (
@@ -699,7 +699,7 @@ function ConfigureAgentPanel(props: {
       return (
         <div>
           <div style={{ fontWeight: 600 }}>{requiredLabel(field.label, field.required)}</div>
-          <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>{field.description || 'Connect exchange; CP stores secrets and Plant receives only refs.'}</div>
+          <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>{field.description || 'Connect your exchange account here.'}</div>
           <div style={{ marginTop: '0.5rem', opacity: 0.9 }}>{currentRef ? `Connected (${currentRef})` : 'Not connected yet'}</div>
 
           <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -1983,9 +1983,9 @@ export default function MyAgents({
     if (runtimeReady) {
       return (
         <div style={{ marginTop: '0.75rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
-          <div style={{ fontWeight: 600 }}>Runtime-ready</div>
+          <div style={{ fontWeight: 600 }}>Ready to start</div>
           <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
-            This hire has completed setup and is ready for campaign runtime handoff.
+            This hire has completed setup and is ready to begin campaign work.
           </div>
         </div>
       )
@@ -2156,7 +2156,7 @@ export default function MyAgents({
                 loading={loading}
                 disabled={loading}
                 label="Selected Agent"
-                helperText={selectedReadOnlyExpired ? "This agent's trial has ended. Select another hire or review retained access." : "View and manage your hired agents"}
+                helperText={selectedReadOnlyExpired ? "This agent's trial has ended. Select another hire or review retained access." : "Select and manage your hired agents"}
               />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>

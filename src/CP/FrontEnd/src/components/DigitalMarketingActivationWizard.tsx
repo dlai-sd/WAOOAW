@@ -952,14 +952,14 @@ export function DigitalMarketingActivationWizard({
                       <div className="dma-wizard-oauth-error">{oauthError}</div>
                     )}
 
-                    {/* Other platforms — coming soon */}
+                    {/* Other platforms */}
                     {(['Instagram', 'Facebook', 'LinkedIn', 'WhatsApp', 'X'] as const).map((name) => (
                       <div key={name} className="dma-wizard-platform-connect-row dma-wizard-platform-connect-row--disabled">
                         <div className="dma-wizard-platform-connect-info">
                           <span className="dma-wizard-platform-connect-name">{name}</span>
                         </div>
                         <div className="dma-wizard-platform-connect-action">
-                          <span className="dma-wizard-coming-soon-badge">Coming soon</span>
+                          <span className="dma-wizard-coming-soon-badge">Unavailable</span>
                         </div>
                       </div>
                     ))}
@@ -1195,7 +1195,7 @@ export function DigitalMarketingActivationWizard({
                     {saveError ? <FeedbackMessage intent="error" title="Save failed" message={saveError} /> : null}
                     {finishError ? <FeedbackMessage intent="error" title="Activation failed" message={finishError} /> : null}
                     {finishStatus === 'success' || activation?.workspace.activation_complete ? (
-                      <FeedbackMessage intent="success" title="Runtime-ready" message="This hire now has channels, theme plan, and schedule confirmed." />
+                      <FeedbackMessage intent="success" title="Setup complete" message="This hire now has channels, theme plan, and schedule confirmed." />
                     ) : null}
                   </div>
                 </div>

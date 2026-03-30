@@ -261,9 +261,9 @@ export default function GoalsSetup() {
             <Badge appearance="filled" color="informative">Digital Marketing Agent</Badge>
             <Badge appearance="tint">Theme Discovery</Badge>
           </div>
-          <h1 style={{ marginBottom: '0.5rem' }}>Build a brief the agent can actually use</h1>
+          <h1 style={{ marginBottom: '0.5rem' }}>Build a brief the agent can use</h1>
           <div style={{ opacity: 0.82, maxWidth: '760px', lineHeight: 1.6 }}>
-            This guided conversation captures business context, audience, offer, YouTube intent, cadence, and success signals so the agent can create precise drafts instead of guessing from a one-line prompt.
+            Use this guided form to capture business context, audience, offer, YouTube goals, cadence, and success signals.
           </div>
         </div>
       </div>
@@ -277,7 +277,7 @@ export default function GoalsSetup() {
         <Card style={{ padding: '1.25rem' }}>
           <h2 style={{ marginTop: 0 }}>No Digital Marketing Agent found yet</h2>
           <div style={{ opacity: 0.82, lineHeight: 1.6 }}>
-            Hire the Digital Marketing Agent first. Once the hire exists, Theme Discovery will save directly into its runtime brief.
+            Hire the Digital Marketing Agent first. Once the hire exists, Theme Discovery will save directly to that hire.
           </div>
         </Card>
       ) : null}
@@ -294,7 +294,7 @@ export default function GoalsSetup() {
                   {selectedInstance?.nickname || selectedInstance?.agent_id || 'Digital Marketing Agent'}
                 </div>
                 <div style={{ marginTop: '0.3rem', opacity: 0.78 }}>
-                  The brief you save here becomes the structured context for content generation and YouTube readiness.
+                  The brief you save here is used for content generation and YouTube setup.
                 </div>
               </div>
               {instances.length > 1 ? (
@@ -364,17 +364,10 @@ export default function GoalsSetup() {
               <div style={{ display: 'grid', gap: '1rem' }}>
                 <DigitalMarketingBriefSummaryCard
                   title="Structured brief summary"
-                  subtitle="This is the exact brief the agent will carry forward into draft creation."
+                  subtitle="Review the saved brief details for this hire."
                   fields={visibleFields}
                   values={values}
                 />
-
-                <Card style={{ padding: '1rem 1.1rem' }}>
-                  <div style={{ fontWeight: 600 }}>Why this matters</div>
-                  <div style={{ marginTop: '0.5rem', opacity: 0.82, lineHeight: 1.6 }}>
-                    Theme Discovery is the customer-approved source of truth for the Digital Marketing Agent. Better brief quality here reduces generic drafts and false-positive publish readiness later.
-                  </div>
-                </Card>
               </div>
             </div>
           ) : null}

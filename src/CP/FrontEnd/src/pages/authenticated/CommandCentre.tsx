@@ -10,16 +10,16 @@ interface CommandCentreProps {
 export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyAgents, onOpenGoals }: CommandCentreProps) {
 
   const readinessCards = [
-    { label: 'Runtime summary', sublabel: 'Loads after your agents begin executing work', value: '⏳' },
-    { label: 'Billing proof', sublabel: 'Appears when subscriptions, invoices, or receipts exist', value: '🧾' },
-    { label: 'Approvals', sublabel: 'Only appears when your decision is actually required', value: '✅' },
-    { label: 'Profile control', sublabel: 'Confirm or update account identity before scaling hires', value: '👤' },
+    { label: 'Agent summary', sublabel: 'Review activity after your agents begin working', value: '⏳' },
+    { label: 'Billing', sublabel: 'View subscriptions, invoices, and receipts', value: '🧾' },
+    { label: 'Approvals', sublabel: 'Review items that need your decision', value: '✅' },
+    { label: 'Profile', sublabel: 'Review or update your account details', value: '👤' },
   ]
 
   const priorities = [
-    'Open My Agents to confirm which hires are actually configured and active.',
-    'Review billing only after a live subscription or invoice record exists.',
-    'Use Goals to define the next business outcome instead of assuming runtime defaults.',
+    'Open My Agents to review setup and current activity.',
+    'Review billing to check subscriptions, invoices, and receipts.',
+    'Use Goals to set the next business outcome for your agents.',
   ]
 
   return (
@@ -56,25 +56,25 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
 
         <Card className="command-centre-panel command-centre-panel--accent">
           <div className="section-header">
-            <h2>Runtime Truth</h2>
-            <span className="live-indicator">Action-needed state</span>
+            <h2>Workspace Overview</h2>
+            <span className="live-indicator">Current status</span>
           </div>
           <div className="command-centre-pulse-grid">
             <div>
               <div className="command-centre-pulse-value">0</div>
-              <div className="command-centre-pulse-label">Live KPIs shown without a fetch</div>
+              <div className="command-centre-pulse-label">Pinned alerts right now</div>
             </div>
             <div>
               <div className="command-centre-pulse-value">1</div>
-              <div className="command-centre-pulse-label">Place to confirm billing truth</div>
+              <div className="command-centre-pulse-label">Billing area to review</div>
             </div>
             <div>
               <div className="command-centre-pulse-value">3</div>
-              <div className="command-centre-pulse-label">Next actions before trust breaks</div>
+              <div className="command-centre-pulse-label">Suggested next actions</div>
             </div>
           </div>
           <p className="command-centre-pulse-body">
-            This shell does not have a live runtime feed yet. Use My Agents, Billing, and Profile to confirm real state instead of reading fake counters here.
+            Use My Agents, Billing, and Profile to review the latest details for your account.
           </p>
         </Card>
       </div>
@@ -82,7 +82,7 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
       <section className="activity-section">
         <div className="section-header">
           <h2>Agent Activity Feed</h2>
-          <span className="live-indicator">Hydrates after runtime starts</span>
+          <span className="live-indicator">Updates when activity is available</span>
         </div>
         <div className="activity-feed">
           <Card className="activity-card">

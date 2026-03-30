@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Dict, Optional, Protocol, Tuple
 
 from core.config import settings
 from core.logging import get_logger
+from core.redis_client import get_redis
 
 logger = get_logger(__name__)
 
@@ -88,10 +90,8 @@ class InMemoryThrottleStore:
 
 
 class RedisThrottleStore:
-    def __init__(self, redis_url: str):
-        import redis  # local import: keep module importable without redis in some contexts
-
-        self._client = redis.from_url(redis_url, decode_responses=True)
+    def __init__(self, client):
+        self._client = client
 
     def get_int(self, key: str) -> Optional[int]:
         raw = self._client.get(key)
@@ -134,6 +134,7 @@ class RedisThrottleStore:
 _in_memory_fallback_store = InMemoryThrottleStore()
 
 
+@lru_cache(maxsize=1)
 def default_throttle_store() -> ThrottleStore:
     """Return a best-effort store.
 
@@ -145,10 +146,7 @@ def default_throttle_store() -> ThrottleStore:
         return _in_memory_fallback_store
 
     try:
-        store = RedisThrottleStore(url)
-        # Ping to validate connectivity.
-        store._client.ping()  # type: ignore[attr-defined]
-        return store
+        return RedisThrottleStore(get_redis())
     except Exception:
         logger.warning("Redis unavailable for throttling; falling back to in-memory store")
         return _in_memory_fallback_store
@@ -198,6 +196,7 @@ class SecurityThrottle:
         return ThrottleDecision(allowed=True)
 
 
+@lru_cache(maxsize=1)
 def get_security_throttle() -> SecurityThrottle:
     return SecurityThrottle(
         default_throttle_store(),
