@@ -161,6 +161,44 @@ The next hardening step is an automated drift check focused specifically on `set
 
 ---
 
+# Tech Debt: CP Browse-Only Identity And Customer Registration Are Still Coupled
+
+## Story
+
+CP is meant to support a browse-first customer journey: users should be able to sign in, explore agents, and decide whether to trial or hire before they are forced through full customer registration. The current implementation still treats those states as one thing. A signed-in user is routed as if they are already a fully registered customer, while customer-only APIs and transaction flows still assume a Plant customer record exists.
+
+That coupling is now showing up as both product friction and production failure modes. Browse-only users hit customer-scoped portal bootstrap calls too early, and transaction surfaces collect registration details without actually creating the customer record before calling protected checkout endpoints.
+
+## Why This Matters
+
+- Users cannot reliably browse as a signed-in but not-yet-registered customer.
+- Signup, portal bootstrap, and transaction flows fail in confusing ways because registration state is implicit instead of modeled.
+- Frontend fixes keep addressing isolated symptoms while the identity model remains inconsistent.
+
+## Debt Item
+
+**Name:** Separate browse-authenticated state from registered-customer state in CP
+
+**Problem:** CP currently collapses anonymous, signed-in browser, and registered customer into a single auth assumption.
+
+**Impact:** Browse-only users are pushed into customer-only API flows, registration failures surface as generic auth or signup errors, and hire/trial transactions do not have a clean inline registration boundary.
+
+**Root cause:** The CP frontend and backend evolved around a single “authenticated means fully activated customer” model, but the intended product journey requires at least three distinct states: anonymous browser, authenticated browser, and registered customer.
+
+## What Is Needed To Pay This Debt Down
+
+1. Make browse surfaces public or browse-authenticated without requiring a Plant customer record.
+2. Introduce an explicit frontend state for signed-in but not-yet-registered users.
+3. Stop bootstrapping customer-only portal APIs until registration is complete.
+4. Add an inline registration checkpoint before any hire, trial, or payment transaction.
+5. Preserve explicit signup as an alternate path that upgrades the same session into a registered customer.
+
+## Recommended Follow-up
+
+Treat this as an identity-state refactor, not a page-level bug fix. The target state is a CP flow where browsing works without registration, registration upgrades the current session in place, and customer-only APIs are never called before that upgrade is complete.
+
+---
+
 # Tech Debt: CP Customer OAuth Is Out Of Compliance With Mobile And Central Plant Auth
 
 ## Story
