@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.7  
-**Date**: 2026-03-13  
+**Version**: 2.8  
+**Date**: 2026-03-30  
 **Purpose**: Single-source operating manual for handing WAOOAW work to AI agents, especially zero-cost and small-context agents, so they can navigate, understand, plan, and execute complex platform tasks with minimal drift.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
@@ -737,7 +737,8 @@ CP BackEnd ──── PlantGatewayClient ────► Plant Gateway
 | Gateway → Plant | HTTP proxy with identity token (GCP metadata server in Cloud Run, shared JWT in dev) |
 | Gateway middleware order | Error handler → Auth → RBAC → Policy → Budget → Audit → Proxy |
 | Gateway → OPA | `rbac.py`, `policy.py`, `budget.py` each make a `POST /v1/data/gateway/<policy>/allow` HTTP call to `OPA_URL`. OPA returns `{"result": {"allow": bool, ...}}`. Circuit breaker wraps every call. |
-| Auth flow | Google OAuth2 → JWT issued by CP/PP → validated at Gateway → forwarded to Plant |
+| Auth flow | Google OAuth2 → JWT issued by CP/PP → CP FrontEnd keeps access token in memory and restores via `POST /auth/refresh` using the httpOnly refresh cookie → Gateway validates and forwards to Plant |
+| Connected-platform OAuth callbacks | Full-page redirects for external platform connections should complete on a public callback surface, restore session there, then resume the protected wizard. Protected routes alone are not safe callback targets when CP web auth is memory-only. |
 | Registration flow (web/CP) | CP Backend `/api/register` → creates customer in local DB → calls Plant Gateway `/api/v1/customers` to create in Plant DB |
 | Registration flow (mobile) | Mobile app → Plant Gateway **directly** (no CP Backend). Three steps: `POST /auth/register` (upsert customer) → `POST /auth/otp/start` (issue OTP challenge) → `POST /auth/otp/verify` (verify code, receive JWT). All three paths are in `PUBLIC_ENDPOINTS` — no prior JWT needed. |
 | CP registration key | Shared secret (`CP_REGISTRATION_KEY`) used between CP → Gateway to authorize customer upsert calls |
@@ -1519,14 +1520,30 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
+### Open PR — 2026-03-30
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#977** | `fix/cp-youtube-callback-session` | **YouTube OAuth callback resilience + portal banner layout + identity debt note** — moves YouTube connection completion onto a dedicated public callback route, persists callback context and resume state across the full-page Google redirect, returns the user to hire setup or My Agents after session recovery, and captures the remaining browse-authenticated vs registered-customer coupling in `docs/tech_debt.md`. | `src/CP/FrontEnd/src/App.tsx`, `src/CP/FrontEnd/src/pages/HireSetupWizard.tsx`, `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`, `src/CP/FrontEnd/src/pages/YouTubeConnectionCallback.tsx`, `src/CP/FrontEnd/src/utils/youtubeOAuthFlow.ts`, `docs/tech_debt.md` |
+
+### Recently merged — 2026-03-30
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#976** | `fix/cp-copy-redis-cleanup` | **CP customer-facing copy cleanup + Redis signup hardening** — Plant security throttling now reuses the shared Redis client with cached fallback behavior, Plant Gateway stays on the shared VPC connector for Memorystore-backed Redis, and customer-facing CP surfaces removed internal/developer-facing copy. | `src/Plant/BackEnd/services/security_throttle.py`, `src/Plant/BackEnd/tests/unit/test_security_throttle_runtime.py`, `cloud/terraform/stacks/plant/main.tf`, `src/CP/FrontEnd/src/components/auth/AuthPanel.tsx`, `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`, `src/CP/FrontEnd/src/pages/SignIn.tsx` |
+
+### Recently merged — 2026-03-29
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#975** | `feat/oauth-static-consent-pages` | **Static OAuth consent/legal pages for Google review** — crawler-readable public app-information, privacy, and terms pages now exist in the CP frontend public build output so Google branding verification does not depend on the SPA booting. The CP app also exposes human-readable legal routes for normal navigation. | `src/CP/FrontEnd/public/oauth/index.html`, `src/CP/FrontEnd/public/privacy/index.html`, `src/CP/FrontEnd/public/terms/index.html`, `src/CP/FrontEnd/src/pages/PrivacyPolicy.tsx`, `src/CP/FrontEnd/src/pages/TermsOfService.tsx` |
+
 ### Ready to PR — 2026-03-13
 
 | PR | Branch | Summary | Key files |
 |----|--------|---------|----------|
 | **branch-only** | `docs/cp-studio-1-plan` | **CP-STUDIO-1 execution plan for inline customer activation studio** — adds a self-sufficient one-iteration delivery plan that makes `My Agents` the real setup surface, reduces `Hire Setup` to a payment/handoff step, and aligns the target CP shell with the PP Agent Studio pattern of fixed chrome plus a scrollable working pane. | `docs/CP/iterations/CP-STUDIO-1-my-agents-inline-studio.md`, `docs/CONTEXT_AND_INDEX.md`, `docs/tech_debt.md` |
 | **branch-only** | `feat/plant-catalog-1-it1-e1` | **Plant runtime vocabulary convergence + hire-ready catalog direction** — repo-wide documentation alignment now treats [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) as the executable runtime source of truth; active governance/spec surfaces were updated to reinterpret `Agent DNA`, `Base Agent Anatomy`, `ConfigureMe`, `OperateMe`, `EEPROM`, and filesystem-memory language as historical or conceptual only; the current PP/CP product direction is now explicit: PP is the internal design board and release gate for hire-ready agent supply, while CP should expose only approved catalog releases and preserve customer continuity for existing hired agents. | `docs/CONTEXT_AND_INDEX.md`, `docs/WAOOAW_agents.md`, `docs/PP/README.md`, `README.md`, `main/README.md`, `main/Foundation.md`, `main/Foundation/template/*.yml`, `main/Foundation/amendments/*.md`, `docs/plant/README.md` |
-
-### Current branch: `feat/ui-ux-revamp` (PR #917 merged to `main`; release-readiness follow-ups committed on branch — 2026-03-11)
 
 ### Ready to PR — 2026-03-11
 
@@ -1968,6 +1985,8 @@ Use this shortlist when the task is broader than runtime routes.
 | `pages/SignIn.tsx` | Sign-in page |
 | `pages/SignUp.tsx` | 3-step registration wizard — Step 1 email+OTP verify, Step 2 profile, Step 3 industry |
 | `pages/AuthCallback.tsx` | OAuth/OIDC redirect callback handler |
+| `pages/PrivacyPolicy.tsx` | Public privacy policy route rendered inside the CP shell |
+| `pages/TermsOfService.tsx` | Public terms route rendered inside the CP shell |
 | `pages/HireSetupWizard.tsx` | Agent hiring wizard |
 | `pages/TrialDashboard.tsx` | Trial management |
 | `pages/AuthenticatedPortal.tsx` | Post-login portal |
@@ -2001,7 +2020,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `services/performanceStats.service.ts` | Performance stats API — `listPerformanceStats()` (CP-SKILLS-1 #835) |
 | `services/platformConnections.service.ts` | Platform connections API — `listPlatformConnections()`, `createPlatformConnection()`, `deletePlatformConnection()`; inspect this immediately after `agentSkills.service.ts` when a hired-agent configuration flow fails |
 | `services/profile.service.ts` | Profile read/update API calls — `getProfile()` and `updateProfile()` via `GET|PATCH /cp/profile` (CP-NAV-1 It2 #829) |
-| `services/auth.service.ts` | Auth API calls |
+| `services/auth.service.ts` | Web auth client — access token in memory only, silent refresh via `POST /auth/refresh`, local `waooaw:session-restorable` hint, and retry-after-refresh behavior. Inspect first for reload/login loops. |
 | `services/registration.service.ts` | Registration API calls |
 | `services/otp.service.ts` | OTP initiation and verification (pre-registration email verify) |
 | `services/hireWizard.service.ts` | Hire flow API calls |
@@ -2025,10 +2044,19 @@ Use this shortlist when the task is broader than runtime routes.
 | `services/exchangeSetup.service.ts` | Exchange setup API calls |
 | `services/platformCredentials.service.ts` | Platform credentials API calls |
 | `config/` | App configuration |
+| `context/AuthContext.tsx` | Web auth bootstrap — loads session on app mount, forces refresh on protected paths, and broadcasts `waooaw:auth-changed` across the shell |
 | `context/` | React context providers |
 | `hooks/` | Custom React hooks |
 | `styles/` | CSS styles |
 | `types/` | TypeScript type definitions |
+
+### src/CP/FrontEnd/public/ — Static consent and legal pages
+
+| File | Purpose |
+|------|---------|
+| `oauth/index.html` | Static public app-information page for Google OAuth branding review; must remain crawler-readable without booting the React bundle |
+| `privacy/index.html` | Static privacy policy page for Google reviewers and external legal checks |
+| `terms/index.html` | Static terms-of-service page for Google reviewers and external legal checks |
 
 ### src/PP/ — Platform Portal
 
@@ -2314,6 +2342,9 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **Cloud SQL Auth Proxy required** | Always connect to `plant-sql-demo` via Cloud SQL Auth Proxy on `127.0.0.1:15432` for IAM auth. Never connect directly on port 5432. If you get `connection refused` on 15432, proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. If proxy startup or first connect fails with `instance does not have IP of type "PUBLIC"`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, wait for the operation to finish, then rerun the auth script. gcloud is pre-installed via `setup-slim.sh`; `source /root/.env.db && psql` is the canonical connect path after the proxy starts. For persistence work, this demo DB is the canonical validation target before Docker regression. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config MUST come from env vars (non-sensitive) or GCP Secret Manager (sensitive) — injected by terraform at deploy time. See §8.1 for the full checklist and §19 for code examples. **Terraform template anti-pattern that is BANNED**: `SOME_VAR = var.x != "" ? var.x : (var.environment == "demo" ? "value_a" : "value_b")` — this bakes environment-conditional logic into the template. Defaults belong in `variables.tf default =`, not in `main.tf` ternaries. Violations are reverted on review. This was found and fixed in PR #851 for CP Backend `PAYMENTS_MODE` and `OTP_DELIVERY_MODE`. |
+| **Plant Gateway needs the shared VPC connector for Redis-backed flows** | Plant Gateway now depends on Memorystore-backed Redis paths used in customer signup and related throttled/runtime operations. Keep the shared VPC connector attached for private ranges while leaving public egress direct; removing it can break Redis-backed flows even when public HTTP ingress still looks healthy. |
+| **CP web auth is memory-only** | CP FrontEnd keeps the access token only in memory and relies on `POST /auth/refresh` plus the `waooaw:session-restorable` hint to recover after reload. When debugging login loops or post-redirect sign-outs, inspect `src/CP/FrontEnd/src/services/auth.service.ts` and `src/CP/FrontEnd/src/context/AuthContext.tsx` first. |
+| **Connected-platform OAuth should finish on a public callback surface** | With memory-only web auth, a full-page Google/YouTube redirect can reload the app before a protected wizard has restored the session. If you add or refactor an external OAuth flow, complete the exchange on a public callback route or other non-protected surface, restore session there, then navigate back into the protected experience. |
 | **`SecretManagerAdapter` — never call GCP SDK directly in routes** | CP BackEnd `services/secret_manager.py` provides the ABC. Routes call `get_secret_manager_adapter()` which reads `SECRET_MANAGER_BACKEND`. For `local`/CI: in-memory `LocalSecretManagerAdapter`. For `gcp`: `GcpSecretManagerAdapter` using Application Default Credentials on Cloud Run — no key file needed. Never instantiate `secretmanager.SecretManagerServiceClient` directly in a route or service other than `GcpSecretManagerAdapter`. |
 | **Platform credential secrets — naming convention** | Platform connection credentials are stored as GCP Secret Manager secrets named `hired-{hired_instance_id}-{platform_key}`. The returned `secret_ref` is the full GCP resource path (e.g., `projects/waooaw-oauth/secrets/hired-abc123-instagram/versions/latest`). Only the `secret_ref` is forwarded to Plant BE and persisted in `platform_connections.secret_ref`. Raw credentials never leave CP BackEnd. |
 | **CP BackEnd SA needs `secretmanager.secretVersionAdder`** | On first deploy of PLANT-SKILLS-1 It3 (#846), verify CP BackEnd's Cloud Run SA has `roles/secretmanager.secretVersionAdder` (or `roles/secretmanager.admin`). Without it, `POST /cp/hired-agents/{id}/platform-connections` will return 500. Check: `gcloud projects get-iam-policy waooaw-oauth --flatten="bindings[].members" --filter="bindings.members:serviceAccount:waooaw-cp-backend@waooaw-oauth.iam.gserviceaccount.com" --format="table(bindings.role)"` |
