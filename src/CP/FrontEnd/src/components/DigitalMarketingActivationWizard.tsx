@@ -1,5 +1,4 @@
 import { Badge, Button, Card, CardHeader, Spinner, Text, Input, Textarea } from '@fluentui/react-components'
-import { useNavigate } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
 import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
@@ -21,12 +20,17 @@ import {
 } from '../services/digitalMarketingActivation.service'
 import {
   startYouTubeConnection,
-  finalizeYouTubeConnection,
   attachYouTubeConnection,
   listYouTubeConnections,
   type YouTubeConnection,
 } from '../services/youtubeConnections.service'
 import { redirectTo } from '../utils/browserNavigation'
+import {
+  beginYouTubeOAuthFlow,
+  clearYouTubeOAuthResult,
+  getYouTubeOAuthCallbackUri,
+  readYouTubeOAuthResult,
+} from '../utils/youtubeOAuthFlow'
 
 const DIGITAL_MARKETING_AGENT_TYPE_ID = 'marketing.digital_marketing.v1'
 
@@ -167,7 +171,6 @@ export function DigitalMarketingActivationWizard({
   onStaleReference,
   onSelectedInstanceChange,
 }: DigitalMarketingActivationWizardProps) {
-  const navigate = useNavigate()
   const activeInstance = instance ?? selectedInstance ?? null
 
   const [loading, setLoading] = useState(true)
@@ -270,41 +273,14 @@ export function DigitalMarketingActivationWizard({
 
   // OAuth callback — detect ?code&state on mount and finalize connection
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
-    const state = params.get('state')
-    if (!code || !state) return
+    const result = readYouTubeOAuthResult()
+    if (!result || result.source !== 'activation-wizard') return
+    if (result.hiredInstanceId && hiredInstanceId && result.hiredInstanceId !== hiredInstanceId) return
 
-    const storedState = sessionStorage.getItem('yt_oauth_state')
-    if (!storedState || storedState !== state) {
-      // State mismatch — do not process (CSRF protection)
-      return
-    }
-
-    const redirectUri = window.location.origin + window.location.pathname
-    const hiredInstanceIdForOauth = String(activeInstance?.hired_instance_id || hiredInstanceId || '').trim()
-    if (!hiredInstanceIdForOauth) return
-
-    ;(async () => {
-      try {
-        setOauthLoading(true)
-        setOauthMessage(null)
-        const connection = await finalizeYouTubeConnection({ state, code, redirect_uri: redirectUri })
-        await attachYouTubeConnection(connection.id, {
-          hired_instance_id: hiredInstanceIdForOauth,
-          skill_id: youtubeSkillId,
-        })
-        sessionStorage.removeItem('yt_oauth_state')
-        window.history.replaceState({}, '', window.location.pathname)
-        markYouTubeConnected(connection, 'YouTube connected successfully.')
-        setActiveStepIndex(DMA_STEPS.findIndex((s) => s.id === 'connect'))
-      } catch (err) {
-        setOauthError('YouTube connection failed. Please try again.')
-      } finally {
-        setOauthLoading(false)
-      }
-    })()
-  }, [activeInstance?.hired_instance_id, hiredInstanceId, youtubeSkillId])
+    clearYouTubeOAuthResult()
+    markYouTubeConnected(result.connection, result.message)
+    setActiveStepIndex(DMA_STEPS.findIndex((s) => s.id === 'connect'))
+  }, [hiredInstanceId])
 
   // Load existing saved YouTube connections for this customer
   useEffect(() => {
@@ -568,9 +544,16 @@ export function DigitalMarketingActivationWizard({
         }
       }
 
-      const redirectUri = window.location.origin + window.location.pathname
+      const redirectUri = getYouTubeOAuthCallbackUri()
       const { state, authorization_url } = await startYouTubeConnection(redirectUri)
-      sessionStorage.setItem('yt_oauth_state', state)
+      beginYouTubeOAuthFlow({
+        state,
+        source: 'activation-wizard',
+        returnTo: '/my-agents',
+        redirectUri,
+        hiredInstanceId,
+        skillId: youtubeSkillId,
+      })
       redirectTo(authorization_url)
     } catch (err) {
       setOauthError('Could not start YouTube connection. Please try again.')
