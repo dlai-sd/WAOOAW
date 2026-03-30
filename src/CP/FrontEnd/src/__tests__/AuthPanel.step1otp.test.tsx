@@ -236,7 +236,7 @@ describe('Step 1 – OTP entry & client-side verify', () => {
   it('shows error for empty OTP code', async () => {
     await advanceToOtpPending()
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
-    expect(await screen.findByText(/Paste the code from your inbox/)).toBeInTheDocument()
+    expect(await screen.findByText(/Enter the code from your inbox to continue/)).toBeInTheDocument()
   })
 
   it('shows error for short numeric OTP (< 4 digits)', async () => {
@@ -251,10 +251,10 @@ describe('Step 1 – OTP entry & client-side verify', () => {
   it('inline error clears as user types', async () => {
     await advanceToOtpPending()
     fireEvent.click(screen.getByRole('button', { name: 'Verify email →' }))
-    await screen.findByText(/Paste the code from your inbox/)
+    await screen.findByText(/Enter the code from your inbox to continue/)
 
     fireEvent.change(screen.getByRole('textbox', { name: 'OTP digit 1' }), { target: { value: '1' } })
-    expect(screen.queryByText(/Paste the code from your inbox/)).toBeInTheDocument()
+    expect(screen.queryByText(/Enter the code from your inbox to continue/)).toBeInTheDocument()
   })
 
   it('Enter key triggers verify', async () => {

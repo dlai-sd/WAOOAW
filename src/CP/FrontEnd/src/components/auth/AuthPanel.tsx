@@ -1137,12 +1137,12 @@ export default function AuthPanel({
             )}
 
             <div className={styles.formIntro}>
-              <div className={styles.formEyebrow}>Startup onboarding</div>
+              <div className={styles.formEyebrow}>Create account</div>
               <h2 className={styles.formHeading}>
-                {regStep === 1 ? 'Launch your first trial with a cleaner setup flow.' : regStep === 2 ? 'Tell us enough to personalise the first agent shortlist.' : 'Finish setup and unlock your workspace.'}
+                {regStep === 1 ? 'Verify your email.' : regStep === 2 ? 'Add your business details.' : 'Finish account setup.'}
               </h2>
               <p className={styles.formBody}>
-                {regStep === 1 ? 'We start with fast verification so you can move from curiosity to trial without losing momentum.' : regStep === 2 ? 'This business context helps WAOOAW feel more like a modern operating system than a generic lead form.' : 'One last contact step, then your account is ready for live agent trials and deliverables.'}
+                {regStep === 1 ? 'Confirm your email to continue.' : regStep === 2 ? 'Add the business details needed for your account.' : 'Add your contact details to complete setup.'}
               </p>
             </div>
 
@@ -1236,9 +1236,7 @@ export default function AuthPanel({
                           <CaptchaWidget key={captchaResetKey} siteKey={turnstileSiteKey} onToken={handleCaptchaToken} onError={handleCaptchaError} />
                           {captchaError && <div className="field-error">{captchaError}</div>}
                         </div>
-                      ) : (
-                        !isProduction && <div style={{ fontSize: '0.75rem', color: 'var(--colorNeutralForeground3)' }}>CAPTCHA not configured (dev mode)</div>
-                      )}
+                      ) : null}
                     </>
                   )}
 
@@ -1246,7 +1244,7 @@ export default function AuthPanel({
                     <div className={styles.otpPanel}>
                       <div className={styles.otpMeta}>
                         <div className={styles.otpTitle}>Verification code</div>
-                        <div className={styles.otpSubtitle}>Paste the code from your inbox to unlock the next onboarding step.</div>
+                        <div className={styles.otpSubtitle}>Enter the code from your inbox to continue.</div>
                       </div>
                       <div className={styles.otpGrid}>
                       {otpDigits.map((digit, i) => (
@@ -1365,7 +1363,7 @@ export default function AuthPanel({
                   <div className={styles.stageCardHeader}>
                     <div className={styles.stageCardEyebrow}>Step 2 of 3</div>
                     <div className={styles.stageCardTitle}>Tell us about you</div>
-                    <div className={styles.stageCardBody}>Enough context to make the agent marketplace feel curated instead of generic.</div>
+                    <div className={styles.stageCardBody}>Share a few business details so we can personalise your workspace.</div>
                   </div>
 
                   <div className={styles.twoColGrid}>
@@ -1439,7 +1437,7 @@ export default function AuthPanel({
                   <div className={styles.stageCardHeader}>
                     <div className={styles.stageCardEyebrow}>Step 3 of 3</div>
                     <div className={styles.stageCardTitle}>Almost done!</div>
-                    <div className={styles.stageCardBody}>This keeps the first trial responsive once your workspace goes live.</div>
+                    <div className={styles.stageCardBody}>Add your contact details so we can complete your account setup.</div>
                   </div>
 
                   <div className={styles.twoColGrid}>

@@ -62,11 +62,6 @@ const STEP_CONTENT: Record<1 | 2 | 3, {
   },
 }
 
-const SIGNUP_NOTES = [
-  'The goal is momentum: verify, personalise, then launch a first trial.',
-  'Every step should feel like product onboarding, not a slow enterprise form.',
-]
-
 export default function SignUp({ theme, toggleTheme }: SignUpProps) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -108,9 +103,6 @@ export default function SignUp({ theme, toggleTheme }: SignUpProps) {
                   <div className="auth-side-kicker">Start Your Workforce</div>
                   <h2 className="auth-left-heading">{step.heading}</h2>
                   <p className="auth-left-tagline">{step.tagline}</p>
-                  <div className="auth-startup-statement">
-                    A startup-grade onboarding flow should make the first trial feel close, concrete, and worth finishing.
-                  </div>
                   <div className="auth-milestone-list">
                     {registrationMilestones.map((milestone, index) => (
                       <div key={milestone} className={`auth-milestone-item ${regStep === index + 1 ? 'active' : ''}`}>
@@ -125,18 +117,6 @@ export default function SignUp({ theme, toggleTheme }: SignUpProps) {
                     ))}
                   </ul>
                   <p className="auth-left-footnote">{step.footnote}</p>
-                  <div className="auth-confidence-card">
-                    <div className="auth-confidence-title">Why this matters</div>
-                    <p className="auth-confidence-body">
-                      Signup should explain the value ladder: try first, keep the work, then decide whether this agent
-                      deserves a bigger role in the business.
-                    </p>
-                  </div>
-                  <div className="auth-note-list">
-                    {SIGNUP_NOTES.map((item) => (
-                      <div key={item} className="auth-note-item">{item}</div>
-                    ))}
-                  </div>
                 </div>
               </section>
 

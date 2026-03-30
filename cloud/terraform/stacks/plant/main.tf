@@ -176,10 +176,11 @@ module "plant_gateway" {
   min_instances = var.min_instances
   max_instances = var.max_instances
 
-  # Gateway does not require DB/VPC access; keep it off the VPC connector so
-  # Cloud Run metadata-based ID token minting cannot be impacted by egress routing.
+  # Gateway requires private-network access for Memorystore-backed Redis.
+  # Route only private ranges through the shared connector so public egress,
+  # including Cloud Run identity-token minting, remains direct.
   cloud_sql_connection_name = null
-  vpc_connector_id          = null
+  vpc_connector_id          = module.vpc_connector.connector_id
 
   env_vars = {
     ENVIRONMENT                = var.environment

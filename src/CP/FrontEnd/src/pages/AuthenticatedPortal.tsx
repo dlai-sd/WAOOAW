@@ -374,49 +374,49 @@ export default function AuthenticatedPortal({
     'command-centre': {
       eyebrow: 'Daily Mission',
       title: 'Run Your Agent Workforce With Confidence',
-      description: 'Use this shell to decide what to check next, not to pretend live runtime data already exists.',
-      metrics: ['Open My Agents for runtime truth', 'Billing becomes real after subscriptions exist', 'Profile should reflect confirmed business data'],
+      description: 'Open the main areas of your workspace and review what needs attention.',
+      metrics: ['Open My Agents', 'Review billing', 'Check account details'],
     },
     'my-agents': {
-      eyebrow: 'Runtime Truth',
+      eyebrow: 'My Agents',
       title: 'Operate The Agents You Already Hired',
-      description: 'Stay close to live status, setup state, deliverables, and next actions without falling back to promotional filler.',
-      metrics: ['Live hire context', 'Setup continuity', 'Deliverable-linked operations'],
+      description: 'Check setup, status, deliverables, and next actions for your hired agents.',
+      metrics: ['Agent status', 'Setup progress', 'Deliverables'],
     },
     'hire-setup': {
-      eyebrow: 'Setup Continuity',
-      title: 'Complete Setup Before Runtime Begins',
-      description: 'Carry payment and studio context straight into the remaining setup work so the hire can move into real operation.',
-      metrics: ['Payment-linked entry', 'Studio context preserved', 'Activation still required'],
+      eyebrow: 'Setup',
+      title: 'Complete Setup Before Activation',
+      description: 'Finish setup so the selected agent can start working.',
+      metrics: ['Selected hire', 'Saved setup', 'Activation required'],
     },
     'hire-receipt': {
-      eyebrow: 'Proof Of Purchase',
+      eyebrow: 'Hire Receipt',
       title: 'Review The Confirmed Hire Before Setup',
-      description: 'Use the receipt surface to confirm what was purchased, then continue into setup without losing the operating context.',
-      metrics: ['Receipt confirmation', 'Subscription context', 'Next step clarity'],
+      description: 'Review the hire details, then continue setup.',
+      metrics: ['Hire details', 'Subscription details', 'Next steps'],
     },
     'discover': {
       eyebrow: 'Marketplace',
       title: 'Browse Talent, Not Generic Software',
-      description: 'Find specialised agents by outcome, vertical fit, and readiness so you can hire with less guesswork.',
+      description: 'Browse agents by outcome, industry, and fit.',
       metrics: ['Live marketplace', '7-day trials', 'Outcome-led profiles'],
     },
     'goals': {
       eyebrow: 'Goal Desk',
       title: 'Set Direction Without Micromanaging',
-      description: 'Give your agents clear operating goals, then monitor whether the work ladder is actually moving.',
+      description: 'Set goals and priorities for the work you want your agents to do.',
       metrics: ['Goal templates', 'Frequency controls', 'Business outcomes'],
     },
     'deliverables': {
       eyebrow: 'Work Feed',
       title: 'See What Your Agents Have Produced',
-      description: 'Review drafts, outputs, and completed work in one place instead of hunting through chats and notifications.',
+      description: 'Review drafts, outputs, and completed work in one place.',
       metrics: ['Drafts', 'Approved work', 'Published output'],
     },
     'inbox': {
       eyebrow: 'Signal Centre',
       title: 'Keep Approvals And Requests From Falling Through',
-      description: 'Prioritise the small number of decisions only you should make, then let the system move again.',
+      description: 'Review approvals, requests, and follow-ups that need your decision.',
       metrics: [
         formatCount(inboxCounts.pending, 'deliverable awaiting your decision'),
         formatCount(inboxCounts.approved, 'approved deliverable still visible'),
@@ -426,14 +426,14 @@ export default function AuthenticatedPortal({
     'billing': {
       eyebrow: 'Spend & Proof',
       title: 'Understand What You Are Paying For',
-      description: 'Track subscriptions, invoices, receipts, and upcoming billing with less ambiguity and more trust.',
+      description: 'View subscriptions, invoices, receipts, and upcoming billing.',
       metrics: ['Live subscription view', 'Invoice history when available', 'Receipt access after payment'],
     },
     'profile-settings': {
       eyebrow: 'Identity & Controls',
       title: 'Shape The Account Your Agents Work For',
-      description: 'Keep your business profile, preferences, and team-facing details aligned with how WAOOAW operates for you.',
-      metrics: ['Business identity loaded from CP', 'Only current controls shown as live', 'Support paths'],
+      description: 'Update your business details, preferences, and support options.',
+      metrics: ['Business details', 'Account settings', 'Support options'],
     },
     }),
     [inboxCounts.approved, inboxCounts.pending, inboxCounts.rejected]
@@ -475,8 +475,8 @@ export default function AuthenticatedPortal({
     if (journeyContext.source === 'trial-activated') {
       return {
         eyebrow: 'Trial activated',
-        title: `${selectedLabel} is now in runtime setup`,
-        body: `You landed in My Agents because that is the first truthful place to confirm the runtime, monitor hydration, and continue operating without guessing.${continuityNote}`,
+        title: `${selectedLabel} is now in setup`,
+        body: `Go to My Agents to confirm setup, monitor activity, and continue managing this hire.${continuityNote}`,
         primaryLabel: 'Open Deliverables',
         onPrimary: () => openPage('deliverables'),
       }
@@ -556,15 +556,11 @@ export default function AuthenticatedPortal({
               </div>
               <div>
                 <div className="portal-brand-title">WAOOAW Customer OS</div>
-                <div className="portal-brand-subtitle">Hire, approve, monitor, and scale your AI workforce</div>
+                <div className="portal-brand-subtitle">Manage your agents, billing, and account</div>
               </div>
             </div>
           </div>
           <div className="portal-header-actions">
-            <div className="portal-header-status">
-              <div className="portal-header-chip">Customer shell</div>
-              <div className="portal-header-chip portal-header-chip--success">Truthful state first</div>
-            </div>
             <div className="portal-header-controls">
               <Button
                 appearance="subtle"
@@ -604,7 +600,7 @@ export default function AuthenticatedPortal({
             {!sidebarCollapsed && (
               <>
                 <div className="portal-sidebar-card-title">Customer workspace</div>
-                <div className="portal-sidebar-card-body">Use My Agents, Billing, and Profile to confirm live state. This shell avoids fake runtime counters.</div>
+                <div className="portal-sidebar-card-body">Open your agents, billing, and account tools.</div>
               </>
             )}
           </div>

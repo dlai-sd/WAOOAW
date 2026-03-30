@@ -11,9 +11,8 @@ import {
   Badge,
   Card
 } from '@fluentui/react-components'
-import { 
-  ArrowLeft20Regular, 
-  Star20Filled,
+import {
+  ArrowLeft20Regular,
   Briefcase20Regular,
   CheckmarkCircle20Filled,
 } from '@fluentui/react-icons'
@@ -256,11 +255,6 @@ export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = 
                 <Briefcase20Regular />
                 {agent.industry.charAt(0).toUpperCase() + agent.industry.slice(1)}
               </span>
-              {/* Placeholder rating - TODO: Get from backend */}
-              <span className="agent-detail-meta">
-                <Star20Filled className="agent-detail-rating-icon" />
-                4.8 (Coming soon)
-              </span>
             </div>
 
             <p className="agent-detail-description">
@@ -279,7 +273,7 @@ export default function AgentDetail({ agentIdProp, onBack }: AgentDetailProps = 
                 {agent.status === 'active' ? `Start ${trialDays}-Day Free Trial` : 'Currently Unavailable'}
               </Button>
               <div className="agent-detail-price">
-                {monthlyPrice ? `₹${monthlyPrice.toLocaleString()}/month after trial` : 'Pricing coming soon'}
+                {monthlyPrice ? `₹${monthlyPrice.toLocaleString()}/month after trial` : 'Pricing shared during checkout'}
               </div>
             </div>
           </div>

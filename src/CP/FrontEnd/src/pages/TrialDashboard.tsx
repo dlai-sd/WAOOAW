@@ -106,7 +106,7 @@ export default function TrialDashboard() {
 
   const handleKeepAgent = async (trialId: string) => {
     // TODO: Call backend API to convert trial to paid subscription
-    alert('Converting to paid subscription!\n\nPayment integration coming soon...')
+    alert('Subscription upgrade is not available from this screen yet. Please contact support to continue.')
   }
 
   const handleCancelTrial = async (trialId: string) => {
