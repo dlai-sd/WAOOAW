@@ -169,3 +169,59 @@ async def test_scheduler_youtube_uses_credential_aware_publish_path(
     assert len(yt_calls) == 1
     assert yt_calls[0]["credential_ref"] == "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
 
+
+@pytest.mark.asyncio
+async def test_scheduler_resolves_attached_youtube_secret_ref_before_publish(
+    test_client, in_memory_marketing_draft_store, monkeypatch
+):
+    from integrations.social.base import SocialPostResult
+
+    yt_calls = []
+
+    async def _fake_post_text(self, *, credential_ref, text, image_url=None):
+        yt_calls.append({"credential_ref": credential_ref, "text": text})
+        return SocialPostResult(
+            success=True,
+            platform="youtube",
+            post_id="yt-sched-002",
+            post_url="https://www.youtube.com/post/yt-sched-002",
+        )
+
+    async def _fake_resolve(db, *, hired_instance_id, supplied_ref):
+        assert hired_instance_id == "HIRED-001"
+        assert supplied_ref == "cred-youtube-1"
+        return "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
+
+    import integrations.social.youtube_client as yt_module
+    import services.marketing_scheduler as scheduler_module
+
+    monkeypatch.setattr(yt_module.YouTubeClient, "post_text", _fake_post_text)
+    monkeypatch.setattr(scheduler_module, "resolve_youtube_secret_ref", _fake_resolve)
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "hired_instance_id": "HIRED-001",
+            "customer_id": "CUST-001",
+            "theme": "Credential-aware YouTube post",
+            "brand_name": "Care Clinic",
+            "youtube_credential_ref": "cred-youtube-1",
+            "channels": ["youtube"],
+        },
+    )
+    assert create.status_code == 200
+    post_id = create.json()["posts"][0]["post_id"]
+
+    assert await in_memory_marketing_draft_store.update_post(
+        post_id,
+        review_status="approved",
+        approval_id="APR-SCHED-001",
+        execution_status="scheduled",
+        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
+    )
+
+    executed = await run_due_posts_once(db=object())
+    assert executed == 1
+    assert yt_calls[0]["credential_ref"] == "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
+

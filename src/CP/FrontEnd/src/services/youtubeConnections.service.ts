@@ -33,6 +33,19 @@ export type AttachYouTubeConnectionInput = {
   platform_key?: string
 }
 
+export type AttachYouTubeConnectionResponse = {
+  id: string
+  hired_instance_id: string
+  skill_id: string
+  customer_platform_credential_id?: string | null
+  platform_key: string
+  status: string
+  connected_at?: string | null
+  last_verified_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export async function startYouTubeConnection(redirectUri: string): Promise<StartYouTubeConnectionResponse> {
   return gatewayRequestJson<StartYouTubeConnectionResponse>('/cp/youtube-connections/connect/start', {
     method: 'POST',
@@ -62,8 +75,8 @@ export async function getYouTubeConnection(credentialId: string): Promise<YouTub
 export async function attachYouTubeConnection(
   credentialId: string,
   input: AttachYouTubeConnectionInput
-): Promise<Record<string, unknown>> {
-  return gatewayRequestJson<Record<string, unknown>>(
+): Promise<AttachYouTubeConnectionResponse> {
+  return gatewayRequestJson<AttachYouTubeConnectionResponse>(
     `/cp/youtube-connections/${encodeURIComponent(credentialId)}/attach`,
     {
       method: 'POST',

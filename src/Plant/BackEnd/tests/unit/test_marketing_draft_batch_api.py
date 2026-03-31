@@ -150,3 +150,32 @@ def test_execute_youtube_draft_post_publishes_and_persists(
     assert updated_post.execution_status == "posted"
     assert updated_post.provider_post_id == "yt-post-abc123"
 
+
+def test_create_draft_batch_resolves_attached_youtube_secret_ref(
+    test_client, in_memory_marketing_draft_store, monkeypatch
+):
+    async def _fake_resolve(db, *, hired_instance_id, supplied_ref):
+        assert hired_instance_id == "HIRED-001"
+        assert supplied_ref == "cred-youtube-1"
+        return "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
+
+    import api.v1.marketing_drafts as marketing_drafts_module
+
+    monkeypatch.setattr(marketing_drafts_module, "resolve_youtube_secret_ref", _fake_resolve)
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "hired_instance_id": "HIRED-001",
+            "customer_id": "CUST-001",
+            "theme": "Health tips for YouTube",
+            "brand_name": "Care Clinic",
+            "youtube_credential_ref": "cred-youtube-1",
+            "channels": ["youtube"],
+        },
+    )
+    assert create.status_code == 200
+    yt_post = create.json()["posts"][0]
+    assert yt_post["credential_ref"] == "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
+

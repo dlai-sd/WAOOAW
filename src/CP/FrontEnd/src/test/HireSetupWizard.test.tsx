@@ -532,7 +532,18 @@ describe('HireSetupWizard (HIRE-3.1)', () => {
       trial_end_at: null,
     } as any)
 
-    vi.mocked(youtubeSvc.attachYouTubeConnection).mockResolvedValue({ attached: true })
+    vi.mocked(youtubeSvc.attachYouTubeConnection).mockResolvedValue({
+      id: 'conn-att-001',
+      hired_instance_id: 'HAI-ATT-1',
+      skill_id: 'default',
+      customer_platform_credential_id: 'cred-att-001',
+      platform_key: 'youtube',
+      status: 'connected',
+      connected_at: '2026-03-18T09:00:00Z',
+      last_verified_at: '2026-03-18T09:00:00Z',
+      created_at: '2026-03-18T09:00:00Z',
+      updated_at: '2026-03-18T09:00:00Z',
+    })
 
     renderWizard(
       '/hire/setup/SUB-ATT-1?agentId=AGENT-ATT-001&agentTypeId=marketing.digital_marketing.v1&step=3&focus=youtube'

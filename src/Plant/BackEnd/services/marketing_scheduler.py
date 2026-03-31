@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_connector
 from services.draft_batches import DatabaseDraftBatchStore
+from services.marketing_credential_resolver import resolve_youtube_secret_ref
 from services.marketing_providers import default_social_provider, provider_allowlist
 from services.usage_events import UsageEvent, UsageEventStore, UsageEventType
 
@@ -53,9 +54,14 @@ async def run_due_posts_once(
                 )
 
                 try:
+                    effective_credential_ref = await resolve_youtube_secret_ref(
+                        session,
+                        hired_instance_id=batch.hired_instance_id,
+                        supplied_ref=post.credential_ref,
+                    )
                     if post.channel.value == "youtube" and not post.approval_id:
                         raise RuntimeError("approval_required_for_youtube_publish")
-                    if post.channel.value == "youtube" and not post.credential_ref:
+                    if post.channel.value == "youtube" and not effective_credential_ref:
                         raise RuntimeError("credential_ref_required_for_youtube_publish")
                     if post.channel.value == "youtube" and post.visibility == "public" and not post.public_release_requested:
                         raise RuntimeError("public_release_requires_explicit_customer_action")
@@ -70,7 +76,7 @@ async def run_due_posts_once(
 
                         yt_client = YouTubeClient(customer_id=batch.customer_id)
                         yt_result = await yt_client.post_text(
-                            credential_ref=post.credential_ref,
+                            credential_ref=effective_credential_ref,
                             text=post.text,
                         )
                         provider_post_id = yt_result.post_id
@@ -87,6 +93,7 @@ async def run_due_posts_once(
 
                     await store.update_post(
                         post.post_id,
+                        credential_ref=effective_credential_ref,
                         execution_status="posted",
                         attempts=attempt_count,
                         last_error=None,

@@ -31,6 +31,7 @@ from services.policy_denial_audit import (
     PolicyDenialAuditStore,
     get_policy_denial_audit_store,
 )
+from services.marketing_credential_resolver import resolve_youtube_secret_ref
 
 router = waooaw_router(prefix="/marketing", tags=["marketing"])
 
@@ -110,6 +111,11 @@ async def create_draft_batch(
 ) -> CreateDraftBatchResponse:
     store = DatabaseDraftBatchStore(db)
     playbook = _marketing_multichannel_playbook()
+    youtube_secret_ref = await resolve_youtube_secret_ref(
+        db,
+        hired_instance_id=body.hired_instance_id,
+        supplied_ref=body.youtube_credential_ref,
+    )
 
     result = execute_marketing_multichannel_v1(
         playbook,
@@ -132,7 +138,7 @@ async def create_draft_batch(
             channel=v.channel,
             text=v.text,
             hashtags=v.hashtags,
-            credential_ref=body.youtube_credential_ref if v.channel == ChannelName.YOUTUBE else None,
+            credential_ref=youtube_secret_ref if v.channel == ChannelName.YOUTUBE else None,
             visibility=body.youtube_visibility if v.channel == ChannelName.YOUTUBE else "private",
             public_release_requested=body.public_release_requested if v.channel == ChannelName.YOUTUBE else False,
         )
@@ -369,17 +375,23 @@ async def execute_draft_post(
         )
 
     # For YouTube posts that are approved and have credential_ref, publish immediately.
+    effective_credential_ref = await resolve_youtube_secret_ref(
+        db,
+        hired_instance_id=batch.hired_instance_id,
+        supplied_ref=post.credential_ref,
+    )
+
     if (
         post.channel.value == "youtube"
         and post.review_status == "approved"
-        and post.credential_ref
+        and effective_credential_ref
     ):
         try:
             from integrations.social.youtube_client import YouTubeClient
 
             client = YouTubeClient(customer_id=batch.customer_id)
             result = await client.post_text(
-                credential_ref=post.credential_ref,
+                credential_ref=effective_credential_ref,
                 text=post.text,
             )
             provider_post_id = result.post_id
@@ -387,6 +399,7 @@ async def execute_draft_post(
 
             await store.update_post(
                 post_id,
+                credential_ref=effective_credential_ref,
                 execution_status="posted",
                 provider_post_id=provider_post_id,
                 provider_post_url=provider_post_url,
