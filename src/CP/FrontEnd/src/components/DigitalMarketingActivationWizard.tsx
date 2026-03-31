@@ -717,9 +717,17 @@ export function DigitalMarketingActivationWizard({
   const handleApprovePost = async (postId: string) => {
     setPostActionStatus((s) => ({ ...s, [postId]: 'loading' }))
     try {
-      await approveDraftPost(postId)
+      const approval = await approveDraftPost(postId)
       setDraftPosts((posts) =>
-        posts.map((p) => (p.post_id === postId ? { ...p, review_status: 'approved' } : p))
+        posts.map((p) => (
+          p.post_id === postId
+            ? {
+                ...p,
+                review_status: 'approved',
+                approval_id: approval.approval_id || p.approval_id || null,
+              }
+            : p
+        ))
       )
       setPostActionStatus((s) => ({ ...s, [postId]: 'done' }))
     } catch {

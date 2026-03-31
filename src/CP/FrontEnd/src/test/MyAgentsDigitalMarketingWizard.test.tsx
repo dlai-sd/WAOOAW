@@ -60,6 +60,14 @@ vi.mock('../services/platformConnections.service', () => ({
     connections.find((connection) => String(connection.platform_key || '').trim().toLowerCase() === String(platformKey || '').trim().toLowerCase()) || null,
 }))
 
+vi.mock('../services/marketingReview.service', () => ({
+  createDraftBatch: vi.fn(),
+  executeDraftPost: vi.fn(),
+  approveDraftPost: vi.fn(),
+  rejectDraftPost: vi.fn(),
+  scheduleDraftPost: vi.fn(),
+}))
+
 const mockInstance = {
   subscription_id: 'SUB-1',
   agent_id: 'AGT-MKT-DMA-001',
@@ -220,6 +228,7 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     const ytModule = await import('../services/youtubeConnections.service')
     const platformModule = await import('../services/platformConnections.service')
+    const marketingReviewModule = await import('../services/marketingReview.service')
     vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([])
     vi.mocked(ytModule.attachYouTubeConnection).mockResolvedValue({
       id: 'conn-youtube-bootstrap',
@@ -234,6 +243,48 @@ describe('DMA Activation Wizard — step navigation', () => {
       updated_at: '2026-03-18T09:00:00Z',
     })
     vi.mocked(platformModule.listPlatformConnections).mockResolvedValue([])
+    vi.mocked(marketingReviewModule.createDraftBatch).mockResolvedValue({
+      batch_id: 'batch-1',
+      agent_id: 'AGT-MKT-DMA-001',
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      theme: 'WAOOAW',
+      brand_name: 'WAOOAW',
+      created_at: '2026-03-18T09:00:00Z',
+      status: 'pending_review',
+      posts: [
+        {
+          post_id: 'post-youtube-1',
+          channel: 'youtube',
+          text: 'Draft YouTube copy',
+          review_status: 'pending_review',
+          approval_id: null,
+          execution_status: 'not_scheduled',
+        },
+      ],
+    })
+    vi.mocked(marketingReviewModule.approveDraftPost).mockResolvedValue({
+      post_id: 'post-youtube-1',
+      review_status: 'approved',
+      approval_id: 'APR-123',
+    })
+    vi.mocked(marketingReviewModule.executeDraftPost).mockResolvedValue({
+      allowed: true,
+      decision_id: 'decision-1',
+      post_id: 'post-youtube-1',
+      execution_status: 'posted',
+      provider_post_url: 'https://youtube.com/post/123',
+      provider_post_id: 'yt-123',
+    })
+    vi.mocked(marketingReviewModule.rejectDraftPost).mockResolvedValue({
+      post_id: 'post-youtube-1',
+      decision: 'rejected',
+    })
+    vi.mocked(marketingReviewModule.scheduleDraftPost).mockResolvedValue({
+      post_id: 'post-youtube-1',
+      execution_status: 'scheduled',
+      scheduled_at: '2026-03-18T10:00:00Z',
+    })
   })
 
   it('renders wizard shell with 7 step buttons', async () => {
@@ -784,6 +835,86 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
     expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
+  })
+
+  it('reuses the approval returned by approve before publishing a YouTube draft', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const platformModule = await import('../services/platformConnections.service')
+    const marketingReviewModule = await import('../services/marketingReview.service')
+
+    const attachedActivation = {
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: 'Growth marketing',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        platform_bindings: { youtube: { skill_id: 'default' } },
+        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: true,
+        missing_requirements: [],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any
+
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValue(attachedActivation)
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValue(attachedActivation)
+    vi.mocked(platformModule.listPlatformConnections).mockResolvedValue([
+      {
+        id: 'conn-youtube-1',
+        hired_instance_id: 'HAI-1',
+        skill_id: 'default',
+        customer_platform_credential_id: 'cred-youtube-1',
+        platform_key: 'youtube',
+        status: 'connected',
+        connected_at: '2026-03-18T09:00:00Z',
+        last_verified_at: '2026-03-18T09:00:00Z',
+        created_at: '2026-03-18T09:00:00Z',
+        updated_at: '2026-03-18T09:00:00Z',
+      },
+    ] as any)
+
+    renderWizard()
+    await goToConnectStep()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generate-youtube-draft-btn')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('generate-youtube-draft-btn'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('draft-post-card-post-youtube-1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('approve-post-btn-post-youtube-1'))
+
+    await waitFor(() => {
+      expect(marketingReviewModule.approveDraftPost).toHaveBeenCalledWith('post-youtube-1')
+      expect(screen.getByTestId('publish-now-btn-post-youtube-1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('publish-now-btn-post-youtube-1'))
+
+    await waitFor(() => {
+      expect(marketingReviewModule.executeDraftPost).toHaveBeenCalledWith({
+        post_id: 'post-youtube-1',
+        agent_id: 'AGT-MKT-DMA-001',
+        approval_id: 'APR-123',
+        intent_action: 'publish',
+      })
+    })
   })
 })
 
