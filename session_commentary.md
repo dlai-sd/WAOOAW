@@ -1,6 +1,49 @@
 
 ---
 
+## [2026-03-31 15:40 UTC] Redis plan + get-plan durability update in progress
+
+**Branch**: `docs/plant-redis-1-plan-and-get-plan`
+**Status**: In progress
+
+### Goal
+Update `.github/prompts/get-plan.prompt.md` so plan generation survives request limits via session commentary notes and small checkpoint commits, then create a real single-iteration Redis plan and open a PR.
+
+### Current checklist
+- [x] Create durable branch for prompt + plan work
+- [x] Persist session note and working checklist
+- [x] Update `get-plan.prompt.md` with durability + secret/image-promotion rules
+- [x] Replace placeholder Redis plan with a self-sufficient single-iteration plan
+- [x] Commit prompt change checkpoint (`91fc4fa6`)
+- [x] Commit plan file checkpoint (`47b287df`)
+- [x] Push branch and open PR (`#987` — https://github.com/dlai-sd/WAOOAW/pull/987)
+
+### Recovery hint
+If the session drops, resume on `docs/plant-redis-1-plan-and-get-plan`, verify commits `91fc4fa6`, `47b287df`, and `a3078d1d`, then continue from PR `#987`. Do not restart the repo archaeology.
+
+---
+
+## [2026-03-31 16:20 UTC] Extend get-ready prompt with durability + secret rules
+
+**Branch**: `docs/plant-redis-1-plan-and-get-plan`
+**PR**: `#987` — https://github.com/dlai-sd/WAOOAW/pull/987
+**Status**: Completed
+
+### Goal
+Update `.github/prompts/get-ready.prompt.md` so agents anticipate request limits by writing a working note/checklist into `session_commentary.md`, then committing/pushing small checkpoints on long-running work. Also enforce that environment-specific values live in GCP Secret Manager or Cloud Run runtime env/secret refs so the same image promotes cleanly demo -> uat -> prod.
+
+### Current checklist
+- [x] Persist this session note before editing prompt files
+- [x] Update `get-ready.prompt.md` with durability workflow instructions
+- [x] Add image-promotion and GCP-secret rules to `get-ready.prompt.md`
+- [x] Commit prompt change checkpoint (`1107776d`)
+- [x] Push branch to update PR `#987`
+
+### Recovery hint
+If the session drops, stay on `docs/plant-redis-1-plan-and-get-plan`, verify commit `1107776d` is present on PR `#987`, and continue from the next requested scope instead of re-running the prompt update.
+
+---
+
 ## [2026-03-04 16:30 UTC] Diagnosed and fixed Razorpay 502 (receipt too long)
 
 **Branch**: `fix/razorpay-receipt-length-plant`
