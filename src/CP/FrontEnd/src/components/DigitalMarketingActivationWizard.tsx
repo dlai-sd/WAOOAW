@@ -33,6 +33,11 @@ import {
   listYouTubeConnections,
   type YouTubeConnection,
 } from '../services/youtubeConnections.service'
+import {
+  findPlatformConnection,
+  listPlatformConnections,
+  type PlatformConnection,
+} from '../services/platformConnections.service'
 import { redirectTo } from '../utils/browserNavigation'
 import {
   beginYouTubeOAuthFlow,
@@ -216,6 +221,7 @@ export function DigitalMarketingActivationWizard({
   const [finishError, setFinishError] = useState<string | null>(null)
   const [youtubeConnected, setYoutubeConnected] = useState(false)
   const [savedYouTubeConnection, setSavedYouTubeConnection] = useState<YouTubeConnection | null>(null)
+  const [attachedYouTubeConnection, setAttachedYouTubeConnection] = useState<PlatformConnection | null>(null)
   const [oauthLoading, setOauthLoading] = useState(false)
   const [oauthError, setOauthError] = useState<string | null>(null)
   const [oauthMessage, setOauthMessage] = useState<string | null>(null)
@@ -268,7 +274,7 @@ export function DigitalMarketingActivationWizard({
               skill_id: youtubeSkillId,
               customer_platform_credential_id: connection?.id,
               credential_id: connection?.id,
-              connected: true,
+              connected: Boolean(connection),
             },
           },
         },
@@ -279,6 +285,28 @@ export function DigitalMarketingActivationWizard({
       }
     })
   }
+
+  async function refreshAttachedYouTubeConnection(nextHiredInstanceId: string): Promise<PlatformConnection | null> {
+    if (!nextHiredInstanceId) {
+      setAttachedYouTubeConnection(null)
+      return null
+    }
+
+    try {
+      const connections = await listPlatformConnections(nextHiredInstanceId)
+      const connection = findPlatformConnection(connections, 'youtube')
+      setAttachedYouTubeConnection(connection)
+      return connection
+    } catch {
+      setAttachedYouTubeConnection(null)
+      return null
+    }
+  }
+
+  const isYouTubeAttached = useMemo(() => {
+    const status = String(attachedYouTubeConnection?.status || '').trim().toLowerCase()
+    return Boolean(attachedYouTubeConnection && (status === 'connected' || status === 'active'))
+  }, [attachedYouTubeConnection])
 
   // Auto-select + advance if only one instance and we are on step 0
   useEffect(() => {
@@ -296,6 +324,7 @@ export function DigitalMarketingActivationWizard({
 
     clearYouTubeOAuthResult()
     markYouTubeConnected(result.connection, result.message)
+    void refreshAttachedYouTubeConnection(result.hiredInstanceId || hiredInstanceId)
     setActiveStepIndex(DMA_STEPS.findIndex((s) => s.id === 'connect'))
   }, [hiredInstanceId])
 
@@ -309,6 +338,10 @@ export function DigitalMarketingActivationWizard({
         setSavedYouTubeConnection(null)
       })
   }, [])
+
+  useEffect(() => {
+    void refreshAttachedYouTubeConnection(hiredInstanceId)
+  }, [hiredInstanceId])
 
   useEffect(() => {
     setYoutubeConnected(Boolean(activation?.readiness?.youtube_connection_ready))
@@ -550,14 +583,16 @@ export function DigitalMarketingActivationWizard({
       const knownConnection = savedYouTubeConnection || pickReusableYouTubeConnection(await listYouTubeConnections())
       if (knownConnection) {
         try {
-          await attachYouTubeConnection(knownConnection.id, {
+          const attachedConnection = await attachYouTubeConnection(knownConnection.id, {
             hired_instance_id: hiredInstanceId,
             skill_id: youtubeSkillId,
           })
           markYouTubeConnected(knownConnection, 'Saved YouTube connection linked successfully.')
+          setAttachedYouTubeConnection(attachedConnection)
           return
         } catch {
           setSavedYouTubeConnection(null)
+          setAttachedYouTubeConnection(null)
         }
       }
 
@@ -630,15 +665,20 @@ export function DigitalMarketingActivationWizard({
 
   const youtubeCredentialRef: string | null = useMemo(() => {
     const binding = activation?.workspace?.platform_bindings?.youtube
-    return String(binding?.credential_ref || binding?.customer_platform_credential_id || '').trim() || null
-  }, [activation?.workspace?.platform_bindings])
+    return String(
+      attachedYouTubeConnection?.customer_platform_credential_id
+      || binding?.credential_ref
+      || binding?.customer_platform_credential_id
+      || ''
+    ).trim() || null
+  }, [activation?.workspace?.platform_bindings, attachedYouTubeConnection?.customer_platform_credential_id])
 
   const canGenerateYouTubeDraft = useMemo(() => {
     const ytSelected = selectedPlatforms.includes('youtube')
-    const ytReady = Boolean(youtubeConnected || activation?.readiness?.youtube_connection_ready)
+    const ytReady = isYouTubeAttached
     const briefReady = Boolean(brandName.trim())
     return ytSelected && ytReady && ytSelected && briefReady && !draftGenerating
-  }, [selectedPlatforms, youtubeConnected, activation?.readiness?.youtube_connection_ready, brandName, draftGenerating])
+  }, [selectedPlatforms, isYouTubeAttached, brandName, draftGenerating])
 
   const handleGenerateYouTubeDraft = async () => {
     if (!canGenerateYouTubeDraft || !hiredInstanceId) return
@@ -1055,14 +1095,14 @@ export function DigitalMarketingActivationWizard({
                             Verification pending — reconnect to refresh.
                           </span>
                         ) : null}
-                        {youtubeConnected && !savedYouTubeConnection?.id ? (
+                        {youtubeConnected && !isYouTubeAttached ? (
                           <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
                             Connection needs to be attached.
                           </span>
                         ) : null}
                       </div>
                       <div className="dma-wizard-platform-connect-action">
-                        {youtubeConnected ? (
+                        {isYouTubeAttached ? (
                           <span className="dma-wizard-connected-badge" data-testid="youtube-connected-badge">✓ Connected</span>
                         ) : (
                           <Button
@@ -1073,8 +1113,10 @@ export function DigitalMarketingActivationWizard({
                             {oauthLoading
                               ? 'Connecting…'
                               : savedYouTubeConnection
-                                ? 'Use saved YouTube connection'
-                                : 'Connect with Google'}
+                                ? 'Attach saved YouTube connection'
+                                : youtubeConnected
+                                  ? 'Reconnect YouTube'
+                                  : 'Connect with Google'}
                           </Button>
                         )}
                       </div>
@@ -1105,7 +1147,7 @@ export function DigitalMarketingActivationWizard({
                             {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
                           </Button>
                           {draftGenerating ? <Spinner size="tiny" /> : null}
-                          {!youtubeConnected ? (
+                          {!isYouTubeAttached ? (
                             <span style={{ opacity: 0.6, fontSize: '0.83rem' }}>Connect YouTube first</span>
                           ) : !brandName.trim() ? (
                             <span style={{ opacity: 0.6, fontSize: '0.83rem' }}>Enter brand name first</span>
@@ -1126,7 +1168,7 @@ export function DigitalMarketingActivationWizard({
                               const isPosted = post.execution_status === 'posted'
                               const isScheduled = post.execution_status === 'scheduled'
                               const receiptUrl = postPublishReceipts[post.post_id] || post.provider_post_url
-                              const ytAttached = Boolean(youtubeConnected && (youtubeCredentialRef || savedYouTubeConnection?.id))
+                              const ytAttached = isYouTubeAttached
                               return (
                                 <div
                                   key={post.post_id}
