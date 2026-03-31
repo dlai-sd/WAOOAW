@@ -3818,6 +3818,72 @@ section[id] {
   flex-shrink: 0;
 }
 
+.dma-wizard-connect-next-step {
+  margin-top: 1rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(0,242,254,0.24);
+  border-radius: 12px;
+  background: rgba(0,242,254,0.05);
+  color: var(--colorNeutralForeground2);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.dma-wizard-theme-workshop-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(0,242,254,0.06), rgba(255,255,255,0.02));
+}
+
+.dma-wizard-theme-workshop-thread {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dma-wizard-theme-workshop-message {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: rgba(255,255,255,0.04);
+}
+
+.dma-wizard-theme-workshop-message--assistant {
+  border-color: rgba(0,242,254,0.28);
+  background: rgba(0,242,254,0.08);
+}
+
+.dma-wizard-theme-workshop-message--user {
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.03);
+}
+
+.dma-wizard-theme-workshop-message-role {
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.dma-wizard-theme-follow-up-question {
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  font-size: 0.9rem;
+}
+
+.dma-wizard-theme-draft-panel {
+  padding: 1rem;
+  border: 1px solid var(--colorNeutralStroke2);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+}
+
 .dma-wizard-connected-badge {
   display: inline-flex;
   align-items: center;

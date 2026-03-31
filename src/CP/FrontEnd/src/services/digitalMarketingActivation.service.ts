@@ -30,11 +30,36 @@ export type DigitalMarketingCampaignSchedule = {
   preferred_hours_utc: number[]
 }
 
+export type DigitalMarketingStrategyWorkshopMessage = {
+  role: 'assistant' | 'user'
+  content: string
+}
+
+export type DigitalMarketingStrategyWorkshopSummary = {
+  business_focus?: string
+  audience?: string
+  positioning?: string
+  tone?: string
+  content_pillars?: string[]
+  youtube_angle?: string
+  cta?: string
+}
+
+export type DigitalMarketingStrategyWorkshop = {
+  status?: 'not_started' | 'discovery' | 'approval_ready' | 'approved'
+  assistant_message?: string
+  follow_up_questions?: string[]
+  messages?: DigitalMarketingStrategyWorkshopMessage[]
+  summary?: DigitalMarketingStrategyWorkshopSummary
+  approved_at?: string | null
+}
+
 export type DigitalMarketingCampaignSetup = {
   campaign_id?: string | null
   master_theme?: string
   derived_themes?: DigitalMarketingDerivedTheme[]
   schedule?: Partial<DigitalMarketingCampaignSchedule>
+  strategy_workshop?: DigitalMarketingStrategyWorkshop
 }
 
 export type DigitalMarketingLegacyWorkspace = {
