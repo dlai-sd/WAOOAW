@@ -649,7 +649,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(pending?.returnTo).toBe('/my-agents')
   })
 
-  it('does not show a connected badge or enable draft generation until the hire connection is attached', async () => {
+  it('does not show a connected badge or draft CTA until the hire connection is attached', async () => {
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     const ytModule = await import('../services/youtubeConnections.service')
     const platformModule = await import('../services/platformConnections.service')
@@ -707,7 +707,83 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     expect(screen.getByRole('button', { name: 'Attach saved YouTube connection' })).toBeInTheDocument()
     expect(screen.queryByTestId('youtube-connected-badge')).not.toBeInTheDocument()
-    expect(screen.getByTestId('generate-youtube-draft-btn')).toBeDisabled()
+    expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('generate-youtube-draft-next-step-hint')).not.toBeInTheDocument()
+  })
+
+  it('shows next-step guidance instead of a disabled draft CTA when YouTube is attached but brand brief is incomplete', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const ytModule = await import('../services/youtubeConnections.service')
+    const platformModule = await import('../services/platformConnections.service')
+
+    const attachedActivation = {
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: '',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: '',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        platform_bindings: { youtube: { skill_id: 'default' } },
+        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+      },
+      readiness: {
+        brief_complete: false,
+        youtube_selected: true,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: false,
+        missing_requirements: [],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any
+
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValue(attachedActivation)
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockResolvedValue(attachedActivation)
+    vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-youtube-1',
+        customer_id: 'CUST-1',
+        platform_key: 'youtube',
+        provider_account_id: 'channel-1',
+        display_name: 'Channel One',
+        granted_scopes: [],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        token_expires_at: null,
+        last_verified_at: '2026-03-18T09:00:00Z',
+        created_at: '2026-03-18T09:00:00Z',
+        updated_at: '2026-03-18T09:00:00Z',
+      },
+    ])
+    vi.mocked(platformModule.listPlatformConnections).mockResolvedValue([
+      {
+        id: 'conn-youtube-1',
+        hired_instance_id: 'HAI-1',
+        skill_id: 'default',
+        customer_platform_credential_id: 'cred-youtube-1',
+        platform_key: 'youtube',
+        status: 'connected',
+        connected_at: '2026-03-18T09:00:00Z',
+        last_verified_at: '2026-03-18T09:00:00Z',
+        created_at: '2026-03-18T09:00:00Z',
+        updated_at: '2026-03-18T09:00:00Z',
+      },
+    ] as any)
+
+    renderWizard()
+    await goToConnectStep()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('youtube-connected-badge')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
+    expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
   })
 })
 

@@ -1137,22 +1137,25 @@ export function DigitalMarketingActivationWizard({
                         <div style={{ opacity: 0.7, fontSize: '0.85rem', marginBottom: '0.75rem' }}>
                           Creates a draft YouTube post from your brand brief and master theme.
                         </div>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                          <Button
-                            appearance="primary"
-                            onClick={() => void handleGenerateYouTubeDraft()}
-                            disabled={!canGenerateYouTubeDraft || readOnly}
-                            data-testid="generate-youtube-draft-btn"
-                          >
-                            {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
-                          </Button>
-                          {draftGenerating ? <Spinner size="tiny" /> : null}
-                          {!isYouTubeAttached ? (
-                            <span style={{ opacity: 0.6, fontSize: '0.83rem' }}>Connect YouTube first</span>
-                          ) : !brandName.trim() ? (
-                            <span style={{ opacity: 0.6, fontSize: '0.83rem' }}>Enter brand name first</span>
-                          ) : null}
-                        </div>
+                        {!isYouTubeAttached ? (
+                          <div style={{ opacity: 0.6, fontSize: '0.83rem' }}>Connect YouTube first</div>
+                        ) : !brandName.trim() ? (
+                          <div style={{ opacity: 0.75, fontSize: '0.85rem' }} data-testid="generate-youtube-draft-next-step-hint">
+                            Continue to Build Master Theme to enter your brand brief before generating a YouTube draft.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                            <Button
+                              appearance="primary"
+                              onClick={() => void handleGenerateYouTubeDraft()}
+                              disabled={!canGenerateYouTubeDraft || readOnly}
+                              data-testid="generate-youtube-draft-btn"
+                            >
+                              {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
+                            </Button>
+                            {draftGenerating ? <Spinner size="tiny" /> : null}
+                          </div>
+                        )}
                         {draftGenerateError ? (
                           <FeedbackMessage intent="error" title="Draft generation failed" message={draftGenerateError} />
                         ) : null}
