@@ -336,6 +336,35 @@ async def execute_draft_post(
 
     batch, post = found
     correlation_id = body.correlation_id or str(uuid4())
+    requested_approval_id = (body.approval_id or "").strip() or None
+    stored_approval_id = (post.approval_id or "").strip() or None
+
+    if requested_approval_id and stored_approval_id and requested_approval_id != stored_approval_id:
+        details = {
+            "post_id": post_id,
+            "correlation_id": correlation_id,
+            "message": "Invalid approval_id for execution",
+        }
+        policy_audit.append(
+            PolicyDenialAuditRecord(
+                correlation_id=correlation_id,
+                decision_id="",
+                agent_id=body.agent_id,
+                customer_id=body.customer_id,
+                stage=str(HookStage.PRE_TOOL_USE),
+                action=body.intent_action,
+                reason="approval_invalid",
+                path=str(request.url.path),
+                details=details,
+            )
+        )
+        raise PolicyEnforcementError(
+            "Policy denied tool use",
+            reason="approval_invalid",
+            details=details,
+        )
+
+    effective_approval_id = requested_approval_id or stored_approval_id
 
     decision = default_hook_bus().emit(
         HookEvent(
@@ -345,7 +374,7 @@ async def execute_draft_post(
             customer_id=body.customer_id,
             purpose=body.purpose,
             action=body.intent_action,
-            payload={"approval_id": body.approval_id, "post_id": post_id},
+            payload={"approval_id": effective_approval_id, "post_id": post_id},
         )
     )
 
