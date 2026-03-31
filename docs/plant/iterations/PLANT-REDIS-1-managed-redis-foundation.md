@@ -291,7 +291,7 @@ Post the PR URL in chat. **HALT.**
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | E1: Live Redis exists and every service has a secret-backed contract | Provision managed Redis by script and bootstrap service secrets | 🔴 Not Started | — |
+| E1-S1 | 1 | E1: Live Redis exists and every service has a secret-backed contract | Provision managed Redis by script and bootstrap service secrets | 🚫 Blocked | pending PR |
 | E1-S2 | 1 | E1: Live Redis exists and every service has a secret-backed contract | Replace hardcoded Redis wiring with Cloud Run secret references | 🔴 Not Started | — |
 | E2-S1 | 1 | E2: Plant owns the reusable Redis runtime contract | Create shared Plant Redis runtime service | 🔴 Not Started | — |
 | E2-S2 | 1 | E2: Plant owns the reusable Redis runtime contract | Add reusable Plant Redis runtime endpoints | 🔴 Not Started | — |
@@ -407,6 +407,11 @@ gcloud redis instances describe waooaw-redis-demo --region asia-south1 --project
 
 **Done signal (post as a comment then continue to E1-S2):**
 `"E1-S1 done. Changed: cloud/scripts/provision-managed-redis.sh. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+**Execution status update — 2026-03-31:**
+- `cloud/scripts/provision-managed-redis.sh` and `tests/test_provision_managed_redis_script.py` were added and validated locally (`bash -n` + focused pytest green).
+- Live demo apply was attempted with `--apply` and failed on GCP IAM: `Permission 'redis.instances.create' denied` for `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`.
+- Story can move to done as soon as a principal with `redis.instances.create` and Secret Manager write access runs the script successfully against demo.
 
 ---
 
