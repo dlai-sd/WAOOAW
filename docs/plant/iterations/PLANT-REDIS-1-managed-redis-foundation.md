@@ -40,6 +40,38 @@
 
 ---
 
+## Live Redis Readiness Snapshot
+
+| Field | Value |
+|---|---|
+| Provisioned on | 2026-03-31 |
+| GCP project | `waooaw-oauth` |
+| Environment | `demo` |
+| Redis instance | `waooaw-redis-demo` |
+| Region | `asia-south1` |
+| Tier | `BASIC` |
+| Size | `1 GB` |
+| Connect mode | `DIRECT_PEERING` |
+| Network | `default` |
+| Host | `10.53.167.11` |
+| Port | `6379` |
+| State | `READY` |
+
+### Secret Contract Ready For Stories
+
+| Secret name | Consumer | Value shape |
+|---|---|---|
+| `demo-plant-backend-redis-url` | Plant BackEnd | `redis://10.53.167.11:6379/0` |
+| `demo-plant-gateway-redis-url` | Plant Gateway | `redis://10.53.167.11:6379/1` |
+| `demo-pp-backend-redis-url` | PP BackEnd | `redis://10.53.167.11:6379/2` |
+| `demo-cp-backend-redis-url` | CP BackEnd | `redis://10.53.167.11:6379/3` |
+
+### Story handoff note
+
+Iteration 1 stories after E1-S1 must treat the demo Redis infra as already created and must reuse the host and secret contract above instead of creating a second Redis instance or introducing new secret names. All remaining stories must continue the same image-promotion rule: environment-specific Redis values live only in GCP Secret Manager or Cloud Run runtime secret references.
+
+---
+
 ## Zero-Cost Agent Constraints (READ FIRST)
 
 | Constraint | How this plan handles it |
@@ -291,7 +323,7 @@ Post the PR URL in chat. **HALT.**
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | E1: Live Redis exists and every service has a secret-backed contract | Provision managed Redis by script and bootstrap service secrets | 🚫 Blocked | pending PR |
+| E1-S1 | 1 | E1: Live Redis exists and every service has a secret-backed contract | Provision managed Redis by script and bootstrap service secrets | 🟢 Done | #988 |
 | E1-S2 | 1 | E1: Live Redis exists and every service has a secret-backed contract | Replace hardcoded Redis wiring with Cloud Run secret references | 🔴 Not Started | — |
 | E2-S1 | 1 | E2: Plant owns the reusable Redis runtime contract | Create shared Plant Redis runtime service | 🔴 Not Started | — |
 | E2-S2 | 1 | E2: Plant owns the reusable Redis runtime contract | Add reusable Plant Redis runtime endpoints | 🔴 Not Started | — |
@@ -410,8 +442,9 @@ gcloud redis instances describe waooaw-redis-demo --region asia-south1 --project
 
 **Execution status update — 2026-03-31:**
 - `cloud/scripts/provision-managed-redis.sh` and `tests/test_provision_managed_redis_script.py` were added and validated locally (`bash -n` + focused pytest green).
-- Live demo apply was attempted with `--apply` and failed on GCP IAM: `Permission 'redis.instances.create' denied` for `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`.
-- Story can move to done as soon as a principal with `redis.instances.create` and Secret Manager write access runs the script successfully against demo.
+- Live demo apply completed successfully with `bash cloud/scripts/provision-managed-redis.sh --project waooaw-oauth --region asia-south1 --environment demo --network projects/waooaw-oauth/global/networks/default --apply`.
+- Managed Redis instance `waooaw-redis-demo` is `READY` at `10.53.167.11:6379`, and the four per-service Secret Manager Redis URL secrets were created with DB indices `/0`, `/1`, `/2`, and `/3`.
+- Downstream stories must now use the existing secret names and runtime contract above instead of provisioning more Redis infra.
 
 ---
 

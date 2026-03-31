@@ -128,9 +128,11 @@ Implement the Redis creation story from `docs/plant/iterations/PLANT-REDIS-1-man
 ### Current result
 - `cloud/scripts/provision-managed-redis.sh` implemented with help, dry-run, idempotent secret upsert flow, and explicit failure handling.
 - `tests/test_provision_managed_redis_script.py` passes (`3 passed`).
-- Live `--apply` against demo is blocked by IAM: `Permission 'redis.instances.create' denied` for `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`.
+- Live `--apply` against demo completed successfully.
+- Redis instance details: `waooaw-redis-demo`, `asia-south1`, `BASIC`, `1 GB`, host `10.53.167.11`, port `6379`, state `READY`, network `default`, connect mode `DIRECT_PEERING`.
+- Secret Manager contracts created: `demo-plant-backend-redis-url`, `demo-plant-gateway-redis-url`, `demo-pp-backend-redis-url`, `demo-cp-backend-redis-url` with DB indices `/0`, `/1`, `/2`, `/3`.
 - Review PR: `#988` — https://github.com/dlai-sd/WAOOAW/pull/988
 
 ### Recovery hint
-If the session drops, resume on `feat/plant-redis-script-story`, inspect the latest diff for `cloud/scripts/provision-managed-redis.sh`, its test file, and the Redis plan status update, then continue from validation rather than re-reading the repo.
+If the session drops, resume on `feat/plant-redis-script-story`, inspect the latest diff for `cloud/scripts/provision-managed-redis.sh`, its test file, and the Redis plan readiness snapshot, then continue from service-wiring stories rather than re-running Redis creation.
 
