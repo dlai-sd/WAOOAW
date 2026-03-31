@@ -23,6 +23,27 @@ If the session drops, resume on `docs/plant-redis-1-plan-and-get-plan`, verify c
 
 ---
 
+## [2026-03-31 16:20 UTC] Extend get-ready prompt with durability + secret rules
+
+**Branch**: `docs/plant-redis-1-plan-and-get-plan`
+**PR**: `#987` — https://github.com/dlai-sd/WAOOAW/pull/987
+**Status**: In progress
+
+### Goal
+Update `.github/prompts/get-ready.prompt.md` so agents anticipate request limits by writing a working note/checklist into `session_commentary.md`, then committing/pushing small checkpoints on long-running work. Also enforce that environment-specific values live in GCP Secret Manager or Cloud Run runtime env/secret refs so the same image promotes cleanly demo -> uat -> prod.
+
+### Current checklist
+- [x] Persist this session note before editing prompt files
+- [ ] Update `get-ready.prompt.md` with durability workflow instructions
+- [ ] Add image-promotion and GCP-secret rules to `get-ready.prompt.md`
+- [ ] Commit prompt change checkpoint
+- [ ] Push branch to update PR `#987`
+
+### Recovery hint
+If the session drops, stay on `docs/plant-redis-1-plan-and-get-plan`, update the checklist above first, then continue the prompt edit instead of re-reading the repo.
+
+---
+
 ## [2026-03-04 16:30 UTC] Diagnosed and fixed Razorpay 502 (receipt too long)
 
 **Branch**: `fix/razorpay-receipt-length-plant`
