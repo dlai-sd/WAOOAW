@@ -112,7 +112,7 @@ Both must be live for Razorpay checkout to work end-to-end.
 ## [2026-03-31 16:55 UTC] E1-S1 managed Redis script story
 
 **Branch**: `feat/plant-redis-script-story`
-**Status**: In progress
+**Status**: Completed pending IAM unblock
 
 ### Goal
 Implement the Redis creation story from `docs/plant/iterations/PLANT-REDIS-1-managed-redis-foundation.md`: create an idempotent GCP provisioning script for demo managed Redis, add a focused test, validate the script, then update the plan and open a new PR.
@@ -123,12 +123,13 @@ Implement the Redis creation story from `docs/plant/iterations/PLANT-REDIS-1-man
 - [x] Add `cloud/scripts/provision-managed-redis.sh`
 - [x] Add focused test for help/dry-run/idempotent secret URL generation
 - [x] Run syntax/help validation and attempt live apply against demo
-- [ ] Update plan status/readiness and open PR
+- [x] Update plan status/readiness and open PR
 
 ### Current result
 - `cloud/scripts/provision-managed-redis.sh` implemented with help, dry-run, idempotent secret upsert flow, and explicit failure handling.
 - `tests/test_provision_managed_redis_script.py` passes (`3 passed`).
 - Live `--apply` against demo is blocked by IAM: `Permission 'redis.instances.create' denied` for `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`.
+- Review PR: `#988` — https://github.com/dlai-sd/WAOOAW/pull/988
 
 ### Recovery hint
 If the session drops, resume on `feat/plant-redis-script-story`, inspect the latest diff for `cloud/scripts/provision-managed-redis.sh`, its test file, and the Redis plan status update, then continue from validation rather than re-reading the repo.
