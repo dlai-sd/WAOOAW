@@ -81,6 +81,76 @@ def test_execute_draft_post_requires_approval_id(test_client, in_memory_marketin
     assert allowed_body["post_id"] == post_id
 
 
+def test_execute_approved_draft_post_uses_stored_approval_id_when_payload_missing(
+    test_client, in_memory_marketing_draft_store
+):
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "customer_id": "CUST-001",
+            "theme": "Seasonal allergies awareness",
+            "brand_name": "Care Clinic",
+        },
+    )
+    assert create.status_code == 200
+    post_id = create.json()["posts"][0]["post_id"]
+
+    approve = test_client.post(
+        f"/api/v1/marketing/draft-posts/{post_id}/approve",
+        json={"approval_id": "APR-STORED-001"},
+    )
+    assert approve.status_code == 200
+
+    execute = test_client.post(
+        f"/api/v1/marketing/draft-posts/{post_id}/execute",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "customer_id": "CUST-001",
+            "intent_action": "publish",
+        },
+    )
+    assert execute.status_code == 200
+    execute_body = execute.json()
+    assert execute_body["allowed"] is True
+    assert execute_body["post_id"] == post_id
+
+
+def test_execute_approved_draft_post_rejects_mismatched_approval_id(
+    test_client, in_memory_marketing_draft_store
+):
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "customer_id": "CUST-001",
+            "theme": "Seasonal allergies awareness",
+            "brand_name": "Care Clinic",
+        },
+    )
+    assert create.status_code == 200
+    post_id = create.json()["posts"][0]["post_id"]
+
+    approve = test_client.post(
+        f"/api/v1/marketing/draft-posts/{post_id}/approve",
+        json={"approval_id": "APR-STORED-001"},
+    )
+    assert approve.status_code == 200
+
+    execute = test_client.post(
+        f"/api/v1/marketing/draft-posts/{post_id}/execute",
+        json={
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "customer_id": "CUST-001",
+            "intent_action": "publish",
+            "approval_id": "APR-WRONG-001",
+        },
+    )
+    assert execute.status_code == 403
+    execute_body = execute.json()
+    assert execute_body["reason"] == "approval_invalid"
+
+
 def test_execute_youtube_draft_post_publishes_and_persists(
     test_client, in_memory_marketing_draft_store, monkeypatch
 ):
@@ -103,14 +173,12 @@ def test_execute_youtube_draft_post_publishes_and_persists(
     yt_post = next(p for p in posts if p["channel"] == "youtube")
     post_id = yt_post["post_id"]
 
-    # Approve the post so execute path is unlocked
     approve_resp = test_client.post(
         f"/api/v1/marketing/draft-posts/{post_id}/approve",
         json={"approval_id": "APR-YT-001"},
     )
     assert approve_resp.status_code == 200
 
-    # Mock the YouTube client to avoid real network calls
     async def _fake_post_text(self, *, credential_ref, text, image_url=None):
         return SocialPostResult(
             success=True,
@@ -138,7 +206,6 @@ def test_execute_youtube_draft_post_publishes_and_persists(
     assert body["provider_post_id"] == "yt-post-abc123"
     assert body["provider_post_url"] == "https://www.youtube.com/post/yt-post-abc123"
 
-    # Verify the store was updated
     found = in_memory_marketing_draft_store._batches
     updated_post = None
     for batch in found.values():
@@ -178,4 +245,3 @@ def test_create_draft_batch_resolves_attached_youtube_secret_ref(
     assert create.status_code == 200
     yt_post = create.json()["posts"][0]
     assert yt_post["credential_ref"] == "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
-
