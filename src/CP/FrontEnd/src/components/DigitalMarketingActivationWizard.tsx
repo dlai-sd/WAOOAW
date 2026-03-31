@@ -121,9 +121,20 @@ function buildEmptyStrategyWorkshop(): DigitalMarketingStrategyWorkshop {
   return {
     status: 'not_started',
     assistant_message: '',
+    checkpoint_summary: '',
+    current_focus_question: '',
+    next_step_options: [],
+    time_saving_note: '',
     follow_up_questions: [],
     messages: [],
     summary: {
+      profession_name: '',
+      location_focus: '',
+      customer_profile: '',
+      service_focus: '',
+      signature_differentiator: '',
+      business_goal: '',
+      first_content_direction: '',
       business_focus: '',
       audience: '',
       positioning: '',
@@ -146,6 +157,12 @@ function normalizeStrategyWorkshop(workshop: unknown): DigitalMarketingStrategyW
   return {
     status,
     assistant_message: String(raw.assistant_message || ''),
+    checkpoint_summary: String(raw.checkpoint_summary || ''),
+    current_focus_question: String(raw.current_focus_question || raw.follow_up_questions?.[0] || ''),
+    next_step_options: Array.isArray(raw.next_step_options)
+      ? raw.next_step_options.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
+    time_saving_note: String(raw.time_saving_note || ''),
     follow_up_questions: Array.isArray(raw.follow_up_questions)
       ? raw.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean)
       : [],
@@ -159,6 +176,13 @@ function normalizeStrategyWorkshop(workshop: unknown): DigitalMarketingStrategyW
           .filter(Boolean) as NonNullable<DigitalMarketingStrategyWorkshop['messages']>
       : [],
     summary: {
+      profession_name: String(rawSummary.profession_name || ''),
+      location_focus: String(rawSummary.location_focus || ''),
+      customer_profile: String(rawSummary.customer_profile || ''),
+      service_focus: String(rawSummary.service_focus || ''),
+      signature_differentiator: String(rawSummary.signature_differentiator || ''),
+      business_goal: String(rawSummary.business_goal || ''),
+      first_content_direction: String(rawSummary.first_content_direction || ''),
       business_focus: String(rawSummary.business_focus || ''),
       audience: String(rawSummary.audience || ''),
       positioning: String(rawSummary.positioning || ''),
@@ -182,6 +206,13 @@ function buildStrategyWorkshopPayload(
     ...normalizeStrategyWorkshop(workshop),
     status: statusOverride || workshop.status || 'not_started',
     summary: {
+      profession_name: String(summary.profession_name || '').trim(),
+      location_focus: String(summary.location_focus || '').trim(),
+      customer_profile: String(summary.customer_profile || '').trim(),
+      service_focus: String(summary.service_focus || '').trim(),
+      signature_differentiator: String(summary.signature_differentiator || '').trim(),
+      business_goal: String(summary.business_goal || '').trim(),
+      first_content_direction: String(summary.first_content_direction || '').trim(),
       business_focus: String(summary.business_focus || '').trim(),
       audience: String(summary.audience || '').trim(),
       positioning: String(summary.positioning || '').trim(),
@@ -294,6 +325,7 @@ export function DigitalMarketingActivationWizard({
   const [strategyWorkshop, setStrategyWorkshop] = useState<DigitalMarketingStrategyWorkshop>(buildEmptyStrategyWorkshop())
   const [strategySummary, setStrategySummary] = useState<DigitalMarketingStrategyWorkshopSummary>(buildEmptyStrategyWorkshop().summary || {})
   const [strategyReply, setStrategyReply] = useState('')
+  const [strategyDetailsEditable, setStrategyDetailsEditable] = useState(false)
   const [themePlanLoading, setThemePlanLoading] = useState(false)
   const [themePlanSaving, setThemePlanSaving] = useState(false)
   const [themePlanError, setThemePlanError] = useState<string | null>(null)
@@ -434,6 +466,13 @@ export function DigitalMarketingActivationWizard({
   const campaignSetup = activation?.workspace.campaign_setup || {}
   const schedule = campaignSetup.schedule || {}
   const isThemeApproved = strategyWorkshop.status === 'approved'
+  const latestCustomerNote = useMemo(() => {
+    const messages = strategyWorkshop.messages || []
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.role === 'user') return messages[index].content
+    }
+    return ''
+  }, [strategyWorkshop.messages])
 
   const normalizedSchedule: DigitalMarketingCampaignSchedule = {
     start_date: scheduleStartDate.trim(),
@@ -734,15 +773,17 @@ export function DigitalMarketingActivationWizard({
     setStrategyWorkshop(nextWorkshop)
     setStrategySummary(nextWorkshop.summary || {})
     setStrategyReply('')
+    setStrategyDetailsEditable(false)
   }
 
-  const generateThemePlan = async () => {
+  const generateThemePlan = async (overrideReply?: string) => {
     if (!hiredInstanceId) return
     setThemePlanLoading(true)
     setThemePlanError(null)
     try {
       const saved = await saveWorkspace()
       if (!saved) return
+      const pendingInput = String(overrideReply ?? strategyReply).trim()
       const response = await generateDigitalMarketingThemePlan(hiredInstanceId, {
         campaign_setup: {
           schedule: normalizedSchedule,
@@ -752,7 +793,7 @@ export function DigitalMarketingActivationWizard({
               strategySummary,
               strategyWorkshop.status === 'approved' ? 'approval_ready' : strategyWorkshop.status,
             ),
-            pending_input: strategyReply.trim(),
+            pending_input: pendingInput,
           },
         },
       })
@@ -1072,6 +1113,14 @@ export function DigitalMarketingActivationWizard({
       ...current,
       [field]: value,
     }))
+  }
+
+  const handleStrategyOption = (option: string) => {
+    if (themePlanLoading || readOnly) return
+    const normalizedOption = String(option || '').trim()
+    if (!normalizedOption) return
+    setStrategyReply(normalizedOption)
+    void generateThemePlan(normalizedOption)
   }
 
   const approveThemeStrategy = async () => {
@@ -1488,7 +1537,7 @@ export function DigitalMarketingActivationWizard({
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
                           <div className="dma-wizard-section-label">AI strategy workshop</div>
-                          <div style={{ fontWeight: 600 }}>Work with the strategist before any draft is generated</div>
+                          <div style={{ fontWeight: 600 }}>A consultative strategist that keeps the customer moving</div>
                         </div>
                         <Badge
                           appearance="outline"
@@ -1500,35 +1549,54 @@ export function DigitalMarketingActivationWizard({
                       </div>
 
                       <div className="dma-wizard-theme-workshop-thread" data-testid="strategy-workshop-thread">
-                        {(strategyWorkshop.messages || []).length > 0 ? (
-                          (strategyWorkshop.messages || []).map((message, index) => (
-                            <div
-                              key={`${message.role}-${index}`}
-                              className={`dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--${message.role}`}
-                            >
-                              <div className="dma-wizard-theme-workshop-message-role">{message.role === 'assistant' ? 'Strategist' : 'You'}</div>
-                              <div>{message.content}</div>
-                            </div>
-                          ))
-                        ) : (
-                          <div style={{ opacity: 0.75, fontSize: '0.9rem' }}>
-                            Start the workshop and the strategist will ask the right questions before locking the theme.
+                        <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
+                          <div className="dma-wizard-theme-workshop-message-role">Strategist</div>
+                          <div>
+                            {strategyWorkshop.assistant_message || 'Start the workshop and the strategist will quickly lock the strongest direction, not run a long intake interview.'}
                           </div>
-                        )}
-                        {strategyWorkshop.assistant_message ? (
-                          <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
-                            <div className="dma-wizard-theme-workshop-message-role">Strategist</div>
-                            <div>{strategyWorkshop.assistant_message}</div>
+                        </div>
+
+                        <div className="dma-wizard-theme-workshop-insights">
+                          <div className="dma-wizard-theme-insight-card" data-testid="strategy-checkpoint-summary">
+                            <div className="dma-wizard-theme-insight-label">What we have locked</div>
+                            <div>{strategyWorkshop.checkpoint_summary || 'The strategist will keep a compact running summary here so the customer does not need to reread the full exchange.'}</div>
+                          </div>
+                          <div className="dma-wizard-theme-insight-card">
+                            <div className="dma-wizard-theme-insight-label">Time-saving note</div>
+                            <div>{strategyWorkshop.time_saving_note || 'The AI will reduce repeated questions and move to a recommendation as soon as the direction is strong enough.'}</div>
+                          </div>
+                        </div>
+
+                        {latestCustomerNote ? (
+                          <div className="dma-wizard-theme-latest-note">
+                            <div className="dma-wizard-theme-workshop-message-role">Latest customer note</div>
+                            <div>{latestCustomerNote}</div>
                           </div>
                         ) : null}
                       </div>
 
-                      {(strategyWorkshop.follow_up_questions || []).length > 0 ? (
+                      {strategyWorkshop.current_focus_question ? (
                         <div>
-                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Open questions</div>
-                          <div style={{ display: 'grid', gap: '0.45rem' }}>
-                            {(strategyWorkshop.follow_up_questions || []).map((question, index) => (
-                              <div key={`${question}-${index}`} className="dma-wizard-theme-follow-up-question">{question}</div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Current focus</div>
+                          <div className="dma-wizard-theme-follow-up-question" data-testid="strategy-current-focus-question">{strategyWorkshop.current_focus_question}</div>
+                        </div>
+                      ) : null}
+
+                      {(strategyWorkshop.next_step_options || []).length > 0 ? (
+                        <div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Suggested next moves</div>
+                          <div className="dma-wizard-theme-option-list">
+                            {(strategyWorkshop.next_step_options || []).map((option, index) => (
+                              <Button
+                                key={`${option}-${index}`}
+                                appearance="secondary"
+                                size="small"
+                                onClick={() => handleStrategyOption(option)}
+                                disabled={readOnly || themePlanLoading}
+                                data-testid={`strategy-option-${index}`}
+                              >
+                                {option}
+                              </Button>
                             ))}
                           </div>
                         </div>
@@ -1556,7 +1624,7 @@ export function DigitalMarketingActivationWizard({
                         >
                           {themePlanLoading
                             ? 'Strategist is thinking…'
-                            : (strategyWorkshop.messages || []).length > 0 || strategyWorkshop.assistant_message
+                            : latestCustomerNote || strategyWorkshop.assistant_message
                               ? 'Send to strategist'
                               : 'Start AI workshop'}
                         </Button>
@@ -1565,80 +1633,72 @@ export function DigitalMarketingActivationWizard({
                       </div>
 
                       <div>
-                        <div className="dma-wizard-section-label">Editable strategy summary</div>
-                        <div className="dma-wizard-form-grid">
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Business focus</span>
-                            <Input
-                              aria-label="Business focus"
-                              value={String(strategySummary.business_focus || '')}
-                              onChange={(_, data) => updateStrategySummaryField('business_focus', data.value)}
-                              disabled={readOnly}
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Audience</span>
-                            <Input
-                              aria-label="Audience"
-                              value={String(strategySummary.audience || '')}
-                              onChange={(_, data) => updateStrategySummaryField('audience', data.value)}
-                              disabled={readOnly}
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Positioning</span>
-                            <Input
-                              aria-label="Positioning"
-                              value={String(strategySummary.positioning || '')}
-                              onChange={(_, data) => updateStrategySummaryField('positioning', data.value)}
-                              disabled={readOnly}
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Tone</span>
-                            <Input
-                              aria-label="Tone"
-                              value={String(strategySummary.tone || '')}
-                              onChange={(_, data) => updateStrategySummaryField('tone', data.value)}
-                              disabled={readOnly}
-                            />
-                          </label>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                          <div className="dma-wizard-section-label">Extracted business brief</div>
+                          <Button
+                            appearance="subtle"
+                            size="small"
+                            onClick={() => setStrategyDetailsEditable((current) => !current)}
+                            disabled={readOnly}
+                            data-testid="toggle-strategy-details-edit"
+                          >
+                            {strategyDetailsEditable ? 'Hide edit fields' : 'Edit extracted details'}
+                          </Button>
                         </div>
-                        <div className="dma-wizard-form-grid" style={{ marginTop: '0.85rem' }}>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Content pillars</span>
-                            <Textarea
-                              aria-label="Content pillars"
-                              value={formatListForTextarea(strategySummary.content_pillars)}
-                              onChange={(_, data) => updateStrategySummaryField('content_pillars', parseListTextarea(data.value))}
-                              disabled={readOnly}
-                              resize="vertical"
-                              rows={3}
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>YouTube angle</span>
-                            <Textarea
-                              aria-label="YouTube angle"
-                              value={String(strategySummary.youtube_angle || '')}
-                              onChange={(_, data) => updateStrategySummaryField('youtube_angle', data.value)}
-                              disabled={readOnly}
-                              resize="vertical"
-                              rows={3}
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Call to action</span>
-                            <Textarea
-                              aria-label="Call to action"
-                              value={String(strategySummary.cta || '')}
-                              onChange={(_, data) => updateStrategySummaryField('cta', data.value)}
-                              disabled={readOnly}
-                              resize="vertical"
-                              rows={3}
-                            />
-                          </label>
+
+                        <div className="dma-wizard-theme-summary-grid" data-testid="strategy-summary-grid">
+                          <div className="dma-wizard-theme-summary-card"><span>Profession</span><strong>{strategySummary.profession_name || 'Waiting for strategist to infer'}</strong></div>
+                          <div className="dma-wizard-theme-summary-card"><span>Location focus</span><strong>{strategySummary.location_focus || location || 'Waiting for locality focus'}</strong></div>
+                          <div className="dma-wizard-theme-summary-card"><span>Customer profile</span><strong>{strategySummary.customer_profile || strategySummary.audience || 'Waiting for audience clarity'}</strong></div>
+                          <div className="dma-wizard-theme-summary-card"><span>Service focus</span><strong>{strategySummary.service_focus || strategySummary.business_focus || 'Waiting for service focus'}</strong></div>
+                          <div className="dma-wizard-theme-summary-card"><span>Differentiator</span><strong>{strategySummary.signature_differentiator || strategySummary.positioning || 'Waiting for differentiation'}</strong></div>
+                          <div className="dma-wizard-theme-summary-card"><span>First content direction</span><strong>{strategySummary.first_content_direction || strategySummary.youtube_angle || 'Waiting for first content direction'}</strong></div>
                         </div>
+
+                        {strategyDetailsEditable ? (
+                          <div className="dma-wizard-form-grid" style={{ marginTop: '0.85rem' }}>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Profession</span>
+                              <Input aria-label="Profession" value={String(strategySummary.profession_name || '')} onChange={(_, data) => updateStrategySummaryField('profession_name', data.value)} disabled={readOnly} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Location focus</span>
+                              <Input aria-label="Location focus" value={String(strategySummary.location_focus || '')} onChange={(_, data) => updateStrategySummaryField('location_focus', data.value)} disabled={readOnly} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Customer profile</span>
+                              <Textarea aria-label="Customer profile" value={String(strategySummary.customer_profile || '')} onChange={(_, data) => updateStrategySummaryField('customer_profile', data.value)} disabled={readOnly} resize="vertical" rows={3} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Service focus</span>
+                              <Textarea aria-label="Service focus" value={String(strategySummary.service_focus || '')} onChange={(_, data) => updateStrategySummaryField('service_focus', data.value)} disabled={readOnly} resize="vertical" rows={3} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Differentiator</span>
+                              <Textarea aria-label="Differentiator" value={String(strategySummary.signature_differentiator || '')} onChange={(_, data) => updateStrategySummaryField('signature_differentiator', data.value)} disabled={readOnly} resize="vertical" rows={3} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Business goal</span>
+                              <Textarea aria-label="Business goal" value={String(strategySummary.business_goal || '')} onChange={(_, data) => updateStrategySummaryField('business_goal', data.value)} disabled={readOnly} resize="vertical" rows={3} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>First content direction</span>
+                              <Textarea aria-label="First content direction" value={String(strategySummary.first_content_direction || '')} onChange={(_, data) => updateStrategySummaryField('first_content_direction', data.value)} disabled={readOnly} resize="vertical" rows={3} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Tone</span>
+                              <Input aria-label="Tone" value={String(strategySummary.tone || '')} onChange={(_, data) => updateStrategySummaryField('tone', data.value)} disabled={readOnly} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Content pillars</span>
+                              <Textarea aria-label="Content pillars" value={formatListForTextarea(strategySummary.content_pillars)} onChange={(_, data) => updateStrategySummaryField('content_pillars', parseListTextarea(data.value))} disabled={readOnly} resize="vertical" rows={3} />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Call to action</span>
+                              <Textarea aria-label="Call to action" value={String(strategySummary.cta || '')} onChange={(_, data) => updateStrategySummaryField('cta', data.value)} disabled={readOnly} resize="vertical" rows={3} />
+                            </label>
+                          </div>
+                        ) : null}
                       </div>
 
                       <DigitalMarketingThemePlanCard

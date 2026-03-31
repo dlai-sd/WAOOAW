@@ -160,9 +160,20 @@ def test_generate_theme_plan_persists_strategy_workshop_state(test_client, monke
         lambda *args, **kwargs: json.dumps(
             {
                 "assistant_message": "Your clinic should win trust by making treatment decisions feel simple, local, and evidence-backed.",
+                "checkpoint_summary": "We have locked the target patient mindset, the trust angle, and the opening content lane.",
+                "current_focus_question": "Do we want the first series to focus more on fear reduction or treatment clarity?",
+                "next_step_options": ["Refine the audience", "Approve this direction", "Suggest 3 opening content angles"],
+                "time_saving_note": "I am reducing this to the one remaining decision so we can finalize quickly.",
                 "status": "approval_ready",
                 "follow_up_questions": [],
                 "summary": {
+                    "profession_name": "Doctor",
+                    "location_focus": "Pune",
+                    "customer_profile": "Families and working professionals delaying treatment.",
+                    "service_focus": "Dental care and preventive treatment.",
+                    "signature_differentiator": "Calm clinical guidance with strong local trust signals.",
+                    "business_goal": "Drive consultation bookings.",
+                    "first_content_direction": "Short myth-busting educational videos.",
                     "business_focus": "Dentistry for families and working professionals.",
                     "audience": "Parents and professionals who delay treatment until pain becomes urgent.",
                     "positioning": "The calm, expert local clinic that explains options clearly.",
@@ -201,6 +212,9 @@ def test_generate_theme_plan_persists_strategy_workshop_state(test_client, monke
     workshop = body["workspace"]["campaign_setup"]["strategy_workshop"]
     assert workshop["status"] == "approval_ready"
     assert workshop["summary"]["tone"] == "Reassuring, clear, and credible."
+    assert workshop["summary"]["profession_name"] == "Doctor"
+    assert workshop["current_focus_question"] == "Do we want the first series to focus more on fear reduction or treatment clarity?"
+    assert workshop["next_step_options"][1] == "Approve this direction"
     assert workshop["messages"][-2]["role"] == "user"
     assert workshop["messages"][-2]["content"] == "We want more high-intent consultation leads from local families."
     assert workshop["messages"][-1]["role"] == "assistant"

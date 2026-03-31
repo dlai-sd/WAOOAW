@@ -179,7 +179,7 @@ def _normalize_workshop_messages(raw_messages: Any) -> list[dict[str, str]]:
         if role not in {"assistant", "user"} or not content:
             continue
         normalized.append({"role": role, "content": content})
-    return normalized
+    return normalized[-4:]
 
 
 def _normalize_string_list(raw_items: Any) -> list[str]:
@@ -190,6 +190,13 @@ def _normalize_string_list(raw_items: Any) -> list[str]:
 
 def _base_workshop_summary(workspace: dict[str, Any]) -> dict[str, Any]:
     return {
+        "profession_name": "",
+        "location_focus": str(workspace.get("location") or "").strip(),
+        "customer_profile": str(workspace.get("target_audience") or "").strip(),
+        "service_focus": ", ".join(_normalize_string_list(workspace.get("offerings_services"))),
+        "signature_differentiator": "",
+        "business_goal": "",
+        "first_content_direction": "",
         "business_focus": str(workspace.get("offerings_services") or "").strip() if isinstance(workspace.get("offerings_services"), str) else ", ".join(
             _normalize_string_list(workspace.get("offerings_services"))
         ),
@@ -207,7 +214,21 @@ def _normalize_workshop_summary(raw_summary: Any, workspace: dict[str, Any]) -> 
     if not isinstance(raw_summary, dict):
         return summary
 
-    for field in ("business_focus", "audience", "positioning", "tone", "youtube_angle", "cta"):
+    for field in (
+        "profession_name",
+        "location_focus",
+        "customer_profile",
+        "service_focus",
+        "signature_differentiator",
+        "business_goal",
+        "first_content_direction",
+        "business_focus",
+        "audience",
+        "positioning",
+        "tone",
+        "youtube_angle",
+        "cta",
+    ):
         value = str(raw_summary.get(field) or "").strip()
         if value:
             summary[field] = value
@@ -226,6 +247,10 @@ def _normalize_strategy_workshop(raw_workshop: Any, workspace: dict[str, Any]) -
     return {
         "status": status,
         "assistant_message": str(workshop.get("assistant_message") or "").strip(),
+        "checkpoint_summary": str(workshop.get("checkpoint_summary") or "").strip(),
+        "current_focus_question": str(workshop.get("current_focus_question") or "").strip(),
+        "next_step_options": _normalize_string_list(workshop.get("next_step_options")),
+        "time_saving_note": str(workshop.get("time_saving_note") or "").strip(),
         "follow_up_questions": _normalize_string_list(workshop.get("follow_up_questions")),
         "messages": _normalize_workshop_messages(workshop.get("messages")),
         "summary": _normalize_workshop_summary(workshop.get("summary"), workspace),
@@ -233,11 +258,77 @@ def _normalize_strategy_workshop(raw_workshop: Any, workspace: dict[str, Any]) -
     }
 
 
+def _infer_profession_label(workspace: dict[str, Any], workshop: dict[str, Any]) -> str:
+    summary = dict(workshop.get("summary") or {})
+    explicit = str(summary.get("profession_name") or "").strip()
+    if explicit:
+        return explicit
+
+    haystack = " ".join(
+        [
+            str(workspace.get("brand_name") or ""),
+            str(workspace.get("business_context") or ""),
+            " ".join(_normalize_string_list(workspace.get("offerings_services"))),
+        ]
+    ).lower()
+
+    profession_keywords = {
+        "Beauty Artist": ["beauty", "makeup", "salon", "hair", "nail", "bridal", "cosmetic"],
+        "Doctor": ["doctor", "clinic", "hospital", "dental", "dentist", "skin", "medical"],
+        "Share Trader": ["trader", "trading", "stocks", "equity", "market", "investment"],
+        "Tutor": ["tutor", "coaching", "teaching", "education", "exam", "class"],
+    }
+    for label, keywords in profession_keywords.items():
+        if any(keyword in haystack for keyword in keywords):
+            return label
+    return "Digital Business Expert"
+
+
+def _profession_flavor(label: str) -> str:
+    normalized = str(label or "").strip().lower()
+    if "beauty" in normalized or "artist" in normalized or "salon" in normalized:
+        return (
+            "Think like a premium beauty growth strategist. Focus on trust, visual proof, occasion-led demand, local reputation, "
+            "repeat bookings, health-conscious product choices, and confidence outcomes for women deciding where to spend on grooming or event looks."
+        )
+    if "doctor" in normalized or "clinic" in normalized or "dental" in normalized:
+        return (
+            "Think like a healthcare content strategist. Focus on trust, expertise, patient hesitation, local credibility, ethical education, "
+            "and helping cautious patients move from fear or confusion to informed action."
+        )
+    if "trader" in normalized or "share" in normalized or "market" in normalized:
+        return (
+            "Think like a finance educator strategist. Focus on trust, clarity, risk awareness, disciplined decision-making, audience sophistication, "
+            "and converting curiosity into advisory credibility without hype."
+        )
+    if "tutor" in normalized or "education" in normalized or "coaching" in normalized:
+        return (
+            "Think like an education growth strategist. Focus on parent/student anxieties, outcomes, pedagogy credibility, exam confidence, local trust, "
+            "and proving teaching quality through helpful explanations and structured guidance."
+        )
+    return (
+        "Think like a premium local-business content strategist. Focus on trust, differentiation, customer motivations, local proof, "
+        "and the fastest path from curiosity to serious inquiry."
+    )
+
+
 def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, Any]) -> str:
     workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
+    profession_label = _infer_profession_label(workspace, workshop)
     pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
     return json.dumps(
         {
+            "operating_mode": {
+                "profession_label": profession_label,
+                "profession_flavor": _profession_flavor(profession_label),
+                "free_model_rules": [
+                    "Keep the strategist response under 90 words.",
+                    "Do not repeat the user's last answer in full.",
+                    "Give one insight, one recommendation, and one next question only if still needed.",
+                    "Provide 2-3 short next-step options that save the customer's time.",
+                    "Move to approval_ready as soon as the strategy is coherent enough.",
+                ],
+            },
             "business_profile": {
                 "brand_name": workspace.get("brand_name") or "",
                 "offerings_services": workspace.get("offerings_services") or [],
@@ -258,10 +349,20 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
             },
             "pending_customer_input": pending_input,
             "response_contract": {
-                "assistant_message": "One concise but premium strategist response in plain English.",
+                "assistant_message": "One compact consultative response in plain English: insight, recommendation, and gentle direction.",
+                "checkpoint_summary": "One short paragraph summarizing what is now locked.",
+                "current_focus_question": "At most one high-value question. Empty string if not needed.",
+                "next_step_options": ["Two or three short suggested next moves."],
+                "time_saving_note": "One sentence that makes it explicit how you are saving the customer's time.",
                 "status": "One of discovery or approval_ready.",
-                "follow_up_questions": ["List 0-3 probing questions."],
                 "summary": {
+                    "profession_name": "Beauty Artist / Doctor / Share Trader / Tutor / etc.",
+                    "location_focus": "Locality or geography to prioritize.",
+                    "customer_profile": "Age, life-stage, income, event, or motivation summary.",
+                    "service_focus": "Key services or offer cluster.",
+                    "signature_differentiator": "What makes the business distinct.",
+                    "business_goal": "Primary commercial goal from content.",
+                    "first_content_direction": "Recommended first angle or series to start with.",
                     "business_focus": "Short sentence.",
                     "audience": "Short sentence.",
                     "positioning": "Short sentence.",
@@ -328,19 +429,19 @@ def _parse_theme_workshop_response(
     pending_input: str,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     cleaned = str(raw_text or "").strip()
-    fallback_message = "I need a bit more context before I lock the final theme. Tell me what outcome matters most from your YouTube presence over the next 90 days."
+    fallback_message = "I can shape a stronger theme quickly once I know the single business result your content should drive first."
 
     if not cleaned:
         workshop = _normalize_strategy_workshop(existing_workshop, workspace)
         workshop["status"] = "discovery"
         workshop["assistant_message"] = fallback_message
+        workshop["checkpoint_summary"] = "We have the business basics, but the commercial priority is still too broad to lock the theme."
+        workshop["time_saving_note"] = "I am narrowing this to the one decision that most changes the content direction."
         if pending_input:
             workshop["messages"] = [*workshop["messages"], {"role": "user", "content": pending_input}]
         workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": fallback_message}]
-        workshop["follow_up_questions"] = [
-            "Who is the exact viewer or buyer you want this channel to win?",
-            "What business result should the content drive first: trust, leads, repeat business, or direct sales?",
-        ]
+        workshop["current_focus_question"] = "What is the first business result this content should drive: trust, leads, repeat bookings, or direct sales?"
+        workshop["next_step_options"] = ["Refine the audience", "Clarify the core offer", "Choose the first content angle"]
         return "Digital marketing activation plan", [], workshop
 
     try:
@@ -353,6 +454,10 @@ def _parse_theme_workshop_response(
         assistant_message = master_theme or fallback_message
         workshop["assistant_message"] = assistant_message
         workshop["status"] = "approval_ready" if derived_themes else "discovery"
+        workshop["checkpoint_summary"] = master_theme or "The core strategy is taking shape, but it still needs one stronger decision."
+        workshop["current_focus_question"] = ""
+        workshop["next_step_options"] = ["Approve this direction", "Sharpen the audience", "Suggest a different first angle"]
+        workshop["time_saving_note"] = "I have collapsed your earlier answers into one working direction so we do not keep restating the same inputs."
         workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": assistant_message}]
         return master_theme, derived_themes, workshop
 
@@ -371,12 +476,21 @@ def _parse_theme_workshop_response(
 
     workshop["assistant_message"] = assistant_message
     workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": assistant_message}]
+    workshop["checkpoint_summary"] = str(payload.get("checkpoint_summary") or workshop.get("checkpoint_summary") or "").strip()
+    workshop["current_focus_question"] = str(payload.get("current_focus_question") or workshop.get("current_focus_question") or "").strip()
+    workshop["time_saving_note"] = str(payload.get("time_saving_note") or workshop.get("time_saving_note") or "").strip()
+    if payload.get("next_step_options"):
+        workshop["next_step_options"] = _normalize_string_list(payload.get("next_step_options"))
     if not workshop["follow_up_questions"] and payload.get("follow_up_questions"):
         workshop["follow_up_questions"] = _normalize_string_list(payload.get("follow_up_questions"))
+    if not workshop["current_focus_question"] and workshop["follow_up_questions"]:
+        workshop["current_focus_question"] = workshop["follow_up_questions"][0]
     if not workshop["status"] or workshop["status"] == "not_started":
         workshop["status"] = "approval_ready" if (master_theme and derived_themes) else "discovery"
     if workshop["status"] == "approval_ready":
         workshop["approved_at"] = None
+        if not workshop["next_step_options"]:
+            workshop["next_step_options"] = ["Approve this direction", "Refine the positioning", "Request another theme version"]
     return master_theme or "Digital marketing activation plan", derived_themes, workshop
 
 

@@ -36,6 +36,13 @@ export type DigitalMarketingStrategyWorkshopMessage = {
 }
 
 export type DigitalMarketingStrategyWorkshopSummary = {
+  profession_name?: string
+  location_focus?: string
+  customer_profile?: string
+  service_focus?: string
+  signature_differentiator?: string
+  business_goal?: string
+  first_content_direction?: string
   business_focus?: string
   audience?: string
   positioning?: string
@@ -48,6 +55,10 @@ export type DigitalMarketingStrategyWorkshopSummary = {
 export type DigitalMarketingStrategyWorkshop = {
   status?: 'not_started' | 'discovery' | 'approval_ready' | 'approved'
   assistant_message?: string
+  checkpoint_summary?: string
+  current_focus_question?: string
+  next_step_options?: string[]
+  time_saving_note?: string
   follow_up_questions?: string[]
   messages?: DigitalMarketingStrategyWorkshopMessage[]
   summary?: DigitalMarketingStrategyWorkshopSummary
