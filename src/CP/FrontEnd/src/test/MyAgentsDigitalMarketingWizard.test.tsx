@@ -245,12 +245,23 @@ describe('DMA Activation Wizard — step navigation', () => {
           strategy_workshop: {
             status: 'approval_ready',
             assistant_message: 'Your content should make complex buying decisions feel commercially obvious.',
+            checkpoint_summary: 'We have locked the audience, the premium-natural positioning, and the first content direction.',
+            current_focus_question: 'Do you want the first YouTube series to lean more into trust-building or behind-the-scenes proof?',
+            next_step_options: ['Refine the audience', 'Sharpen the positioning', 'Suggest first 3 content angles'],
+            time_saving_note: 'I have collapsed your earlier inputs into one working direction so we can move straight to the best next decision.',
             follow_up_questions: ['What is the first commercial outcome this content must drive?'],
             messages: [
               { role: 'assistant', content: 'Tell me what business result matters most from this channel.' },
               { role: 'user', content: 'We need more qualified inbound demand.' },
             ],
             summary: {
+              profession_name: 'Beauty Artist',
+              location_focus: 'Viman Nagar, Pune',
+              customer_profile: 'Women aged 25-45 seeking premium beauty support for events and everyday confidence.',
+              service_focus: 'Makeup, hair styling, and event-ready beauty services.',
+              signature_differentiator: 'Natural, health-conscious products backed by a decade of experience.',
+              business_goal: 'Grow qualified inbound demand and repeat bookings.',
+              first_content_direction: 'Behind-the-scenes transformation stories that build trust.',
               business_focus: 'Activation services for growth-stage teams.',
               audience: 'Founders and operators.',
               positioning: 'The operator-led partner that turns confusion into execution.',
@@ -284,9 +295,20 @@ describe('DMA Activation Wizard — step navigation', () => {
           strategy_workshop: patch?.campaign_setup?.strategy_workshop || {
             status: 'not_started',
             assistant_message: '',
+            checkpoint_summary: '',
+            current_focus_question: '',
+            next_step_options: [],
+            time_saving_note: '',
             follow_up_questions: [],
             messages: [],
             summary: {
+              profession_name: '',
+              location_focus: '',
+              customer_profile: '',
+              service_focus: '',
+              signature_differentiator: '',
+              business_goal: '',
+              first_content_direction: '',
               business_focus: '',
               audience: '',
               positioning: '',
@@ -952,7 +974,14 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('strategy-assistant-message')).toHaveTextContent(
       'Your content should make complex buying decisions feel commercially obvious.'
     )
-    expect(screen.getByLabelText('Positioning')).toHaveValue('The operator-led partner that turns confusion into execution.')
+    expect(screen.getByTestId('strategy-checkpoint-summary')).toHaveTextContent(
+      'We have locked the audience, the premium-natural positioning, and the first content direction.'
+    )
+    expect(screen.getByTestId('strategy-current-focus-question')).toHaveTextContent(
+      'Do you want the first YouTube series to lean more into trust-building or behind-the-scenes proof?'
+    )
+    expect(screen.getByText('Beauty Artist')).toBeInTheDocument()
+    expect(screen.getByText('Viman Nagar, Pune')).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('approve-theme-strategy-btn'))
 
@@ -968,6 +997,34 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
 
     expect(screen.getByTestId('strategy-workshop-status')).toHaveTextContent('Approved')
+  })
+
+  it('lets the customer use a suggested next-step option without typing a long reply', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+
+    renderWizard()
+    await goToThemeStep()
+
+    fireEvent.click(screen.getByTestId('start-theme-workshop-btn'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('strategy-option-0')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('strategy-option-2'))
+
+    await waitFor(() => {
+      expect(serviceModule.generateDigitalMarketingThemePlan).toHaveBeenLastCalledWith(
+        'HAI-1',
+        expect.objectContaining({
+          campaign_setup: expect.objectContaining({
+            strategy_workshop: expect.objectContaining({
+              pending_input: 'Suggest first 3 content angles',
+            }),
+          }),
+        })
+      )
+    })
   })
 
   it('reuses the approval returned by approve before publishing a YouTube draft', async () => {
@@ -997,9 +1054,20 @@ describe('DMA Activation Wizard — step navigation', () => {
           strategy_workshop: {
             status: 'approved',
             assistant_message: 'Approved strategy',
+            checkpoint_summary: 'Audience, offer, and opening YouTube direction are approved.',
+            current_focus_question: '',
+            next_step_options: ['Approve this direction'],
+            time_saving_note: 'No more discovery is needed before drafts.',
             follow_up_questions: [],
             messages: [],
             summary: {
+              profession_name: 'Beauty Artist',
+              location_focus: 'Viman Nagar, Pune',
+              customer_profile: 'Founders',
+              service_focus: 'Activation services',
+              signature_differentiator: 'Operator-led growth partner',
+              business_goal: 'Generate demand',
+              first_content_direction: 'Explain growth clearly',
               business_focus: 'Activation services',
               audience: 'Founders',
               positioning: 'Operator-led growth partner',
