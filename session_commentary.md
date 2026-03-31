@@ -16,10 +16,10 @@ Update `.github/prompts/get-plan.prompt.md` so plan generation survives request 
 - [x] Replace placeholder Redis plan with a self-sufficient single-iteration plan
 - [x] Commit prompt change checkpoint (`91fc4fa6`)
 - [x] Commit plan file checkpoint (`47b287df`)
-- [ ] Push branch and open PR
+- [x] Push branch and open PR (`#987` — https://github.com/dlai-sd/WAOOAW/pull/987)
 
 ### Recovery hint
-If the session drops, resume on `docs/plant-redis-1-plan-and-get-plan`, verify commits `91fc4fa6` and `47b287df`, then push the branch and create the PR. Do not restart the repo archaeology.
+If the session drops, resume on `docs/plant-redis-1-plan-and-get-plan`, verify commits `91fc4fa6`, `47b287df`, and `a3078d1d`, then continue from PR `#987`. Do not restart the repo archaeology.
 
 ---
 
