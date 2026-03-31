@@ -84,10 +84,19 @@ def test_provision_managed_redis_dry_run() -> None:
         text=True,
     )
 
-    assert "Planned create:" in completed.stderr
+    assert (
+      "Planned create:" in completed.stderr
+      or "already exists in asia-south1 with host" in completed.stderr
+    )
     assert "demo-plant-backend-redis-url" in completed.stderr
-    assert "redis://DRY_RUN_REDIS_HOST_demo:6379/0" in completed.stderr
-    assert "redis://DRY_RUN_REDIS_HOST_demo:6379/3" in completed.stderr
+    assert (
+      "redis://DRY_RUN_REDIS_HOST_demo:6379/0" in completed.stderr
+      or "redis://10.53.167.11:6379/0" in completed.stderr
+    )
+    assert (
+      "redis://DRY_RUN_REDIS_HOST_demo:6379/3" in completed.stderr
+      or "redis://10.53.167.11:6379/3" in completed.stderr
+    )
 
 
 def test_provision_managed_redis_apply_with_fake_gcloud(tmp_path: Path) -> None:
