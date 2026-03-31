@@ -12,14 +12,14 @@ Update `.github/prompts/get-plan.prompt.md` so plan generation survives request 
 ### Current checklist
 - [x] Create durable branch for prompt + plan work
 - [x] Persist session note and working checklist
-- [ ] Update `get-plan.prompt.md` with durability + secret/image-promotion rules
-- [ ] Replace placeholder Redis plan with a self-sufficient single-iteration plan
-- [ ] Commit prompt change checkpoint
-- [ ] Commit plan file checkpoint
+- [x] Update `get-plan.prompt.md` with durability + secret/image-promotion rules
+- [x] Replace placeholder Redis plan with a self-sufficient single-iteration plan
+- [x] Commit prompt change checkpoint (`91fc4fa6`)
+- [x] Commit plan file checkpoint (`47b287df`)
 - [ ] Push branch and open PR
 
 ### Recovery hint
-If the session drops, resume on `docs/plant-redis-1-plan-and-get-plan`, finish the prompt update first, then the plan file, then create the PR. Do not restart the repo archaeology.
+If the session drops, resume on `docs/plant-redis-1-plan-and-get-plan`, verify commits `91fc4fa6` and `47b287df`, then push the branch and create the PR. Do not restart the repo archaeology.
 
 ---
 
