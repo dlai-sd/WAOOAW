@@ -107,3 +107,32 @@ Two independent Razorpay bugs were fixed across two PRs this session:
 - **PR #854** (ready to merge): Backend receipt 42 chars → Razorpay API rejected order with 400 → 502 to user
 Both must be live for Razorpay checkout to work end-to-end.
 
+---
+
+## [2026-03-31 16:55 UTC] E1-S1 managed Redis script story
+
+**Branch**: `feat/plant-redis-script-story`
+**Status**: Completed pending IAM unblock
+
+### Goal
+Implement the Redis creation story from `docs/plant/iterations/PLANT-REDIS-1-managed-redis-foundation.md`: create an idempotent GCP provisioning script for demo managed Redis, add a focused test, validate the script, then update the plan and open a new PR.
+
+### Current checklist
+- [x] Create fresh branch from updated `main`
+- [x] Re-read Redis story card and GCP script conventions
+- [x] Add `cloud/scripts/provision-managed-redis.sh`
+- [x] Add focused test for help/dry-run/idempotent secret URL generation
+- [x] Run syntax/help validation and attempt live apply against demo
+- [x] Update plan status/readiness and open PR
+
+### Current result
+- `cloud/scripts/provision-managed-redis.sh` implemented with help, dry-run, idempotent secret upsert flow, and explicit failure handling.
+- `tests/test_provision_managed_redis_script.py` passes (`3 passed`).
+- Live `--apply` against demo completed successfully.
+- Redis instance details: `waooaw-redis-demo`, `asia-south1`, `BASIC`, `1 GB`, host `10.53.167.11`, port `6379`, state `READY`, network `default`, connect mode `DIRECT_PEERING`.
+- Secret Manager contracts created: `demo-plant-backend-redis-url`, `demo-plant-gateway-redis-url`, `demo-pp-backend-redis-url`, `demo-cp-backend-redis-url` with DB indices `/0`, `/1`, `/2`, `/3`.
+- Review PR: `#988` — https://github.com/dlai-sd/WAOOAW/pull/988
+
+### Recovery hint
+If the session drops, resume on `feat/plant-redis-script-story`, inspect the latest diff for `cloud/scripts/provision-managed-redis.sh`, its test file, and the Redis plan readiness snapshot, then continue from service-wiring stories rather than re-running Redis creation.
+
