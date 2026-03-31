@@ -166,6 +166,124 @@ def _theme_prompt(workspace: dict[str, Any], campaign_setup: dict[str, Any]) -> 
     )
 
 
+def _normalize_workshop_messages(raw_messages: Any) -> list[dict[str, str]]:
+    if not isinstance(raw_messages, list):
+        return []
+
+    normalized: list[dict[str, str]] = []
+    for item in raw_messages:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        content = str(item.get("content") or "").strip()
+        if role not in {"assistant", "user"} or not content:
+            continue
+        normalized.append({"role": role, "content": content})
+    return normalized
+
+
+def _normalize_string_list(raw_items: Any) -> list[str]:
+    if not isinstance(raw_items, list):
+        return []
+    return [str(item or "").strip() for item in raw_items if str(item or "").strip()]
+
+
+def _base_workshop_summary(workspace: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "business_focus": str(workspace.get("offerings_services") or "").strip() if isinstance(workspace.get("offerings_services"), str) else ", ".join(
+            _normalize_string_list(workspace.get("offerings_services"))
+        ),
+        "audience": str(workspace.get("target_audience") or "").strip(),
+        "positioning": "",
+        "tone": "",
+        "content_pillars": [],
+        "youtube_angle": "",
+        "cta": "",
+    }
+
+
+def _normalize_workshop_summary(raw_summary: Any, workspace: dict[str, Any]) -> dict[str, Any]:
+    summary = _base_workshop_summary(workspace)
+    if not isinstance(raw_summary, dict):
+        return summary
+
+    for field in ("business_focus", "audience", "positioning", "tone", "youtube_angle", "cta"):
+        value = str(raw_summary.get(field) or "").strip()
+        if value:
+            summary[field] = value
+    summary["content_pillars"] = _normalize_string_list(raw_summary.get("content_pillars"))
+    return summary
+
+
+def _normalize_strategy_workshop(raw_workshop: Any, workspace: dict[str, Any]) -> dict[str, Any]:
+    workshop = dict(raw_workshop or {}) if isinstance(raw_workshop, dict) else {}
+    status = str(workshop.get("status") or "not_started").strip().lower()
+    if status not in {"not_started", "discovery", "approval_ready", "approved"}:
+        status = "not_started"
+
+    approved_at = workshop.get("approved_at")
+    approved_at_value = str(approved_at).strip() if approved_at else None
+    return {
+        "status": status,
+        "assistant_message": str(workshop.get("assistant_message") or "").strip(),
+        "follow_up_questions": _normalize_string_list(workshop.get("follow_up_questions")),
+        "messages": _normalize_workshop_messages(workshop.get("messages")),
+        "summary": _normalize_workshop_summary(workshop.get("summary"), workspace),
+        "approved_at": approved_at_value,
+    }
+
+
+def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, Any]) -> str:
+    workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
+    pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
+    return json.dumps(
+        {
+            "business_profile": {
+                "brand_name": workspace.get("brand_name") or "",
+                "offerings_services": workspace.get("offerings_services") or [],
+                "location": workspace.get("location") or "",
+                "primary_language": workspace.get("primary_language") or "",
+                "timezone": workspace.get("timezone") or "",
+                "business_context": workspace.get("business_context") or "",
+                "selected_platforms": _selected_platforms(workspace),
+            },
+            "campaign_setup": {
+                "schedule": dict(campaign_setup.get("schedule") or {}),
+            },
+            "workshop_state": {
+                "status": workshop["status"],
+                "messages": workshop["messages"],
+                "summary": workshop["summary"],
+                "follow_up_questions": workshop["follow_up_questions"],
+            },
+            "pending_customer_input": pending_input,
+            "response_contract": {
+                "assistant_message": "One concise but premium strategist response in plain English.",
+                "status": "One of discovery or approval_ready.",
+                "follow_up_questions": ["List 0-3 probing questions."],
+                "summary": {
+                    "business_focus": "Short sentence.",
+                    "audience": "Short sentence.",
+                    "positioning": "Short sentence.",
+                    "tone": "Short sentence.",
+                    "content_pillars": ["Three concise pillars."],
+                    "youtube_angle": "Short sentence.",
+                    "cta": "Short sentence.",
+                },
+                "master_theme": "A clear approved-ready master theme statement.",
+                "derived_themes": [
+                    {
+                        "title": "Theme title",
+                        "description": "What this content lane covers",
+                        "frequency": "weekly",
+                    }
+                ],
+            },
+        },
+        ensure_ascii=False,
+    )
+
+
 def _normalize_derived_themes(raw_derived: Any) -> list[dict[str, Any]]:
     if not isinstance(raw_derived, list):
         return []
@@ -200,6 +318,66 @@ def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
 
     master_theme = str(payload.get("master_theme") or payload.get("theme") or "Digital marketing activation plan").strip()
     return master_theme or "Digital marketing activation plan", _normalize_derived_themes(payload.get("derived_themes"))
+
+
+def _parse_theme_workshop_response(
+    raw_text: str,
+    *,
+    workspace: dict[str, Any],
+    existing_workshop: dict[str, Any],
+    pending_input: str,
+) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+    cleaned = str(raw_text or "").strip()
+    fallback_message = "I need a bit more context before I lock the final theme. Tell me what outcome matters most from your YouTube presence over the next 90 days."
+
+    if not cleaned:
+        workshop = _normalize_strategy_workshop(existing_workshop, workspace)
+        workshop["status"] = "discovery"
+        workshop["assistant_message"] = fallback_message
+        if pending_input:
+            workshop["messages"] = [*workshop["messages"], {"role": "user", "content": pending_input}]
+        workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": fallback_message}]
+        workshop["follow_up_questions"] = [
+            "Who is the exact viewer or buyer you want this channel to win?",
+            "What business result should the content drive first: trust, leads, repeat business, or direct sales?",
+        ]
+        return "Digital marketing activation plan", [], workshop
+
+    try:
+        payload = json.loads(cleaned)
+    except json.JSONDecodeError:
+        master_theme, derived_themes = _parse_theme_plan(cleaned)
+        workshop = _normalize_strategy_workshop(existing_workshop, workspace)
+        if pending_input:
+            workshop["messages"] = [*workshop["messages"], {"role": "user", "content": pending_input}]
+        assistant_message = master_theme or fallback_message
+        workshop["assistant_message"] = assistant_message
+        workshop["status"] = "approval_ready" if derived_themes else "discovery"
+        workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": assistant_message}]
+        return master_theme, derived_themes, workshop
+
+    if not isinstance(payload, dict):
+        return _parse_theme_workshop_response("", workspace=workspace, existing_workshop=existing_workshop, pending_input=pending_input)
+
+    master_theme = str(payload.get("master_theme") or payload.get("theme") or existing_workshop.get("master_theme") or "Digital marketing activation plan").strip()
+    derived_themes = _normalize_derived_themes(payload.get("derived_themes"))
+    assistant_message = str(payload.get("assistant_message") or "").strip() or (master_theme if derived_themes else fallback_message)
+    workshop = _normalize_strategy_workshop(payload.get("strategy_workshop") or payload, workspace)
+
+    if pending_input:
+        workshop["messages"] = [*existing_workshop.get("messages", []), {"role": "user", "content": pending_input}]
+    else:
+        workshop["messages"] = list(existing_workshop.get("messages", []))
+
+    workshop["assistant_message"] = assistant_message
+    workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": assistant_message}]
+    if not workshop["follow_up_questions"] and payload.get("follow_up_questions"):
+        workshop["follow_up_questions"] = _normalize_string_list(payload.get("follow_up_questions"))
+    if not workshop["status"] or workshop["status"] == "not_started":
+        workshop["status"] = "approval_ready" if (master_theme and derived_themes) else "discovery"
+    if workshop["status"] == "approval_ready":
+        workshop["approved_at"] = None
+    return master_theme or "Digital marketing activation plan", derived_themes, workshop
 
 
 def _build_theme_plan_workspace(
@@ -513,14 +691,25 @@ async def generate_theme_plan(
     _ensure_supported_record(record)
 
     workspace = _workspace_from_config(record.config)
-    campaign_setup = dict(body.campaign_setup or {})
+    existing_campaign_setup = dict(workspace.get("campaign_setup") or {})
+    campaign_setup = {
+        **existing_campaign_setup,
+        **dict(body.campaign_setup or {}),
+    }
+    existing_workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
+    pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
 
     try:
         client = get_grok_client()
         proposal = grok_complete(
             client,
-            system="You are a digital marketing strategist creating one master theme and a short list of derived campaign themes. Return JSON with master_theme and derived_themes.",
-            user=_theme_prompt(workspace, campaign_setup),
+            system=(
+                "You are a premium digital brand strategist running a live strategy workshop for a business owner. "
+                "Speak like a senior consultant with deep domain expertise, be direct and commercially sharp, and never sound generic. "
+                "Ask probing questions until the strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, "
+                "and a structured summary. Always return JSON matching the requested response contract."
+            ),
+            user=_theme_workshop_prompt(workspace, campaign_setup),
             model="grok-3-latest",
             temperature=0.7,
         )
@@ -529,7 +718,12 @@ async def generate_theme_plan(
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    master_theme, derived_themes = _parse_theme_plan(proposal)
+    master_theme, derived_themes, strategy_workshop = _parse_theme_workshop_response(
+        proposal,
+        workspace=workspace,
+        existing_workshop=existing_workshop,
+        pending_input=pending_input,
+    )
     logger.info("Generated DMA theme plan for hired_instance_id=%s", hired_instance_id)
     campaign_id = await _persist_theme_plan_to_campaign(
         record=record,
@@ -539,9 +733,15 @@ async def generate_theme_plan(
         campaign_setup=campaign_setup,
         db=db,
     )
+    persisted_campaign_setup = {
+        **campaign_setup,
+        "strategy_workshop": {
+            **strategy_workshop,
+        },
+    }
     persisted_workspace = _build_theme_plan_workspace(
         workspace=workspace,
-        campaign_setup=campaign_setup,
+        campaign_setup=persisted_campaign_setup,
         campaign_id=campaign_id,
         master_theme=master_theme,
         derived_themes=derived_themes,
@@ -579,7 +779,11 @@ async def update_theme_plan(
     _ensure_supported_record(record)
 
     workspace = _workspace_from_config(record.config)
-    campaign_setup = dict(body.campaign_setup or {})
+    existing_campaign_setup = dict(workspace.get("campaign_setup") or {})
+    campaign_setup = {
+        **existing_campaign_setup,
+        **dict(body.campaign_setup or {}),
+    }
     master_theme = str(body.master_theme or "").strip()
     if not master_theme:
         raise HTTPException(status_code=422, detail="master_theme is required")

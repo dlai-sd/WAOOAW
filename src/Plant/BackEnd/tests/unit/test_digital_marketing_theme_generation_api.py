@@ -144,6 +144,70 @@ def test_generate_theme_plan_reuses_existing_draft_campaign(test_client, monkeyp
 
 
 @pytest.mark.unit
+def test_generate_theme_plan_persists_strategy_workshop_state(test_client, monkeypatch):
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    hired_instance_id = _create_marketing_hire(test_client, customer_id="cust-dma-workshop")
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(
+        dma_module,
+        "grok_complete",
+        lambda *args, **kwargs: json.dumps(
+            {
+                "assistant_message": "Your clinic should win trust by making treatment decisions feel simple, local, and evidence-backed.",
+                "status": "approval_ready",
+                "follow_up_questions": [],
+                "summary": {
+                    "business_focus": "Dentistry for families and working professionals.",
+                    "audience": "Parents and professionals who delay treatment until pain becomes urgent.",
+                    "positioning": "The calm, expert local clinic that explains options clearly.",
+                    "tone": "Reassuring, clear, and credible.",
+                    "content_pillars": ["Pain-to-prevention education", "Proof and outcomes", "Local trust builders"],
+                    "youtube_angle": "Turn common treatment fears into practical, confident next steps.",
+                    "cta": "Book a consultation before a small issue becomes expensive.",
+                },
+                "master_theme": "Own your local market with calm, authority-building dental education.",
+                "derived_themes": [
+                    {"title": "Pain-to-prevention", "description": "Answer urgent symptom questions.", "frequency": "weekly"},
+                    {"title": "Treatment clarity", "description": "Explain procedures and outcomes.", "frequency": "weekly"},
+                ],
+            }
+        ),
+    )
+
+    response = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "campaign_setup": {
+                "strategy_workshop": {
+                    "status": "discovery",
+                    "messages": [
+                        {"role": "assistant", "content": "Tell me the business outcome this YouTube channel must create first."}
+                    ],
+                    "pending_input": "We want more high-intent consultation leads from local families.",
+                }
+            }
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    workshop = body["workspace"]["campaign_setup"]["strategy_workshop"]
+    assert workshop["status"] == "approval_ready"
+    assert workshop["summary"]["tone"] == "Reassuring, clear, and credible."
+    assert workshop["messages"][-2]["role"] == "user"
+    assert workshop["messages"][-2]["content"] == "We want more high-intent consultation leads from local families."
+    assert workshop["messages"][-1]["role"] == "assistant"
+    assert body["master_theme"] == "Own your local market with calm, authority-building dental education."
+
+
+@pytest.mark.unit
 def test_patch_theme_plan_persists_manual_revisions_into_same_draft(test_client, monkeypatch):
     monkeypatch.setenv("PAYMENTS_MODE", "coupon")
     monkeypatch.setenv("PERSISTENCE_MODE", "memory")

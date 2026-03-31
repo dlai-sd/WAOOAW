@@ -16,6 +16,8 @@ import {
   type DigitalMarketingCampaignSchedule,
   type DigitalMarketingDerivedTheme,
   type DigitalMarketingActivationResponse,
+  type DigitalMarketingStrategyWorkshop,
+  type DigitalMarketingStrategyWorkshopSummary,
   type UpsertDigitalMarketingActivationInput,
 } from '../services/digitalMarketingActivation.service'
 import {
@@ -114,6 +116,85 @@ function buildEmptyActivationResponse(
     updated_at: new Date().toISOString(),
   }
 }
+
+function buildEmptyStrategyWorkshop(): DigitalMarketingStrategyWorkshop {
+  return {
+    status: 'not_started',
+    assistant_message: '',
+    follow_up_questions: [],
+    messages: [],
+    summary: {
+      business_focus: '',
+      audience: '',
+      positioning: '',
+      tone: '',
+      content_pillars: [],
+      youtube_angle: '',
+      cta: '',
+    },
+    approved_at: null,
+  }
+}
+
+function normalizeStrategyWorkshop(workshop: unknown): DigitalMarketingStrategyWorkshop {
+  const raw = workshop && typeof workshop === 'object' ? workshop as DigitalMarketingStrategyWorkshop : {}
+  const rawSummary = raw.summary && typeof raw.summary === 'object' ? raw.summary : {}
+  const status = raw.status === 'discovery' || raw.status === 'approval_ready' || raw.status === 'approved'
+    ? raw.status
+    : 'not_started'
+
+  return {
+    status,
+    assistant_message: String(raw.assistant_message || ''),
+    follow_up_questions: Array.isArray(raw.follow_up_questions)
+      ? raw.follow_up_questions.map((item) => String(item || '').trim()).filter(Boolean)
+      : [],
+    messages: Array.isArray(raw.messages)
+      ? raw.messages
+          .map((item) => {
+            const role = item?.role === 'user' ? 'user' : item?.role === 'assistant' ? 'assistant' : null
+            const content = String(item?.content || '').trim()
+            return role && content ? { role, content } : null
+          })
+          .filter(Boolean) as NonNullable<DigitalMarketingStrategyWorkshop['messages']>
+      : [],
+    summary: {
+      business_focus: String(rawSummary.business_focus || ''),
+      audience: String(rawSummary.audience || ''),
+      positioning: String(rawSummary.positioning || ''),
+      tone: String(rawSummary.tone || ''),
+      content_pillars: Array.isArray(rawSummary.content_pillars)
+        ? rawSummary.content_pillars.map((item) => String(item || '').trim()).filter(Boolean)
+        : [],
+      youtube_angle: String(rawSummary.youtube_angle || ''),
+      cta: String(rawSummary.cta || ''),
+    },
+    approved_at: raw.approved_at ? String(raw.approved_at) : null,
+  }
+}
+
+function buildStrategyWorkshopPayload(
+  workshop: DigitalMarketingStrategyWorkshop,
+  summary: DigitalMarketingStrategyWorkshopSummary,
+  statusOverride?: DigitalMarketingStrategyWorkshop['status'],
+): DigitalMarketingStrategyWorkshop {
+  return {
+    ...normalizeStrategyWorkshop(workshop),
+    status: statusOverride || workshop.status || 'not_started',
+    summary: {
+      business_focus: String(summary.business_focus || '').trim(),
+      audience: String(summary.audience || '').trim(),
+      positioning: String(summary.positioning || '').trim(),
+      tone: String(summary.tone || '').trim(),
+      content_pillars: Array.isArray(summary.content_pillars)
+        ? summary.content_pillars.map((item) => String(item || '').trim()).filter(Boolean)
+        : [],
+      youtube_angle: String(summary.youtube_angle || '').trim(),
+      cta: String(summary.cta || '').trim(),
+    },
+  }
+}
+
 type DigitalMarketingActivationWizardProps = {
   instances?: MyAgentInstanceSummary[]
   instance?: MyAgentInstanceSummary | null
@@ -210,6 +291,9 @@ export function DigitalMarketingActivationWizard({
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [masterTheme, setMasterTheme] = useState('')
   const [derivedThemes, setDerivedThemes] = useState<DigitalMarketingDerivedTheme[]>([])
+  const [strategyWorkshop, setStrategyWorkshop] = useState<DigitalMarketingStrategyWorkshop>(buildEmptyStrategyWorkshop())
+  const [strategySummary, setStrategySummary] = useState<DigitalMarketingStrategyWorkshopSummary>(buildEmptyStrategyWorkshop().summary || {})
+  const [strategyReply, setStrategyReply] = useState('')
   const [themePlanLoading, setThemePlanLoading] = useState(false)
   const [themePlanSaving, setThemePlanSaving] = useState(false)
   const [themePlanError, setThemePlanError] = useState<string | null>(null)
@@ -349,6 +433,7 @@ export function DigitalMarketingActivationWizard({
 
   const campaignSetup = activation?.workspace.campaign_setup || {}
   const schedule = campaignSetup.schedule || {}
+  const isThemeApproved = strategyWorkshop.status === 'approved'
 
   const normalizedSchedule: DigitalMarketingCampaignSchedule = {
     start_date: scheduleStartDate.trim(),
@@ -361,8 +446,11 @@ export function DigitalMarketingActivationWizard({
     const resolvedWorkspace = (workspace || {}) as DigitalMarketingActivationResponse['workspace']
     const nextCampaignSetup = resolvedWorkspace.campaign_setup || {}
     const nextSchedule = nextCampaignSetup.schedule || {}
+    const nextWorkshop = normalizeStrategyWorkshop(nextCampaignSetup.strategy_workshop)
     setMasterTheme(String(nextCampaignSetup.master_theme || ''))
     setDerivedThemes(Array.isArray(nextCampaignSetup.derived_themes) ? nextCampaignSetup.derived_themes : [])
+    setStrategyWorkshop(nextWorkshop)
+    setStrategySummary(nextWorkshop.summary || {})
     setScheduleStartDate(String(nextSchedule.start_date || ''))
     setPostsPerWeek(String(nextSchedule.posts_per_week || ''))
     setPreferredDaysText(Array.isArray(nextSchedule.preferred_days) ? nextSchedule.preferred_days.join(', ') : '')
@@ -443,8 +531,8 @@ export function DigitalMarketingActivationWizard({
   }
 
   const milestoneCount = getActivationMilestoneCount(readiness)
-  const completedMilestones = milestoneCount + (masterTheme.trim() ? 1 : 0)
-  const canFinish = Boolean(masterTheme.trim()) && Boolean(scheduleStartDate.trim()) && Boolean(readiness.can_finalize)
+  const completedMilestones = milestoneCount + (isThemeApproved ? 1 : 0)
+  const canFinish = Boolean(masterTheme.trim()) && isThemeApproved && Boolean(scheduleStartDate.trim()) && Boolean(readiness.can_finalize)
   const missingProfileFields = useMemo(() => {
     const items: string[] = []
     if (!brandName.trim()) items.push('brand name')
@@ -642,6 +730,10 @@ export function DigitalMarketingActivationWizard({
     })
     setMasterTheme(String(response.master_theme || nextWorkspace.campaign_setup?.master_theme || ''))
     setDerivedThemes(Array.isArray(response.derived_themes) ? response.derived_themes : nextWorkspace.campaign_setup?.derived_themes || [])
+    const nextWorkshop = normalizeStrategyWorkshop(nextWorkspace.campaign_setup?.strategy_workshop)
+    setStrategyWorkshop(nextWorkshop)
+    setStrategySummary(nextWorkshop.summary || {})
+    setStrategyReply('')
   }
 
   const generateThemePlan = async () => {
@@ -649,9 +741,19 @@ export function DigitalMarketingActivationWizard({
     setThemePlanLoading(true)
     setThemePlanError(null)
     try {
+      const saved = await saveWorkspace()
+      if (!saved) return
       const response = await generateDigitalMarketingThemePlan(hiredInstanceId, {
         campaign_setup: {
           schedule: normalizedSchedule,
+          strategy_workshop: {
+            ...buildStrategyWorkshopPayload(
+              strategyWorkshop,
+              strategySummary,
+              strategyWorkshop.status === 'approved' ? 'approval_ready' : strategyWorkshop.status,
+            ),
+            pending_input: strategyReply.trim(),
+          },
         },
       })
       applyThemePlanResponse(response)
@@ -677,8 +779,8 @@ export function DigitalMarketingActivationWizard({
     const ytSelected = selectedPlatforms.includes('youtube')
     const ytReady = isYouTubeAttached
     const briefReady = Boolean(brandName.trim())
-    return ytSelected && ytReady && ytSelected && briefReady && !draftGenerating
-  }, [selectedPlatforms, isYouTubeAttached, brandName, draftGenerating])
+    return ytSelected && ytReady && briefReady && isThemeApproved && !draftGenerating
+  }, [selectedPlatforms, isYouTubeAttached, brandName, isThemeApproved, draftGenerating])
 
   const handleGenerateYouTubeDraft = async () => {
     if (!canGenerateYouTubeDraft || !hiredInstanceId) return
@@ -794,6 +896,145 @@ export function DigitalMarketingActivationWizard({
     }
   }
 
+  const renderDraftGenerationPanel = () => {
+    if (!selectedPlatforms.includes('youtube')) return null
+
+    return (
+      <div className="dma-wizard-theme-draft-panel" data-testid="theme-draft-panel">
+        <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Generate YouTube draft</div>
+        <div style={{ opacity: 0.7, fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+          Once you approve the strategy, the agent can turn it into a YouTube draft for review.
+        </div>
+        {!isYouTubeAttached ? (
+          <div style={{ opacity: 0.7, fontSize: '0.85rem' }}>Connect and attach YouTube in the previous step first.</div>
+        ) : !isThemeApproved ? (
+          <div style={{ opacity: 0.75, fontSize: '0.85rem' }} data-testid="generate-youtube-draft-next-step-hint">
+            Approve the master theme strategy below before generating a YouTube draft.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <Button
+              appearance="primary"
+              onClick={() => void handleGenerateYouTubeDraft()}
+              disabled={!canGenerateYouTubeDraft || readOnly}
+              data-testid="generate-youtube-draft-btn"
+            >
+              {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
+            </Button>
+            {draftGenerating ? <Spinner size="tiny" /> : null}
+          </div>
+        )}
+        {draftGenerateError ? (
+          <FeedbackMessage intent="error" title="Draft generation failed" message={draftGenerateError} />
+        ) : null}
+
+        {draftPosts.length > 0 && (
+          <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Draft posts ({draftPosts.length})</div>
+            {draftPosts.map((post) => {
+              const status = postActionStatus[post.post_id] || 'idle'
+              const isApproved = post.review_status === 'approved'
+              const isRejected = post.review_status === 'rejected'
+              const isPosted = post.execution_status === 'posted'
+              const isScheduled = post.execution_status === 'scheduled'
+              const receiptUrl = postPublishReceipts[post.post_id] || post.provider_post_url
+              const ytAttached = isYouTubeAttached
+              return (
+                <div
+                  key={post.post_id}
+                  data-testid={`draft-post-card-${post.post_id}`}
+                  style={{ padding: '0.85rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}
+                >
+                  <div style={{ fontSize: '0.85rem', opacity: 0.65, marginBottom: '0.4rem' }}>YouTube draft</div>
+                  <div style={{ marginBottom: '0.75rem', lineHeight: 1.5 }}>{post.text}</div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Badge appearance="outline" color={isApproved ? 'success' : isRejected ? 'danger' : 'warning'}>
+                      {post.review_status}
+                    </Badge>
+                    {isPosted ? (
+                      <Badge appearance="outline" color="success">Published</Badge>
+                    ) : isScheduled ? (
+                      <Badge appearance="outline" color="informative">Queued</Badge>
+                    ) : null}
+                  </div>
+                  {receiptUrl ? (
+                    <div style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
+                      <span style={{ opacity: 0.6 }}>Published: </span>
+                      <a href={receiptUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#00f2fe' }} data-testid={`publish-receipt-${post.post_id}`}>
+                        {receiptUrl}
+                      </a>
+                    </div>
+                  ) : null}
+                  {!isRejected && !isPosted && !isScheduled ? (
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                      {!isApproved ? (
+                        <>
+                          <Button
+                            size="small"
+                            appearance="primary"
+                            disabled={status === 'loading' || readOnly}
+                            onClick={() => void handleApprovePost(post.post_id)}
+                            data-testid={`approve-post-btn-${post.post_id}`}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="small"
+                            appearance="subtle"
+                            disabled={status === 'loading' || readOnly}
+                            onClick={() => void handleRejectPost(post.post_id)}
+                            data-testid={`reject-post-btn-${post.post_id}`}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      ) : null}
+                      {isApproved ? (
+                        <>
+                          <Button
+                            size="small"
+                            appearance="primary"
+                            disabled={status === 'loading' || !ytAttached || readOnly}
+                            onClick={() => void handlePublishNow(post)}
+                            data-testid={`publish-now-btn-${post.post_id}`}
+                            title={!ytAttached ? 'YouTube must be connected and attached' : undefined}
+                          >
+                            Publish now
+                          </Button>
+                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            <Input
+                              type="datetime-local"
+                              size="small"
+                              aria-label="Queue date and time"
+                              value={queueDateTime[post.post_id] || ''}
+                              onChange={(_, d) => setQueueDateTime((q) => ({ ...q, [post.post_id]: d.value }))}
+                              style={{ fontSize: '0.82rem' }}
+                            />
+                            <Button
+                              size="small"
+                              appearance="outline"
+                              disabled={status === 'loading' || !queueDateTime[post.post_id] || readOnly}
+                              onClick={() => void handleQueuePost(post)}
+                              data-testid={`queue-post-btn-${post.post_id}`}
+                            >
+                              Queue for later
+                            </Button>
+                          </div>
+                        </>
+                      ) : null}
+                      {status === 'loading' ? <Spinner size="tiny" /> : null}
+                      {status === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed</span> : null}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const saveThemePlan = async () => {
     if (!hiredInstanceId) return
     setThemePlanSaving(true)
@@ -805,6 +1046,7 @@ export function DigitalMarketingActivationWizard({
         campaign_setup: {
           campaign_id: campaignSetup.campaign_id,
           schedule: normalizedSchedule,
+          strategy_workshop: buildStrategyWorkshopPayload(strategyWorkshop, strategySummary),
         },
       })
       applyThemePlanResponse(response)
@@ -825,6 +1067,38 @@ export function DigitalMarketingActivationWizard({
     setDerivedThemes((current) => [...current, { title: `Derived theme ${current.length + 1}`, description: '', frequency: 'weekly' }])
   }
 
+  const updateStrategySummaryField = (field: keyof DigitalMarketingStrategyWorkshopSummary, value: string | string[]) => {
+    setStrategySummary((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  const approveThemeStrategy = async () => {
+    if (!hiredInstanceId || !masterTheme.trim()) return
+    setThemePlanSaving(true)
+    setThemePlanError(null)
+    try {
+      const response = await patchDigitalMarketingThemePlan(hiredInstanceId, {
+        master_theme: masterTheme.trim(),
+        derived_themes: derivedThemes,
+        campaign_setup: {
+          campaign_id: campaignSetup.campaign_id,
+          schedule: normalizedSchedule,
+          strategy_workshop: {
+            ...buildStrategyWorkshopPayload(strategyWorkshop, strategySummary, 'approved'),
+            approved_at: new Date().toISOString(),
+          },
+        },
+      })
+      applyThemePlanResponse(response)
+    } catch (e: any) {
+      setThemePlanError(e?.message || 'Failed to approve theme strategy.')
+    } finally {
+      setThemePlanSaving(false)
+    }
+  }
+
   const finishActivation = async () => {
     if (!hiredInstanceId || readOnly) return
     setFinishStatus('saving')
@@ -841,6 +1115,7 @@ export function DigitalMarketingActivationWizard({
             master_theme: masterTheme.trim(),
             derived_themes: derivedThemes,
             schedule: normalizedSchedule,
+            strategy_workshop: buildStrategyWorkshopPayload(strategyWorkshop, strategySummary),
           },
         },
       }
@@ -1138,142 +1413,11 @@ export function DigitalMarketingActivationWizard({
                       <div className="dma-wizard-oauth-error">{oauthError}</div>
                     )}
 
-                    {/* Generate YouTube Draft CTA */}
-                    {selectedPlatforms.includes('youtube') && (
-                      <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', background: 'rgba(0,242,254,0.04)' }}>
-                        <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Generate YouTube Draft</div>
-                        <div style={{ opacity: 0.7, fontSize: '0.85rem', marginBottom: '0.75rem' }}>
-                          Creates a draft YouTube post from your brand brief and master theme.
-                        </div>
-                        {!isYouTubeAttached ? (
-                          <div style={{ opacity: 0.6, fontSize: '0.83rem' }}>Connect YouTube first</div>
-                        ) : !brandName.trim() ? (
-                          <div style={{ opacity: 0.75, fontSize: '0.85rem' }} data-testid="generate-youtube-draft-next-step-hint">
-                            Continue to Build Master Theme to enter your brand brief before generating a YouTube draft.
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                            <Button
-                              appearance="primary"
-                              onClick={() => void handleGenerateYouTubeDraft()}
-                              disabled={!canGenerateYouTubeDraft || readOnly}
-                              data-testid="generate-youtube-draft-btn"
-                            >
-                              {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
-                            </Button>
-                            {draftGenerating ? <Spinner size="tiny" /> : null}
-                          </div>
-                        )}
-                        {draftGenerateError ? (
-                          <FeedbackMessage intent="error" title="Draft generation failed" message={draftGenerateError} />
-                        ) : null}
-
-                        {/* Inline draft posts */}
-                        {draftPosts.length > 0 && (
-                          <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
-                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Draft posts ({draftPosts.length})</div>
-                            {draftPosts.map((post) => {
-                              const status = postActionStatus[post.post_id] || 'idle'
-                              const isApproved = post.review_status === 'approved'
-                              const isRejected = post.review_status === 'rejected'
-                              const isPosted = post.execution_status === 'posted'
-                              const isScheduled = post.execution_status === 'scheduled'
-                              const receiptUrl = postPublishReceipts[post.post_id] || post.provider_post_url
-                              const ytAttached = isYouTubeAttached
-                              return (
-                                <div
-                                  key={post.post_id}
-                                  data-testid={`draft-post-card-${post.post_id}`}
-                                  style={{ padding: '0.85rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}
-                                >
-                                  <div style={{ fontSize: '0.85rem', opacity: 0.65, marginBottom: '0.4rem' }}>YouTube draft</div>
-                                  <div style={{ marginBottom: '0.75rem', lineHeight: 1.5 }}>{post.text}</div>
-                                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                                    <Badge appearance="outline" color={isApproved ? 'success' : isRejected ? 'danger' : 'warning'}>
-                                      {post.review_status}
-                                    </Badge>
-                                    {isPosted ? (
-                                      <Badge appearance="outline" color="success">Published</Badge>
-                                    ) : isScheduled ? (
-                                      <Badge appearance="outline" color="informative">Queued</Badge>
-                                    ) : null}
-                                  </div>
-                                  {receiptUrl ? (
-                                    <div style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
-                                      <span style={{ opacity: 0.6 }}>Published: </span>
-                                      <a href={receiptUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#00f2fe' }} data-testid={`publish-receipt-${post.post_id}`}>
-                                        {receiptUrl}
-                                      </a>
-                                    </div>
-                                  ) : null}
-                                  {!isRejected && !isPosted && !isScheduled ? (
-                                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-                                      {!isApproved ? (
-                                        <>
-                                          <Button
-                                            size="small"
-                                            appearance="primary"
-                                            disabled={status === 'loading' || readOnly}
-                                            onClick={() => void handleApprovePost(post.post_id)}
-                                            data-testid={`approve-post-btn-${post.post_id}`}
-                                          >
-                                            Approve
-                                          </Button>
-                                          <Button
-                                            size="small"
-                                            appearance="subtle"
-                                            disabled={status === 'loading' || readOnly}
-                                            onClick={() => void handleRejectPost(post.post_id)}
-                                            data-testid={`reject-post-btn-${post.post_id}`}
-                                          >
-                                            Reject
-                                          </Button>
-                                        </>
-                                      ) : null}
-                                      {isApproved ? (
-                                        <>
-                                          <Button
-                                            size="small"
-                                            appearance="primary"
-                                            disabled={status === 'loading' || !ytAttached || readOnly}
-                                            onClick={() => void handlePublishNow(post)}
-                                            data-testid={`publish-now-btn-${post.post_id}`}
-                                            title={!ytAttached ? 'YouTube must be connected and attached' : undefined}
-                                          >
-                                            Publish now
-                                          </Button>
-                                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                                            <Input
-                                              type="datetime-local"
-                                              size="small"
-                                              aria-label="Queue date and time"
-                                              value={queueDateTime[post.post_id] || ''}
-                                              onChange={(_, d) => setQueueDateTime((q) => ({ ...q, [post.post_id]: d.value }))}
-                                              style={{ fontSize: '0.82rem' }}
-                                            />
-                                            <Button
-                                              size="small"
-                                              appearance="outline"
-                                              disabled={status === 'loading' || !queueDateTime[post.post_id] || readOnly}
-                                              onClick={() => void handleQueuePost(post)}
-                                              data-testid={`queue-post-btn-${post.post_id}`}
-                                            >
-                                              Queue for later
-                                            </Button>
-                                          </div>
-                                        </>
-                                      ) : null}
-                                      {status === 'loading' ? <Spinner size="tiny" /> : null}
-                                      {status === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed</span> : null}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
+                    {selectedPlatforms.includes('youtube') ? (
+                      <div className="dma-wizard-connect-next-step" data-testid="generate-youtube-draft-next-step-hint">
+                        Build Master Theme is next. The AI strategist will workshop your positioning, ask follow-up questions, and only unlock draft generation after you approve the final theme.
                       </div>
-                    )}
+                    ) : null}
 
                     {/* Other platforms */}
                     {(['Instagram', 'Facebook', 'LinkedIn', 'WhatsApp', 'X'] as const).map((name) => (
@@ -1294,7 +1438,6 @@ export function DigitalMarketingActivationWizard({
               {currentStep.id === 'theme' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-theme">
                   <div style={{ display: 'grid', gap: '1.75rem' }}>
-                    {/* Business brief */}
                     <div>
                       <div className="dma-wizard-section-label">Business brief</div>
                       <div className="dma-wizard-form-grid" style={{ marginBottom: '0.85rem' }}>
@@ -1341,51 +1484,193 @@ export function DigitalMarketingActivationWizard({
                       </label>
                     </div>
 
-                    {/* AI theme generation */}
-                    <div>
-                      <div className="dma-wizard-section-label">AI-generated content strategy</div>
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div className="dma-wizard-theme-workshop-card">
+                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                          <div className="dma-wizard-section-label">AI strategy workshop</div>
+                          <div style={{ fontWeight: 600 }}>Work with the strategist before any draft is generated</div>
+                        </div>
+                        <Badge
+                          appearance="outline"
+                          color={isThemeApproved ? 'success' : strategyWorkshop.status === 'approval_ready' ? 'informative' : 'warning'}
+                          data-testid="strategy-workshop-status"
+                        >
+                          {isThemeApproved ? 'Approved' : strategyWorkshop.status === 'approval_ready' ? 'Ready for approval' : 'Discovery in progress'}
+                        </Badge>
+                      </div>
+
+                      <div className="dma-wizard-theme-workshop-thread" data-testid="strategy-workshop-thread">
+                        {(strategyWorkshop.messages || []).length > 0 ? (
+                          (strategyWorkshop.messages || []).map((message, index) => (
+                            <div
+                              key={`${message.role}-${index}`}
+                              className={`dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--${message.role}`}
+                            >
+                              <div className="dma-wizard-theme-workshop-message-role">{message.role === 'assistant' ? 'Strategist' : 'You'}</div>
+                              <div>{message.content}</div>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ opacity: 0.75, fontSize: '0.9rem' }}>
+                            Start the workshop and the strategist will ask the right questions before locking the theme.
+                          </div>
+                        )}
+                        {strategyWorkshop.assistant_message ? (
+                          <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
+                            <div className="dma-wizard-theme-workshop-message-role">Strategist</div>
+                            <div>{strategyWorkshop.assistant_message}</div>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {(strategyWorkshop.follow_up_questions || []).length > 0 ? (
+                        <div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Open questions</div>
+                          <div style={{ display: 'grid', gap: '0.45rem' }}>
+                            {(strategyWorkshop.follow_up_questions || []).map((question, index) => (
+                              <div key={`${question}-${index}`} className="dma-wizard-theme-follow-up-question">{question}</div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <span>Your answer or instruction</span>
+                        <Textarea
+                          aria-label="Strategy workshop reply"
+                          value={strategyReply}
+                          onChange={(_, data) => setStrategyReply(data.value)}
+                          disabled={readOnly}
+                          resize="vertical"
+                          rows={3}
+                          placeholder="Tell the strategist about your ideal customer, business goals, positioning, or anything the strategy must respect."
+                        />
+                      </label>
+
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <Button
                           appearance="primary"
                           onClick={() => void generateThemePlan()}
                           disabled={readOnly || themePlanLoading || !brandName.trim()}
+                          data-testid="start-theme-workshop-btn"
                         >
-                          {themePlanLoading ? 'Generating…' : 'Generate with AI'}
+                          {themePlanLoading
+                            ? 'Strategist is thinking…'
+                            : (strategyWorkshop.messages || []).length > 0 || strategyWorkshop.assistant_message
+                              ? 'Send to strategist'
+                              : 'Start AI workshop'}
                         </Button>
                         {themePlanLoading ? <Spinner size="tiny" /> : null}
                         {!brandName.trim() ? <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>Enter brand name first</span> : null}
                       </div>
-                      {masterTheme ? (
-                        <div style={{ display: 'grid', gap: '1rem' }}>
+
+                      <div>
+                        <div className="dma-wizard-section-label">Editable strategy summary</div>
+                        <div className="dma-wizard-form-grid">
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span style={{ fontWeight: 600 }}>Master theme</span>
+                            <span>Business focus</span>
                             <Input
-                              aria-label="Master theme"
-                              value={masterTheme}
-                              onChange={(_, data) => setMasterTheme(data.value)}
+                              aria-label="Business focus"
+                              value={String(strategySummary.business_focus || '')}
+                              onChange={(_, data) => updateStrategySummaryField('business_focus', data.value)}
                               disabled={readOnly}
                             />
                           </label>
-                          {derivedThemes.length > 0 ? (
-                            <div>
-                              <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Derived themes ({derivedThemes.length})</div>
-                              <div style={{ display: 'grid', gap: '0.6rem' }}>
-                                {derivedThemes.map((dt, idx) => (
-                                  <div key={idx} style={{ padding: '0.75rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
-                                    <div style={{ fontWeight: 600 }}>{dt.title}</div>
-                                    {dt.description ? <div style={{ opacity: 0.75, fontSize: '0.85rem', marginTop: '0.2rem' }}>{dt.description}</div> : null}
-                                    {dt.frequency ? <div style={{ opacity: 0.5, fontSize: '0.78rem', marginTop: '0.2rem' }}>Frequency: {dt.frequency}</div> : null}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Audience</span>
+                            <Input
+                              aria-label="Audience"
+                              value={String(strategySummary.audience || '')}
+                              onChange={(_, data) => updateStrategySummaryField('audience', data.value)}
+                              disabled={readOnly}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Positioning</span>
+                            <Input
+                              aria-label="Positioning"
+                              value={String(strategySummary.positioning || '')}
+                              onChange={(_, data) => updateStrategySummaryField('positioning', data.value)}
+                              disabled={readOnly}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Tone</span>
+                            <Input
+                              aria-label="Tone"
+                              value={String(strategySummary.tone || '')}
+                              onChange={(_, data) => updateStrategySummaryField('tone', data.value)}
+                              disabled={readOnly}
+                            />
+                          </label>
                         </div>
-                      ) : (
-                        <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>
-                          Fill in the brief above then click &ldquo;Generate with AI&rdquo; to create a tailored content strategy.
+                        <div className="dma-wizard-form-grid" style={{ marginTop: '0.85rem' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Content pillars</span>
+                            <Textarea
+                              aria-label="Content pillars"
+                              value={formatListForTextarea(strategySummary.content_pillars)}
+                              onChange={(_, data) => updateStrategySummaryField('content_pillars', parseListTextarea(data.value))}
+                              disabled={readOnly}
+                              resize="vertical"
+                              rows={3}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>YouTube angle</span>
+                            <Textarea
+                              aria-label="YouTube angle"
+                              value={String(strategySummary.youtube_angle || '')}
+                              onChange={(_, data) => updateStrategySummaryField('youtube_angle', data.value)}
+                              disabled={readOnly}
+                              resize="vertical"
+                              rows={3}
+                            />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Call to action</span>
+                            <Textarea
+                              aria-label="Call to action"
+                              value={String(strategySummary.cta || '')}
+                              onChange={(_, data) => updateStrategySummaryField('cta', data.value)}
+                              disabled={readOnly}
+                              resize="vertical"
+                              rows={3}
+                            />
+                          </label>
                         </div>
-                      )}
+                      </div>
+
+                      <DigitalMarketingThemePlanCard
+                        masterTheme={masterTheme}
+                        derivedThemes={derivedThemes}
+                        editable
+                        saving={themePlanSaving}
+                        loading={themePlanLoading}
+                        error={themePlanError}
+                        onMasterThemeChange={setMasterTheme}
+                        onDerivedThemeChange={updateDerivedTheme}
+                        onAddDerivedTheme={addDerivedTheme}
+                        onSave={() => void saveThemePlan()}
+                      />
+
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Button
+                          appearance="primary"
+                          disabled={readOnly || themePlanSaving || !masterTheme.trim()}
+                          onClick={() => void approveThemeStrategy()}
+                          data-testid="approve-theme-strategy-btn"
+                        >
+                          {isThemeApproved ? 'Strategy approved' : 'Approve strategy'}
+                        </Button>
+                        {isThemeApproved ? (
+                          <span style={{ color: '#10b981', fontSize: '0.85rem' }}>Draft generation is now unlocked.</span>
+                        ) : (
+                          <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>Approve only when the positioning and content lanes feel final.</span>
+                        )}
+                      </div>
+
+                      {renderDraftGenerationPanel()}
                     </div>
                   </div>
                 </div>

@@ -157,6 +157,14 @@ async function goToConnectStep() {
   })
 }
 
+async function goToThemeStep() {
+  await goToConnectStep()
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  await waitFor(() => {
+    expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
+  })
+}
+
 describe('DMA Activation Wizard — step navigation', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -212,6 +220,86 @@ describe('DMA Activation Wizard — step navigation', () => {
       },
       updated_at: '2026-03-18T09:00:00Z',
     } as any)
+    vi.mocked(serviceModule.generateDigitalMarketingThemePlan).mockResolvedValue({
+      campaign_id: 'CAM-1',
+      master_theme: 'Own your category with clear, premium education',
+      derived_themes: [
+        { title: 'Authority content', description: 'Teach the market', frequency: 'weekly' },
+        { title: 'Conversion content', description: 'Convert interest into demand', frequency: 'weekly' },
+      ],
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: 'Growth marketing',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        campaign_setup: {
+          ...structuredClone(defaultWorkspace).campaign_setup,
+          master_theme: 'Own your category with clear, premium education',
+          derived_themes: [
+            { title: 'Authority content', description: 'Teach the market', frequency: 'weekly' },
+            { title: 'Conversion content', description: 'Convert interest into demand', frequency: 'weekly' },
+          ],
+          strategy_workshop: {
+            status: 'approval_ready',
+            assistant_message: 'Your content should make complex buying decisions feel commercially obvious.',
+            follow_up_questions: ['What is the first commercial outcome this content must drive?'],
+            messages: [
+              { role: 'assistant', content: 'Tell me what business result matters most from this channel.' },
+              { role: 'user', content: 'We need more qualified inbound demand.' },
+            ],
+            summary: {
+              business_focus: 'Activation services for growth-stage teams.',
+              audience: 'Founders and operators.',
+              positioning: 'The operator-led partner that turns confusion into execution.',
+              tone: 'Sharp, credible, and practical.',
+              content_pillars: ['Education', 'Proof', 'Execution'],
+              youtube_angle: 'Turn strategy confusion into practical next steps.',
+              cta: 'Book a strategy session.',
+            },
+          },
+        },
+      },
+    } as any)
+    vi.mocked(serviceModule.patchDigitalMarketingThemePlan).mockImplementation(async (_hiredInstanceId, patch: any) => ({
+      campaign_id: patch?.campaign_setup?.campaign_id || 'CAM-1',
+      master_theme: patch?.master_theme || 'Own your category with clear, premium education',
+      derived_themes: patch?.derived_themes || [],
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: 'Growth marketing',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        campaign_setup: {
+          ...structuredClone(defaultWorkspace).campaign_setup,
+          campaign_id: patch?.campaign_setup?.campaign_id || 'CAM-1',
+          master_theme: patch?.master_theme || 'Own your category with clear, premium education',
+          derived_themes: patch?.derived_themes || [],
+          schedule: patch?.campaign_setup?.schedule || structuredClone(defaultWorkspace).campaign_setup.schedule,
+          strategy_workshop: patch?.campaign_setup?.strategy_workshop || {
+            status: 'not_started',
+            assistant_message: '',
+            follow_up_questions: [],
+            messages: [],
+            summary: {
+              business_focus: '',
+              audience: '',
+              positioning: '',
+              tone: '',
+              content_pillars: [],
+              youtube_angle: '',
+              cta: '',
+            },
+            approved_at: null,
+          },
+        },
+      },
+    }) as any)
 
     const hiredAgentsModule = await import('../services/hiredAgents.service')
     vi.mocked(hiredAgentsModule.upsertHiredAgentDraft).mockResolvedValue({
@@ -759,10 +847,10 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByRole('button', { name: 'Attach saved YouTube connection' })).toBeInTheDocument()
     expect(screen.queryByTestId('youtube-connected-badge')).not.toBeInTheDocument()
     expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('generate-youtube-draft-next-step-hint')).not.toBeInTheDocument()
+    expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
   })
 
-  it('shows next-step guidance instead of a disabled draft CTA when YouTube is attached but brand brief is incomplete', async () => {
+  it('shows theme-step guidance on connect instead of any draft CTA', async () => {
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     const ytModule = await import('../services/youtubeConnections.service')
     const platformModule = await import('../services/platformConnections.service')
@@ -837,6 +925,51 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
   })
 
+  it('runs the AI strategy workshop and lets the customer approve the resulting theme', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+
+    renderWizard()
+    await goToThemeStep()
+
+    fireEvent.change(screen.getByLabelText('Strategy workshop reply'), {
+      target: { value: 'We want more qualified inbound demand from founder-led teams.' },
+    })
+    fireEvent.click(screen.getByTestId('start-theme-workshop-btn'))
+
+    await waitFor(() => {
+      expect(serviceModule.generateDigitalMarketingThemePlan).toHaveBeenCalledWith(
+        'HAI-1',
+        expect.objectContaining({
+          campaign_setup: expect.objectContaining({
+            strategy_workshop: expect.objectContaining({
+              pending_input: 'We want more qualified inbound demand from founder-led teams.',
+            }),
+          }),
+        })
+      )
+    })
+
+    expect(screen.getByTestId('strategy-assistant-message')).toHaveTextContent(
+      'Your content should make complex buying decisions feel commercially obvious.'
+    )
+    expect(screen.getByLabelText('Positioning')).toHaveValue('The operator-led partner that turns confusion into execution.')
+
+    fireEvent.click(screen.getByTestId('approve-theme-strategy-btn'))
+
+    await waitFor(() => {
+      expect(serviceModule.patchDigitalMarketingThemePlan).toHaveBeenCalledWith(
+        'HAI-1',
+        expect.objectContaining({
+          campaign_setup: expect.objectContaining({
+            strategy_workshop: expect.objectContaining({ status: 'approved' }),
+          }),
+        })
+      )
+    })
+
+    expect(screen.getByTestId('strategy-workshop-status')).toHaveTextContent('Approved')
+  })
+
   it('reuses the approval returned by approve before publishing a YouTube draft', async () => {
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     const platformModule = await import('../services/platformConnections.service')
@@ -855,7 +988,29 @@ describe('DMA Activation Wizard — step navigation', () => {
         offerings_services: ['Activation'],
         platforms_enabled: ['youtube'],
         platform_bindings: { youtube: { skill_id: 'default' } },
-        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+        campaign_setup: {
+          ...structuredClone(defaultWorkspace).campaign_setup,
+          master_theme: 'Own your category with clear, premium education',
+          derived_themes: [
+            { title: 'Authority content', description: 'Teach the market', frequency: 'weekly' },
+          ],
+          strategy_workshop: {
+            status: 'approved',
+            assistant_message: 'Approved strategy',
+            follow_up_questions: [],
+            messages: [],
+            summary: {
+              business_focus: 'Activation services',
+              audience: 'Founders',
+              positioning: 'Operator-led growth partner',
+              tone: 'Clear and practical',
+              content_pillars: ['Education'],
+              youtube_angle: 'Explain growth clearly',
+              cta: 'Book a session',
+            },
+            approved_at: '2026-03-18T09:10:00Z',
+          },
+        },
       },
       readiness: {
         brief_complete: true,
@@ -886,7 +1041,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     ] as any)
 
     renderWizard()
-    await goToConnectStep()
+    await goToThemeStep()
 
     await waitFor(() => {
       expect(screen.getByTestId('generate-youtube-draft-btn')).toBeInTheDocument()
