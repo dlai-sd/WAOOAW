@@ -79,11 +79,16 @@ module "pp_backend" {
     ENABLE_METERING_DEBUG = var.enable_metering_debug
   }
 
-  secrets = var.attach_secret_manager_secrets ? {
-    GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
-    GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
-    JWT_SECRET           = "JWT_SECRET:latest"
-  } : {}
+  secrets = merge(
+    var.attach_secret_manager_secrets ? {
+      GOOGLE_CLIENT_ID     = "GOOGLE_CLIENT_ID:latest"
+      GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET:latest"
+      JWT_SECRET           = "JWT_SECRET:latest"
+    } : {},
+    {
+      REDIS_URL = "${var.environment}-pp-backend-redis-url:latest"
+    }
+  )
 }
 
 locals {

@@ -15,13 +15,27 @@ import hashlib
 import json
 import logging
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from core.config import settings
+from core.logging import PIIMaskingFilter
 
 logger = logging.getLogger(__name__)
+logger.addFilter(PIIMaskingFilter())
 
 # Module-level singleton — created lazily on first use.
 _redis_client: Any = None
+
+
+def _effective_db_index(redis_url: str) -> int:
+    parsed = urlparse(redis_url)
+    path = (parsed.path or "").lstrip("/")
+    if not path:
+        return 0
+    try:
+        return int(path.split("/", 1)[0])
+    except ValueError:
+        return 0
 
 
 async def _get_redis() -> Optional[Any]:
@@ -42,7 +56,7 @@ async def _get_redis() -> Optional[Any]:
         client = aioredis.from_url(redis_url, decode_responses=True)
         await client.ping()
         _redis_client = client
-        logger.info("ops_cache: Redis connected at %s", redis_url)
+        logger.info("ops_cache: Redis connected (db_index=%s)", _effective_db_index(redis_url))
         return _redis_client
     except Exception as exc:  # pragma: no cover — only hit when Redis is down
         logger.warning("ops_cache: Redis unavailable — cache disabled: %s", exc)

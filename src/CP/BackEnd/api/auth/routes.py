@@ -29,6 +29,7 @@ from services.cp_2fa import (
 )
 from services.cp_refresh_revocations import (
     FileCPRefreshRevocationStore,
+    RedisCPRefreshRevocationStore,
     get_cp_refresh_revocation_store,
 )
 from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
@@ -37,7 +38,7 @@ router = waooaw_router(prefix="/auth", tags=["authentication"])
 logger = logging.getLogger(__name__)
 REFRESH_COOKIE_NAME = "refresh_token"
 
-# In-memory state storage (use Redis in production)
+# In-memory state storage (refresh-token revocation uses REDIS_URL when configured)
 _state_store = {}
 
 
@@ -382,11 +383,11 @@ async def create_e2e_session(
 async def logout(
     response: Response,
     current_user: User = Depends(get_current_user),
-    revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
+    revocations: FileCPRefreshRevocationStore | RedisCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
 ):
     """
     Logout current user
-    In production, add token to blacklist in Redis
+    Uses the configured revocation store (Redis-first when REDIS_URL is present).
 
     Args:
         current_user: Authenticated user
@@ -472,4 +473,3 @@ async def disable_2fa(
 
     two_fa_store.disable(user_id=current_user.id, email=current_user.email)
     return {"enabled": False}
-

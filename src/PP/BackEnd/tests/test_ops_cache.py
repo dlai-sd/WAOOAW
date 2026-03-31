@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sys
+import types
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -230,3 +231,40 @@ async def test_cache_roundtrip_set_then_get():
         result = await oc.cache_get("hired", path, params)
 
     assert result == payload
+
+
+@pytest.mark.unit
+async def test_get_redis_connects_successfully_when_configured(monkeypatch):
+    await _reset_module_cache()
+    import services.ops_cache as oc
+
+    mock_redis = _make_redis_mock()
+
+    monkeypatch.setattr(oc.settings, "REDIS_URL", "redis://localhost:6379/2")
+    monkeypatch.setitem(sys.modules, "redis.asyncio", types.SimpleNamespace(from_url=lambda *args, **kwargs: mock_redis))
+
+    client = await oc._get_redis()
+
+    assert client is mock_redis
+    mock_redis.ping.assert_awaited_once()
+
+
+@pytest.mark.unit
+async def test_get_redis_returns_none_when_unavailable(monkeypatch):
+    await _reset_module_cache()
+    import services.ops_cache as oc
+
+    monkeypatch.setattr(oc.settings, "REDIS_URL", "redis://localhost:6379/2")
+    monkeypatch.setitem(
+        sys.modules,
+        "redis.asyncio",
+        types.SimpleNamespace(
+            from_url=lambda *args, **kwargs: MagicMock(
+                ping=AsyncMock(side_effect=RuntimeError("down"))
+            )
+        ),
+    )
+
+    client = await oc._get_redis()
+
+    assert client is None

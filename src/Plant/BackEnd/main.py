@@ -694,10 +694,9 @@ async def readiness_check():
 
     # --- Redis check ---
     try:
-        import redis.asyncio as aioredis
-        _r = aioredis.from_url(settings.redis_url, socket_connect_timeout=2)
-        await _r.ping()
-        await _r.aclose()
+        from services import redis_runtime
+
+        await redis_runtime.health_check()
         redis_ok = True
     except Exception as _redis_exc:
         logger.warning("readiness_check: Redis unavailable: %s", _redis_exc)
@@ -760,4 +759,3 @@ if __name__ == "__main__":
         reload=settings.debug,
         log_level=settings.log_level.lower(),
     )
-

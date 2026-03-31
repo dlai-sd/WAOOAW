@@ -57,12 +57,6 @@ variable "attach_secret_manager_secrets" {
   default     = true
 }
 
-variable "redis_url" {
-  description = "Redis connection string shared by Plant Backend and Plant Gateway. Must point at the deployed Redis service, not localhost, in demo/uat/prod."
-  type        = string
-  default     = "redis://10.0.0.3:6379/0"
-}
-
 variable "cp_backend_url" {
   description = "Base URL for CP Backend internal credential calls. Non-secret runtime config; override per environment if needed."
   type        = string
