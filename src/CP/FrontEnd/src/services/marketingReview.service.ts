@@ -9,11 +9,15 @@ export type DraftPost = {
   approval_id?: string | null
   execution_status?: string
   scheduled_at?: string | null
+  credential_ref?: string | null
+  provider_post_id?: string | null
+  provider_post_url?: string | null
 }
 
 export type DraftBatch = {
   batch_id: string
   agent_id: string
+  hired_instance_id?: string | null
   customer_id?: string | null
   theme: string
   brand_name: string
@@ -22,8 +26,59 @@ export type DraftBatch = {
   posts: DraftPost[]
 }
 
+export type CreateDraftBatchInput = {
+  agent_id: string
+  hired_instance_id?: string | null
+  campaign_id?: string | null
+  theme: string
+  brand_name: string
+  brief_summary?: string | null
+  offer?: string | null
+  location?: string | null
+  audience?: string | null
+  tone?: string | null
+  language?: string | null
+  youtube_credential_ref?: string | null
+  youtube_visibility?: string
+  public_release_requested?: boolean
+  channels?: string[] | null
+}
+
+export type ExecuteDraftPostInput = {
+  post_id: string
+  agent_id: string
+  purpose?: string | null
+  intent_action?: string
+  approval_id?: string | null
+}
+
+export type ExecuteDraftPostResponse = {
+  allowed: boolean
+  decision_id: string
+  post_id: string
+  execution_status?: string | null
+  provider_post_id?: string | null
+  provider_post_url?: string | null
+}
+
 export async function listCustomerDraftBatches(): Promise<DraftBatch[]> {
   return gatewayRequestJson<DraftBatch[]>('/cp/marketing/draft-batches')
+}
+
+export async function createDraftBatch(input: CreateDraftBatchInput): Promise<DraftBatch> {
+  return gatewayRequestJson<DraftBatch>('/cp/marketing/draft-batches', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
+export async function executeDraftPost(input: ExecuteDraftPostInput): Promise<ExecuteDraftPostResponse> {
+  return gatewayRequestJson<ExecuteDraftPostResponse>('/cp/marketing/draft-posts/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
 }
 
 export async function approveDraftPost(postId: string): Promise<{ post_id: string; review_status: string; approval_id: string }> {

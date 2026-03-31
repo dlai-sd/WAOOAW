@@ -19,6 +19,15 @@ import {
   type UpsertDigitalMarketingActivationInput,
 } from '../services/digitalMarketingActivation.service'
 import {
+  createDraftBatch,
+  executeDraftPost,
+  approveDraftPost,
+  rejectDraftPost,
+  scheduleDraftPost,
+  type DraftBatch,
+  type DraftPost,
+} from '../services/marketingReview.service'
+import {
   startYouTubeConnection,
   attachYouTubeConnection,
   listYouTubeConnections,
@@ -210,6 +219,14 @@ export function DigitalMarketingActivationWizard({
   const [oauthLoading, setOauthLoading] = useState(false)
   const [oauthError, setOauthError] = useState<string | null>(null)
   const [oauthMessage, setOauthMessage] = useState<string | null>(null)
+
+  const [generatedBatch, setGeneratedBatch] = useState<DraftBatch | null>(null)
+  const [draftPosts, setDraftPosts] = useState<DraftPost[]>([])
+  const [draftGenerating, setDraftGenerating] = useState(false)
+  const [draftGenerateError, setDraftGenerateError] = useState<string | null>(null)
+  const [postActionStatus, setPostActionStatus] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
+  const [postPublishReceipts, setPostPublishReceipts] = useState<Record<string, string>>({})
+  const [queueDateTime, setQueueDateTime] = useState<Record<string, string>>({})
 
   const hiredInstanceId = useMemo(
     () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
@@ -611,6 +628,124 @@ export function DigitalMarketingActivationWizard({
     }
   }
 
+  const youtubeCredentialRef: string | null = useMemo(() => {
+    const binding = activation?.workspace?.platform_bindings?.youtube
+    return String(binding?.credential_ref || binding?.customer_platform_credential_id || '').trim() || null
+  }, [activation?.workspace?.platform_bindings])
+
+  const canGenerateYouTubeDraft = useMemo(() => {
+    const ytSelected = selectedPlatforms.includes('youtube')
+    const ytReady = Boolean(youtubeConnected || activation?.readiness?.youtube_connection_ready)
+    const briefReady = Boolean(brandName.trim())
+    return ytSelected && ytReady && ytSelected && briefReady && !draftGenerating
+  }, [selectedPlatforms, youtubeConnected, activation?.readiness?.youtube_connection_ready, brandName, draftGenerating])
+
+  const handleGenerateYouTubeDraft = async () => {
+    if (!canGenerateYouTubeDraft || !hiredInstanceId) return
+    setDraftGenerating(true)
+    setDraftGenerateError(null)
+    try {
+      const agentId = String(draft?.agent_id || activeInstance?.agent_id || '').trim()
+      const campaignId = activation?.workspace?.campaign_setup?.campaign_id || undefined
+      const batch = await createDraftBatch({
+        agent_id: agentId,
+        hired_instance_id: hiredInstanceId,
+        campaign_id: campaignId ?? null,
+        theme: masterTheme.trim() || brandName.trim(),
+        brand_name: brandName.trim(),
+        brief_summary: businessContext.trim() || undefined,
+        location: location.trim() || undefined,
+        audience: undefined,
+        tone: undefined,
+        language: primaryLanguage.trim() || undefined,
+        youtube_credential_ref: youtubeCredentialRef,
+        youtube_visibility: 'private',
+        public_release_requested: false,
+        channels: ['youtube'],
+      })
+      setGeneratedBatch(batch)
+      setDraftPosts(batch.posts.filter((p) => p.channel === 'youtube'))
+      setPostActionStatus({})
+      setPostPublishReceipts({})
+    } catch (e: any) {
+      setDraftGenerateError(e?.message || 'Failed to generate YouTube draft.')
+    } finally {
+      setDraftGenerating(false)
+    }
+  }
+
+  const handleApprovePost = async (postId: string) => {
+    setPostActionStatus((s) => ({ ...s, [postId]: 'loading' }))
+    try {
+      await approveDraftPost(postId)
+      setDraftPosts((posts) =>
+        posts.map((p) => (p.post_id === postId ? { ...p, review_status: 'approved' } : p))
+      )
+      setPostActionStatus((s) => ({ ...s, [postId]: 'done' }))
+    } catch {
+      setPostActionStatus((s) => ({ ...s, [postId]: 'error' }))
+    }
+  }
+
+  const handleRejectPost = async (postId: string) => {
+    setPostActionStatus((s) => ({ ...s, [postId]: 'loading' }))
+    try {
+      await rejectDraftPost(postId)
+      setDraftPosts((posts) =>
+        posts.map((p) => (p.post_id === postId ? { ...p, review_status: 'rejected' } : p))
+      )
+      setPostActionStatus((s) => ({ ...s, [postId]: 'done' }))
+    } catch {
+      setPostActionStatus((s) => ({ ...s, [postId]: 'error' }))
+    }
+  }
+
+  const handlePublishNow = async (post: DraftPost) => {
+    if (!generatedBatch) return
+    const agentId = String(draft?.agent_id || activeInstance?.agent_id || '').trim()
+    setPostActionStatus((s) => ({ ...s, [post.post_id]: 'loading' }))
+    try {
+      const result = await executeDraftPost({
+        post_id: post.post_id,
+        agent_id: agentId,
+        approval_id: post.approval_id ?? undefined,
+        intent_action: 'publish',
+      })
+      if (result.provider_post_url) {
+        setPostPublishReceipts((r) => ({ ...r, [post.post_id]: result.provider_post_url! }))
+      }
+      setDraftPosts((posts) =>
+        posts.map((p) =>
+          p.post_id === post.post_id
+            ? { ...p, execution_status: result.execution_status ?? 'posted', provider_post_url: result.provider_post_url ?? null }
+            : p
+        )
+      )
+      setPostActionStatus((s) => ({ ...s, [post.post_id]: 'done' }))
+    } catch {
+      setPostActionStatus((s) => ({ ...s, [post.post_id]: 'error' }))
+    }
+  }
+
+  const handleQueuePost = async (post: DraftPost) => {
+    const scheduledAt = queueDateTime[post.post_id]
+    if (!scheduledAt) return
+    setPostActionStatus((s) => ({ ...s, [post.post_id]: 'loading' }))
+    try {
+      await scheduleDraftPost(post.post_id, scheduledAt, post.approval_id ?? undefined)
+      setDraftPosts((posts) =>
+        posts.map((p) =>
+          p.post_id === post.post_id
+            ? { ...p, execution_status: 'scheduled', scheduled_at: scheduledAt }
+            : p
+        )
+      )
+      setPostActionStatus((s) => ({ ...s, [post.post_id]: 'done' }))
+    } catch {
+      setPostActionStatus((s) => ({ ...s, [post.post_id]: 'error' }))
+    }
+  }
+
   const saveThemePlan = async () => {
     if (!hiredInstanceId) return
     setThemePlanSaving(true)
@@ -907,10 +1042,28 @@ export function DigitalMarketingActivationWizard({
                         <span className="dma-wizard-platform-connect-desc">
                           Connect your YouTube channel to allow the agent to manage uploads and publishing.
                         </span>
+                        {savedYouTubeConnection?.display_name ? (
+                          <span
+                            data-testid="youtube-linked-channel-name"
+                            style={{ fontSize: '0.85rem', color: '#10b981', marginTop: '0.2rem', display: 'block' }}
+                          >
+                            Channel: {savedYouTubeConnection.display_name}
+                          </span>
+                        ) : null}
+                        {savedYouTubeConnection && savedYouTubeConnection.verification_status !== 'verified' ? (
+                          <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
+                            Verification pending — reconnect to refresh.
+                          </span>
+                        ) : null}
+                        {youtubeConnected && !savedYouTubeConnection?.id ? (
+                          <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
+                            Connection needs to be attached.
+                          </span>
+                        ) : null}
                       </div>
                       <div className="dma-wizard-platform-connect-action">
                         {youtubeConnected ? (
-                          <span className="dma-wizard-connected-badge">✓ Connected</span>
+                          <span className="dma-wizard-connected-badge" data-testid="youtube-connected-badge">✓ Connected</span>
                         ) : (
                           <Button
                             appearance="primary"
@@ -933,6 +1086,140 @@ export function DigitalMarketingActivationWizard({
 
                     {oauthError && (
                       <div className="dma-wizard-oauth-error">{oauthError}</div>
+                    )}
+
+                    {/* Generate YouTube Draft CTA */}
+                    {selectedPlatforms.includes('youtube') && (
+                      <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px', background: 'rgba(0,242,254,0.04)' }}>
+                        <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Generate YouTube Draft</div>
+                        <div style={{ opacity: 0.7, fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                          Creates a draft YouTube post from your brand brief and master theme.
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                          <Button
+                            appearance="primary"
+                            onClick={() => void handleGenerateYouTubeDraft()}
+                            disabled={!canGenerateYouTubeDraft || readOnly}
+                            data-testid="generate-youtube-draft-btn"
+                          >
+                            {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
+                          </Button>
+                          {draftGenerating ? <Spinner size="tiny" /> : null}
+                          {!youtubeConnected ? (
+                            <span style={{ opacity: 0.6, fontSize: '0.83rem' }}>Connect YouTube first</span>
+                          ) : !brandName.trim() ? (
+                            <span style={{ opacity: 0.6, fontSize: '0.83rem' }}>Enter brand name first</span>
+                          ) : null}
+                        </div>
+                        {draftGenerateError ? (
+                          <FeedbackMessage intent="error" title="Draft generation failed" message={draftGenerateError} />
+                        ) : null}
+
+                        {/* Inline draft posts */}
+                        {draftPosts.length > 0 && (
+                          <div style={{ marginTop: '1rem', display: 'grid', gap: '1rem' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>Draft posts ({draftPosts.length})</div>
+                            {draftPosts.map((post) => {
+                              const status = postActionStatus[post.post_id] || 'idle'
+                              const isApproved = post.review_status === 'approved'
+                              const isRejected = post.review_status === 'rejected'
+                              const isPosted = post.execution_status === 'posted'
+                              const isScheduled = post.execution_status === 'scheduled'
+                              const receiptUrl = postPublishReceipts[post.post_id] || post.provider_post_url
+                              const ytAttached = Boolean(youtubeConnected && (youtubeCredentialRef || savedYouTubeConnection?.id))
+                              return (
+                                <div
+                                  key={post.post_id}
+                                  data-testid={`draft-post-card-${post.post_id}`}
+                                  style={{ padding: '0.85rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}
+                                >
+                                  <div style={{ fontSize: '0.85rem', opacity: 0.65, marginBottom: '0.4rem' }}>YouTube draft</div>
+                                  <div style={{ marginBottom: '0.75rem', lineHeight: 1.5 }}>{post.text}</div>
+                                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    <Badge appearance="outline" color={isApproved ? 'success' : isRejected ? 'danger' : 'warning'}>
+                                      {post.review_status}
+                                    </Badge>
+                                    {isPosted ? (
+                                      <Badge appearance="outline" color="success">Published</Badge>
+                                    ) : isScheduled ? (
+                                      <Badge appearance="outline" color="informative">Queued</Badge>
+                                    ) : null}
+                                  </div>
+                                  {receiptUrl ? (
+                                    <div style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
+                                      <span style={{ opacity: 0.6 }}>Published: </span>
+                                      <a href={receiptUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#00f2fe' }} data-testid={`publish-receipt-${post.post_id}`}>
+                                        {receiptUrl}
+                                      </a>
+                                    </div>
+                                  ) : null}
+                                  {!isRejected && !isPosted && !isScheduled ? (
+                                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                                      {!isApproved ? (
+                                        <>
+                                          <Button
+                                            size="small"
+                                            appearance="primary"
+                                            disabled={status === 'loading' || readOnly}
+                                            onClick={() => void handleApprovePost(post.post_id)}
+                                            data-testid={`approve-post-btn-${post.post_id}`}
+                                          >
+                                            Approve
+                                          </Button>
+                                          <Button
+                                            size="small"
+                                            appearance="subtle"
+                                            disabled={status === 'loading' || readOnly}
+                                            onClick={() => void handleRejectPost(post.post_id)}
+                                            data-testid={`reject-post-btn-${post.post_id}`}
+                                          >
+                                            Reject
+                                          </Button>
+                                        </>
+                                      ) : null}
+                                      {isApproved ? (
+                                        <>
+                                          <Button
+                                            size="small"
+                                            appearance="primary"
+                                            disabled={status === 'loading' || !ytAttached || readOnly}
+                                            onClick={() => void handlePublishNow(post)}
+                                            data-testid={`publish-now-btn-${post.post_id}`}
+                                            title={!ytAttached ? 'YouTube must be connected and attached' : undefined}
+                                          >
+                                            Publish now
+                                          </Button>
+                                          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                            <Input
+                                              type="datetime-local"
+                                              size="small"
+                                              aria-label="Queue date and time"
+                                              value={queueDateTime[post.post_id] || ''}
+                                              onChange={(_, d) => setQueueDateTime((q) => ({ ...q, [post.post_id]: d.value }))}
+                                              style={{ fontSize: '0.82rem' }}
+                                            />
+                                            <Button
+                                              size="small"
+                                              appearance="outline"
+                                              disabled={status === 'loading' || !queueDateTime[post.post_id] || readOnly}
+                                              onClick={() => void handleQueuePost(post)}
+                                              data-testid={`queue-post-btn-${post.post_id}`}
+                                            >
+                                              Queue for later
+                                            </Button>
+                                          </div>
+                                        </>
+                                      ) : null}
+                                      {status === 'loading' ? <Spinner size="tiny" /> : null}
+                                      {status === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed</span> : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* Other platforms */}

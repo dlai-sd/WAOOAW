@@ -80,3 +80,78 @@ describe('digitalMarketingActivation.service', () => {
     })
   })
 })
+
+describe('marketingReview.service — draft create and execute', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+  })
+
+  it('createDraftBatch POSTs to /cp/marketing/draft-batches with youtube fields', async () => {
+    const gateway = await import('../services/gatewayApiClient')
+    const spy = vi.spyOn(gateway, 'gatewayRequestJson' as any).mockResolvedValue({
+      batch_id: 'b-new',
+      agent_id: 'AGT-MKT-DMA-001',
+      customer_id: 'user-1',
+      theme: 'YouTube health tips',
+      brand_name: 'Care Clinic',
+      created_at: '2026-01-01T00:00:00Z',
+      status: 'pending_review',
+      posts: [],
+    })
+
+    const svc = await import('../services/marketingReview.service')
+    const result = await svc.createDraftBatch({
+      agent_id: 'AGT-MKT-DMA-001',
+      theme: 'YouTube health tips',
+      brand_name: 'Care Clinic',
+      youtube_credential_ref: 'projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest',
+      youtube_visibility: 'private',
+      public_release_requested: false,
+    })
+
+    expect(spy).toHaveBeenCalledWith(
+      '/cp/marketing/draft-batches',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('youtube_credential_ref'),
+      })
+    )
+    expect(result.batch_id).toBe('b-new')
+  })
+
+  it('executeDraftPost POSTs to /cp/marketing/draft-posts/execute', async () => {
+    const gateway = await import('../services/gatewayApiClient')
+    const spy = vi.spyOn(gateway, 'gatewayRequestJson' as any).mockResolvedValue({
+      allowed: true,
+      decision_id: 'dec-1',
+      post_id: 'post-yt-1',
+      execution_status: 'posted',
+      provider_post_id: 'yt-abc123',
+      provider_post_url: 'https://www.youtube.com/post/yt-abc123',
+    })
+
+    const svc = await import('../services/marketingReview.service')
+    const result = await svc.executeDraftPost({
+      post_id: 'post-yt-1',
+      agent_id: 'AGT-MKT-DMA-001',
+      approval_id: 'APR-123',
+      intent_action: 'publish',
+    })
+
+    expect(spy).toHaveBeenCalledWith(
+      '/cp/marketing/draft-posts/execute',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          post_id: 'post-yt-1',
+          agent_id: 'AGT-MKT-DMA-001',
+          approval_id: 'APR-123',
+          intent_action: 'publish',
+        }),
+      })
+    )
+    expect(result.allowed).toBe(true)
+    expect(result.provider_post_url).toBe('https://www.youtube.com/post/yt-abc123')
+  })
+})

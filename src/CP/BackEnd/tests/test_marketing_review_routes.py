@@ -54,6 +54,41 @@ class _FakePlantClient:
                     "headers": {},
                 },
             )()
+        if method == "POST" and path.endswith("/marketing/draft-batches"):
+            body = json_body or {}
+            return type(
+                "R",
+                (),
+                {
+                    "status_code": 200,
+                    "json": {
+                        "batch_id": "b-new",
+                        "agent_id": body.get("agent_id", "AGT-1"),
+                        "customer_id": body.get("customer_id"),
+                        "theme": body.get("theme", ""),
+                        "brand_name": body.get("brand_name", ""),
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "status": "pending_review",
+                        "posts": [],
+                    },
+                    "headers": {},
+                },
+            )()
+        if method == "POST" and "/draft-posts/" in path and path.endswith("/execute"):
+            return type(
+                "R",
+                (),
+                {
+                    "status_code": 200,
+                    "json": {
+                        "allowed": True,
+                        "decision_id": "dec-1",
+                        "post_id": path.split("/")[-2],
+                        "provider_post_url": None,
+                    },
+                    "headers": {},
+                },
+            )()
         if method == "POST" and "/draft-posts/" in path and path.endswith("/approve"):
             return type(
                 "R",
@@ -147,3 +182,101 @@ def test_marketing_review_schedule(client, auth_headers, monkeypatch, tmp_path):
     assert body["execution_status"] == "scheduled"
 
     app.dependency_overrides.clear()
+
+
+@pytest.mark.usefixtures("auth_headers")
+def test_marketing_review_raw_customer_id_forwarding(client, auth_headers, monkeypatch, tmp_path):
+    """Prove that the customer_id forwarded to Plant is a raw user id (not CUST- prefixed)."""
+    monkeypatch.setenv("CP_APPROVALS_STORE_PATH", str(tmp_path / "cp_approvals.jsonl"))
+    from services import cp_approvals as approvals
+
+    approvals.default_cp_approval_store.cache_clear()
+
+    from main import app
+    from api.marketing_review import get_plant_gateway_client
+
+    fake = _FakePlantClient()
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    listed = client.get("/api/cp/marketing/draft-batches", headers=auth_headers)
+    assert listed.status_code == 200
+
+    list_call = next(c for c in fake.calls if c["method"] == "GET" and "draft-batches" in c["path"])
+    customer_id_forwarded = list_call["params"].get("customer_id", "")
+    assert not customer_id_forwarded.startswith("CUST-"), (
+        f"Expected raw user ID but got: {customer_id_forwarded!r}"
+    )
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.usefixtures("auth_headers")
+def test_marketing_create_draft_batch_proxy(client, auth_headers, monkeypatch, tmp_path):
+    """Prove create-draft-batch proxies to Plant with raw customer_id injected."""
+    monkeypatch.setenv("CP_APPROVALS_STORE_PATH", str(tmp_path / "cp_approvals.jsonl"))
+    from services import cp_approvals as approvals
+
+    approvals.default_cp_approval_store.cache_clear()
+
+    from main import app
+    from api.marketing_review import get_plant_gateway_client
+
+    fake = _FakePlantClient()
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    resp = client.post(
+        "/api/cp/marketing/draft-batches",
+        headers=auth_headers,
+        json={
+            "agent_id": "AGT-MKT-DMA-001",
+            "theme": "YouTube health tips",
+            "brand_name": "Care Clinic",
+            "youtube_credential_ref": "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["batch_id"] == "b-new"
+
+    create_call = next(c for c in fake.calls if c["method"] == "POST" and "draft-batches" in c["path"])
+    cid = (create_call["json"] or {}).get("customer_id", "")
+    assert not cid.startswith("CUST-"), f"Expected raw customer id, got: {cid!r}"
+
+    app.dependency_overrides.clear()
+
+
+@pytest.mark.usefixtures("auth_headers")
+def test_marketing_execute_draft_post_proxy(client, auth_headers, monkeypatch, tmp_path):
+    """Prove execute-draft-post proxies to Plant with raw customer_id injected."""
+    monkeypatch.setenv("CP_APPROVALS_STORE_PATH", str(tmp_path / "cp_approvals.jsonl"))
+    from services import cp_approvals as approvals
+
+    approvals.default_cp_approval_store.cache_clear()
+
+    from main import app
+    from api.marketing_review import get_plant_gateway_client
+
+    fake = _FakePlantClient()
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    resp = client.post(
+        "/api/cp/marketing/draft-posts/execute",
+        headers=auth_headers,
+        json={
+            "post_id": "post-yt-1",
+            "agent_id": "AGT-MKT-DMA-001",
+            "approval_id": "APR-123",
+            "intent_action": "publish",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["allowed"] is True
+    assert data["post_id"] == "post-yt-1"
+
+    execute_call = next(c for c in fake.calls if c["method"] == "POST" and "/execute" in c["path"])
+    cid = (execute_call["json"] or {}).get("customer_id", "")
+    assert not cid.startswith("CUST-"), f"Expected raw customer id, got: {cid!r}"
+
+    app.dependency_overrides.clear()
+
