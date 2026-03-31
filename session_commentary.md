@@ -1,6 +1,28 @@
 
 ---
 
+## [2026-03-31 15:40 UTC] Redis plan + get-plan durability update in progress
+
+**Branch**: `docs/plant-redis-1-plan-and-get-plan`
+**Status**: In progress
+
+### Goal
+Update `.github/prompts/get-plan.prompt.md` so plan generation survives request limits via session commentary notes and small checkpoint commits, then create a real single-iteration Redis plan and open a PR.
+
+### Current checklist
+- [x] Create durable branch for prompt + plan work
+- [x] Persist session note and working checklist
+- [ ] Update `get-plan.prompt.md` with durability + secret/image-promotion rules
+- [ ] Replace placeholder Redis plan with a self-sufficient single-iteration plan
+- [ ] Commit prompt change checkpoint
+- [ ] Commit plan file checkpoint
+- [ ] Push branch and open PR
+
+### Recovery hint
+If the session drops, resume on `docs/plant-redis-1-plan-and-get-plan`, finish the prompt update first, then the plan file, then create the PR. Do not restart the repo archaeology.
+
+---
+
 ## [2026-03-04 16:30 UTC] Diagnosed and fixed Razorpay 502 (receipt too long)
 
 **Branch**: `fix/razorpay-receipt-length-plant`

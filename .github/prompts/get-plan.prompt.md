@@ -40,6 +40,14 @@ Read these files in order before asking any questions:
 2. `docs/CP/iterations/NFRReusable.md` §3, §6
 3. `docs/templates/iteration-plan-template.md` — this is the output format you MUST use
 
+## Step 1.5 — Durability workflow (required, do not skip)
+
+Before asking any clarifying questions or writing any story:
+1. Update `session_commentary.md` with a short working note containing the task goal, current branch (or intended branch), a flat todo/checkpoint list, and the next save point.
+2. Create the plan branch before writing substantial plan content.
+3. Commit in small chunks as you go. At minimum: prompt/instruction changes first, plan skeleton second, then each completed major plan section.
+4. Push after each checkpoint commit so request limits, disconnects, or model resets do not lose the work.
+
 ## Step 2 — Vision intake
 
 The user's vision is in the message that triggered this command. Extract answers to these 5 questions from it. If any answer is unclear, ask all unclear questions in a single message before proceeding.
@@ -59,6 +67,8 @@ Once the vision intake is confirmed:
 - Save the plan to `docs/[service]/iterations/[PLAN-ID]-[short-name].md`
 - Fill every `[PLACEHOLDER]` — zero placeholders in the saved file
 - Tick every item in the PM Review Checklist before reporting the plan as ready
+- Create the branch and save the plan skeleton immediately before writing full story content
+- Commit the skeleton right away, then commit each completed major section in small chunks
 - **Optimize for PR-only delivery:** default to 1-2 iterations total. Only create Iteration 3 when the user explicitly accepts the extra merge overhead or the scoped work still exceeds 12 atomic stories after aggressive splitting.
 - **Iteration sizing rule:** target 4-6 stories and roughly 4-6 hours of agent execution per iteration so one merge to `main` unlocks meaningful product progress.
 - **Merge-overhead rule:** prefer vertical slices inside the same iteration over technically pure but merge-heavy sequencing. Do not add an extra iteration just to separate closely related backend/frontend work unless `BLOCKED UNTIL: merged to main` is truly unavoidable.
@@ -68,6 +78,8 @@ Once the vision intake is confirmed:
 - Every story card is self-contained: exact file paths, 2-3 sentence context, no "see above"
 - **Zero-cost agent rule:** Story cards must embed all required NFR code snippets inline — do NOT write "see NFRReusable.md §3". Pull the relevant 10-20 line snippet from `docs/CP/iterations/NFRReusable.md` (which you read in Step 1) and paste it into the story card's "Code patterns to copy exactly" block. The executing agent has an 8K-32K context window and cannot afford to read external reference files mid-execution.
 - **CP BackEnd is a thin proxy — not a business logic layer.** Before writing any CP story, check: (a) if a `/cp/<resource>` route already exists in `src/CP/BackEnd/api/cp_*.py`, use it from FE via `gatewayRequestJson`; (b) if not, create a thin proxy route in `api/cp_<resource>.py` using `waooaw_router` + `PlantGatewayClient` (Lane B story, 45 min); (c) for existing Plant endpoints at `/v1/*`, call directly via `gatewayRequestJson` — no new CP BackEnd file needed. Never put computation or data storage in CP BackEnd; that belongs in Plant BackEnd.
+- **Image promotion and secret-management rule:** Every story that introduces or changes environment-specific configuration must state that values live in GCP Secret Manager or Cloud Run runtime env/secret references only. Do not bake environment-specific values into Dockerfiles, committed `.env` files, Terraform defaults, or source code. The same image must promote cleanly from demo → uat → prod.
+- **GCP-first infra rule:** If the user explicitly asks for live infra creation from GCP first, plan the resource creation as script/CLI automation against GCP, then add Terraform only to reference, import, or reconcile the already-created resource. Do not make Terraform the creation source of truth for that iteration.
 - **Deployment workflow note:** assume deployment happens via the `waooaw deploy` GitHub workflow after merge to `main`. Do not add per-iteration deploy steps unless the scope changes infrastructure, environment variables, or database migrations.
 
 ## Step 4 — Report to user
