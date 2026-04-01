@@ -173,6 +173,7 @@ describe('Brand voice section', () => {
       <DigitalMarketingActivationWizard
         instance={activeInstance}
         instances={[activeInstance]}
+        readOnly={false}
       />
     )
 

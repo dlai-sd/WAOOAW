@@ -1809,7 +1809,7 @@ export function DigitalMarketingActivationWizard({
 
                       <StrategyPreviewPanel
                         isThemeApproved={isThemeApproved}
-                        strategySummary={strategySummary.first_content_direction || strategyWorkshop.checkpoint_summary || strategyWorkshop.assistant_message}
+                        strategySummary={strategySummary.first_content_direction ?? strategyWorkshop.checkpoint_summary ?? strategyWorkshop.assistant_message ?? ''}
                         messages={strategyPreviewMessages}
                       />
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
