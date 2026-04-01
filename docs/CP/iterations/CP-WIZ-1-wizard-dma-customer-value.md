@@ -810,3 +810,381 @@ cd src/CP/FrontEnd && npx jest src/__tests__/BrandVoiceSection.test.tsx --no-cov
 
 ---
 
+## Iteration 2 — Customer profile owns identity + polished platform status
+
+**Scope:** After this iteration, brand_name/location/timezone/language live in Customer Profile (wizard pre-fills from profile), unsupported platforms are hidden, publish receipts are visible in deliverable review, and exchange credentials stop showing for DMA agents.
+**Lane:** B — profile model extension + frontend wiring
+**⏱ Estimated:** 5h | **Come back:** 2026-04-03 10:00 IST
+**Prerequisite:** Iteration 1 PR merged to `main`
+**Epics:** E3, E4
+
+### Dependency Map (Iteration 2)
+
+```
+E3-S1 (profile model) ──► E3-S2 (wizard pre-fill from profile)
+E4-S1 (hide platforms)     (independent)
+E4-S2 (publish receipts)   (independent)
+E4-S3 (hide exchange creds)(independent)
+```
+
+---
+
+### Epic E3: Customer profile owns identity fields — wizard pre-fills
+
+**Branch:** `feat/cp-wiz-1-it2-e3`
+**User story:** As a customer, I enter my brand name, location, timezone, and language once in my profile, and every agent I hire pre-fills from it — no repetitive data entry in the wizard.
+
+---
+
+#### Story E3-S1: Extend profile model with location, timezone, primary_language
+
+**BLOCKED UNTIL:** Iteration 1 merged to `main`
+**Estimated time:** 45 min
+**Branch:** `feat/cp-wiz-1-it2-e3`
+**CP BackEnd pattern:** N/A — modifying existing CP Backend profile route (Pattern A)
+
+**What to do:**
+> `src/CP/BackEnd/models/user.py` lines 30-38 define the `User` model with fields up to `industry`. Add three new optional fields: `location: Optional[str]`, `timezone: Optional[str]`, `primary_language: Optional[str]`.
+>
+> `src/CP/BackEnd/api/cp_profile.py` lines 57-66 define `ProfileResponse` — add the three new fields. Lines 69-76 define `ProfileUpdate` — add the three new fields as optional.
+>
+> `src/CP/FrontEnd/src/services/profile.service.ts` — add the three fields to `ProfileData` interface and `ProfileUpdatePayload` interface.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/BackEnd/models/user.py` | 1–40 | `User` model fields, `model_config` |
+| `src/CP/BackEnd/api/cp_profile.py` | 55–95 | `ProfileResponse`, `ProfileUpdate`, `_to_response` mapper |
+| `src/CP/FrontEnd/src/services/profile.service.ts` | 1–40 | `ProfileData`, `ProfileUpdatePayload` interfaces |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/BackEnd/models/user.py` | modify | After `industry: Optional[str] = None` (line 37), add: `location: Optional[str] = None`, `timezone: Optional[str] = None`, `primary_language: Optional[str] = None` |
+| `src/CP/BackEnd/api/cp_profile.py` | modify | Add `location`, `timezone`, `primary_language` as `Optional[str] = None` to both `ProfileResponse` and `ProfileUpdate`. Add them to `_to_response` mapper. |
+| `src/CP/FrontEnd/src/services/profile.service.ts` | modify | Add `location?: string`, `timezone?: string`, `primary_language?: string` to `ProfileData` interface. Add same to `ProfileUpdatePayload`. |
+
+**Code patterns to copy exactly:**
+
+```python
+# User model fields to add (after industry line):
+    location: Optional[str] = None
+    timezone: Optional[str] = None
+    primary_language: Optional[str] = None
+```
+
+```python
+# ProfileResponse / ProfileUpdate fields to add:
+    location: Optional[str] = None
+    timezone: Optional[str] = None
+    primary_language: Optional[str] = None
+```
+
+```python
+# _to_response mapper — add these lines:
+        location=user.location,
+        timezone=user.timezone,
+        primary_language=user.primary_language,
+```
+
+**Acceptance criteria:**
+1. GET `/cp/profile` response includes `location`, `timezone`, `primary_language` fields (null when not set)
+2. PATCH `/cp/profile` accepts `location`, `timezone`, `primary_language` and persists them
+3. `ProfileData` TypeScript interface includes the three new fields as optional strings
+4. Existing profile tests still pass
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S1-T1 | `src/CP/BackEnd/tests/test_cp_profile.py` | PATCH with `{"location": "Mumbai", "timezone": "Asia/Kolkata", "primary_language": "Hindi"}` | Response 200, all three fields returned |
+| E3-S1-T2 | same | GET after PATCH | Response includes updated location, timezone, primary_language |
+
+**Test command:**
+```bash
+cd src/CP/BackEnd && python -m pytest tests/test_cp_profile.py -v
+```
+
+**Commit message:** `feat(cp-wiz-1): extend profile model with location, timezone, primary_language`
+
+**Done signal:** `"E3-S1 done. Changed: models/user.py, api/cp_profile.py, profile.service.ts. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E3-S2: Wizard pre-fills from profile and saves back
+
+**BLOCKED UNTIL:** E3-S1 committed to `feat/cp-wiz-1-it2-e3`
+**Estimated time:** 45 min
+**Branch:** `feat/cp-wiz-1-it2-e3` (same branch, continue from E3-S1)
+**CP BackEnd pattern:** N/A — frontend only
+
+**What to do:**
+> `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` lines 530-550 populate state from `nextActivation?.workspace.*`. Currently, `brandName`, `location`, `primaryLanguage`, `timezone` are only set from workspace data. Add a `useEffect` that on wizard mount calls `getProfile()` from `profile.service.ts`. If the workspace fields are empty but profile has values, pre-fill from profile. On step 5 save (handleContinue), if user changed these fields, also call `updateProfile()` to sync back.
+>
+> This eliminates repeat data entry — the customer enters these fields once, every agent benefits.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 530–560 | `loadState` effect that populates brand_name, location, timezone from workspace |
+| `src/CP/FrontEnd/src/services/profile.service.ts` | 1–40 | `getProfile()`, `updateProfile()`, `ProfileData` with location/timezone/primary_language |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | Import `getProfile`, `updateProfile` from `profile.service`. Add `useEffect` on mount that calls `getProfile()` and stores result in `profileRef` (useRef). In the existing loadState effect (~line 534), after setting state from workspace, check: if `brandName` is empty and `profile.business_name` exists, set `brandName` from it. Same for `location`, `timezone`, `primary_language`. In handleContinue for step 5 (~line 699), if location/timezone/primary_language changed, call `updateProfile({location, timezone, primary_language})`. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Profile pre-fill (add near top of component, after other useEffects):
+import { getProfile, updateProfile, ProfileData } from '../services/profile.service'
+
+const profileRef = useRef<ProfileData | null>(null)
+
+useEffect(() => {
+  getProfile()
+    .then(p => { profileRef.current = p })
+    .catch(() => {})  // profile load failure is non-blocking
+}, [])
+
+// In loadState effect, after setBrandName(normalizeText(nextActivation?.workspace.brand_name)):
+const p = profileRef.current
+if (!nextActivation?.workspace.brand_name && p?.business_name) setBrandName(p.business_name)
+if (!nextActivation?.workspace.location && p?.location) setLocation(p.location)
+if (!nextActivation?.workspace.timezone && p?.timezone) setTimezone(p.timezone)
+if (!nextActivation?.workspace.primary_language && p?.primary_language) setPrimaryLanguage(p.primary_language)
+```
+
+**Acceptance criteria:**
+1. When wizard opens and workspace has no brand_name but profile has business_name, brand_name field is pre-filled
+2. When workspace has no location/timezone/language but profile has them, fields are pre-filled
+3. When workspace already has values, workspace values take precedence (not overwritten)
+4. On step 5 Continue, profile is updated with new location/timezone/language values
+5. Profile API failure does not block wizard from loading
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S2-T1 | `src/CP/FrontEnd/src/__tests__/WizardProfilePrefill.test.tsx` | Mock `getProfile` returns `{business_name: "TestCo", location: "Delhi"}`, workspace is empty | Brand name shows "TestCo", location shows "Delhi" |
+| E3-S2-T2 | same | Mock `getProfile` returns `{location: "Delhi"}`, workspace has `location: "Mumbai"` | Location shows "Mumbai" (workspace wins) |
+| E3-S2-T3 | same | Trigger step 5 continue with changed location | `updateProfile` called with new location |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx jest src/__tests__/WizardProfilePrefill.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(cp-wiz-1): wizard pre-fills from profile and saves back`
+
+**Done signal:** `"E3-S2 done. Changed: DigitalMarketingActivationWizard.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+### Epic E4: Customer sees polished, honest platform status
+
+**Branch:** `feat/cp-wiz-1-it2-e4`
+**User story:** As a customer, I see only platforms the agent actually supports, I can view publish receipts proving the agent published content, and I don't see irrelevant exchange credential forms for my marketing agent.
+
+---
+
+#### Story E4-S1: Hide unsupported platforms from wizard step 3
+
+**BLOCKED UNTIL:** none (independent of E3)
+**Estimated time:** 30 min
+**Branch:** `feat/cp-wiz-1-it2-e4`
+**CP BackEnd pattern:** N/A — frontend only
+
+**What to do:**
+> `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` step 3 ("platforms") renders platform cards including Instagram, Facebook, LinkedIn, WhatsApp, and X — all showing "Unavailable" badges. These signal a broken product. Filter the platform list to only show platforms the agent actually supports (currently only `youtube`). Hide unsupported platforms entirely rather than showing them as unavailable.
+>
+> Find the platforms rendering section in step 3 and wrap it with a filter: only render platforms where `available === true` or where the platform key is in the agent's supported platforms list.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 1200–1350 | Step 3 ("platforms") rendering: platform card array, `.map()` call, "Unavailable" badge rendering |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | In the platforms step rendering section, add `.filter(p => p.available !== false)` before the `.map()` that renders platform cards. This hides platforms marked unavailable. If the platform list is a constant array, filter out entries where `available: false` or where key is not in `['youtube']`. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Filter pattern — add before .map() on platform cards:
+.filter(platform => platform.available !== false)
+```
+
+**Acceptance criteria:**
+1. Step 3 does NOT show Instagram, Facebook, LinkedIn, WhatsApp, or X cards
+2. Step 3 shows YouTube card (available platform)
+3. If all platforms are filtered out, show a message: "No platforms available yet — YouTube is coming soon" (edge case safety)
+4. No "Unavailable" badge text appears anywhere in step 3
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S1-T1 | `src/CP/FrontEnd/src/__tests__/WizardPlatforms.test.tsx` | Render step 3 with default platform list | "Unavailable" text NOT in DOM, YouTube card IS in DOM |
+| E4-S1-T2 | same | Render step 3 | Instagram, Facebook, LinkedIn, WhatsApp, X text NOT rendered as platform cards |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx jest src/__tests__/WizardPlatforms.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(cp-wiz-1): hide unsupported platforms from wizard step 3`
+
+**Done signal:** `"E4-S1 done. Changed: DigitalMarketingActivationWizard.tsx. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E4-S2: Wire publish receipts to Deliverables review panel
+
+**BLOCKED UNTIL:** none (independent)
+**Estimated time:** 45 min
+**Branch:** `feat/cp-wiz-1-it2-e4` (same branch, continue from E4-S1)
+**CP BackEnd pattern:** C — existing Plant endpoint at `/api/v1/publish-receipts/{hired_instance_id}`, call via `gatewayRequestJson` from FE — no new BE file needed
+
+**What to do:**
+> Plant Backend already has `/api/v1/publish-receipts/{hired_instance_id}` returning publish receipt records. CP Frontend never calls this endpoint. Create a new service `publishReceipts.service.ts` and add a "Publish History" section to the deliverable review in `MyAgents.tsx` (or the Deliverables page) showing:
+> - Publish date/time
+> - Platform (YouTube)
+> - Status (success/failed)
+> - Platform URL (link to published content)
+>
+> The CP Backend already has a proxy route through the general hired-agents proxy. Use `gatewayRequestJson` to call the endpoint directly.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/services/hiredAgentDeliverables.service.ts` | 1–60 | Existing service pattern, `Deliverable` type, `listHiredAgentDeliverables` |
+| `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` | 1730–1760 | Where PerformancePanel is rendered — publish receipts section should go nearby |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/services/publishReceipts.service.ts` | create | Export `PublishReceipt` interface: `id: string`, `hired_instance_id: string`, `platform_key: string`, `published_at: string`, `status: string`, `platform_url?: string`, `error_message?: string`. Export `listPublishReceipts(hiredInstanceId: string): Promise<PublishReceipt[]>` calling GET `/cp/hired-agents/${id}/publish-receipts` via `gatewayRequestJson`. |
+| `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` | modify | After the `PerformancePanel` component, add a `PublishHistoryPanel` component that fetches `listPublishReceipts(hiredInstanceId)` and renders a list of publish receipts with date, platform, status badge (green for success, red for failed), and platform URL as a link. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Publish receipts service (copy exactly):
+import { gatewayRequestJson } from './gatewayApiClient'
+
+export interface PublishReceipt {
+  id: string
+  hired_instance_id: string
+  platform_key: string
+  published_at: string
+  status: string
+  platform_url?: string
+  error_message?: string
+}
+
+export async function listPublishReceipts(hiredInstanceId: string): Promise<PublishReceipt[]> {
+  const data = await gatewayRequestJson<unknown>(
+    `/cp/hired-agents/${encodeURIComponent(hiredInstanceId)}/publish-receipts`,
+    { method: 'GET' }
+  )
+  if (Array.isArray(data)) return data as PublishReceipt[]
+  if (Array.isArray((data as any)?.items)) return (data as any).items
+  return []
+}
+```
+
+**Acceptance criteria:**
+1. New `publishReceipts.service.ts` exports `PublishReceipt` type and `listPublishReceipts` function
+2. MyAgents page shows "Publish History" section for DMA agents
+3. Each receipt shows formatted date, platform name, status badge, and clickable URL
+4. Empty state: "No publish history yet" when array is empty
+5. Error state: error message shown when API fails
+6. Loading state: spinner while fetching
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S2-T1 | `src/CP/FrontEnd/src/__tests__/PublishHistoryPanel.test.tsx` | Mock `listPublishReceipts` returns 2 receipts (1 success, 1 failed) | Both rendered, success has green badge, failed has red badge |
+| E4-S2-T2 | same | Mock returns empty array | "No publish history yet" in DOM |
+| E4-S2-T3 | same | Mock rejects | Error message in DOM |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx jest src/__tests__/PublishHistoryPanel.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(cp-wiz-1): wire publish receipts to Deliverables review panel`
+
+**Done signal:** `"E4-S2 done. Changed: publishReceipts.service.ts (created), MyAgents.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E4-S3: Hide exchange credentials section for DMA agents
+
+**BLOCKED UNTIL:** none (independent)
+**Estimated time:** 30 min
+**Branch:** `feat/cp-wiz-1-it2-e4` (same branch, continue from E4-S2)
+**CP BackEnd pattern:** N/A — frontend only
+
+**What to do:**
+> `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` lines 821-892 render an "Exchange credentials" form section for trading agents. This section currently shows for ALL agent types, including DMA (digital marketing activation) agents. DMA agents don't use exchange credentials — showing these fields confuses customers and wastes their time.
+>
+> Add a conditional check: only render the exchange credentials section when the agent's `agent_type` or `skill_type` indicates a trading/exchange agent. For DMA agents (identified by `agent_type === 'digital_marketing'` or by checking the hired instance's skill type), hide this section entirely.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` | 820–900 | Exchange credentials section — conditional rendering, how agent type is accessed |
+| `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` | 240–260 | ConfigureAgentPanel props — how `instance` is passed, what fields it has |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` | modify | Wrap the exchange credentials section (lines ~821-892) in a conditional: `if (instance.agent_type === 'trading' || instance.agent_type === 'exchange')` — only render for trading agents. If `agent_type` is not available, check `instance.skill_type` or `instance.industry`. For DMA/marketing agents, do NOT render this section. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Conditional rendering — wrap exchange credentials section:
+{(instance.agent_type === 'trading' || instance.agent_type === 'exchange') && (
+  // ... existing exchange credentials JSX ...
+)}
+```
+
+**Acceptance criteria:**
+1. Exchange credentials section does NOT render for DMA/marketing agents
+2. Exchange credentials section STILL renders for trading/exchange agents
+3. No visual change for trading agent users
+4. No TypeScript errors
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S3-T1 | `src/CP/FrontEnd/src/__tests__/ExchangeCredentialsVisibility.test.tsx` | Render ConfigureAgentPanel with DMA agent instance | Exchange credentials section NOT in DOM |
+| E4-S3-T2 | same | Render with trading agent instance | Exchange credentials section IS in DOM |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx jest src/__tests__/ExchangeCredentialsVisibility.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(cp-wiz-1): hide exchange credentials section for DMA agents`
+
+**Done signal:** `"E4-S3 done. Changed: MyAgents.tsx. Tests: T1 ✅ T2 ✅"`
+
