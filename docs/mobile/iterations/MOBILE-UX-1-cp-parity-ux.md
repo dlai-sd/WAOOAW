@@ -348,6 +348,462 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 
 ---
 
-<!-- ITERATION 1 STORY CARDS WILL BE ADDED IN NEXT COMMIT -->
+## Iteration 1 — CP Frontend: Customer Sees Real Data, Not Placeholders
+
+**Scope:** Wire Deliverables and Command Centre to real APIs; deduplicate DMA wizard identity fields; show strategy content before approval gate.
+**Lane:** A — wire existing APIs only. No new backend endpoints.
+**⏱ Estimated:** 5h | **Come back:** +6h from launch
+**Epics:** E1, E2
+
+### Dependency Map (Iteration 1)
+
+```
+E1-S1 ──► E1-S2    (same branch, S2 adds review actions on top of S1's wired page)
+   └────► E1-S3    (S3 is Command Centre, same branch, uses same getMyAgentsSummary service)
+E2-S1 ──► E2-S2    (same branch, S1 pre-fills fields, S2 shows strategy preview)
+```
+
+---
+
+### Epic E1: Customer sees real deliverables and live dashboard
+
+**Branch:** `feat/mobile-ux-1-it1-e1`
+**User story:** As a customer, I can see the actual deliverables my hired agents have produced and my real dashboard status, so that I know my agents are working and I'm getting value for money.
+
+---
+
+#### Story E1-S1: Wire Deliverables page to listHiredAgentDeliverables API
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+**Branch:** `feat/mobile-ux-1-it1-e1`
+**CP BackEnd pattern:** C — existing `/v1/hired-agents/*/deliverables` Plant endpoint. CP FE calls via `gatewayRequestJson` through existing service. No new BE file.
+
+**What to do (self-contained — read this card, then act):**
+> `src/CP/FrontEnd/src/pages/authenticated/Deliverables.tsx` (47 lines) contains a hardcoded `placeholders` array (lines 4-8) with fake healthcare examples. Replace the entire component with a data-fetching version that:
+> 1. Calls `getMyAgentsSummary()` on mount to get all hired instances
+> 2. For each instance with a `hired_instance_id`, calls `listHiredAgentDeliverables(hiredInstanceId)`
+> 3. Aggregates all deliverables into a single list sorted by `created_at` descending
+> 4. Shows loading spinner, error banner, or empty state as appropriate
+> 5. Renders each real deliverable in a Card with: title, review_status badge (pending_review=yellow, approved=green, rejected=red), created_at formatted date, and a preview of payload (use the first non-empty value from payload.summary, payload.text_preview, payload.preview, or payload.content — truncated to 120 chars)
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/Deliverables.tsx` | 1–47 | Current placeholder implementation to replace entirely |
+| `src/CP/FrontEnd/src/services/hiredAgentDeliverables.service.ts` | 1–60, 155–170 | `Deliverable` type definition (lines 3-20), `listHiredAgentDeliverables` function signature (line 155) |
+| `src/CP/FrontEnd/src/services/myAgentsSummary.service.ts` | 1–35 | `MyAgentInstanceSummary` type (lines 3-29), `getMyAgentsSummary()` signature (line 30) |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/Deliverables.tsx` | modify | Replace entire file content. Keep `Card` import from `@fluentui/react-components`. Add `Badge`, `Spinner` imports. Import `getMyAgentsSummary` and `listHiredAgentDeliverables`, `type Deliverable`. Add useState for deliverables/loading/error. Add useEffect to fetch. Render 3-state UI. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// 3-state data fetching — mandatory pattern for every data-fetching component:
+import { useEffect, useState } from 'react'
+import { Card, Badge, Spinner } from '@fluentui/react-components'
+import { getMyAgentsSummary } from '../../services/myAgentsSummary.service'
+import { listHiredAgentDeliverables, type Deliverable } from '../../services/hiredAgentDeliverables.service'
+
+export default function Deliverables() {
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const summary = await getMyAgentsSummary()
+        const instances = (summary?.instances || []).filter(
+          (i) => String(i.hired_instance_id || '').trim()
+        )
+        if (!instances.length) {
+          if (!cancelled) setDeliverables([])
+          return
+        }
+        const results = await Promise.allSettled(
+          instances.map((i) =>
+            listHiredAgentDeliverables(String(i.hired_instance_id))
+          )
+        )
+        const all: Deliverable[] = []
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value?.deliverables) {
+            all.push(...r.value.deliverables)
+          }
+        }
+        all.sort((a, b) =>
+          (b.created_at || '').localeCompare(a.created_at || '')
+        )
+        if (!cancelled) setDeliverables(all)
+      } catch {
+        if (!cancelled) setError('Failed to load deliverables. Please try again.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}><Spinner label="Loading deliverables..." /></div>
+  if (error) return <div className="error-banner" style={{ padding: '1rem', color: '#ef4444' }}>{error}</div>
+  if (!deliverables.length) return (
+    <div className="deliverables-page">
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <h1>Deliverables</h1>
+      </div>
+      <Card style={{ padding: '2rem', textAlign: 'center', opacity: 0.7 }}>
+        No deliverables yet. Once your agents start working, their output will appear here.
+      </Card>
+    </div>
+  )
+  // ...render real deliverables
+}
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. Visiting /deliverables when user has hired agents shows deliverable cards with titles from the API, not hardcoded "5 Ways to Manage Diabetes"
+2. Each deliverable card shows a `review_status` badge: yellow for `pending_review`, green for `approved`, red for `rejected`
+3. When API returns error, "Failed to load deliverables" message appears in DOM
+4. When loading, Spinner component with "Loading deliverables..." text is rendered
+5. When user has no hired agents, empty state "No deliverables yet" message appears
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E1-S1-T1 | `src/CP/FrontEnd/src/__tests__/Deliverables.test.tsx` | Mock `getMyAgentsSummary` returns 1 instance, mock `listHiredAgentDeliverables` returns 2 deliverables | Both deliverable titles in DOM |
+| E1-S1-T2 | same | Mock `getMyAgentsSummary` rejects | Error text "Failed to load" in DOM |
+| E1-S1-T3 | same | Mock `getMyAgentsSummary` returns empty instances | Empty state text in DOM |
+| E1-S1-T4 | same | Mock returns deliverable with `review_status: 'approved'` | Green badge or "approved" text in DOM |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx vitest run src/__tests__/Deliverables.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(mobile-ux-1): wire deliverables page to real API`
+
+**Done signal:** `"E1-S1 done. Changed: Deliverables.tsx, Deliverables.test.tsx. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+
+---
+
+#### Story E1-S2: Add deliverable review actions (approve/reject)
+
+**BLOCKED UNTIL:** E1-S1 committed to `feat/mobile-ux-1-it1-e1`
+**Estimated time:** 30 min
+**Branch:** `feat/mobile-ux-1-it1-e1` (same branch, continue from E1-S1)
+**CP BackEnd pattern:** C — existing `/v1/hired-agents/*/deliverables/*/review` Plant endpoint. Called via `reviewHiredAgentDeliverable` in existing service. No new BE file.
+
+**What to do:**
+> In the `Deliverables.tsx` modified by E1-S1, add approve/reject buttons to each deliverable card where `review_status === 'pending_review'`. Import `reviewHiredAgentDeliverable` from the existing `hiredAgentDeliverables.service.ts` (line 160). When clicked, call the service with `{ decision: 'approved' }` or `{ decision: 'rejected' }` and update the local deliverables state to reflect the new review_status. Show a loading state on the button during the API call. For rejected items, show a simple text input for rejection notes before confirming.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/Deliverables.tsx` | 1–80 | Current state after E1-S1 — the deliverables rendering, state variables |
+| `src/CP/FrontEnd/src/services/hiredAgentDeliverables.service.ts` | 55–70, 160–170 | `ReviewDeliverableInput` type (decision + notes), `reviewHiredAgentDeliverable` function |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/Deliverables.tsx` | modify | Import `reviewHiredAgentDeliverable`. Add `reviewLoading` state (Record<string, boolean>). For deliverables with `review_status === 'pending_review'`, add Approve button (calls service with `{decision:'approved'}`), Reject button (shows notes input then calls service). On success, update deliverable's review_status in state. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+import { reviewHiredAgentDeliverable } from '../../services/hiredAgentDeliverables.service'
+
+// Inside component:
+const [reviewLoading, setReviewLoading] = useState<Record<string, boolean>>({})
+
+async function handleReview(deliverableId: string, decision: 'approved' | 'rejected', notes?: string) {
+  setReviewLoading((prev) => ({ ...prev, [deliverableId]: true }))
+  try {
+    await reviewHiredAgentDeliverable(deliverableId, { decision, notes })
+    setDeliverables((prev) =>
+      prev.map((d) =>
+        d.deliverable_id === deliverableId
+          ? { ...d, review_status: decision }
+          : d
+      )
+    )
+  } catch {
+    // Show inline error — do not crash
+  } finally {
+    setReviewLoading((prev) => ({ ...prev, [deliverableId]: false }))
+  }
+}
+```
+
+**Acceptance criteria:**
+1. Deliverables with `review_status === 'pending_review'` show Approve and Reject buttons
+2. Deliverables with `review_status === 'approved'` or `'rejected'` do NOT show action buttons
+3. Clicking Approve calls `reviewHiredAgentDeliverable` with `{decision: 'approved'}` and updates the badge to green
+4. Clicking Reject shows a notes input; submitting calls service with `{decision: 'rejected', notes}` and updates badge to red
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E1-S2-T1 | `src/CP/FrontEnd/src/__tests__/Deliverables.test.tsx` | Render with `pending_review` deliverable | Approve + Reject buttons visible |
+| E1-S2-T2 | same | Render with `approved` deliverable | No action buttons in DOM |
+| E1-S2-T3 | same | Click Approve, mock `reviewHiredAgentDeliverable` resolves | Badge changes to approved/green |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx vitest run src/__tests__/Deliverables.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(mobile-ux-1): add deliverable review actions`
+
+**Done signal:** `"E1-S2 done. Changed: Deliverables.tsx, Deliverables.test.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E1-S3: Wire Command Centre to live agent summary data
+
+**BLOCKED UNTIL:** E1-S1 committed (shares service import knowledge, but technically independent — same branch for simplicity)
+**Estimated time:** 45 min
+**Branch:** `feat/mobile-ux-1-it1-e1`
+**CP BackEnd pattern:** C — existing `/cp/my-agents-summary` called via `getMyAgentsSummary`. No new BE file.
+
+**What to do:**
+> `src/CP/FrontEnd/src/pages/authenticated/CommandCentre.tsx` (104 lines) has hardcoded `readinessCards` array (lines 10-14) with static emoji values, hardcoded `priorities` array (lines 16-20), and hardcoded numbers (lines 75-79: "Pinned alerts: 0", "Billing area: 1", "Suggested actions: 3"). Replace with real data from `getMyAgentsSummary()`. Show: (1) total hired agents count, (2) agents in trial count, (3) agents needing setup count, (4) configured agents count. Replace priorities with context-aware suggestions based on actual agent state. Replace workspace overview with real counts. Add loading/error/empty states.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/CommandCentre.tsx` | 1–104 | Full file — hardcoded arrays, readinessCards, priorities, workspace overview numbers |
+| `src/CP/FrontEnd/src/services/myAgentsSummary.service.ts` | 1–35 | `MyAgentInstanceSummary` type with `configured`, `goals_completed`, `trial_status`, `status` fields |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/pages/authenticated/CommandCentre.tsx` | modify | Import `getMyAgentsSummary`, `type MyAgentInstanceSummary`. Add `useState`/`useEffect`. Replace hardcoded `readinessCards` with computed values from API. Replace `priorities` with dynamic suggestions. Replace workspace overview numbers with real counts. Add Spinner for loading, error banner for errors. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+import { useEffect, useState } from 'react'
+import { getMyAgentsSummary, type MyAgentInstanceSummary } from '../../services/myAgentsSummary.service'
+
+// Inside component — compute dashboard stats from real data:
+const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
+const [loading, setLoading] = useState(true)
+const [error, setError] = useState<string | null>(null)
+
+useEffect(() => {
+  getMyAgentsSummary()
+    .then((resp) => setInstances(resp?.instances || []))
+    .catch(() => setError('Failed to load dashboard data.'))
+    .finally(() => setLoading(false))
+}, [])
+
+const totalAgents = instances.length
+const inTrial = instances.filter((i) => i.trial_status === 'active').length
+const needsSetup = instances.filter((i) => !i.configured || !i.goals_completed).length
+const configured = instances.filter((i) => i.configured).length
+
+const readinessCards = [
+  { label: 'Total agents', sublabel: 'Hired agents in your workspace', value: String(totalAgents) },
+  { label: 'In trial', sublabel: 'Agents in their 7-day trial period', value: String(inTrial) },
+  { label: 'Need setup', sublabel: 'Agents waiting for configuration', value: String(needsSetup) },
+  { label: 'Configured', sublabel: 'Agents ready and producing output', value: String(configured) },
+]
+
+// Dynamic priorities based on actual state:
+const priorities: string[] = []
+if (needsSetup > 0) priorities.push(`${needsSetup} agent${needsSetup > 1 ? 's' : ''} need${needsSetup === 1 ? 's' : ''} setup — open My Agents to configure.`)
+if (inTrial > 0) priorities.push(`${inTrial} agent${inTrial > 1 ? 's' : ''} in trial — review output before trial ends.`)
+if (totalAgents === 0) priorities.push('Hire your first agent from Discover to get started.')
+if (priorities.length === 0) priorities.push('All agents are set up and running. Check Deliverables for latest output.')
+```
+
+**Acceptance criteria:**
+1. Command Centre shows "Total agents" card with the real count from API (not hardcoded ⏳)
+2. "Need setup" card shows count of agents where `configured === false` or `goals_completed === false`
+3. Priorities section shows context-aware text like "2 agents need setup" instead of static text
+4. When API errors, "Failed to load dashboard data" text appears
+5. When loading, Spinner component is rendered
+6. Workspace overview section shows real counts instead of hardcoded 0/1/3
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E1-S3-T1 | `src/CP/FrontEnd/src/__tests__/CommandCentre.test.tsx` | Mock `getMyAgentsSummary` returns 3 instances (1 trial, 1 needs setup, 1 configured) | "3" in total agents card, "1" in trial card, "1" in needs setup card |
+| E1-S3-T2 | same | Mock rejects | Error text in DOM |
+| E1-S3-T3 | same | Mock returns 0 instances | "Hire your first agent" text in priorities |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx vitest run src/__tests__/CommandCentre.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(mobile-ux-1): wire command centre to live agent data`
+
+**Done signal:** `"E1-S3 done. Changed: CommandCentre.tsx, CommandCentre.test.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+### Epic E2: DMA Wizard stops wasting customer time
+
+**Branch:** `feat/mobile-ux-1-it1-e2`
+**User story:** As a customer, I don't have to re-enter my business name, location, and timezone in the DMA wizard because the agent already knows them from my profile, and I can see what strategy the agent produced before I'm asked to approve it.
+
+---
+
+#### Story E2-S1: Pre-fill DMA Wizard identity fields from customer profile
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 30 min
+**Branch:** `feat/mobile-ux-1-it1-e2`
+**CP BackEnd pattern:** C — existing `/cp/profile` called via `getProfile()` in `profile.service.ts`. No new BE file.
+
+**What to do:**
+> `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` initializes `brandName`, `location`, `timezone` as empty strings (lines 315, 317, 319). When the activation workspace data loads (lines 534-536), it populates these from `nextActivation?.workspace.*`. But on FIRST activation (when workspace is empty/new), these remain blank and the user must type everything from scratch. Fix: after loading the activation workspace, if `brandName` is still empty, fall back to `getProfile()` and use `business_name` as the default. The profile service already exists at `src/CP/FrontEnd/src/services/profile.service.ts` with `getProfile(): Promise<ProfileData>` returning `business_name` and `industry` fields.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 310–340, 520–555 | State variables (lines 315-319), loadState function that populates from workspace (lines 534-536) |
+| `src/CP/FrontEnd/src/services/profile.service.ts` | 1–36 | `ProfileData` type with `business_name`, `industry` fields; `getProfile()` function |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | Import `getProfile` from `../../services/profile.service`. In the `loadState` async function, AFTER the existing `setBrandName(normalizeText(...))` call at line 534, add a fallback: if `normalizeText(nextActivation?.workspace.brand_name)` is empty, call `getProfile()` and use `response.business_name` as the default for `setBrandName`. This is a single conditional block — no restructuring. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// In loadState function, after line 536 (setTimezone(...)):
+// Fallback: pre-fill from customer profile if activation workspace is empty
+const wsName = normalizeText(nextActivation?.workspace.brand_name)
+if (!wsName) {
+  try {
+    const profile = await getProfile()
+    if (profile.business_name && !normalizeText(nextActivation?.workspace.brand_name)) {
+      setBrandName(profile.business_name)
+    }
+  } catch {
+    // Profile fallback is best-effort — don't block wizard
+  }
+}
+```
+
+**Acceptance criteria:**
+1. When DMA wizard opens for a NEW activation (empty workspace), `brandName` field is pre-filled with `business_name` from customer profile
+2. When DMA wizard opens for an EXISTING activation with workspace data, the workspace value takes priority over profile
+3. If `getProfile()` fails, wizard continues without error — fields remain empty for manual entry
+4. No new API call is made if the workspace already has a `brand_name` value
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E2-S1-T1 | `src/CP/FrontEnd/src/test/MyAgentsDigitalMarketingWizard.test.tsx` | Mock activation workspace with empty `brand_name`, mock `getProfile` returns `{business_name: 'TestCo'}` | Input with `aria-label="Brand name"` has value "TestCo" |
+| E2-S1-T2 | same | Mock activation workspace with `brand_name: 'ExistingBrand'` | Input value is "ExistingBrand" (not profile fallback) |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx vitest run src/test/MyAgentsDigitalMarketingWizard.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(mobile-ux-1): pre-fill DMA wizard fields from customer profile`
+
+**Done signal:** `"E2-S1 done. Changed: DigitalMarketingActivationWizard.tsx, test file. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E2-S2: Show strategy content before approval gate
+
+**BLOCKED UNTIL:** E2-S1 committed to `feat/mobile-ux-1-it1-e2`
+**Estimated time:** 45 min
+**Branch:** `feat/mobile-ux-1-it1-e2`
+**CP BackEnd pattern:** N/A — pure frontend display change, no API calls needed
+
+**What to do:**
+> `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` line 951 shows a disabled message "Approve the master theme strategy below before generating a YouTube draft" when `isThemeApproved` is false (line 468: `const isThemeApproved = strategyWorkshop.status === 'approved'`). The customer complaint is BLIND APPROVAL — they can't see what they're approving. Fix: in the step where the user sees this gate message, render a read-only preview of the `strategyWorkshop` content (master theme, derived themes, summary) ABOVE the approval message. The `strategyWorkshop` state variable (line 325) already contains `master_theme`, `derived_themes[]`, and `summary` fields. Show this as a styled read-only card so the customer can see exactly what they're approving.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 325–327, 460–475, 940–960 | `strategyWorkshop` state (line 325), `isThemeApproved` derivation (line 468), gate message rendering (line 951) |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | Around line 951, BEFORE the "Approve the master theme strategy" disabled message, add a Card block that renders: (1) `masterTheme` as a heading, (2) `derivedThemes` as a bulleted list showing each theme's `label` and `description`, (3) `strategySummary` object's key fields. Only show this preview if `masterTheme` or `derivedThemes.length > 0`. Wrap in a Card with `background: 'var(--colorNeutralBackground3)'` and `padding: '1rem'`. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Strategy preview card — insert before the approval gate message:
+{(masterTheme || derivedThemes.length > 0) && !isThemeApproved && (
+  <Card style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--colorNeutralBackground3)' }}>
+    <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.7, marginBottom: '0.5rem' }}>
+      Strategy Preview — review before approving
+    </div>
+    {masterTheme && (
+      <div style={{ fontWeight: 600, fontSize: '1.05rem', marginBottom: '0.5rem' }}>
+        Master Theme: {masterTheme}
+      </div>
+    )}
+    {derivedThemes.length > 0 && (
+      <div style={{ marginBottom: '0.5rem' }}>
+        <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Derived Themes:</div>
+        <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+          {derivedThemes.map((dt, i) => (
+            <li key={i} style={{ marginBottom: '0.25rem' }}>
+              <strong>{dt.label}</strong>{dt.description ? ` — ${dt.description}` : ''}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </Card>
+)}
+```
+
+**Acceptance criteria:**
+1. When `isThemeApproved` is `false` and `masterTheme` has a value, a "Strategy Preview" card appears above the approval gate message
+2. The preview card shows the master theme text and a list of derived themes with labels
+3. When `masterTheme` is empty and `derivedThemes` is empty, no preview card is shown (just the existing gate message)
+4. The preview card has a "Strategy Preview — review before approving" label
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E2-S2-T1 | `src/CP/FrontEnd/src/test/MyAgentsDigitalMarketingWizard.test.tsx` | Mock strategyWorkshop with `status: 'pending'`, master_theme = "Growth content" | Text "Strategy Preview" and "Growth content" in DOM |
+| E2-S2-T2 | same | Mock strategyWorkshop with `status: 'approved'` | "Strategy Preview" NOT in DOM (already approved) |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx vitest run src/test/MyAgentsDigitalMarketingWizard.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(mobile-ux-1): show strategy preview before approval gate`
+
+**Done signal:** `"E2-S2 done. Changed: DigitalMarketingActivationWizard.tsx, test file. Tests: T1 ✅ T2 ✅"`
+
+---
 
 <!-- ITERATION 2 STORY CARDS WILL BE ADDED IN NEXT COMMIT -->
