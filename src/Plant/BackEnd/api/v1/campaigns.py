@@ -968,7 +968,7 @@ async def publish_post(
                 detail="Post is already published.",
             )
         inp = _build_publish_input(post)
-        receipt = default_engine.publish(inp)
+        receipt = await default_engine.publish(inp)
         receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
         publish_status_str = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
         await repo.update_post_publish_status(post_id, publish_status_str, publish_receipt=receipt_dict)
@@ -1005,7 +1005,7 @@ async def publish_post(
         )
 
     inp = _build_publish_input(post)
-    receipt = default_engine.publish(inp)
+    receipt = await default_engine.publish(inp)
 
     now = datetime.now(timezone.utc)
     if receipt.success:
@@ -1059,7 +1059,7 @@ async def publish_due(
         for orm_post in eligible_orm:
             post = _orm_post_to_pydantic(orm_post)
             inp = _build_publish_input(post)
-            receipt = default_engine.publish(inp)
+            receipt = await default_engine.publish(inp)
             receipt_dict = receipt.model_dump() if hasattr(receipt, "model_dump") else receipt.dict()
             pub_status = PublishStatus.PUBLISHED.value if receipt.success else PublishStatus.FAILED.value
             await repo.update_post_publish_status(orm_post.post_id, pub_status, publish_receipt=receipt_dict)
@@ -1091,7 +1091,7 @@ async def publish_due(
     receipts: list[PublishReceipt] = []
     for post in eligible:
         inp = _build_publish_input(post)
-        receipt = default_engine.publish(inp)
+        receipt = await default_engine.publish(inp)
         if receipt.success:
             post.publish_status = PublishStatus.PUBLISHED
         else:

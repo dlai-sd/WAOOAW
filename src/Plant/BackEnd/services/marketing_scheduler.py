@@ -3,15 +3,58 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_mold.skills.content_models import ContentPost, DestinationRef, PublishInput, PublishReceipt
+from agent_mold.skills.publisher_engine import default_engine
 from core.database import get_connector
+from models.publish_receipt import PublishReceiptModel
 from services.draft_batches import DatabaseDraftBatchStore
 from services.marketing_credential_resolver import resolve_youtube_secret_ref
 from services.marketing_providers import default_social_provider, provider_allowlist
 from services.usage_events import UsageEvent, UsageEventStore, UsageEventType
+
+
+def _build_publish_input(
+    *,
+    batch,
+    post,
+    credential_ref: str | None,
+) -> PublishInput:
+    return PublishInput(
+        post=ContentPost(
+            post_id=post.post_id,
+            campaign_id=batch.campaign_id or "",
+            theme_item_id="",
+            destination=DestinationRef(
+                destination_type=post.channel.value,
+                metadata={"customer_id": batch.customer_id or ""},
+            ),
+            content_text=post.text,
+            hashtags=post.hashtags or [],
+            scheduled_publish_at=post.scheduled_at or datetime.now(timezone.utc),
+        ),
+        credential_ref=credential_ref,
+        approval_id=post.approval_id,
+        visibility=post.visibility,
+        public_release_requested=post.public_release_requested,
+    )
+
+
+def _persist_publish_receipt(session: AsyncSession, receipt: PublishReceipt) -> None:
+    session.add(
+        PublishReceiptModel(
+            post_id=receipt.post_id,
+            destination_type=receipt.destination_type,
+            success=receipt.success,
+            platform_post_id=receipt.platform_post_id,
+            published_at=receipt.published_at,
+            error=receipt.error,
+            raw_response=receipt.raw_response,
+        )
+    )
 
 
 async def run_due_posts_once(
@@ -53,34 +96,36 @@ async def run_due_posts_once(
                     attempts=attempt_count,
                 )
 
+                receipt_persisted = False
                 try:
                     effective_credential_ref = await resolve_youtube_secret_ref(
                         session,
                         hired_instance_id=batch.hired_instance_id,
                         supplied_ref=post.credential_ref,
                     )
-                    if post.channel.value == "youtube" and not post.approval_id:
-                        raise RuntimeError("approval_required_for_youtube_publish")
-                    if post.channel.value == "youtube" and not effective_credential_ref:
-                        raise RuntimeError("credential_ref_required_for_youtube_publish")
-                    if post.channel.value == "youtube" and post.visibility == "public" and not post.public_release_requested:
-                        raise RuntimeError("public_release_requires_explicit_customer_action")
 
                     if fail_channel and post.channel.value == fail_channel:
                         raise RuntimeError(f"Simulated transient failure for channel={fail_channel}")
 
                     allowlist.ensure_allowed(post.channel)
 
-                    if post.channel.value == "youtube" and post.credential_ref:
-                        from integrations.social.youtube_client import YouTubeClient
-
-                        yt_client = YouTubeClient(customer_id=batch.customer_id)
-                        yt_result = await yt_client.post_text(
+                    if post.channel.value == "youtube":
+                        publish_input = _build_publish_input(
+                            batch=batch,
+                            post=post,
                             credential_ref=effective_credential_ref,
-                            text=post.text,
                         )
-                        provider_post_id = yt_result.post_id
-                        provider_post_url = yt_result.post_url
+                        receipt = await default_engine.publish(publish_input)
+                        _persist_publish_receipt(session, receipt)
+                        receipt_persisted = True
+                        provider_post_id = receipt.platform_post_id
+                        provider_post_url = (
+                            receipt.raw_response.get("post_url")
+                            if isinstance(receipt.raw_response, dict)
+                            else None
+                        )
+                        if not receipt.success:
+                            raise RuntimeError(receipt.error or "Publish failed via engine")
                     else:
                         published = provider.publish_text(
                             channel=post.channel,
@@ -90,6 +135,18 @@ async def run_due_posts_once(
                         )
                         provider_post_id = published.provider_post_id
                         provider_post_url = published.provider_post_url
+                        _persist_publish_receipt(
+                            session,
+                            PublishReceipt(
+                                post_id=post.post_id,
+                                destination_type=post.channel.value,
+                                success=True,
+                                platform_post_id=provider_post_id,
+                                published_at=datetime.now(timezone.utc),
+                                raw_response={"post_url": provider_post_url} if provider_post_url else None,
+                            ),
+                        )
+                        receipt_persisted = True
 
                     await store.update_post(
                         post.post_id,
@@ -112,6 +169,16 @@ async def run_due_posts_once(
                             )
                         )
                 except Exception as exc:
+                    if not receipt_persisted:
+                        _persist_publish_receipt(
+                            session,
+                            PublishReceipt(
+                                post_id=post.post_id,
+                                destination_type=post.channel.value,
+                                success=False,
+                                error=str(exc),
+                            ),
+                        )
                     await store.update_post(
                         post.post_id,
                         execution_status="failed",

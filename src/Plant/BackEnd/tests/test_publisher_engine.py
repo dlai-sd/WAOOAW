@@ -15,6 +15,7 @@ Run:
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -55,12 +56,13 @@ def _make_publish_input(destination_type: str = "simulated") -> PublishInput:
 # ─── E5-S1-T1: SimulatedAdapter publish → success=True, platform_post_id set ──
 
 @pytest.mark.unit
-def test_simulated_adapter_publish_returns_success():
+@pytest.mark.asyncio
+async def test_simulated_adapter_publish_returns_success():
     """E5-S1-T1: SimulatedAdapter.publish returns PublishReceipt with success=True and platform_post_id set."""
     adapter = SimulatedAdapter()
     inp = _make_publish_input("simulated")
 
-    receipt = adapter.publish(inp)
+    receipt = await adapter.publish(inp)
 
     assert receipt.success is True
     assert receipt.platform_post_id is not None
@@ -74,13 +76,14 @@ def test_simulated_adapter_publish_returns_success():
 # ─── E5-S1-T2: Unregistered destination → success=False, no exception ─────────
 
 @pytest.mark.unit
-def test_publish_engine_unregistered_destination_returns_failure_without_exception():
+@pytest.mark.asyncio
+async def test_publish_engine_unregistered_destination_returns_failure_without_exception():
     """E5-S1-T2: PublisherEngine.publish with unknown destination_type returns success=False, no exception."""
     registry = DestinationRegistry()
     engine = PublisherEngine(registry)
 
     inp = _make_publish_input("unknown_platform")
-    receipt = engine.publish(inp)
+    receipt = await engine.publish(inp)
 
     assert receipt.success is False
     assert receipt.error is not None
@@ -119,10 +122,11 @@ def test_simulated_adapter_estimate_cost_is_zero():
 # ─── Additional coverage ──────────────────────────────────────────────────────
 
 @pytest.mark.unit
-def test_default_engine_publishes_simulated_post():
+@pytest.mark.asyncio
+async def test_default_engine_publishes_simulated_post():
     """default_engine.publish with simulated destination returns success=True."""
     inp = _make_publish_input("simulated")
-    receipt = default_engine.publish(inp)
+    receipt = await default_engine.publish(inp)
 
     assert receipt.success is True
     assert receipt.platform_post_id is not None
@@ -141,25 +145,28 @@ def test_default_registry_includes_youtube():
 
 
 @pytest.mark.unit
-def test_youtube_publish_requires_approval_and_credential_ref():
+@pytest.mark.asyncio
+async def test_youtube_publish_requires_approval_and_credential_ref():
     post = _make_post("youtube")
     engine = PublisherEngine(build_default_registry())
 
-    missing_approval = engine.publish(PublishInput(post=post, credential_ref="secret-ref"))
+    missing_approval = await engine.publish(PublishInput(post=post, credential_ref="secret-ref"))
     assert missing_approval.success is False
     assert missing_approval.error == "approval_required_for_youtube_publish"
 
-    missing_credential = engine.publish(PublishInput(post=post, approval_id="APR-1"))
+    missing_credential = await engine.publish(PublishInput(post=post, approval_id="APR-1"))
     assert missing_credential.success is False
     assert missing_credential.error == "credential_ref_required_for_youtube_publish"
 
 
 @pytest.mark.unit
-def test_youtube_public_release_requires_explicit_customer_action():
+@pytest.mark.asyncio
+async def test_youtube_public_release_requires_explicit_customer_action():
     post = _make_post("youtube")
+    post.destination.metadata = {"customer_id": "cust-001"}
     engine = PublisherEngine(build_default_registry())
 
-    denied = engine.publish(
+    denied = await engine.publish(
         PublishInput(
             post=post,
             approval_id="APR-1",
@@ -171,15 +178,31 @@ def test_youtube_public_release_requires_explicit_customer_action():
     assert denied.success is False
     assert denied.error == "public_release_requires_explicit_customer_action"
 
-    allowed = engine.publish(
-        PublishInput(
-            post=post,
-            approval_id="APR-1",
-            credential_ref="secret-ref",
-            visibility="public",
-            public_release_requested=True,
+    with patch(
+        "agent_mold.skills.adapters_youtube.YouTubeClient.post_text",
+        new=AsyncMock(
+            return_value=type(
+                "_Result",
+                (),
+                {
+                    "success": True,
+                    "post_id": "yt-public-001",
+                    "post_url": "https://www.youtube.com/post/yt-public-001",
+                    "posted_at": datetime.now(timezone.utc),
+                    "raw_response": {"id": "yt-public-001"},
+                },
+            )()
+        ),
+    ):
+        allowed = await engine.publish(
+            PublishInput(
+                post=post,
+                approval_id="APR-1",
+                credential_ref="secret-ref",
+                visibility="public",
+                public_release_requested=True,
+            )
         )
-    )
     assert allowed.success is True
 
 
@@ -194,12 +217,13 @@ def test_build_default_registry_returns_fresh_registry():
 
 
 @pytest.mark.unit
-def test_publisher_engine_catches_adapter_exception():
+@pytest.mark.asyncio
+async def test_publisher_engine_catches_adapter_exception():
     """PublisherEngine catches exceptions raised inside adapters and returns failure receipt."""
     class BrokenAdapter(SimulatedAdapter):
         DESTINATION_TYPE = "broken"
 
-        def publish(self, inp: PublishInput):
+        async def publish(self, inp: PublishInput):
             raise RuntimeError("Simulated publish failure")
 
     registry = DestinationRegistry()
@@ -207,7 +231,7 @@ def test_publisher_engine_catches_adapter_exception():
     engine = PublisherEngine(registry)
 
     inp = _make_publish_input("broken")
-    receipt = engine.publish(inp)
+    receipt = await engine.publish(inp)
 
     assert receipt.success is False
     assert "Simulated publish failure" in (receipt.error or "")

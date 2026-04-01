@@ -719,6 +719,7 @@ if settings.enable_route_registration_logging:
     logger.info("=" * 80)
 
 from api.v1.router import api_v1_router
+from api.v1 import publish_receipts
 
 if settings.enable_route_registration_logging:
     logger.info(f"api_v1_router prefix: {api_v1_router.prefix}")
@@ -729,6 +730,7 @@ if settings.enable_route_registration_logging:
     logger.info(f"Auth routes found: {auth_routes}")
 
 app.include_router(api_v1_router)
+app.include_router(publish_receipts.router)
 
 if settings.enable_route_registration_logging:
     logger.info("api_v1_router mounted to app")

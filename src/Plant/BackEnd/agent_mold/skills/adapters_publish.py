@@ -24,7 +24,7 @@ class SimulatedAdapter(DestinationAdapter):
     """
     DESTINATION_TYPE = "simulated"
 
-    def publish(self, inp: PublishInput) -> PublishReceipt:
+    async def publish(self, inp: PublishInput) -> PublishReceipt:
         fake_id = f"sim_{inp.post.post_id[:8]}"
         return PublishReceipt(
             post_id=inp.post.post_id,
