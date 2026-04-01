@@ -3,19 +3,21 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { DigitalMarketingActivationWizard } from '../components/DigitalMarketingActivationWizard'
 
-const getBrandVoiceMock = vi.fn(async () => ({
-  tone_keywords: ['warm', 'credible'],
-  vocabulary_preferences: [],
-  messaging_patterns: [],
-  example_phrases: ['We explain every step.'],
-  voice_description: 'Warm and credible.',
-}))
-const updateBrandVoiceMock = vi.fn(async () => ({
-  tone_keywords: ['warm', 'credible'],
-  vocabulary_preferences: [],
-  messaging_patterns: [],
-  example_phrases: ['We explain every step.'],
-  voice_description: 'Warm and credible.',
+const { getBrandVoiceMock, updateBrandVoiceMock } = vi.hoisted(() => ({
+  getBrandVoiceMock: vi.fn(async () => ({
+    tone_keywords: ['warm', 'credible'],
+    vocabulary_preferences: [],
+    messaging_patterns: [],
+    example_phrases: ['We explain every step.'],
+    voice_description: 'Warm and credible.',
+  })),
+  updateBrandVoiceMock: vi.fn(async () => ({
+    tone_keywords: ['warm', 'credible'],
+    vocabulary_preferences: [],
+    messaging_patterns: [],
+    example_phrases: ['We explain every step.'],
+    voice_description: 'Warm and credible.',
+  })),
 }))
 
 vi.mock('../services/brandVoice.service', () => ({
@@ -152,24 +154,42 @@ describe('Brand voice section', () => {
   })
 
   async function renderThemeStep() {
+    const activeInstance = {
+      subscription_id: 'sub_1',
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      hired_instance_id: 'hire_1',
+      nickname: 'Growth Copilot',
+      duration: 'monthly',
+      status: 'active',
+      current_period_start: '',
+      current_period_end: '',
+      cancel_at_period_end: false,
+      configured: false,
+      goals_completed: false,
+    }
+
     render(
       <DigitalMarketingActivationWizard
-        instances={[{ subscription_id: 'sub_1', agent_id: 'AGT-MKT-DMA-001', agent_type_id: 'marketing.digital_marketing.v1', hired_instance_id: 'hire_1', nickname: 'Growth Copilot', duration: 'monthly', status: 'active', current_period_start: '', current_period_end: '', cancel_at_period_end: false, configured: false, goals_completed: false }]}
+        instance={activeInstance}
+        instances={[activeInstance]}
       />
     )
 
-    for (let i = 0; i < 4; i += 1) {
-      fireEvent.click(await screen.findByRole('button', { name: /Continue/i }))
-    }
+    fireEvent.click(await screen.findByRole('button', { name: /Build Master Theme/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Brand Voice')).toBeInTheDocument()
+    })
   }
 
   it('loads brand voice into the step 5 fields', async () => {
     await renderThemeStep()
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('Warm and credible.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Voice description')).toHaveValue('Warm and credible.')
     })
-    expect(screen.getByDisplayValue('warm, credible')).toBeInTheDocument()
+    expect(screen.getByLabelText('Tone keywords')).toHaveValue('warm, credible')
   })
 
   it('keeps fields empty when brand voice is missing', async () => {
