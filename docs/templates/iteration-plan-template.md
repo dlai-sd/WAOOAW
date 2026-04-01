@@ -212,16 +212,18 @@ This gives you a progress feed. Subscribe to the PR once — GitHub notifies you
 ```bash
 # 1. Create the first epic branch from main
 git checkout main && git pull
-git checkout -b feat/[plan-id]-it1-e1
+export PLAN_RUN_ID="$(date -u +%Y%m%d%H%M%S)"
+export TRACKING_BRANCH="feat/[plan-id]-it1-e1-${PLAN_RUN_ID}"
+git checkout -b "$TRACKING_BRANCH"
 
 # 2. Push an empty init commit so the branch exists on remote
 git commit --allow-empty -m "chore([plan-id]): start iteration 1"
-git push origin feat/[plan-id]-it1-e1
+git push origin "$TRACKING_BRANCH"
 
 # 3. Open draft PR — this is the progress tracker, not the final iteration PR
 gh pr create \
   --base main \
-  --head feat/[plan-id]-it1-e1 \
+  --head "$TRACKING_BRANCH" \
   --draft \
   --title "tracking: [PLAN-ID] Iteration 1 — in progress" \
   --body "## tracking: [PLAN-ID] Iteration 1
@@ -234,6 +236,8 @@ Subscribe to this PR to receive one notification per story completion.
 - [ ] [E2-S1] [story title]
 
 _Live updates posted as comments below ↓_"
+
+export TRACKING_PR_NUMBER="$(gh pr list --head "$TRACKING_BRANCH" --json number -q '.[0].number')"
 ```
 
 **PM instruction for plan files:** replace the `- [ ]` list above with the actual story IDs and titles from this plan's Tracking Table.
@@ -243,7 +247,8 @@ After the agent posts the draft PR URL: go to GitHub, open the PR, click **Subsc
 ---
 
 ### Rule 1 — Branch discipline
-One epic = one branch: `feat/[plan-id]-itN-eN`.
+One epic = one branch: `feat/[plan-id]-itN-eN-$PLAN_RUN_ID`.
+Treat every `Branch:` value in story cards as a base name only; append `-$PLAN_RUN_ID` to the actual git branch you create and push.
 All stories in one epic commit to the same branch sequentially.
 Never push to `main` directly.
 
@@ -269,16 +274,16 @@ Run the test command listed in the story card — not a generic command.
 ```bash
 git add -A
 git commit -m "feat([plan-id]): [story title]"
-git push origin feat/[plan-id]-itN-eN
+git push origin HEAD
 
 # Update this file's Tracking Table: change story status to Done
 git add docs/[path/to/this/plan.md]
 git commit -m "docs([plan-id]): mark [story-id] done"
-git push origin feat/[plan-id]-itN-eN
+git push origin HEAD
 
 # Post progress comment to tracking draft PR (notifies the subscriber)
 gh pr comment \
-  $(gh pr list --head feat/[plan-id]-it1-e1 --json number -q '.[0].number') \
+  "$TRACKING_PR_NUMBER" \
   --body "✅ **[story-id] done** — $(git rev-parse --short HEAD)
 Files changed: [list]
 Tests: [T1 ✅ T2 ✅ ...]
@@ -296,10 +301,10 @@ Non-zero → fix on same branch, retry. Max 3 attempts. Then: STUCK PROTOCOL.
 ### Rule 6 — STUCK PROTOCOL (3 failures = stop immediately)
 ```bash
 git add -A && git commit -m "WIP: [story-id] blocked — [exact error]"
-git push origin feat/[plan-id]-itN-eN
+git push origin HEAD
 gh pr create \
   --base main \
-  --head feat/[plan-id]-itN-eN \
+  --head "$(git branch --show-current)" \
   --title "WIP: [story-id] — blocked" \
   --draft \
   --body "Blocked on: [test name]
@@ -313,14 +318,15 @@ Post the draft PR URL. **HALT. Do not start the next story.**
 ### Rule 7 — Iteration PR (after ALL epics complete)
 ```bash
 git checkout main && git pull
-git checkout -b feat/[plan-id]-itN
+export ITERATION_BRANCH="feat/[plan-id]-itN-${PLAN_RUN_ID}"
+git checkout -b "$ITERATION_BRANCH"
 # Merge all epic branches for this iteration:
-git merge --no-ff feat/[plan-id]-itN-e1 feat/[plan-id]-itN-e2
-git push origin feat/[plan-id]-itN
+git merge --no-ff "feat/[plan-id]-itN-e1-${PLAN_RUN_ID}" "feat/[plan-id]-itN-e2-${PLAN_RUN_ID}"
+git push origin "$ITERATION_BRANCH"
 
 gh pr create \
   --base main \
-  --head feat/[plan-id]-itN \
+  --head "$ITERATION_BRANCH" \
   --title "feat([plan-id]): iteration N — [one-line summary]" \
   --body "## [PLAN-ID] Iteration N
 
@@ -341,6 +347,12 @@ All containers exited 0 ✅
 - [ ] Tests >= 80% coverage on new BE code"
 ```
 Post the PR URL in chat. **HALT — do not start the next iteration.**
+
+**CHECKPOINT RULE**: After completing each epic (all tests passing), run:
+```bash
+git add -A && git commit -m "feat([plan-id]): [epic-id] — [epic title]" && git push origin HEAD
+```
+Do this BEFORE starting the next epic. If interrupted, completed epics are already saved.
 
 ---
 

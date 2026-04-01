@@ -210,13 +210,15 @@ Activate each persona now. For every epic you execute, open with one line:
 
 ```bash
 git checkout main && git pull
-git checkout -b feat/cp-wiz-1-it1-e1
+export PLAN_RUN_ID="$(date -u +%Y%m%d%H%M%S)"
+export TRACKING_BRANCH="feat/cp-wiz-1-it1-e1-${PLAN_RUN_ID}"
+git checkout -b "$TRACKING_BRANCH"
 git commit --allow-empty -m "chore(cp-wiz-1): start iteration 1"
-git push origin feat/cp-wiz-1-it1-e1
+git push origin "$TRACKING_BRANCH"
 
 gh pr create \
   --base main \
-  --head feat/cp-wiz-1-it1-e1 \
+  --head "$TRACKING_BRANCH" \
   --draft \
   --title "tracking: CP-WIZ-1 Iteration 1 — in progress" \
   --body "## tracking: CP-WIZ-1 Iteration 1
@@ -232,12 +234,15 @@ Subscribe to this PR to receive one notification per story completion.
 - [ ] [E2-S3] Render strategy preview before approval gate
 
 _Live updates posted as comments below ↓_"
+
+export TRACKING_PR_NUMBER="$(gh pr list --head "$TRACKING_BRANCH" --json number -q '.[0].number')"
 ```
 
 ---
 
 ### Rule 1 — Branch discipline
-One epic = one branch: `feat/cp-wiz-1-itN-eN`.
+One epic = one branch: `feat/cp-wiz-1-itN-eN-$PLAN_RUN_ID`.
+Treat every `Branch:` value in story cards as a base name only; append `-$PLAN_RUN_ID` to the actual git branch you create and push.
 All stories in one epic commit to the same branch sequentially.
 Never push to `main` directly.
 
@@ -260,14 +265,14 @@ Write every test in the story's test table before advancing to the next story.
 ```bash
 git add -A
 git commit -m "feat(cp-wiz-1): [story title]"
-git push origin feat/cp-wiz-1-itN-eN
+git push origin HEAD
 
 git add docs/CP/iterations/CP-WIZ-1-wizard-dma-customer-value.md
 git commit -m "docs(cp-wiz-1): mark [story-id] done"
-git push origin feat/cp-wiz-1-itN-eN
+git push origin HEAD
 
 gh pr comment \
-  $(gh pr list --head feat/cp-wiz-1-it1-e1 --json number -q '.[0].number') \
+  "$TRACKING_PR_NUMBER" \
   --body "✅ **[story-id] done** — $(git rev-parse --short HEAD)
 Files changed: [list]
 Tests: [T1 ✅ T2 ✅ ...]
@@ -283,10 +288,10 @@ exit_code=$?; docker compose -f docker-compose.test.yml down; exit $exit_code
 ### Rule 6 — STUCK PROTOCOL (3 failures = stop immediately)
 ```bash
 git add -A && git commit -m "WIP: [story-id] blocked — [exact error]"
-git push origin feat/cp-wiz-1-itN-eN
+git push origin HEAD
 gh pr create \
   --base main \
-  --head feat/cp-wiz-1-itN-eN \
+  --head "$(git branch --show-current)" \
   --title "WIP: [story-id] — blocked" \
   --draft \
   --body "Blocked on: [test name]
@@ -300,13 +305,14 @@ Post the draft PR URL. **HALT. Do not start the next story.**
 ### Rule 7 — Iteration PR (after ALL epics complete)
 ```bash
 git checkout main && git pull
-git checkout -b feat/cp-wiz-1-itN
-git merge --no-ff feat/cp-wiz-1-itN-e1 feat/cp-wiz-1-itN-e2
-git push origin feat/cp-wiz-1-itN
+export ITERATION_BRANCH="feat/cp-wiz-1-itN-${PLAN_RUN_ID}"
+git checkout -b "$ITERATION_BRANCH"
+git merge --no-ff "feat/cp-wiz-1-itN-e1-${PLAN_RUN_ID}" "feat/cp-wiz-1-itN-e2-${PLAN_RUN_ID}"
+git push origin "$ITERATION_BRANCH"
 
 gh pr create \
   --base main \
-  --head feat/cp-wiz-1-itN \
+  --head "$ITERATION_BRANCH" \
   --title "feat(cp-wiz-1): iteration N — [one-line summary]" \
   --body "## CP-WIZ-1 Iteration N
 
@@ -325,7 +331,7 @@ gh pr create \
 
 **CHECKPOINT RULE**: After completing each epic (all tests passing), run:
 ```bash
-git add -A && git commit -m "feat(cp-wiz-1): [epic-id] — [epic title]" && git push
+git add -A && git commit -m "feat(cp-wiz-1): [epic-id] — [epic title]" && git push origin HEAD
 ```
 Do this BEFORE starting the next epic. If interrupted, completed epics are already saved.
 
