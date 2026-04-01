@@ -37,3 +37,24 @@ class BrandVoiceModel(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        now = datetime.now(timezone.utc)
+        if self.id is None:
+            self.id = str(uuid.uuid4())
+        if self.tone_keywords is None:
+            self.tone_keywords = []
+        if self.vocabulary_preferences is None:
+            self.vocabulary_preferences = []
+        if self.messaging_patterns is None:
+            self.messaging_patterns = []
+        if self.example_phrases is None:
+            self.example_phrases = []
+        if self.voice_description is None:
+            self.voice_description = ""
+        if self.created_at is None:
+            self.created_at = now
+        if self.updated_at is None:
+            self.updated_at = now
