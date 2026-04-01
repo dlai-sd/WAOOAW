@@ -73,9 +73,9 @@ async def test_e2_s2_valid_jwt_passes(monkeypatch):
     app = _make_app()
     token = _make_jwt(jti="clean-jti")
 
-    mock_redis = AsyncMock()
-    mock_redis.exists = AsyncMock(return_value=0)
-    monkeypatch.setattr("middleware.auth._get_gateway_redis", lambda: mock_redis)
+    mock_is_revoked = AsyncMock(return_value=False)
+    monkeypatch.setattr("middleware.auth.redis_runtime.is_access_token_revoked", mock_is_revoked)
+    monkeypatch.setattr("middleware.auth.redis_runtime.get_token_version", AsyncMock(return_value=None))
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -85,7 +85,7 @@ async def test_e2_s2_valid_jwt_passes(monkeypatch):
         )
 
     assert r.status_code == 200
-    mock_redis.exists.assert_awaited_once_with("revoked_access:clean-jti")
+    mock_is_revoked.assert_awaited_once_with("clean-jti")
 
 
 # ---------------------------------------------------------------------------
@@ -98,9 +98,8 @@ async def test_e2_s2_revoked_jti_blocked(monkeypatch):
     app = _make_app()
     token = _make_jwt(jti="revoked-jti-001")
 
-    mock_redis = AsyncMock()
-    mock_redis.exists = AsyncMock(return_value=1)  # 1 = key exists = revoked
-    monkeypatch.setattr("middleware.auth._get_gateway_redis", lambda: mock_redis)
+    monkeypatch.setattr("middleware.auth.redis_runtime.is_access_token_revoked", AsyncMock(return_value=True))
+    monkeypatch.setattr("middleware.auth.redis_runtime.get_token_version", AsyncMock(return_value=None))
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -124,9 +123,8 @@ async def test_e2_s2_expired_token_distinct_from_revoked(monkeypatch):
     app = _make_app()
     token = _make_jwt(exp_delta=timedelta(seconds=-60), jti="expired-jti")
 
-    mock_redis = AsyncMock()
-    mock_redis.exists = AsyncMock(return_value=0)
-    monkeypatch.setattr("middleware.auth._get_gateway_redis", lambda: mock_redis)
+    monkeypatch.setattr("middleware.auth.redis_runtime.is_access_token_revoked", AsyncMock(return_value=False))
+    monkeypatch.setattr("middleware.auth.redis_runtime.get_token_version", AsyncMock(return_value=None))
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -151,9 +149,11 @@ async def test_e2_s2_redis_failure_is_non_fatal(monkeypatch):
     app = _make_app()
     token = _make_jwt(jti="redis-fail-jti")
 
-    mock_redis = AsyncMock()
-    mock_redis.exists = AsyncMock(side_effect=ConnectionError("Redis down"))
-    monkeypatch.setattr("middleware.auth._get_gateway_redis", lambda: mock_redis)
+    monkeypatch.setattr(
+        "middleware.auth.redis_runtime.is_access_token_revoked",
+        AsyncMock(side_effect=ConnectionError("Redis down")),
+    )
+    monkeypatch.setattr("middleware.auth.redis_runtime.get_token_version", AsyncMock(return_value=None))
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

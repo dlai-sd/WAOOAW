@@ -25,6 +25,7 @@ RUN chown -R gateway:gateway /home/gateway/.local
 # Copy application code
 COPY middleware/ ./middleware/
 COPY infrastructure/ ./infrastructure/
+COPY services/ ./services/
 COPY core/ ./core/
 COPY main.py .
 

@@ -111,3 +111,29 @@ class TestHealthReady:
         body = client.get("/health/ready").json()
         # Should parse without raising
         datetime.fromisoformat(body["timestamp"])
+
+
+@pytest.mark.unit
+def test_health_ready_uses_redis_runtime_helper(test_client, monkeypatch) -> None:
+    session = MagicMock()
+    session.execute = AsyncMock(return_value=MagicMock())
+    session.close = AsyncMock(return_value=None)
+    connector = SimpleNamespace(get_session=AsyncMock(return_value=session))
+    mock_health = AsyncMock(
+        return_value={
+            "status": "ok",
+            "redis": "ok",
+            "service": "plant-backend",
+            "db_index": 0,
+            "namespaces": ["cache", "sessions"],
+        }
+    )
+
+    monkeypatch.setattr("core.database._connector", connector)
+    monkeypatch.setattr("services.redis_runtime.health_check", mock_health)
+
+    response = test_client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["redis"] == "ok"
+    mock_health.assert_awaited_once()

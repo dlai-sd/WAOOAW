@@ -95,7 +95,6 @@ module "plant_backend" {
   env_vars = {
     ENVIRONMENT               = var.environment
     CLOUD_SQL_CONNECTION_NAME = module.plant_database.instance_connection_name
-    REDIS_URL                 = var.redis_url
     LOG_LEVEL                 = "info"
     DEBUG_VERBOSE             = "false"
 
@@ -143,6 +142,7 @@ module "plant_backend" {
     } : {},
     {
       DATABASE_URL = "${module.plant_database.database_url_secret_id}:latest"
+      REDIS_URL    = "${var.environment}-plant-backend-redis-url:latest"
     },
   )
 
@@ -187,7 +187,6 @@ module "plant_gateway" {
     PLANT_BACKEND_URL          = module.plant_backend.service_url
     PLANT_BACKEND_USE_ID_TOKEN = "true"
     PLANT_BACKEND_AUDIENCE     = module.plant_backend.service_url
-    REDIS_URL                  = var.redis_url
     LOG_LEVEL                  = "info"
     DEBUG_VERBOSE              = "false"
     OPA_URL                    = module.plant_opa.service_url
@@ -209,6 +208,7 @@ module "plant_gateway" {
     },
     {
       CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
+      REDIS_URL           = "${var.environment}-plant-gateway-redis-url:latest"
     }
   )
 

@@ -14,12 +14,15 @@ import os
 import time
 import base64
 import json
-import redis.asyncio as redis
 import logging
 try:
     from .circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
 except ImportError:  # pragma: no cover
     from middleware.circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+try:
+    from ..services import redis_runtime
+except ImportError:  # pragma: no cover
+    from services import redis_runtime
 
 _opa_cb = CircuitBreaker(service_name="opa-budget")  # P-1: fast-fail when OPA is down
 from typing import Dict, Any, Optional, Tuple
@@ -140,18 +143,6 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
         self.feature_flag_service = feature_flag_service
         self.timeout = timeout
         self.http_client = httpx.AsyncClient(timeout=timeout)
-        self.redis_client: Optional[redis.Redis] = None
-    
-    async def _get_redis(self) -> redis.Redis:
-        """Get or create Redis client."""
-        if not self.redis_client:
-            self.redis_client = redis.from_url(
-                self.redis_url,
-                decode_responses=True,
-                socket_connect_timeout=2,
-                socket_timeout=2
-            )
-        return self.redis_client
     
     async def dispatch(self, request: Request, call_next):
         """
@@ -263,7 +254,7 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
             
             # Update Redis with request cost (post-request, non-blocking)
             try:
-                await self._update_budget_redis(agent_id, customer_id, self.COST_PER_REQUEST)
+                await redis_runtime.enqueue_budget_update(agent_id, customer_id, self.COST_PER_REQUEST)
             except Exception as e:
                 logger.error(f"Failed to update budget in Redis: {e}")
                 # Don't fail request if Redis update fails
@@ -345,35 +336,6 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
                 _opa_cb.record_failure()
             raise
     
-    async def _update_budget_redis(
-        self,
-        agent_id: Optional[str],
-        customer_id: str,
-        cost: Decimal
-    ):
-        """
-        Update Redis with request cost.
-        
-        Redis Keys:
-        - platform_budget:spent_usd: Total platform spend
-        - agent_budgets:{agent_id}:spent_usd: Per-agent spend
-        - customer_budgets:{customer_id}:spent_usd: Per-customer spend
-        """
-        r = await self._get_redis()
-        cost_str = str(cost)
-        
-        # Update platform budget
-        await r.hincrbyfloat("platform_budget", "spent_usd", float(cost))
-        
-        # Update agent budget (if agent_id present)
-        if agent_id:
-            await r.hincrbyfloat(f"agent_budgets:{agent_id}", "spent_usd", float(cost))
-        
-        # Update customer budget
-        await r.hincrbyfloat(f"customer_budgets:{customer_id}", "spent_usd", float(cost))
-        
-        logger.debug(f"Updated budget: agent={agent_id}, customer={customer_id}, cost=${cost}")
-    
     def _handle_budget_exceeded(
         self,
         result: Dict[str, Any],
@@ -430,5 +392,3 @@ class BudgetGuardMiddleware(BaseHTTPMiddleware):
     async def close(self):
         """Close HTTP and Redis clients."""
         await self.http_client.aclose()
-        if self.redis_client:
-            await self.redis_client.close()

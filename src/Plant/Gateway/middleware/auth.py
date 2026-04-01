@@ -42,26 +42,18 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response
 
 import httpx
-import redis.asyncio as aioredis
 try:
     from .circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
 except ImportError:  # pragma: no cover
     from middleware.circuit_breaker import CircuitBreaker, GatewayCircuitOpenError
+try:
+    from ..services import redis_runtime
+except ImportError:  # pragma: no cover
+    from services import redis_runtime
 
 _metadata_cb = CircuitBreaker(service_name="gcp-metadata")  # P-1: GCP metadata server
 _plant_auth_cb = CircuitBreaker(service_name="plant-auth")  # P-1: Plant auth service
 logger = logging.getLogger(__name__)
-
-# ── Lazy async Redis client for token revocation (E2-S2) ──────────────────────
-_gw_redis_client: Optional[aioredis.Redis] = None
-
-
-def _get_gateway_redis() -> aioredis.Redis:
-    global _gw_redis_client
-    if _gw_redis_client is None:
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        _gw_redis_client = aioredis.Redis.from_url(redis_url, decode_responses=True)
-    return _gw_redis_client
 
 # Metadata server for fetching identity tokens (works in Cloud Run/Compute).
 _METADATA_IDENTITY_URLS = [
@@ -682,7 +674,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # E2-S2: check revocation list for the access token's jti
             if claims.jti:
                 try:
-                    is_revoked = await _get_gateway_redis().exists(f"revoked_access:{claims.jti}")
+                    is_revoked = await redis_runtime.is_access_token_revoked(claims.jti)
                     if is_revoked:
                         return JSONResponse(
                             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -704,7 +696,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if jwt_token_version is not None and (claims.user_id or claims.sub):
                 uid = claims.user_id or claims.sub
                 try:
-                    cached_version_str = await _get_gateway_redis().get(f"token_version:{uid}")
+                    cached_version_str = await redis_runtime.get_token_version(uid)
                     if cached_version_str is not None:
                         cached_version = int(cached_version_str)
                         if jwt_token_version < cached_version:

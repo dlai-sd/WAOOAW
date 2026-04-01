@@ -32,7 +32,7 @@ def mock_jwt_claims():
 async def test_budget_under_limit(mock_jwt_claims):
     """Budget under limit allows request"""
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
-         patch("redis.asyncio.from_url") as mock_redis:
+         patch("middleware.budget.redis_runtime.enqueue_budget_update", new_callable=AsyncMock) as mock_enqueue:
         
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -55,11 +55,6 @@ async def test_budget_under_limit(mock_jwt_claims):
                 }
             }
         )
-        
-        # Mock Redis
-        mock_redis_client = AsyncMock()
-        mock_redis_client.hincrbyfloat = AsyncMock()
-        mock_redis.return_value = mock_redis_client
         
         test_app = FastAPI()
         test_app.add_middleware(
@@ -84,6 +79,7 @@ async def test_budget_under_limit(mock_jwt_claims):
         assert response.status_code == 200
         assert "X-Budget-Alert-Level" in response.headers
         assert response.headers["X-Budget-Alert-Level"] == "normal"
+        mock_enqueue.assert_awaited_once()
 
 
 # Test Budget Warning (80%)
@@ -91,7 +87,7 @@ async def test_budget_under_limit(mock_jwt_claims):
 async def test_budget_warning_threshold(mock_jwt_claims):
     """Budget at 80% warning threshold"""
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
-         patch("redis.asyncio.from_url") as mock_redis:
+         patch("middleware.budget.redis_runtime.enqueue_budget_update", new_callable=AsyncMock):
         
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -114,10 +110,6 @@ async def test_budget_warning_threshold(mock_jwt_claims):
                 }
             }
         )
-        
-        mock_redis_client = AsyncMock()
-        mock_redis_client.hincrbyfloat = AsyncMock()
-        mock_redis.return_value = mock_redis_client
         
         test_app = FastAPI()
         test_app.add_middleware(
@@ -148,7 +140,7 @@ async def test_budget_warning_threshold(mock_jwt_claims):
 async def test_budget_high_threshold(mock_jwt_claims):
     """Budget at 95% high threshold"""
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
-         patch("redis.asyncio.from_url") as mock_redis:
+         patch("middleware.budget.redis_runtime.enqueue_budget_update", new_callable=AsyncMock):
         
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -171,10 +163,6 @@ async def test_budget_high_threshold(mock_jwt_claims):
                 }
             }
         )
-        
-        mock_redis_client = AsyncMock()
-        mock_redis_client.hincrbyfloat = AsyncMock()
-        mock_redis.return_value = mock_redis_client
         
         test_app = FastAPI()
         test_app.add_middleware(
@@ -260,7 +248,7 @@ async def test_budget_exceeded_critical(mock_jwt_claims):
 async def test_budget_redis_update(mock_jwt_claims):
     """Budget updates Redis after request"""
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
-         patch("redis.asyncio.from_url") as mock_redis:
+         patch("middleware.budget.redis_runtime.enqueue_budget_update", new_callable=AsyncMock) as mock_enqueue:
         
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -273,11 +261,6 @@ async def test_budget_redis_update(mock_jwt_claims):
                 }
             }
         )
-        
-        # Mock Redis
-        mock_redis_client = AsyncMock()
-        mock_redis_client.hincrbyfloat = AsyncMock()
-        mock_redis.return_value = mock_redis_client
         
         test_app = FastAPI()
         test_app.add_middleware(
@@ -300,8 +283,7 @@ async def test_budget_redis_update(mock_jwt_claims):
         response = client.post("/api/v1/tasks", json={})
         
         assert response.status_code == 200
-        # Verify Redis was called (would be called 3 times: platform, agent, customer)
-        # Note: Actual Redis calls happen async, test validates middleware logic
+        mock_enqueue.assert_awaited_once()
 
 
 # Test Public Endpoints Bypass
@@ -398,7 +380,7 @@ async def test_budget_missing_jwt_claims():
 async def test_budget_response_headers(mock_jwt_claims):
     """Budget adds utilization headers to response"""
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post, \
-         patch("redis.asyncio.from_url") as mock_redis:
+         patch("middleware.budget.redis_runtime.enqueue_budget_update", new_callable=AsyncMock):
         
         mock_post.return_value = MagicMock(
             status_code=200,
@@ -411,10 +393,6 @@ async def test_budget_response_headers(mock_jwt_claims):
                 }
             }
         )
-        
-        mock_redis_client = AsyncMock()
-        mock_redis_client.hincrbyfloat = AsyncMock()
-        mock_redis.return_value = mock_redis_client
         
         test_app = FastAPI()
         test_app.add_middleware(

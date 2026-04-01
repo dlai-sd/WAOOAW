@@ -106,6 +106,7 @@ module "cp_backend" {
     } : {},
     {
       CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
+      REDIS_URL           = "${var.environment}-cp-backend-redis-url:latest"
 
       # Google Workspace SMTP credentials — always injected from Secret Manager
       CP_OTP_SMTP_USERNAME = "CP_OTP_SMTP_USERNAME:latest"
