@@ -1,4 +1,4 @@
-import { Card, Button, Badge, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Input, Textarea, Checkbox } from '@fluentui/react-components'
+import { Card, Button, Badge, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Input, Textarea, Checkbox, Spinner } from '@fluentui/react-components'
 import { Star20Filled } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -34,6 +34,7 @@ import { SkillsPanel } from '../../components/SkillsPanel'
 import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
 import { listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
+import { getContentRecommendations, type ContentRecommendation } from '../../services/contentAnalytics.service'
 import { listYouTubeConnections, type YouTubeConnection } from '../../services/youtubeConnections.service'
 
 type MyAgentsSection = 'configure' | 'goals' | 'skills' | 'performance'
@@ -74,6 +75,14 @@ function parseListText(value: string): string[] {
     .split(/\n|,/g)
     .map((x) => x.trim())
     .filter(Boolean)
+}
+
+function formatPostingHour(hour: number): string {
+  const normalized = Number(hour)
+  if (!Number.isFinite(normalized)) return ''
+  const suffix = normalized >= 12 ? 'PM' : 'AM'
+  const base = normalized % 12 || 12
+  return `${base} ${suffix}`
 }
 
 function stableJsonStringify(value: unknown): string {
@@ -1734,13 +1743,16 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   )
 }
 
-function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
+export function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
   const { instance } = props
   const hiredInstanceId = String(instance.hired_instance_id || '').trim()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<PerformanceStat[]>([])
+  const [recommendations, setRecommendations] = useState<ContentRecommendation | null>(null)
+  const [recsLoading, setRecsLoading] = useState(true)
+  const [recsError, setRecsError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!hiredInstanceId) return
@@ -1761,18 +1773,23 @@ function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
     return () => { cancelled = true }
   }, [hiredInstanceId])
 
+  useEffect(() => {
+    if (!hiredInstanceId) return
+    let cancelled = false
+    setRecsLoading(true)
+    setRecsError(null)
+    getContentRecommendations(hiredInstanceId)
+      .then((data) => { if (!cancelled) setRecommendations(data) })
+      .catch(() => { if (!cancelled) setRecsError('Failed to load content insights.') })
+      .finally(() => { if (!cancelled) setRecsLoading(false) })
+    return () => { cancelled = true }
+  }, [hiredInstanceId])
+
   if (!hiredInstanceId) {
     return <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>No hired agent selected.</div>
   }
   if (loading) return <LoadingIndicator message="Loading performance data..." size="medium" />
   if (error) return <FeedbackMessage intent="error" title="Error" message={error} />
-  if (stats.length === 0) {
-    return (
-      <div style={{ opacity: 0.6, fontSize: '0.9rem', paddingTop: '0.5rem' }}>
-        No performance data yet. Stats will appear here once the agent starts running.
-      </div>
-    )
-  }
 
   // Group by metric_key, show latest value per metric
   const byKey: Record<string, PerformanceStat[]> = {}
@@ -1783,28 +1800,100 @@ function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
 
   return (
     <div>
-      {Object.entries(byKey).map(([key, rows]) => {
-        const latest = [...rows].sort((a, b) => b.stat_date.localeCompare(a.stat_date))[0]
-        return (
-          <div
-            key={key}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '0.6rem 0.75rem',
-              marginBottom: '0.4rem',
-              borderRadius: '8px',
-              border: '1px solid var(--colorNeutralStroke2)',
-            }}
-          >
-            <span style={{ fontWeight: 500 }}>{key.replace(/_/g, ' ')}</span>
-            <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{latest.metric_value}</span>
+      {stats.length === 0 ? (
+        <div style={{ opacity: 0.6, fontSize: '0.9rem', paddingTop: '0.5rem' }}>
+          No performance data yet. Stats will appear here once the agent starts running.
+        </div>
+      ) : (
+        <>
+          {Object.entries(byKey).map(([key, rows]) => {
+            const latest = [...rows].sort((a, b) => b.stat_date.localeCompare(a.stat_date))[0]
+            return (
+              <div
+                key={key}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.6rem 0.75rem',
+                  marginBottom: '0.4rem',
+                  borderRadius: '8px',
+                  border: '1px solid var(--colorNeutralStroke2)',
+                }}
+              >
+                <span style={{ fontWeight: 500 }}>{key.replace(/_/g, ' ')}</span>
+                <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>{latest.metric_value}</span>
+              </div>
+            )
+          })}
+          <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem' }}>
+            Showing latest value per metric across {stats.length} recorded data points.
           </div>
-        )
-      })}
-      <div style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem' }}>
-        Showing latest value per metric across {stats.length} recorded data points.
+        </>
+      )}
+
+      <div
+        style={{
+          marginTop: '1rem',
+          paddingTop: '1rem',
+          borderTop: '1px solid var(--colorNeutralStroke2)',
+          display: 'grid',
+          gap: '0.75rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontWeight: 700 }}>Content Insights</span>
+          <Badge appearance="outline" color="informative">AI</Badge>
+        </div>
+        {recsLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Spinner size="tiny" />
+            <span>Loading content insights…</span>
+          </div>
+        ) : recsError ? (
+          <FeedbackMessage intent="error" title="Content insights unavailable" message={recsError} />
+        ) : recommendations && recommendations.total_posts_analyzed === 0 ? (
+          <div style={{ opacity: 0.8 }}>
+            Your agent is analyzing your content — first insights appear within 24–48 hours
+          </div>
+        ) : recommendations && recommendations.total_posts_analyzed < 3 ? (
+          <div style={{ opacity: 0.8 }}>
+            Building insights — {recommendations.total_posts_analyzed} posts analyzed so far, need at least 3 for recommendations
+          </div>
+        ) : recommendations ? (
+          <>
+            <div>
+              <div style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '0.35rem' }}>Best posting hours</div>
+              <div>{recommendations.best_posting_hours.map(formatPostingHour).filter(Boolean).join(', ') || 'Not enough data yet'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '0.35rem' }}>Top content dimensions</div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {recommendations.top_dimensions.map((dimension) => (
+                  <Badge key={dimension} appearance="tint" color="brand">
+                    {dimension}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.85rem', opacity: 0.7, marginBottom: '0.35rem' }}>Average engagement rate</div>
+              <div>{(recommendations.avg_engagement_rate * 100).toFixed(1)}%</div>
+            </div>
+            <blockquote
+              style={{
+                margin: 0,
+                paddingLeft: '1rem',
+                borderLeft: '3px solid #667eea',
+                color: 'var(--colorNeutralForeground2)',
+              }}
+            >
+              {recommendations.recommendation_text}
+            </blockquote>
+          </>
+        ) : (
+          <div style={{ opacity: 0.7 }}>No insights yet — the agent needs more data</div>
+        )}
       </div>
     </div>
   )

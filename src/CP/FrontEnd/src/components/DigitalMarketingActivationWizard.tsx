@@ -40,6 +40,11 @@ import {
   listPlatformConnections,
   type PlatformConnection,
 } from '../services/platformConnections.service'
+import {
+  getBrandVoice,
+  updateBrandVoice,
+  type BrandVoiceData,
+} from '../services/brandVoice.service'
 import { redirectTo } from '../utils/browserNavigation'
 import {
   beginYouTubeOAuthFlow,
@@ -319,6 +324,11 @@ export function DigitalMarketingActivationWizard({
   const [timezone, setTimezone] = useState('')
   const [businessContext, setBusinessContext] = useState('')
   const [offeringsText, setOfferingsText] = useState('')
+  const [voiceDescription, setVoiceDescription] = useState('')
+  const [toneKeywords, setToneKeywords] = useState('')
+  const [examplePhrases, setExamplePhrases] = useState('')
+  const [brandVoiceLoading, setBrandVoiceLoading] = useState(false)
+  const [brandVoiceDraft, setBrandVoiceDraft] = useState<BrandVoiceData | null>(null)
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [masterTheme, setMasterTheme] = useState('')
   const [derivedThemes, setDerivedThemes] = useState<DigitalMarketingDerivedTheme[]>([])
@@ -560,6 +570,29 @@ export function DigitalMarketingActivationWizard({
     void loadState()
   }, [activeInstance?.subscription_id])
 
+  useEffect(() => {
+    if (currentStep.id !== 'theme') return
+    let cancelled = false
+    setBrandVoiceLoading(true)
+    getBrandVoice()
+      .then((bv) => {
+        if (cancelled) return
+        setBrandVoiceDraft(bv)
+        setVoiceDescription(bv.voice_description || '')
+        setToneKeywords((bv.tone_keywords || []).join(', '))
+        setExamplePhrases((bv.example_phrases || []).join('\n'))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setBrandVoiceDraft(null)
+        setVoiceDescription('')
+        setToneKeywords('')
+        setExamplePhrases('')
+      })
+      .finally(() => { if (!cancelled) setBrandVoiceLoading(false) })
+    return () => { cancelled = true }
+  }, [currentStep.id])
+
   const readiness = activation?.readiness || {
     brief_complete: false,
     youtube_selected: selectedPlatforms.includes('youtube'),
@@ -693,6 +726,22 @@ export function DigitalMarketingActivationWizard({
     if (currentStep.id !== 'select') {
       const saved = await saveWorkspace()
       if (!saved) return
+      if (!readOnly && currentStep.id === 'theme') {
+        try {
+          const payload = {
+            tone_keywords: parseListTextarea(toneKeywords),
+            vocabulary_preferences: brandVoiceDraft?.vocabulary_preferences || [],
+            messaging_patterns: brandVoiceDraft?.messaging_patterns || [],
+            example_phrases: parseListTextarea(examplePhrases),
+            voice_description: voiceDescription.trim(),
+          }
+          const updated = await updateBrandVoice(payload)
+          setBrandVoiceDraft(updated)
+        } catch (e: any) {
+          setSaveError(e?.message || 'Failed to save brand voice')
+          return
+        }
+      }
     }
     setActiveStepIndex(i => Math.min(DMA_STEPS.length - 1, i + 1))
   }
@@ -1533,6 +1582,50 @@ export function DigitalMarketingActivationWizard({
                       </label>
                     </div>
 
+                    <div style={{ display: 'grid', gap: '0.75rem', padding: '1rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <div>
+                          <div className="dma-wizard-section-label">Brand Voice</div>
+                          <div style={{ opacity: 0.75, fontSize: '0.9rem' }}>Teach the agent how your brand should sound.</div>
+                        </div>
+                        {brandVoiceLoading ? <Spinner size="tiny" /> : null}
+                      </div>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <span>Voice description</span>
+                        <Textarea
+                          aria-label="Voice description"
+                          value={voiceDescription}
+                          onChange={(_, data) => setVoiceDescription(data.value)}
+                          disabled={readOnly}
+                          resize="vertical"
+                          rows={3}
+                          placeholder="Describe your brand tone and communication style"
+                        />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <span>Tone keywords</span>
+                        <Input
+                          aria-label="Tone keywords"
+                          value={toneKeywords}
+                          onChange={(_, data) => setToneKeywords(data.value)}
+                          disabled={readOnly}
+                          placeholder="Confident, warm, expert"
+                        />
+                      </label>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <span>Example phrases</span>
+                        <Textarea
+                          aria-label="Example phrases"
+                          value={examplePhrases}
+                          onChange={(_, data) => setExamplePhrases(data.value)}
+                          disabled={readOnly}
+                          resize="vertical"
+                          rows={4}
+                          placeholder="One phrase per line"
+                        />
+                      </label>
+                    </div>
+
                     <div className="dma-wizard-theme-workshop-card">
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
@@ -1713,6 +1806,32 @@ export function DigitalMarketingActivationWizard({
                         onAddDerivedTheme={addDerivedTheme}
                         onSave={() => void saveThemePlan()}
                       />
+
+                      {!isThemeApproved && (
+                        <div
+                          style={{
+                            marginBottom: '1rem',
+                            padding: '1rem',
+                            border: '1px solid #333',
+                            borderRadius: '0.75rem',
+                            background: '#1a1a1a',
+                          }}
+                        >
+                          <h4 style={{ margin: '0 0 0.5rem', color: '#00f2fe' }}>Review your content strategy before approving</h4>
+                          {strategyWorkshop.checkpoint_summary || strategyWorkshop.assistant_message ? (
+                            <blockquote style={{ borderLeft: '3px solid #667eea', paddingLeft: '1rem', margin: '0.5rem 0', color: '#ccc' }}>
+                              {strategyWorkshop.checkpoint_summary || strategyWorkshop.assistant_message}
+                            </blockquote>
+                          ) : (
+                            <p style={{ color: '#666' }}>No strategy generated yet — the agent will create one after you provide your business context.</p>
+                          )}
+                          {(strategyWorkshop.messages ?? []).slice(-5).map((msg: any, i: number) => (
+                            <div key={i} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? '#00f2fe' : '#ccc' }}>
+                              <strong>{msg.role === 'assistant' ? 'Agent' : 'You'}:</strong> {msg.content}
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <Button
