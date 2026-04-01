@@ -95,21 +95,19 @@ Lane A — wire existing APIs. No new backend endpoints required.
 
 ## How to Launch Each Iteration
 
+> Launch these tasks from the GitHub repository Agents tab.
+> These tasks must not assume shell, git, gh, or docker access is available.
+> Use the GitHub task branch and PR flow provided by the execution surface.
+
 ### Iteration 1
 
-**Pre-flight check (run in terminal before launching):**
-```bash
-git status && git log --oneline -3
-# Must show: clean tree on main. If not, resolve before launching.
-```
-
 **Steps to launch:**
-1. Open VS Code
-2. Open Copilot Chat: `Ctrl+Alt+I` (Windows/Linux) or `Cmd+Alt+I` (Mac)
-3. Click the model dropdown at the top of the chat panel → select **Agent mode**
-4. Click `+` to start a new agent session
-5. Type `@` in the message box → select **platform-engineer** from the dropdown
-6. Copy the block below and paste into the message box → press **Enter**
+1. Open this repository on GitHub
+2. Open the **Agents** tab
+3. Start a new agent task
+4. If the UI exposes repository agents, select **platform-engineer**; otherwise use the default coding agent
+5. Copy the block below and paste it into the task
+6. Start the run
 7. Go away. Come back at: **+6h from launch**
 
 **Iteration 1 agent task** (paste verbatim — do not modify):
@@ -125,16 +123,20 @@ PLAN FILE: docs/mobile/iterations/MOBILE-UX-1-cp-parity-ux.md
 YOUR SCOPE: Iteration 1 only — Epics E1, E2. Do not touch Iteration 2 content.
 TIME BUDGET: 5h. If you reach 6h without finishing, follow STUCK PROTOCOL now.
 
+ENVIRONMENT REQUIREMENT:
+- This task is intended for the GitHub repository Agents tab.
+- Shell/git/gh/docker tools may be unavailable on this execution surface.
+- Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
+
 EXECUTION ORDER:
-1. Run: git checkout main && git pull origin main
-   (GitHub cloud agents start on a copilot/* branch — this is normal. Always checkout main first.)
-2. Run: git status && git log --oneline -3
-   Confirm: clean tree on main. If untracked/modified files exist, stash them.
-3. Read the "Agent Execution Rules" section in this plan file.
-4. Read the "Iteration 1" section in this plan file.
-5. Read nothing else before starting.
-6. Execute Epics in this order: E1 → E2
-7. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
+1. Read the "Agent Execution Rules" section in this plan file.
+2. Read the "Iteration 1" section in this plan file.
+3. Read nothing else before starting.
+4. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
+5. Execute Epics in this order: E1 → E2
+6. Add or update the tests listed in each story before moving on.
+7. If this execution surface exposes validation tools, run the narrowest relevant tests and record the result. If not, state: "Validation deferred: GitHub Agents tab on this run did not expose shell/docker test execution."
+8. Open or update the iteration PR to `main`, post the PR URL, and HALT.
 ```
 
 ---
@@ -143,13 +145,9 @@ EXECUTION ORDER:
 
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
-**Verify merge first:**
-```bash
-git fetch origin && git log --oneline origin/main | head -3
-# Must show: feat(mobile-ux-1): iteration 1 — CP wiring
-```
+**Verify merge first:** confirm on GitHub that the Iteration 1 PR is merged to `main` before launching.
 
-**Steps to launch:** same as Iteration 1 (VS Code → Copilot Chat → Agent mode → platform-engineer)
+**Steps to launch:** same as Iteration 1 (GitHub repository → Agents tab)
 
 **Iteration 2 agent task** (paste verbatim):
 
@@ -164,16 +162,22 @@ PLAN FILE: docs/mobile/iterations/MOBILE-UX-1-cp-parity-ux.md
 YOUR SCOPE: Iteration 2 only — Epics E3, E4. Do not touch Iteration 1.
 TIME BUDGET: 5h.
 
+ENVIRONMENT REQUIREMENT:
+- This task is intended for the GitHub repository Agents tab.
+- Shell/git/gh/docker tools may be unavailable on this execution surface.
+- Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
+
 PREREQUISITE CHECK (do before anything else):
-  Run: git fetch origin main:refs/remotes/origin/main && git log --oneline origin/main | head -5
-  Must show: feat(mobile-ux-1): iteration 1 — CP wiring
-  If not: post "Blocked: Iteration 1 not merged to main." and HALT.
+  Confirm from GitHub that the Iteration 1 PR for this plan is merged to `main`.
+  If you cannot verify that merge from the available GitHub context: post "Blocked: Iteration 1 merge to main could not be verified." and HALT.
 
 EXECUTION ORDER:
-1. git checkout main && git pull origin main
-2. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
+1. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
+2. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
 3. Respect backend-before-frontend ordering in the Dependency Map.
-4. When all epics are docker-tested, open the iteration PR. Post URL. HALT.
+4. Add or update the tests listed in each story before moving on.
+5. If this execution surface exposes validation tools, run the narrowest relevant tests and record the result. If not, state: "Validation deferred: GitHub Agents tab on this run did not expose shell/docker test execution."
+6. Open or update the iteration PR to `main`, post URL, and HALT.
 ```
 
 **Come back at:** +6h from launch
@@ -197,43 +201,17 @@ Activate each persona now. For every epic you execute, open with one line:
 | `src/CP/BackEnd/` | Senior Python 3.11 / FastAPI / SQLAlchemy engineer |
 | `src/mobile/` | Senior React Native / Expo / TypeScript engineer |
 
-### Rule 0 — Open tracking draft PR first (before writing any code)
+### Rule 0 — Use the GitHub task branch and open the iteration PR early
 
-```bash
-git checkout main && git pull
-export PLAN_RUN_ID="$(date -u +%Y%m%d%H%M%S)"
-export TRACKING_BRANCH="feat/mobile-ux-1-it1-e1-${PLAN_RUN_ID}"
-git checkout -b "$TRACKING_BRANCH"
-
-git commit --allow-empty -m "chore(mobile-ux-1): start iteration 1"
-git push origin "$TRACKING_BRANCH"
-
-gh pr create \
-  --base main \
-  --head "$TRACKING_BRANCH" \
-  --draft \
-  --title "tracking: MOBILE-UX-1 Iteration 1 — in progress" \
-  --body "## tracking: MOBILE-UX-1 Iteration 1
-
-Subscribe to this PR to receive one notification per story completion.
-
-### Stories
-- [ ] [E1-S1] Wire Deliverables page to listHiredAgentDeliverables API
-- [ ] [E1-S2] Add deliverable review actions (approve/reject)
-- [ ] [E1-S3] Wire Command Centre to live agent summary data
-- [ ] [E2-S1] Deduplicate DMA Wizard fields — pull from customer profile
-- [ ] [E2-S2] Show draft preview before strategy approval gate
-
-_Live updates posted as comments below ↓_"
-
-export TRACKING_PR_NUMBER="$(gh pr list --head "$TRACKING_BRANCH" --json number -q '.[0].number')"
-```
+- Keep the full iteration on the GitHub task branch created for this run.
+- If the UI lets you choose a branch name, prefer `feat/mobile-ux-1-itN-[scope]-[run-id]`.
+- Open a draft PR to `main` as soon as the execution surface allows it, and keep updating that same PR through the iteration.
+- Use the Tracking Table in this plan as the source of truth for story status updates.
 
 ### Rule 1 — Branch discipline
-One epic = one branch: `feat/mobile-ux-1-itN-eN-$PLAN_RUN_ID`.
-Treat every `Branch:` value in story cards as a base name only; append `-$PLAN_RUN_ID` to the actual git branch you create and push.
-All stories in one epic commit to the same branch sequentially.
-Never push to `main` directly.
+One iteration = one GitHub task branch and one PR.
+Treat every `Branch:` value in story cards as a logical label only; on the GitHub Agents tab, keep the full iteration on the single branch created for the run.
+Never push or merge directly to `main`.
 
 ### Rule 2 — Scope lock
 Implement exactly the acceptance criteria in the story card.
@@ -242,81 +220,35 @@ If you notice a bug outside your scope: add a TODO comment and move on.
 
 **File scope**: Only create or modify files listed in your story card's "Files to create / modify" table.
 
-**Missing iteration HALT rule**: Before writing any code, verify your assigned iteration section exists:
-```bash
-grep -n "## Iteration N" docs/mobile/iterations/MOBILE-UX-1-cp-parity-ux.md
-```
+**Missing iteration HALT rule**: Before writing any code, verify your assigned iteration section exists in this plan file.
 If the section is missing, do not create story cards. HALT.
 
 ### Rule 3 — Tests before the next story
 Write every test in the story's test table before advancing to the next story.
-Run the test command listed in the story card — not a generic command.
+If this execution surface exposes test execution, run the story's listed command or the narrowest equivalent.
+If not, add the tests anyway and note that execution is deferred to CI or local follow-up.
 
-### Rule 4 — Commit + push + notify after every story
-```bash
-git add -A
-git commit -m "feat(mobile-ux-1): [story title]"
-git push origin HEAD
+### Rule 4 — Save progress after every story
+- Update this plan file's Tracking Table: change the story status to Done or Blocked.
+- Save code and plan updates to the GitHub task branch for this run.
+- If the PR already exists, add a concise progress update in the PR description or comments with files changed, tests added/run, and the next story.
 
-git add docs/mobile/iterations/MOBILE-UX-1-cp-parity-ux.md
-git commit -m "docs(mobile-ux-1): mark [story-id] done"
-git push origin HEAD
-
-gh pr comment \
-  "$TRACKING_PR_NUMBER" \
-  --body "✅ **[story-id] done** — $(git rev-parse --short HEAD)
-Files changed: [list]
-Tests: [T1 ✅ T2 ✅ ...]
-Next: [next-story-id]"
-```
-
-### Rule 5 — Docker integration test after every epic
-```bash
-docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
-exit_code=$?; docker compose -f docker-compose.test.yml down; exit $exit_code
-```
-Exit 0 → add `**Epic complete ✅**` under the epic heading, commit, push.
-Non-zero → fix on same branch, retry. Max 3 attempts. Then: STUCK PROTOCOL.
+### Rule 5 — Validate after every epic
+- Prefer the narrowest relevant automated validation for the files you changed.
+- If GitHub Agents exposes execution tools, run the relevant test command and record the result.
+- If execution tools are unavailable, state clearly that validation is deferred to CI or local follow-up and continue.
+- After validation, add `**Epic complete ✅**` under the epic heading if the epic is complete.
 
 ### Rule 6 — STUCK PROTOCOL (3 failures = stop immediately)
-```bash
-git add -A && git commit -m "WIP: [story-id] blocked — [exact error]"
-git push origin HEAD
-gh pr create \
-  --base main \
-  --head "$(git branch --show-current)" \
-  --title "WIP: [story-id] — blocked" \
-  --draft \
-  --body "Blocked on: [test name]
-Error: [exact error message]
-Attempted fixes:
-1. [what I tried]
-2. [what I tried]"
-```
-Post the draft PR URL. **HALT. Do not start the next story.**
+- Mark the blocked story as `🚫 Blocked` in the Tracking Table.
+- Open or update a draft PR titled `WIP: [story-id] — blocked` if PR controls are available.
+- Include the exact blocker, the exact error message, and 1-2 attempted fixes.
+- Post the PR URL if available. Otherwise post the blocker in the GitHub agent thread. **HALT. Do not start the next story.**
 
 ### Rule 7 — Iteration PR (after ALL epics complete)
-```bash
-git checkout main && git pull
-export ITERATION_BRANCH="feat/mobile-ux-1-itN-${PLAN_RUN_ID}"
-git checkout -b "$ITERATION_BRANCH"
-git merge --no-ff "feat/mobile-ux-1-itN-e1-${PLAN_RUN_ID}" "feat/mobile-ux-1-itN-e2-${PLAN_RUN_ID}"
-git push origin "$ITERATION_BRANCH"
-
-gh pr create \
-  --base main \
-  --head "$ITERATION_BRANCH" \
-  --title "feat(mobile-ux-1): iteration N — [summary]" \
-  --body "## MOBILE-UX-1 Iteration N
-
-### Stories completed
-[paste tracking table rows]
-
-### NFR checklist
-- [ ] FE: loading + error + empty states on all data-fetching components
-- [ ] No env-specific values in code
-- [ ] Tests pass"
-```
+- Use the same GitHub task branch for the final iteration PR to `main`.
+- Title format: `feat(mobile-ux-1): iteration N — [summary]`.
+- PR body must include completed stories for this iteration, validation status or deferral note, and the relevant NFR checklist.
 Post PR URL. **HALT — do not start the next iteration.**
 
 **CHECKPOINT RULE**: After completing each epic (all tests passing), run:

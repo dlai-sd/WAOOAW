@@ -98,26 +98,28 @@ File: `docs/[path]`
 
 ---
 
-**To launch Iteration 1 — GitHub Copilot agent interface:**
+**To launch Iteration 1 — GitHub repository → Agents tab:**
 
-1. Open VS Code
-2. Open Copilot Chat: `Ctrl+Alt+I` (Windows/Linux) or `Cmd+Alt+I` (Mac)
-3. Click the model dropdown → select **Agent mode**
-4. Click `+` (new conversation)
-5. Type `@` → select **platform-engineer** from the agent list
-6. Paste this task and press **Enter**:
+> These plans are written for GitHub-hosted agents.
+> Do not require shell, git, gh, or docker tools to begin work from the Agents tab.
+
+1. Open this repository on GitHub
+2. Open the **Agents** tab
+3. Start a new agent task
+4. If the UI shows repository agents, select **platform-engineer**; otherwise use the default coding agent
+5. Paste this task and start the run:
 
 ```
 [copy the Iteration 1 agent task block verbatim from the plan's "How to Launch" section]
 ```
 
-7. Come back at: **[DATE HH:MM TZ]** — Copilot will have posted a PR URL when done.
+6. Come back at: **[DATE HH:MM TZ]** — GitHub should show a branch or PR update when done.
 
 ---
 
 **To launch Iteration 2** (only after Iteration 1 PR is merged to `main`):
 
-Same steps above (VS Code → Copilot Chat → Agent mode → @platform-engineer), then paste:
+Same steps above (GitHub repository → Agents tab), then paste:
 
 ```
 [copy the Iteration 2 agent task block verbatim from the plan's "How to Launch" section]
