@@ -771,4 +771,532 @@ docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEn
 
 ---
 
-<!-- ITERATION 2 STORY CARDS GO BELOW — next commit -->
+---
+
+## Iteration 2 — Analytics Feedback + Brand Voice Consistency
+
+**Scope:** Performance analytics feed back into content generation prompts; brand voice model ensures consistent tone across all generated content.
+**Lane:** B — new service, model, and prompt wiring
+**⏱ Estimated:** 5h | **Come back:** 2026-04-02 00:00 UTC
+**Epics:** E3, E4
+
+### Dependency Map (Iteration 2)
+
+```
+E3-S1 ──► E3-S2    (same branch, S2 starts after S1 committed + pushed)
+E4-S1 ──► E4-S2    (same branch, S2 starts after S1 committed + pushed)
+E3 and E4 are independent — can be executed in either order
+```
+
+---
+
+### Epic E3: Analytics drive content quality improvements
+
+**Branch:** `feat/plant-dma-2-it2-e3`
+**User story:** As a DMA agent, I use past performance data (impressions, engagement_rate) to generate better-performing content so that customers see continuous improvement.
+
+---
+
+#### Story E3-S1: Create content analytics reader service
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 90 min
+**Branch:** `feat/plant-dma-2-it2-e3`
+**CP BackEnd pattern:** N/A — Plant BackEnd only
+
+**What to do (self-contained — read this card, then act):**
+> `src/Plant/BackEnd/models/performance_stat.py` stores daily metrics in a JSONB `metrics` column with shape `{ "impressions": int, "clicks": int, "engagement_rate": float, "posts_published": int }` for social-content-publisher skills. Nothing currently reads these metrics to inform content generation. Create `src/Plant/BackEnd/services/content_analytics.py` with a function `get_content_recommendations(hired_instance_id, db_session)` that:
+> 1. Queries the last 30 days of `performance_stats` for the hired agent
+> 2. Identifies top-performing content dimensions (by engagement_rate)
+> 3. Identifies posting times that got highest impressions
+> 4. Returns a `ContentRecommendation` Pydantic model with `top_dimensions`, `best_posting_hours`, `avg_engagement_rate`, and `recommendation_text`
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/models/performance_stat.py` | 1–55 | `PerformanceStatModel` columns, JSONB metrics shape, table name |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 50–65 | `_CONTENT_DIMENSIONS` list — these are the dimension values stored in theme items |
+| `src/Plant/BackEnd/core/database.py` | 1–30 | `get_read_db_session` import for read-replica pattern |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/services/content_analytics.py` | create | New service with `ContentRecommendation` model and `get_content_recommendations()` function |
+
+**Code patterns to copy exactly:**
+
+```python
+# services/content_analytics.py — copy this structure:
+"""Content analytics — reads performance_stats to recommend content improvements.
+
+PLANT-DMA-2 E3-S1
+
+Queries last 30 days of PerformanceStatModel for a hired agent,
+identifies top-performing dimensions and posting times,
+and returns structured recommendations for the content creator.
+"""
+from __future__ import annotations
+
+import logging
+from collections import defaultdict
+from datetime import date, timedelta
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.performance_stat import PerformanceStatModel
+
+logger = logging.getLogger(__name__)
+
+
+class ContentRecommendation(BaseModel):
+    """Structured recommendation for content creator prompts."""
+
+    top_dimensions: List[str] = Field(
+        default_factory=list,
+        description="Content dimensions sorted by engagement rate (best first)",
+    )
+    best_posting_hours: List[int] = Field(
+        default_factory=list,
+        description="UTC hours that historically got highest impressions",
+    )
+    avg_engagement_rate: float = Field(
+        0.0, description="Average engagement rate over the analysis window"
+    )
+    total_posts_analyzed: int = Field(0)
+    recommendation_text: str = Field(
+        "",
+        description="Human-readable summary for injection into content prompts",
+    )
+
+
+async def get_content_recommendations(
+    hired_instance_id: str,
+    db: AsyncSession,
+    lookback_days: int = 30,
+) -> ContentRecommendation:
+    """Analyze recent performance and return content recommendations.
+
+    Returns empty recommendation if no data exists (never raises).
+    """
+    cutoff = date.today() - timedelta(days=lookback_days)
+
+    stmt = (
+        select(PerformanceStatModel)
+        .where(
+            PerformanceStatModel.hired_instance_id == hired_instance_id,
+            PerformanceStatModel.platform_key == "youtube",
+            PerformanceStatModel.stat_date >= cutoff,
+        )
+        .order_by(PerformanceStatModel.stat_date.desc())
+    )
+    result = await db.execute(stmt)
+    rows = result.scalars().all()
+
+    if not rows:
+        return ContentRecommendation(
+            recommendation_text="No historical data yet — use default content strategy."
+        )
+
+    # Aggregate metrics
+    engagement_rates: List[float] = []
+    impressions_by_hour: defaultdict[int, int] = defaultdict(int)
+    total_posts = 0
+
+    for row in rows:
+        metrics = row.metrics or {}
+        er = metrics.get("engagement_rate", 0.0)
+        impressions = metrics.get("impressions", 0)
+        posts = metrics.get("posts_published", 0)
+
+        engagement_rates.append(er)
+        total_posts += posts
+
+        # Approximate hour from stat_date (collected_at has actual time)
+        if row.collected_at:
+            impressions_by_hour[row.collected_at.hour] += impressions
+
+    avg_er = sum(engagement_rates) / len(engagement_rates) if engagement_rates else 0.0
+
+    # Sort hours by total impressions (descending)
+    best_hours = sorted(impressions_by_hour, key=impressions_by_hour.get, reverse=True)[:3]
+
+    recommendation_text = (
+        f"Based on {total_posts} posts over the last {lookback_days} days: "
+        f"average engagement rate is {avg_er:.2%}. "
+        f"Best posting hours (UTC): {best_hours}. "
+        f"Focus on content that drives engagement — prioritize educational and social proof dimensions."
+    )
+
+    return ContentRecommendation(
+        top_dimensions=["education", "social proof"],  # TODO: derive from actual post-level data when available
+        best_posting_hours=best_hours,
+        avg_engagement_rate=avg_er,
+        total_posts_analyzed=total_posts,
+        recommendation_text=recommendation_text,
+    )
+```
+
+**Acceptance criteria:**
+1. `ContentRecommendation` Pydantic model exists with fields: `top_dimensions`, `best_posting_hours`, `avg_engagement_rate`, `total_posts_analyzed`, `recommendation_text`
+2. `get_content_recommendations()` returns valid `ContentRecommendation` when performance_stats has data
+3. `get_content_recommendations()` returns empty recommendation (not error) when no data exists
+4. Function uses `get_read_db_session` pattern (read replica safe)
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S1-T1 | `src/Plant/BackEnd/tests/unit/test_content_analytics.py` | Mock DB returns 10 `PerformanceStatModel` rows with varied metrics | `recommendation.total_posts_analyzed > 0`, `recommendation.avg_engagement_rate > 0`, `recommendation_text` non-empty |
+| E3-S1-T2 | same | Mock DB returns empty result | `recommendation.total_posts_analyzed == 0`, `recommendation_text` contains "No historical data" |
+| E3-S1-T3 | same | Mock DB returns rows with specific `collected_at` hours | `recommendation.best_posting_hours` lists correct hours sorted by impressions |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/unit/test_content_analytics.py -v
+```
+
+**Commit message:** `feat(plant-dma-2): E3-S1 — content analytics reader service`
+
+**Done signal:** `"E3-S1 done. Created: services/content_analytics.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E3-S2: Wire analytics recommendations into content creator prompts
+
+**BLOCKED UNTIL:** E3-S1 committed to `feat/plant-dma-2-it2-e3`
+**Estimated time:** 45 min
+**Branch:** `feat/plant-dma-2-it2-e3` (same branch)
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+> `src/Plant/BackEnd/agent_mold/skills/content_creator.py` `_grok_theme_list()` (line ~183) constructs a `user` prompt string for Grok. Currently this prompt has zero awareness of past performance. Add an optional `analytics_context: str` parameter to `generate_theme_list()` and `_grok_theme_list()`. When provided, append the analytics context to the Grok `user` prompt so the AI generates content that builds on past success patterns. The deterministic engine ignores this parameter.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 78–98 | `generate_theme_list()` signature and how it calls `_grok_theme_list()` |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 165–205 | `_grok_theme_list()` — the `system` and `user` prompt strings, Grok call |
+| `src/Plant/BackEnd/services/content_analytics.py` | 1–30 | `ContentRecommendation.recommendation_text` field — this is what gets injected |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | Add `analytics_context: str = ""` parameter to `generate_theme_list()` (line 79). Pass it through to `_grok_theme_list()`. In `_grok_theme_list()`, if `analytics_context` is non-empty, append `f"\n\nPast performance insights:\n{analytics_context}"` to the `user` prompt string before calling `grok_complete()` |
+
+**Code patterns to copy exactly:**
+
+```python
+# In content_creator.py, modify generate_theme_list():
+def generate_theme_list(self, campaign: Campaign, analytics_context: str = "") -> ContentCreatorOutput:
+    """Step 1: Generate DailyThemeItems for the full campaign duration."""
+    brief = campaign.brief
+    model_used = "grok-3-latest" if _executor_backend() == "grok" else "deterministic"
+    cost = estimate_cost(brief, model_used=model_used)
+
+    if _executor_backend() == "grok":
+        theme_items = self._grok_theme_list(campaign, analytics_context=analytics_context)
+    else:
+        theme_items = self._deterministic_theme_list(campaign)
+
+    return ContentCreatorOutput(
+        campaign_id=campaign.campaign_id,
+        theme_items=theme_items,
+        cost_estimate=cost,
+    )
+```
+
+```python
+# In _grok_theme_list(), add analytics_context parameter and inject into prompt:
+def _grok_theme_list(self, campaign: Campaign, analytics_context: str = "") -> List[DailyThemeItem]:
+    # ... existing code ...
+    user = (
+        f"Create a {brief.duration_days}-day content calendar ..."
+        # ... existing prompt text ...
+    )
+    if analytics_context:
+        user += f"\n\nPast performance insights (use these to improve content):\n{analytics_context}"
+    raw = grok_complete(client, system, user)
+    # ... rest unchanged ...
+```
+
+**Acceptance criteria:**
+1. `generate_theme_list()` accepts optional `analytics_context: str` parameter
+2. When `analytics_context` is provided and Grok backend is active, the prompt includes the analytics text
+3. When `analytics_context` is empty or deterministic backend is used, behavior is unchanged
+4. Existing content creator tests still pass
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S2-T1 | `src/Plant/BackEnd/tests/unit/test_content_creator.py` | Set `EXECUTOR_BACKEND=grok`, mock `grok_complete`, call `generate_theme_list(campaign, analytics_context="Avg engagement 5%")` | `grok_complete` called with user prompt containing "Past performance insights" |
+| E3-S2-T2 | same | Call `generate_theme_list(campaign)` without analytics_context | Prompt does NOT contain "Past performance insights" |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/unit/test_content_creator.py -v
+```
+
+**Commit message:** `feat(plant-dma-2): E3-S2 — wire analytics into content creator prompts`
+
+**Done signal:** `"E3-S2 done. Modified: content_creator.py. Tests: T1 ✅ T2 ✅"`
+
+---
+
+### Epic E4: Content maintains consistent brand voice
+
+**Branch:** `feat/plant-dma-2-it2-e4`
+**User story:** As a customer, my DMA agent generates content that sounds like my brand — consistent tone, vocabulary, and messaging patterns — so I don't need to rewrite every draft.
+
+---
+
+#### Story E4-S1: Create brand voice model and storage service
+
+**BLOCKED UNTIL:** none (independent of E3)
+**Estimated time:** 45 min
+**Branch:** `feat/plant-dma-2-it2-e4`
+**CP BackEnd pattern:** N/A — Plant BackEnd only
+
+**What to do:**
+> There is no brand voice persistence in the platform. `content_models.py` `CampaignBrief` has a `tone` field (line 176) and `brand_name` (line 175) but no structured brand voice definition. Create `src/Plant/BackEnd/models/brand_voice.py` with a `BrandVoiceModel` SQLAlchemy model storing: `customer_id`, `tone_keywords` (list), `vocabulary_preferences` (list), `messaging_patterns` (list), `example_phrases` (list), and `voice_description` (text). Also create a simple CRUD service `src/Plant/BackEnd/services/brand_voice_service.py`.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/agent_mold/skills/content_models.py` | 155–180 | `CampaignBrief` fields — `tone`, `brand_name`, `audience` — what exists today |
+| `src/Plant/BackEnd/models/performance_stat.py` | 1–35 | SQLAlchemy model pattern — `Base`, UUID primary key, JSONB columns |
+| `src/Plant/BackEnd/core/database.py` | 1–30 | `Base`, `get_db_session`, `get_read_db_session` imports |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/models/brand_voice.py` | create | New SQLAlchemy model `BrandVoiceModel` |
+| `src/Plant/BackEnd/services/brand_voice_service.py` | create | CRUD service with `get_brand_voice(customer_id, db)` and `upsert_brand_voice(customer_id, data, db)` |
+| `src/Plant/BackEnd/models/__init__.py` | modify | Add `from models.brand_voice import BrandVoiceModel` |
+
+**Code patterns to copy exactly:**
+
+```python
+# models/brand_voice.py — copy this structure:
+"""BrandVoiceModel — customer-specific brand voice definition.
+
+PLANT-DMA-2 E4-S1
+
+One row per customer. Drives content generation tone and vocabulary.
+Upsert-safe on customer_id.
+"""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, DateTime, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
+
+from core.database import Base
+
+
+class BrandVoiceModel(Base):
+    __tablename__ = "brand_voices"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    customer_id = Column(String, nullable=False, unique=True, index=True)
+    tone_keywords = Column(JSONB, nullable=False, default=list)
+    vocabulary_preferences = Column(JSONB, nullable=False, default=list)
+    messaging_patterns = Column(JSONB, nullable=False, default=list)
+    example_phrases = Column(JSONB, nullable=False, default=list)
+    voice_description = Column(Text, nullable=False, default="")
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+```
+
+```python
+# services/brand_voice_service.py — copy this structure:
+"""Brand voice CRUD service.
+
+PLANT-DMA-2 E4-S1
+"""
+from __future__ import annotations
+
+from typing import Optional
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from models.brand_voice import BrandVoiceModel
+
+
+async def get_brand_voice(
+    customer_id: str, db: AsyncSession
+) -> Optional[BrandVoiceModel]:
+    """Get brand voice for a customer. Returns None if not set."""
+    stmt = select(BrandVoiceModel).where(
+        BrandVoiceModel.customer_id == customer_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def upsert_brand_voice(
+    customer_id: str,
+    data: dict,
+    db: AsyncSession,
+) -> BrandVoiceModel:
+    """Create or update brand voice for a customer."""
+    existing = await get_brand_voice(customer_id, db)
+    if existing:
+        for key, value in data.items():
+            if hasattr(existing, key):
+                setattr(existing, key, value)
+        await db.flush()
+        return existing
+
+    voice = BrandVoiceModel(customer_id=customer_id, **data)
+    db.add(voice)
+    await db.flush()
+    return voice
+```
+
+**Acceptance criteria:**
+1. `BrandVoiceModel` exists at `src/Plant/BackEnd/models/brand_voice.py`
+2. Model has columns: `id`, `customer_id` (unique), `tone_keywords`, `vocabulary_preferences`, `messaging_patterns`, `example_phrases`, `voice_description`, `created_at`, `updated_at`
+3. `get_brand_voice()` returns model or None
+4. `upsert_brand_voice()` creates new or updates existing
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S1-T1 | `src/Plant/BackEnd/tests/unit/test_brand_voice.py` | Instantiate `BrandVoiceModel(customer_id="c1", tone_keywords=["professional"])` | All fields set correctly, `id` auto-generated |
+| E4-S1-T2 | same | Mock DB, call `get_brand_voice("c1")` with seeded row | Returns model with correct `customer_id` |
+| E4-S1-T3 | same | Mock DB, call `upsert_brand_voice("c1", {"tone_keywords": ["casual"]})` twice | First call creates, second call updates |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/unit/test_brand_voice.py -v
+```
+
+**Commit message:** `feat(plant-dma-2): E4-S1 — brand voice model and storage service`
+
+**Done signal:** `"E4-S1 done. Created: models/brand_voice.py, services/brand_voice_service.py. Modified: models/__init__.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E4-S2: Apply brand voice to content generation prompts
+
+**BLOCKED UNTIL:** E4-S1 committed to `feat/plant-dma-2-it2-e4`
+**Estimated time:** 45 min
+**Branch:** `feat/plant-dma-2-it2-e4` (same branch)
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+> `src/Plant/BackEnd/agent_mold/skills/content_creator.py` `_grok_theme_list()` uses a generic tone from `brief.tone` (e.g. "professional"). Add an optional `brand_voice_context: str` parameter to `generate_theme_list()` and both engine methods. When provided, inject the brand voice description and example phrases into the Grok system prompt so generated content matches the customer's established voice. For deterministic engine, append brand voice keywords to the theme description.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 78–98 | `generate_theme_list()` signature (already modified by E3-S2 to include `analytics_context`) |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 165–185 | `_grok_theme_list()` — `system` prompt string where brand voice should be injected |
+| `src/Plant/BackEnd/services/brand_voice_service.py` | 1–20 | `BrandVoiceModel` fields available for building voice context string |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | Add `brand_voice_context: str = ""` param to `generate_theme_list()`, `_grok_theme_list()`, and `_deterministic_theme_list()`. In Grok engine: append brand voice to `system` prompt. In deterministic engine: include brand voice keywords in theme description. |
+
+**Code patterns to copy exactly:**
+
+```python
+# Modify generate_theme_list() — add brand_voice_context alongside analytics_context:
+def generate_theme_list(
+    self,
+    campaign: Campaign,
+    analytics_context: str = "",
+    brand_voice_context: str = "",
+) -> ContentCreatorOutput:
+    brief = campaign.brief
+    model_used = "grok-3-latest" if _executor_backend() == "grok" else "deterministic"
+    cost = estimate_cost(brief, model_used=model_used)
+
+    if _executor_backend() == "grok":
+        theme_items = self._grok_theme_list(
+            campaign,
+            analytics_context=analytics_context,
+            brand_voice_context=brand_voice_context,
+        )
+    else:
+        theme_items = self._deterministic_theme_list(campaign, brand_voice_context=brand_voice_context)
+
+    return ContentCreatorOutput(
+        campaign_id=campaign.campaign_id,
+        theme_items=theme_items,
+        cost_estimate=cost,
+    )
+```
+
+```python
+# In _grok_theme_list(), inject brand voice into system prompt:
+def _grok_theme_list(
+    self,
+    campaign: Campaign,
+    analytics_context: str = "",
+    brand_voice_context: str = "",
+) -> List[DailyThemeItem]:
+    # ... existing code ...
+    system = "You are an expert content strategist. Return ONLY a valid JSON array."
+    if brand_voice_context:
+        system += f"\n\nBrand voice guidelines (match this tone and style):\n{brand_voice_context}"
+    # ... rest unchanged ...
+```
+
+```python
+# In _deterministic_theme_list(), add brand voice keywords to description:
+def _deterministic_theme_list(self, campaign: Campaign, brand_voice_context: str = "") -> List[DailyThemeItem]:
+    # ... existing loop ...
+    voice_note = f" Voice: {brand_voice_context}." if brand_voice_context else ""
+    # Append voice_note to theme_description in the DailyThemeItem construction
+```
+
+**Acceptance criteria:**
+1. `generate_theme_list()` accepts optional `brand_voice_context: str` parameter
+2. Grok engine includes brand voice in the system prompt when provided
+3. Deterministic engine includes brand voice keywords in theme descriptions when provided
+4. When `brand_voice_context` is empty, behavior is unchanged from before
+5. Existing tests still pass
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S2-T1 | `src/Plant/BackEnd/tests/unit/test_content_creator.py` | Set `EXECUTOR_BACKEND=grok`, mock `grok_complete`, call with `brand_voice_context="Friendly, casual, use emoji"` | `grok_complete` system prompt contains "Brand voice guidelines" |
+| E4-S2-T2 | same | Set `EXECUTOR_BACKEND=deterministic`, call with `brand_voice_context="Professional, formal"` | Generated theme descriptions contain "Professional, formal" |
+| E4-S2-T3 | same | Call without `brand_voice_context` | Prompts unchanged, no "Brand voice" text present |
+
+**Test command:**
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest src/Plant/BackEnd/tests/unit/test_content_creator.py -v
+```
+
+**Commit message:** `feat(plant-dma-2): E4-S2 — apply brand voice to content generation`
+
+**Done signal:** `"E4-S2 done. Modified: content_creator.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
