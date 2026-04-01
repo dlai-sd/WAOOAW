@@ -17,9 +17,9 @@
 ### Checkpoint list
 - [x] Branch created: `docs/plant-dma-1-real-publishing-engine`
 - [x] Session commentary updated
-- [ ] Plan skeleton committed + pushed
-- [ ] Iteration 1 story cards committed + pushed
-- [ ] Iteration 2 story cards committed + pushed
+- [x] Plan skeleton committed + pushed (4cb0eb00)
+- [x] Iteration 1 story cards committed + pushed (6c2c18fa)
+- [x] Iteration 2 story cards committed + pushed (621b5a59)
 - [ ] PR opened
 
 ### Key files for story cards
