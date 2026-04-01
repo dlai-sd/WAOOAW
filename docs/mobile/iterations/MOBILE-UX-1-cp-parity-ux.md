@@ -806,4 +806,407 @@ cd src/CP/FrontEnd && npx vitest run src/test/MyAgentsDigitalMarketingWizard.tes
 
 ---
 
-<!-- ITERATION 2 STORY CARDS WILL BE ADDED IN NEXT COMMIT -->
+## Iteration 2 — Mobile: Professional Polish + Functional Search
+
+**Scope:** Replace emoji tab icons with vector icons, add tab badge counts, wire SearchResults to API, add Apply button to FilterAgents, add pull-to-refresh.
+**Lane:** A — wire existing hooks/APIs only. No new backend endpoints.
+**⏱ Estimated:** 5h | **Come back:** +6h from launch
+**Epics:** E3, E4
+
+### Dependency Map (Iteration 2)
+
+```
+E3-S1 ──► E3-S2    (same branch — S1 changes icon rendering, S2 adds badges on same Tab.Screen components)
+   └────► E3-S3    (same branch — FilterAgents apply button, same navigation stack)
+E4-S1              (independent branch — SearchResults wiring)
+E4-S2              (independent branch — pull-to-refresh, but keep on same E4 branch for simplicity)
+```
+
+---
+
+### Epic E3: Mobile navigation feels professional
+
+**Branch:** `feat/mobile-ux-1-it2-e3`
+**User story:** As a mobile user, I see professional vector icons in the bottom navigation (not emojis), I can see badge counts for pending actions, and I can apply filters and navigate back with results.
+
+---
+
+#### Story E3-S1: Replace emoji tab icons with Ionicons
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 30 min
+**Branch:** `feat/mobile-ux-1-it2-e3`
+**CP BackEnd pattern:** N/A
+
+**What to do (self-contained — read this card, then act):**
+> `src/mobile/src/navigation/MainNavigator.tsx` uses emoji characters (🏠🔍🤖👤) inside `<Text>` components for tab bar icons (lines 165, 186, 198, 210). Replace these with proper `Ionicons` from `@expo/vector-icons` (already installed as an Expo transitive dependency — `node_modules/@expo/vector-icons/Ionicons.js` exists). For each tab, replace the `<View><Text>{emoji}</Text></View>` block with `<Ionicons name={iconName} size={size} color={color} />`. Icon mapping: HomeTab → `home`, DiscoverTab → `search`, MyAgentsTab → `grid` (operations), ProfileTab → `person`. Remove the wrapping `<View>` and `<Text>` — just return the Ionicons component directly.
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/navigation/MainNavigator.tsx` | 140–215 | Four `Tab.Screen` definitions with emoji icon rendering blocks at lines 158-166 (🏠), 178-187 (🔍), 190-199 (🤖), 202-211 (👤) |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Add import: `import { Ionicons } from '@expo/vector-icons'` at top. For each of the 4 `tabBarIcon` callbacks, replace the `<View>...<Text>{emoji}</Text></View>` block with a single `<Ionicons name={name} size={size} color={color} />`. Icon names: HomeTab→`"home"`, DiscoverTab→`"search"`, MyAgentsTab→`"grid"`, ProfileTab→`"person"`. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+import { Ionicons } from '@expo/vector-icons';
+
+// For each Tab.Screen, the tabBarIcon prop becomes simply:
+tabBarIcon: ({ color, size }) => (
+  <Ionicons name="home" size={size} color={color} />
+),
+// Replace "home" with the correct icon name for each tab:
+// HomeTab: "home"
+// DiscoverTab: "search"
+// MyAgentsTab: "grid"
+// ProfileTab: "person"
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. All 4 bottom tabs show Ionicons vector icons, not emoji characters
+2. Icons use the tab's `color` prop (cyan when active, gray when inactive)
+3. No `<Text>` elements with emoji characters remain in the tab bar
+4. App compiles without errors: `cd src/mobile && npx expo export --platform web` exits 0
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S1-T1 | `src/mobile/src/navigation/__tests__/MainNavigator.test.tsx` | Render MainNavigator in test | No emoji strings (🏠🔍🤖👤) in rendered output |
+| E3-S1-T2 | same | Render MainNavigator | Ionicons components present in tree (mock @expo/vector-icons if needed) |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest src/navigation/__tests__/MainNavigator.test.tsx --no-coverage --forceExit
+```
+
+**Commit message:** `feat(mobile-ux-1): replace emoji tab icons with Ionicons`
+
+**Done signal:** `"E3-S1 done. Changed: MainNavigator.tsx, MainNavigator.test.tsx. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E3-S2: Add tab badge counts for pending actions
+
+**BLOCKED UNTIL:** E3-S1 committed to `feat/mobile-ux-1-it2-e3`
+**Estimated time:** 45 min
+**Branch:** `feat/mobile-ux-1-it2-e3` (same branch)
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+> In `src/mobile/src/navigation/MainNavigator.tsx`, add badge counts on the Ops tab (MyAgentsTab) to show how many agents need setup. Use the existing `useAgentsNeedingSetup()` hook from `src/mobile/src/hooks/useHiredAgents.ts` (line 200). In the `MainNavigator` component (which wraps the Tab.Navigator), call `useAgentsNeedingSetup()` and pass the count to the `tabBarBadge` prop on the MyAgentsTab `Tab.Screen`. React Navigation's `tabBarBadge` prop natively supports this — pass a number and it shows a red badge. Only show the badge if count > 0 (pass `undefined` when 0).
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/navigation/MainNavigator.tsx` | 130–145, 190–200 | MainNavigator component function, MyAgentsTab Tab.Screen definition |
+| `src/mobile/src/hooks/useHiredAgents.ts` | 195–215 | `useAgentsNeedingSetup()` hook — returns `UseQueryResult<MyAgentInstanceSummary[], Error>` |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `useAgentsNeedingSetup` from hooks. Call it inside `MainNavigator` component. On the MyAgentsTab `Tab.Screen`, add `tabBarBadge` prop: `tabBarBadge={needsSetupCount > 0 ? needsSetupCount : undefined}`. Also add `tabBarBadgeStyle` with small font and neon-red background. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+import { useAgentsNeedingSetup } from '../hooks/useHiredAgents';
+
+// Inside MainNavigator component, before the return:
+const { data: agentsNeedingSetup } = useAgentsNeedingSetup();
+const needsSetupCount = agentsNeedingSetup?.length ?? 0;
+
+// On the MyAgentsTab Tab.Screen options:
+tabBarBadge: needsSetupCount > 0 ? needsSetupCount : undefined,
+tabBarBadgeStyle: { backgroundColor: '#ef4444', fontSize: 10, fontWeight: '700' },
+```
+
+**Acceptance criteria:**
+1. When there are agents needing setup, Ops tab shows a red badge with the count
+2. When all agents are configured, no badge is shown (badge is `undefined`)
+3. Badge updates when agent setup status changes (on refocus via React Query refetchOnWindowFocus)
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S2-T1 | `src/mobile/src/navigation/__tests__/MainNavigator.test.tsx` | Mock `useAgentsNeedingSetup` returns 2 items | Badge with "2" visible |
+| E3-S2-T2 | same | Mock `useAgentsNeedingSetup` returns empty array | No badge in DOM |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest src/navigation/__tests__/MainNavigator.test.tsx --no-coverage --forceExit
+```
+
+**Commit message:** `feat(mobile-ux-1): add tab badge counts for pending actions`
+
+**Done signal:** `"E3-S2 done. Changed: MainNavigator.tsx, test. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E3-S3: Add Apply button to FilterAgentsScreen with navigation back
+
+**BLOCKED UNTIL:** E3-S1 committed (same branch, but independent of S2)
+**Estimated time:** 30 min
+**Branch:** `feat/mobile-ux-1-it2-e3`
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+> `src/mobile/src/screens/discover/FilterAgentsScreen.tsx` (57 lines) has industry, rating, and price inputs but NO apply button (line 41: `{/* TODO: Add filter action button */}`). Add a "Apply Filters" `TouchableOpacity` button below the inputs. When pressed, navigate back to the Discover screen with the selected filter values. Use `navigation.navigate('Discover', { industry: selectedIndustry, minRating, maxPrice })` to pass filter state back. The DiscoverScreen already reads filter state from its own local state, so the approach is: navigate back and let DiscoverScreen pick up the params. Alternatively, use `navigation.goBack()` after setting params on the parent route.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/screens/discover/FilterAgentsScreen.tsx` | 1–57 | Full file — industry picker, rating/price inputs, TODO at line 41, no submit button |
+| `src/mobile/src/navigation/types.ts` | 80–95 | `DiscoverStackParamList` type — `FilterAgents` params definition, `Discover` params (check if it accepts filter params) |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/discover/FilterAgentsScreen.tsx` | modify | Add `useNavigation` import. Replace `{/* TODO: Add filter action button */}` with a styled `TouchableOpacity` button labeled "Apply Filters". On press, call `navigation.navigate('Discover', { industry: selectedIndustry, minRating, maxPrice })`. Style the button with neon cyan background (#00f2fe), dark text, border radius 12, padding 14. |
+| `src/mobile/src/navigation/types.ts` | modify | If `Discover` route params don't include filter fields, add them as optional: `{ industry?: string; minRating?: number; maxPrice?: number }` |
+
+**Code patterns to copy exactly:**
+
+```typescript
+import { TouchableOpacity } from 'react-native';
+
+// Replace the TODO comment with:
+<TouchableOpacity
+  style={{
+    backgroundColor: '#00f2fe',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    width: '100%',
+  }}
+  onPress={() => navigation.navigate('Discover', {
+    industry: selectedIndustry || undefined,
+    minRating: minRating || undefined,
+    maxPrice: maxPrice || undefined,
+  })}
+>
+  <Text style={{ color: '#0a0a0a', fontWeight: '700', fontSize: 16 }}>Apply Filters</Text>
+</TouchableOpacity>
+```
+
+**Acceptance criteria:**
+1. FilterAgents screen shows an "Apply Filters" button below the price input
+2. Pressing Apply navigates back to Discover screen
+3. The button has neon cyan (#00f2fe) background with dark text
+4. No `TODO` comment remains in the file
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S3-T1 | `src/mobile/src/screens/discover/__tests__/FilterAgentsScreen.test.tsx` | Render FilterAgentsScreen | "Apply Filters" button text in DOM |
+| E3-S3-T2 | same | Press Apply button | `navigation.navigate` called with filter params |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest src/screens/discover/__tests__/FilterAgentsScreen.test.tsx --no-coverage --forceExit
+```
+
+**Commit message:** `feat(mobile-ux-1): add apply button to filter agents screen`
+
+**Done signal:** `"E3-S3 done. Changed: FilterAgentsScreen.tsx, types.ts, test. Tests: T1 ✅ T2 ✅"`
+
+---
+
+### Epic E4: Mobile search shows real results
+
+**Branch:** `feat/mobile-ux-1-it2-e4`
+**User story:** As a mobile user, when I search for agents from the SearchResults screen, I see real agent cards from the API instead of a TODO placeholder.
+
+---
+
+#### Story E4-S1: Wire SearchResultsScreen to useSearchAgents hook
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 45 min
+**Branch:** `feat/mobile-ux-1-it2-e4`
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+> `src/mobile/src/screens/discover/SearchResultsScreen.tsx` (24 lines) receives `query` from route params (line 5) but renders only a TODO placeholder (line 18). Replace the placeholder with a real implementation: use the existing `useSearchAgents(query)` hook from `src/mobile/src/hooks/useAgents.ts` (line 45) to fetch matching agents. Render results as a `FlatList` of `AgentCard` components (from `src/mobile/src/components/AgentCard.tsx`). Show loading spinner, error message, and "No agents found" empty state.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/screens/discover/SearchResultsScreen.tsx` | 1–24 | Full file — route.params.query destructuring, TODO placeholder |
+| `src/mobile/src/hooks/useAgents.ts` | 45–60 | `useSearchAgents(query, params?)` hook — returns `UseQueryResult<Agent[], Error>` |
+| `src/mobile/src/components/AgentCard.tsx` | 1–30 | Import path and `AgentCardProps` interface (needs `agent: Agent` prop) |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/discover/SearchResultsScreen.tsx` | modify | Replace entire file content. Import `useSearchAgents` from hooks, `AgentCard` from components, `FlatList`, `ActivityIndicator`. Call `useSearchAgents(query)`. Render loading → error → empty → FlatList of AgentCard. On AgentCard press, navigate to `AgentDetail`. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+import React from 'react';
+import { View, Text, FlatList, ActivityIndicator, SafeAreaView } from 'react-native';
+import { useTheme } from '../../hooks/useTheme';
+import { useSearchAgents } from '../../hooks/useAgents';
+import AgentCard from '../../components/AgentCard';
+import type { DiscoverStackScreenProps } from '../../navigation/types';
+
+const SearchResultsScreen: React.FC<DiscoverStackScreenProps<'SearchResults'>> = ({ route, navigation }) => {
+  const { colors, spacing, typography } = useTheme();
+  const { query } = route.params;
+  const { data: agents, isLoading, error } = useSearchAgents(query);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.black, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.neonCyan} />
+        <Text style={{ color: colors.textSecondary, marginTop: spacing.md }}>Searching for "{query}"...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.black, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: '#ef4444' }}>Failed to search agents. Please try again.</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!agents?.length) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.black, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ color: colors.textSecondary }}>No agents found for "{query}"</Text>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }}>
+      <View style={{ padding: spacing.md }}>
+        <Text style={[typography.textVariants.body, { color: colors.white, marginBottom: spacing.md }]}>
+          {agents.length} result{agents.length !== 1 ? 's' : ''} for "{query}"
+        </Text>
+      </View>
+      <FlatList
+        data={agents}
+        keyExtractor={(item) => item.id || item.agent_id}
+        renderItem={({ item }) => (
+          <AgentCard
+            agent={item}
+            // onPress={() => navigation.navigate('AgentDetail', { agentId: item.agent_id })}
+          />
+        )}
+        contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: spacing.xl }}
+      />
+    </SafeAreaView>
+  );
+};
+
+export default SearchResultsScreen;
+```
+
+**Acceptance criteria:**
+1. SearchResultsScreen shows agent cards from `useSearchAgents(query)` — not a TODO placeholder
+2. Loading state shows ActivityIndicator with "Searching..." text
+3. Error state shows "Failed to search agents" text
+4. Empty results show "No agents found for [query]" text
+5. Results count is displayed above the list
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S1-T1 | `src/mobile/src/screens/discover/__tests__/SearchResultsScreen.test.tsx` | Mock `useSearchAgents` returns 2 agents | Both agent cards rendered |
+| E4-S1-T2 | same | Mock `useSearchAgents` returns empty array | "No agents found" text |
+| E4-S1-T3 | same | Mock `useSearchAgents` isLoading=true | "Searching" text in DOM |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest src/screens/discover/__tests__/SearchResultsScreen.test.tsx --no-coverage --forceExit
+```
+
+**Commit message:** `feat(mobile-ux-1): wire search results to API`
+
+**Done signal:** `"E4-S1 done. Changed: SearchResultsScreen.tsx, test. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E4-S2: Add pull-to-refresh on DiscoverScreen and MyAgentsScreen
+
+**BLOCKED UNTIL:** none (independent of E4-S1, but same branch for simplicity)
+**Estimated time:** 30 min
+**Branch:** `feat/mobile-ux-1-it2-e4`
+**CP BackEnd pattern:** N/A
+
+**What to do:**
+> `src/mobile/src/screens/discover/DiscoverScreen.tsx` and `src/mobile/src/screens/agents/MyAgentsScreen.tsx` fetch data via React Query hooks (`useAgents` and `useHiredAgents`) which expose `refetch` and `isFetching` properties. Add a `RefreshControl` to the main `ScrollView` or `FlatList` in each screen. This is the standard React Native pattern for pull-to-refresh: pass `refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}` to the scrollable container. Use the neon cyan color (#00f2fe) for the refresh indicator.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/screens/discover/DiscoverScreen.tsx` | 30–70, 210–260 | Hook call (useAgents) with refetch/isFetching, FlatList or ScrollView rendering |
+| `src/mobile/src/screens/agents/MyAgentsScreen.tsx` | 1–50, scrollable container | Hook call (useHiredAgents) with refetch/isFetching, main scrollable component |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/discover/DiscoverScreen.tsx` | modify | Import `RefreshControl` from `react-native`. Add `refreshControl` prop to the main FlatList or ScrollView. |
+| `src/mobile/src/screens/agents/MyAgentsScreen.tsx` | modify | Import `RefreshControl` from `react-native`. Add `refreshControl` prop to the main scrollable container. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+import { RefreshControl } from 'react-native';
+
+// On the FlatList or ScrollView:
+refreshControl={
+  <RefreshControl
+    refreshing={isFetching && !isLoading}
+    onRefresh={refetch}
+    tintColor="#00f2fe"
+    colors={['#00f2fe']}
+  />
+}
+```
+
+**Acceptance criteria:**
+1. Pulling down on DiscoverScreen triggers a data refresh (new API call)
+2. Pulling down on MyAgentsScreen triggers a data refresh
+3. Refresh spinner uses neon cyan color (#00f2fe)
+4. Spinner shows during refetch, disappears when data arrives
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S2-T1 | `src/mobile/src/screens/discover/__tests__/DiscoverScreen.test.tsx` | Render DiscoverScreen | RefreshControl component present in tree |
+| E4-S2-T2 | `src/mobile/src/screens/agents/__tests__/MyAgentsScreen.test.tsx` | Render MyAgentsScreen | RefreshControl component present in tree |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest src/screens/discover/__tests__/DiscoverScreen.test.tsx src/screens/agents/__tests__/MyAgentsScreen.test.tsx --no-coverage --forceExit
+```
+
+**Commit message:** `feat(mobile-ux-1): add pull-to-refresh to discover and my agents`
+
+**Done signal:** `"E4-S2 done. Changed: DiscoverScreen.tsx, MyAgentsScreen.tsx, tests. Tests: T1 ✅ T2 ✅"`
