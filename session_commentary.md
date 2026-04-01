@@ -1,6 +1,40 @@
 
 ---
 
+## [2026-04-01 UTC] PLANT-DMA-2 — Real Publishing Engine + Analytics plan
+
+**Branch**: `docs/plant-dma-1-real-publishing-engine`
+**Plan file**: `docs/plant/iterations/PLANT-DMA-2-real-publishing-engine.md`
+**Status**: In progress
+
+### Vision (confirmed)
+- **Area**: Plant BackEnd
+- **Outcome**: DMA publishes real YouTube content via unified engine; analytics feed back into content quality
+- **Out of scope**: Other social platforms, CP/PP/mobile UI, image/video generation
+- **Lane**: B (new backend required)
+- **Iterations**: 2
+
+### Checkpoint list
+- [x] Branch created: `docs/plant-dma-1-real-publishing-engine`
+- [x] Session commentary updated
+- [ ] Plan skeleton committed + pushed
+- [ ] Iteration 1 story cards committed + pushed
+- [ ] Iteration 2 story cards committed + pushed
+- [ ] PR opened
+
+### Key files for story cards
+- `src/Plant/BackEnd/agent_mold/skills/publisher_engine.py` — DestinationAdapter ABC, DestinationRegistry, PublisherEngine with YouTube eligibility checks
+- `src/Plant/BackEnd/agent_mold/skills/adapters_publish.py` — SimulatedAdapter only
+- `src/Plant/BackEnd/integrations/social/youtube_client.py` — Real YouTubeClient (post_text, post_short)
+- `src/Plant/BackEnd/integrations/social/base.py` — SocialPlatformClient base (post_text only)
+- `src/Plant/BackEnd/services/marketing_scheduler.py` — Lines 76-86 call YouTubeClient directly, bypassing publisher_engine
+- `src/Plant/BackEnd/models/performance_stat.py` — Passive JSONB metrics, no feedback loop
+
+### Recovery hint
+If session drops, resume on branch `docs/plant-dma-1-real-publishing-engine`. Check last commit. Continue from next unchecked item above.
+
+---
+
 ## [2026-03-31 15:40 UTC] Redis plan + get-plan durability update in progress
 
 **Branch**: `docs/plant-redis-1-plan-and-get-plan`
