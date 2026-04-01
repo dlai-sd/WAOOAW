@@ -117,13 +117,15 @@ YOUR SCOPE: Iteration 1 only — Epics [E1, E2, E3]. Do not touch Iteration 2 or
 TIME BUDGET: [Xh]. If you reach [X+1h] without finishing, follow STUCK PROTOCOL now.
 
 EXECUTION ORDER:
-1. Run: git status && git log --oneline -3
-   You must be on main with a clean tree. If not, post why and HALT.
-2. Read the "Agent Execution Rules" section in this plan file.
-3. Read the "Iteration 1" section in this plan file.
-4. Read nothing else before starting.
-5. Execute Epics in this order: [E1] → [E2] → [E3]
-6. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
+1. Run: git checkout main && git pull origin main
+   (GitHub cloud agents start on a copilot/* branch — this is normal. Always checkout main first.)
+2. Run: git status && git log --oneline -3
+   Confirm: clean tree on main. If untracked/modified files exist, stash them.
+3. Read the "Agent Execution Rules" section in this plan file.
+4. Read the "Iteration 1" section in this plan file.
+5. Read nothing else before starting.
+6. Execute Epics in this order: [E1] → [E2] → [E3]
+7. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
 ```
 
 **When you return:** Check Copilot Chat for a PR URL. If you see a draft PR titled `WIP:` — an agent got stuck. Read the PR comment for the exact blocker.
