@@ -158,12 +158,12 @@ YOUR SCOPE: Iteration 2 only — Epics [E4, E5]. Do not touch Iteration 3.
 TIME BUDGET: [Xh].
 
 PREREQUISITE CHECK (do before anything else):
-  Run: git log --oneline origin/main | head -5
+  Run: git fetch origin main:refs/remotes/origin/main && git log --oneline origin/main | head -5
   Must show: feat([plan-id]): iteration 1 — [summary]
   If not: post "Blocked: Iteration 1 not merged to main." and HALT.
 
 EXECUTION ORDER:
-1. git checkout main && git pull
+1. git checkout main && git pull origin main
 2. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
 3. Respect backend-before-frontend ordering in the Dependency Map.
 4. When all epics are docker-tested, open the iteration PR. Post URL. HALT.
