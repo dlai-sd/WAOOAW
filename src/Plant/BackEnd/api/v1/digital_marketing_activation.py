@@ -391,15 +391,21 @@ def _normalize_derived_themes(raw_derived: Any) -> list[dict[str, Any]]:
 
     normalized: list[dict[str, Any]] = []
     for row in raw_derived:
-        row_dict = dict(row or {})
-        title = str(row_dict.get("title") or "").strip()
+        if isinstance(row, str):
+            title = row.strip()
+            if title:
+                normalized.append({"title": title, "description": "", "frequency": "weekly"})
+            continue
+        if not isinstance(row, dict):
+            continue
+        title = str(row.get("title") or "").strip()
         if not title:
             continue
         normalized.append(
             {
                 "title": title,
-                "description": str(row_dict.get("description") or "").strip(),
-                "frequency": str(row_dict.get("frequency") or "weekly").strip() or "weekly",
+                "description": str(row.get("description") or "").strip(),
+                "frequency": str(row.get("frequency") or "weekly").strip() or "weekly",
             }
         )
     return normalized
