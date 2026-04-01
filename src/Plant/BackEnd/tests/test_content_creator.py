@@ -130,3 +130,106 @@ def test_scheduled_publish_at_hour_matches_preferred_hour(monkeypatch):
 
     for post in post_output.posts:
         assert post.scheduled_publish_at.hour == preferred_hour
+
+
+@pytest.mark.unit
+def test_generate_theme_list_grok_includes_analytics_context(monkeypatch):
+    """E3-S2-T1: Grok prompt includes analytics context when provided."""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "grok")
+    monkeypatch.setenv("XAI_API_KEY", "dummy-key")
+    campaign = _make_campaign(duration_days=1, num_destinations=1)
+    skill = ContentCreatorSkill()
+
+    import agent_mold.skills.grok_client as grok_client_module
+
+    captured: dict[str, str] = {}
+
+    def _fake_grok_complete(client, system, user, model="grok-3-latest", temperature=0.7):
+        captured["system"] = system
+        captured["user"] = user
+        return '[{"theme_title":"Day 1","theme_description":"Desc","dimensions":["education"]}]'
+
+    monkeypatch.setattr(grok_client_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(grok_client_module, "grok_complete", _fake_grok_complete)
+
+    output = skill.generate_theme_list(campaign, analytics_context="Avg engagement 5%")
+
+    assert len(output.theme_items) == 1
+    assert "Past performance insights" in captured["user"]
+    assert "Avg engagement 5%" in captured["user"]
+
+
+@pytest.mark.unit
+def test_generate_theme_list_grok_omits_analytics_context_when_empty(monkeypatch):
+    """E3-S2-T2: Grok prompt stays unchanged when analytics context is empty."""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "grok")
+    monkeypatch.setenv("XAI_API_KEY", "dummy-key")
+    campaign = _make_campaign(duration_days=1, num_destinations=1)
+    skill = ContentCreatorSkill()
+
+    import agent_mold.skills.grok_client as grok_client_module
+
+    captured: dict[str, str] = {}
+
+    def _fake_grok_complete(client, system, user, model="grok-3-latest", temperature=0.7):
+        captured["user"] = user
+        return '[{"theme_title":"Day 1","theme_description":"Desc","dimensions":["education"]}]'
+
+    monkeypatch.setattr(grok_client_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(grok_client_module, "grok_complete", _fake_grok_complete)
+
+    skill.generate_theme_list(campaign)
+
+    assert "Past performance insights" not in captured["user"]
+
+
+@pytest.mark.unit
+def test_generate_theme_list_grok_includes_brand_voice_in_system_prompt(monkeypatch):
+    """E4-S2-T1: Grok system prompt includes brand voice guidance."""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "grok")
+    monkeypatch.setenv("XAI_API_KEY", "dummy-key")
+    campaign = _make_campaign(duration_days=1, num_destinations=1)
+    skill = ContentCreatorSkill()
+
+    import agent_mold.skills.grok_client as grok_client_module
+
+    captured: dict[str, str] = {}
+
+    def _fake_grok_complete(client, system, user, model="grok-3-latest", temperature=0.7):
+        captured["system"] = system
+        return '[{"theme_title":"Day 1","theme_description":"Desc","dimensions":["education"]}]'
+
+    monkeypatch.setattr(grok_client_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(grok_client_module, "grok_complete", _fake_grok_complete)
+
+    skill.generate_theme_list(campaign, brand_voice_context="Friendly, casual, use emoji")
+
+    assert "Brand voice guidelines" in captured["system"]
+    assert "Friendly, casual, use emoji" in captured["system"]
+
+
+@pytest.mark.unit
+def test_generate_theme_list_deterministic_includes_brand_voice_context(monkeypatch):
+    """E4-S2-T2: Deterministic theme descriptions include brand voice context."""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "deterministic")
+    campaign = _make_campaign(duration_days=2, num_destinations=1)
+    skill = ContentCreatorSkill()
+
+    output = skill.generate_theme_list(
+        campaign,
+        brand_voice_context="Professional, formal",
+    )
+
+    assert all("Professional, formal" in item.theme_description for item in output.theme_items)
+
+
+@pytest.mark.unit
+def test_generate_theme_list_without_brand_voice_keeps_previous_description_shape(monkeypatch):
+    """E4-S2-T3: No brand voice text is added when brand_voice_context is empty."""
+    monkeypatch.setenv("EXECUTOR_BACKEND", "deterministic")
+    campaign = _make_campaign(duration_days=1, num_destinations=1)
+    skill = ContentCreatorSkill()
+
+    output = skill.generate_theme_list(campaign)
+
+    assert "Voice:" not in output.theme_items[0].theme_description

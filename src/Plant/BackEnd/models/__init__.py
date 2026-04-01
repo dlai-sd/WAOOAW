@@ -19,6 +19,7 @@ from models.platform_connection import PlatformConnectionModel
 from models.customer_platform_credential import CustomerPlatformCredentialModel
 from models.oauth_connection_session import OAuthConnectionSessionModel
 from models.publish_receipt import PublishReceiptModel
+from models.brand_voice import BrandVoiceModel
 from models.schemas import (
     BaseEntitySchema,
     SkillCreate,
@@ -51,6 +52,7 @@ __all__ = [
     "CustomerPlatformCredentialModel",
     "OAuthConnectionSessionModel",
     "PublishReceiptModel",
+    "BrandVoiceModel",
     "BaseEntitySchema",
     "SkillCreate",
     "SkillResponse",

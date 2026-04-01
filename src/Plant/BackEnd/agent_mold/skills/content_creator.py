@@ -75,16 +75,28 @@ class ContentCreatorSkill(BaseProcessor):
             correlation_id=input_data.correlation_id,
         )
 
-    def generate_theme_list(self, campaign: Campaign) -> ContentCreatorOutput:
+    def generate_theme_list(
+        self,
+        campaign: Campaign,
+        analytics_context: str = "",
+        brand_voice_context: str = "",
+    ) -> ContentCreatorOutput:
         """Step 1: Generate DailyThemeItems for the full campaign duration."""
         brief = campaign.brief
         model_used = "grok-3-latest" if _executor_backend() == "grok" else "deterministic"
         cost = estimate_cost(brief, model_used=model_used)
 
         if _executor_backend() == "grok":
-            theme_items = self._grok_theme_list(campaign)
+            theme_items = self._grok_theme_list(
+                campaign,
+                analytics_context=analytics_context,
+                brand_voice_context=brand_voice_context,
+            )
         else:
-            theme_items = self._deterministic_theme_list(campaign)
+            theme_items = self._deterministic_theme_list(
+                campaign,
+                brand_voice_context=brand_voice_context,
+            )
 
         return ContentCreatorOutput(
             campaign_id=campaign.campaign_id,
@@ -102,12 +114,17 @@ class ContentCreatorSkill(BaseProcessor):
 
     # ── Deterministic engine ──────────────────────────────────────────────────
 
-    def _deterministic_theme_list(self, campaign: Campaign) -> List[DailyThemeItem]:
+    def _deterministic_theme_list(
+        self,
+        campaign: Campaign,
+        brand_voice_context: str = "",
+    ) -> List[DailyThemeItem]:
         brief = campaign.brief
         items: List[DailyThemeItem] = []
         for day in range(brief.duration_days):
             day_date = brief.start_date + timedelta(days=day)
             dim = _CONTENT_DIMENSIONS[day % len(_CONTENT_DIMENSIONS)]
+            voice_note = f" Voice: {brand_voice_context}." if brand_voice_context else ""
             items.append(DailyThemeItem(
                 campaign_id=campaign.campaign_id,
                 day_number=day + 1,
@@ -116,6 +133,7 @@ class ContentCreatorSkill(BaseProcessor):
                 theme_description=(
                     f"Focus: {dim}. Brand: {brief.brand_name or 'WAOOAW'}. "
                     f"Audience: {brief.audience or 'general'}. Tone: {brief.tone}."
+                    f"{voice_note}"
                 ),
                 dimensions=[dim],
             ))
@@ -162,7 +180,12 @@ class ContentCreatorSkill(BaseProcessor):
 
     # ── Grok engine ───────────────────────────────────────────────────────────
 
-    def _grok_theme_list(self, campaign: Campaign) -> List[DailyThemeItem]:
+    def _grok_theme_list(
+        self,
+        campaign: Campaign,
+        analytics_context: str = "",
+        brand_voice_context: str = "",
+    ) -> List[DailyThemeItem]:
         from agent_mold.skills.grok_client import get_grok_client, grok_complete
         client = get_grok_client()
         brief = campaign.brief
@@ -171,6 +194,11 @@ class ContentCreatorSkill(BaseProcessor):
             "You are an expert content strategist. "
             "Return ONLY a valid JSON array — no markdown, no explanation."
         )
+        if brand_voice_context:
+            system += (
+                f"\n\nBrand voice guidelines (match this tone and style):\n"
+                f"{brand_voice_context}"
+            )
         user = (
             f"Create a {brief.duration_days}-day content calendar for the theme: "
             f"'{brief.theme}'. Brand: '{brief.brand_name}'. Audience: '{brief.audience}'. "
@@ -180,13 +208,21 @@ class ContentCreatorSkill(BaseProcessor):
             f"theme_title (string), theme_description (string), dimensions (list of strings). "
             f"Start date: {brief.start_date.isoformat()}."
         )
+        if analytics_context:
+            user += (
+                "\n\nPast performance insights (use these to improve content):\n"
+                f"{analytics_context}"
+            )
         raw = grok_complete(client, system, user)
 
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             # Graceful fallback to deterministic if Grok returns non-JSON
-            return self._deterministic_theme_list(campaign)
+            return self._deterministic_theme_list(
+                campaign,
+                brand_voice_context=brand_voice_context,
+            )
 
         items: List[DailyThemeItem] = []
         for i, item in enumerate(data[: brief.duration_days]):
