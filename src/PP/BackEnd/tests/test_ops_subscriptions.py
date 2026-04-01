@@ -7,6 +7,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _disable_ops_cache(monkeypatch):
+    import api.ops_subscriptions as ops_subscriptions
+
+    monkeypatch.setattr(ops_subscriptions, "cache_get", AsyncMock(return_value=None))
+    monkeypatch.setattr(ops_subscriptions, "cache_set", AsyncMock(return_value=None))
+
+
 def _make_plant(status_code: int, body):
     """Return a mock PlantAPIClient whose _request returns a controlled response."""
     mock_resp = MagicMock()

@@ -253,17 +253,13 @@ async def test_get_redis_connects_successfully_when_configured(monkeypatch):
 async def test_get_redis_returns_none_when_unavailable(monkeypatch):
     await _reset_module_cache()
     import services.ops_cache as oc
+    import redis.asyncio as aioredis
+
+    mock_redis = MagicMock()
+    mock_redis.ping = AsyncMock(side_effect=RuntimeError("down"))
 
     monkeypatch.setattr(oc.settings, "REDIS_URL", "redis://localhost:6379/2")
-    monkeypatch.setitem(
-        sys.modules,
-        "redis.asyncio",
-        types.SimpleNamespace(
-            from_url=lambda *args, **kwargs: MagicMock(
-                ping=AsyncMock(side_effect=RuntimeError("down"))
-            )
-        ),
-    )
+    monkeypatch.setattr(aioredis, "from_url", lambda *args, **kwargs: mock_redis)
 
     client = await oc._get_redis()
 
