@@ -14,14 +14,14 @@
 | Platform index | `docs/CONTEXT_AND_INDEX.md` (file map §13) |
 | Total iterations | 2 |
 | Total epics | 4 |
-| Total stories | 10 |
+| Total stories | 11 |
 
 ---
 
 ## Objective — Why This Plan Exists
 
 PLANT-DMA-2 ("Real Publishing Engine") built four backend capabilities:
-1. **YouTubeAdapter** — real publishing adapter (registered but scheduler bypasses it)
+1. **YouTubeAdapter** — real publishing adapter (registered and wired via `default_engine` in `marketing_scheduler.py`)
 2. **PublishReceiptModel** — persists publish attempt records (API route exists at `/api/v1/publish-receipts/{id}`)
 3. **Content Analytics** — `get_content_recommendations()` computes top dimensions, best posting hours, engagement rate (`src/Plant/BackEnd/services/content_analytics.py`, 110 lines, 4 passing unit tests)
 4. **BrandVoiceModel** — stores customer tone/vocabulary for content generation (`src/Plant/BackEnd/models/brand_voice.py` + `brand_voice_service.py` with `get_brand_voice()` / `upsert_brand_voice()`)
@@ -36,6 +36,9 @@ PLANT-DMA-2 ("Real Publishing Engine") built four backend capabilities:
 | 5 "Unavailable" platforms shown | Instagram, Facebook, LinkedIn, WhatsApp, X cards render with "Unavailable" badge | Signals broken product — customer thinks platform is half-built | E4-S1 |
 | Performance tab shows raw metrics only | `PerformancePanel` calls `listPerformanceStats()` but never calls content analytics | Customer sees numbers without context — "23 posts" means nothing without "best hours: 9 AM, 2 PM" | E2-S1 |
 | Publish receipts not surfaced | CP reads `payload.publish_receipt` embedded in deliverable but never calls dedicated `/api/v1/publish-receipts/{id}` endpoint | Customer can't see publish confirmation, success/failure, or platform links | E4-S2 |
+| Strategy approval is blind | `isThemeApproved` gate (wizard line 468) blocks content generation until customer approves — but no preview of the strategy is shown before the approve button | Trust gap — customer approves unknown content; undermines "try before hire" confidence | E2-S3 |
+
+> ⚠️ **Known limitation — in-memory profile store:** `UserStore` in `src/CP/BackEnd/api/auth/user_store.py` persists profile data in a `Dict[str, User]` — server restart loses all profile fields added by E3-S1. This is pre-existing tech debt (not introduced by this plan). A follow-up plan should migrate to persistent storage.
 
 **Revenue impact:** The customer hired an agent and sees a wizard that asks redundant questions, raw numbers without insight, and zero evidence the agent published anything. There is no reason to pay. This plan wires PLANT-DMA-2's backend features through to the customer's screen so the agent demonstrably earns its keep.
 
@@ -88,7 +91,7 @@ with limited context windows. Every structural decision in this plan exists to p
 
 | Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
 |---|---|---|---|---|---|
-| 1 | Lane B — Expose content analytics + brand voice: Plant API routes, CP Backend proxies, CP Frontend services | 2 | 5 | 5h | 2026-04-02 10:00 IST |
+| 1 | Lane B — Expose content analytics + brand voice + strategy preview: Plant API routes, CP Backend proxies, CP Frontend services, strategy preview gate | 2 | 6 | 5.5h | 2026-04-02 10:30 IST |
 | 2 | Lane A/B — Profile field migration, hide unavailable platforms, wire performance insights + publish receipts to UI | 2 | 5 | 5h | 2026-04-03 10:00 IST |
 
 **Estimate basis:** FE wiring = 30 min | New BE endpoint = 45 min | Full-stack = 90 min | Docker test = 15 min | PR = 10 min. Add 20% buffer for zero-cost model context loading.
@@ -224,6 +227,7 @@ Subscribe to this PR to receive one notification per story completion.
 - [ ] [E1-S3] CP Frontend services for content analytics + brand voice
 - [ ] [E2-S1] Wire Performance tab to show content recommendations
 - [ ] [E2-S2] Add brand voice editor to wizard step 5
+- [ ] [E2-S3] Render strategy preview before approval gate
 
 _Live updates posted as comments below ↓_"
 ```
@@ -355,6 +359,7 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E1-S3 | 1 | Customer gets AI-powered content insights | CP Frontend services for analytics + brand voice | 🔴 Not Started | — |
 | E2-S1 | 1 | Customer sees actionable recommendations in Performance tab | Wire Performance tab to show content recommendations | 🔴 Not Started | — |
 | E2-S2 | 1 | Customer sees actionable recommendations in Performance tab | Add brand voice editor to wizard step 5 | 🔴 Not Started | — |
+| E2-S3 | 1 | Customer sees actionable recommendations in Performance tab | Render strategy preview before approval gate | 🔴 Not Started | — |
 | E3-S1 | 2 | Customer profile owns identity fields — wizard pre-fills | Extend profile model with location, timezone, primary_language | 🔴 Not Started | — |
 | E3-S2 | 2 | Customer profile owns identity fields — wizard pre-fills | Wizard pre-fills from profile and saves back | 🔴 Not Started | — |
 | E4-S1 | 2 | Customer sees polished, honest platform status | Hide unsupported platforms from wizard step 3 | 🔴 Not Started | — |
@@ -377,9 +382,13 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 ```
 E1-S1 (Plant API routes) ──► E1-S2 (CP Backend proxies) ──► E1-S3 (CP Frontend services)
                                                                        │
-                                                              ┌────────┴────────┐
-                                                              ▼                 ▼
+                                                              ┌────────┴───────────────────────────┐
+                                                              │                           │
+                                                              ▼                           ▼
                                                           E2-S1 (Performance)  E2-S2 (Brand voice UI)
+                                                                                        │
+                                                                                        ▼
+                                                                               E2-S3 (Strategy preview)
 ```
 
 ---
@@ -403,7 +412,7 @@ E1-S1 (Plant API routes) ──► E1-S2 (CP Backend proxies) ──► E1-S3 (C
 >
 > Create two new API route files:
 > 1. `src/Plant/BackEnd/api/v1/content_analytics.py` — GET `/v1/hired-agents/{hired_instance_id}/content-recommendations`
-> 2. `src/Plant/BackEnd/api/v1/brand_voice.py` — GET `/v1/brand-voice/{customer_id}` and PUT `/v1/brand-voice/{customer_id}`
+> 2. `src/Plant/BackEnd/api/v1/brand_voice.py` — GET `/v1/brand-voice/me` and PUT `/v1/brand-voice/me` (customer_id derived from JWT/auth context — prevents IDOR)
 >
 > Register both routers in `src/Plant/BackEnd/main.py`.
 
@@ -420,7 +429,7 @@ E1-S1 (Plant API routes) ──► E1-S2 (CP Backend proxies) ──► E1-S3 (C
 | File | Action | Precise instruction |
 |---|---|---|
 | `src/Plant/BackEnd/api/v1/content_analytics.py` | create | New route file. One GET endpoint: `/hired-agents/{hired_instance_id}/content-recommendations`. Uses `get_read_db_session`. Returns `ContentRecommendation` from service. |
-| `src/Plant/BackEnd/api/v1/brand_voice.py` | create | New route file. GET `/brand-voice/{customer_id}` returns brand voice or 404. PUT `/brand-voice/{customer_id}` upserts brand voice. GET uses `get_read_db_session`, PUT uses `get_db_session`. |
+| `src/Plant/BackEnd/api/v1/brand_voice.py` | create | New route file. GET `/brand-voice/me` derives `customer_id` from JWT auth context (prevents IDOR — never accept customer_id as path param). PUT `/brand-voice/me` upserts brand voice. GET uses `get_read_db_session`, PUT uses `get_db_session`. |
 | `src/Plant/BackEnd/main.py` | modify | Add `from api.v1.content_analytics import router as content_analytics_router` and `from api.v1.brand_voice import router as brand_voice_router`. Add `app.include_router(content_analytics_router, prefix="/api/v1")` and `app.include_router(brand_voice_router, prefix="/api/v1")`. |
 
 **Code patterns to copy exactly** (no other file reads needed for these):
@@ -450,8 +459,8 @@ logger.addFilter(PiiMaskingFilter())
 **Acceptance criteria (binary pass/fail only):**
 1. GET `/api/v1/hired-agents/{hired_instance_id}/content-recommendations` returns 200 with `ContentRecommendation` JSON when performance data exists
 2. GET `/api/v1/hired-agents/{hired_instance_id}/content-recommendations` returns 200 with empty recommendation (not 404) when no data exists
-3. GET `/api/v1/brand-voice/{customer_id}` returns 200 with brand voice JSON when exists, 404 when not
-4. PUT `/api/v1/brand-voice/{customer_id}` creates brand voice on first call, updates on subsequent calls, returns 200
+3. GET `/api/v1/brand-voice/me` derives customer_id from JWT, returns 200 with brand voice JSON when exists, 404 when not
+4. PUT `/api/v1/brand-voice/me` derives customer_id from JWT, creates brand voice on first call, updates on subsequent calls, returns 200
 5. All GET routes use `get_read_db_session()`
 
 **Tests to write:**
@@ -485,7 +494,7 @@ cd src/Plant/BackEnd && python -m pytest tests/test_content_analytics_api.py tes
 > CP Backend has no proxy routes for content analytics or brand voice. Create two thin proxy files that forward requests to the Plant API routes created in E1-S1.
 >
 > 1. `src/CP/BackEnd/api/cp_content_analytics.py` — proxies GET `/cp/content-recommendations/{hired_instance_id}` → Plant `/api/v1/hired-agents/{hired_instance_id}/content-recommendations`
-> 2. `src/CP/BackEnd/api/cp_brand_voice.py` — proxies GET and PUT `/cp/brand-voice` → Plant `/api/v1/brand-voice/{customer_id}` (customer_id injected from auth)
+> 2. `src/CP/BackEnd/api/cp_brand_voice.py` — proxies GET and PUT `/cp/brand-voice` → Plant `/api/v1/brand-voice/me` (Plant derives customer_id from JWT — IDOR-safe)
 >
 > Register both routers in `src/CP/BackEnd/main.py`.
 
@@ -502,7 +511,7 @@ cd src/Plant/BackEnd && python -m pytest tests/test_content_analytics_api.py tes
 | File | Action | Precise instruction |
 |---|---|---|
 | `src/CP/BackEnd/api/cp_content_analytics.py` | create | Proxy GET `/cp/content-recommendations/{hired_instance_id}` → Plant. Use `PlantGatewayClient.request_json(method="GET", path=f"/api/v1/hired-agents/{hired_instance_id}/content-recommendations", headers=_forward_headers(request))`. |
-| `src/CP/BackEnd/api/cp_brand_voice.py` | create | Proxy GET `/cp/brand-voice` → Plant GET `/api/v1/brand-voice/{customer_id}` and PUT `/cp/brand-voice` → Plant PUT `/api/v1/brand-voice/{customer_id}`. Inject `customer_id` from `current_user.id`. |
+| `src/CP/BackEnd/api/cp_brand_voice.py` | create | Proxy GET `/cp/brand-voice` → Plant GET `/api/v1/brand-voice/me` and PUT `/cp/brand-voice` → Plant PUT `/api/v1/brand-voice/me`. Forward auth token — Plant derives customer_id from JWT internally (IDOR-safe). |
 | `src/CP/BackEnd/main.py` | modify | Add imports and `app.include_router()` for both new routers. |
 
 **Code patterns to copy exactly:**
@@ -704,9 +713,10 @@ useEffect(() => {
 2. Best posting hours display as formatted times (e.g. "9 AM, 2 PM")
 3. Top dimensions display as tag/badge elements
 4. Engagement rate shows as percentage (e.g. "4.2%")
-5. When `total_posts_analyzed < 3`, shows "No insights yet — the agent needs more data"
-6. Loading spinner shown while fetching
-7. Error message shown on API failure
+5. When `total_posts_analyzed === 0` (trial cold-start), shows contextual guidance: "Your agent is analyzing your content — first insights appear within 24–48 hours"
+6. When `0 < total_posts_analyzed < 3`, shows "Building insights — ${total_posts_analyzed} posts analyzed so far, need at least 3 for recommendations"
+7. Loading spinner shown while fetching
+8. Error message shown on API failure
 
 **Tests to write:**
 
@@ -807,6 +817,86 @@ cd src/CP/FrontEnd && npx jest src/__tests__/BrandVoiceSection.test.tsx --no-cov
 **Commit message:** `feat(cp-wiz-1): add brand voice editor to wizard step 5`
 
 **Done signal:** `"E2-S2 done. Changed: DigitalMarketingActivationWizard.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E2-S3: Render strategy preview before approval gate
+
+**BLOCKED UNTIL:** none (independent — reads existing wizard state)
+**Estimated time:** 30 min
+**Branch:** `feat/cp-wiz-1-it1-e2` (same branch, continue from E2-S2)
+**CP BackEnd pattern:** N/A — frontend only
+
+**What to do:**
+> `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` line ~468 has an `isThemeApproved` gate that blocks content generation until the customer clicks "Approve". The problem: the customer cannot see what they are approving. The wizard stores strategy data in `nextActivation?.workspace.strategyWorkshop` (messages array) and `nextActivation?.workspace.strategySummary` (text summary), but neither is rendered before the approve button.
+>
+> Add a "Strategy Preview" panel directly above the approve button that renders:
+> 1. The `strategySummary` text (if it exists) as a formatted summary block
+> 2. Key strategy messages from `strategyWorkshop.messages` (last 3-5 messages, formatted as a conversation thread)
+> 3. A clear label: "Review your content strategy before approving"
+>
+> This gives the customer transparency into what the agent planned before they commit.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 940–970 | Approval gate message rendering, `isThemeApproved` usage, approve button location |
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 460–480 | `isThemeApproved` state variable, how it's toggled |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | Above the existing "Approve" button in the strategy approval section (~line 960), add a `StrategyPreviewPanel` inline component that reads `nextActivation?.workspace.strategySummary` and `nextActivation?.workspace.strategyWorkshop?.messages`. Render summary as a styled blockquote, messages as a conversation thread (role + content), and show "No strategy generated yet" if both are empty. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Strategy preview (add directly above the Approve button):
+{!isThemeApproved && (
+  <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #333', borderRadius: '0.75rem', background: '#1a1a1a' }}>
+    <h4 style={{ margin: '0 0 0.5rem', color: '#00f2fe' }}>Review Your Content Strategy</h4>
+    {nextActivation?.workspace?.strategySummary ? (
+      <blockquote style={{ borderLeft: '3px solid #667eea', paddingLeft: '1rem', margin: '0.5rem 0', color: '#ccc' }}>
+        {nextActivation.workspace.strategySummary}
+      </blockquote>
+    ) : (
+      <p style={{ color: '#666' }}>No strategy generated yet — the agent will create one after you provide your business context.</p>
+    )}
+    {(nextActivation?.workspace?.strategyWorkshop?.messages ?? []).slice(-5).map((msg: any, i: number) => (
+      <div key={i} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? '#00f2fe' : '#ccc' }}>
+        <strong>{msg.role === 'assistant' ? 'Agent' : 'You'}:</strong> {msg.content}
+      </div>
+    ))}
+  </div>
+)}
+```
+
+**Acceptance criteria:**
+1. Strategy preview panel is visible above the Approve button when `isThemeApproved === false`
+2. `strategySummary` renders as a blockquote when present
+3. Last 5 strategy workshop messages render as a conversation thread
+4. When both `strategySummary` and messages are empty/absent, shows "No strategy generated yet" placeholder
+5. Panel disappears after customer approves (when `isThemeApproved === true`)
+6. No TypeScript errors
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E2-S3-T1 | `src/CP/FrontEnd/src/__tests__/StrategyPreview.test.tsx` | Mock `nextActivation.workspace.strategySummary = "Focus on video content..."`, `isThemeApproved = false` | Blockquote with summary text in DOM, "Review Your Content Strategy" heading visible |
+| E2-S3-T2 | same | Mock empty workspace (no strategySummary, no messages), `isThemeApproved = false` | "No strategy generated yet" placeholder in DOM |
+| E2-S3-T3 | same | Mock `isThemeApproved = true` | Strategy preview panel NOT in DOM |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx jest src/__tests__/StrategyPreview.test.tsx --no-coverage
+```
+
+**Commit message:** `feat(cp-wiz-1): render strategy preview before approval gate`
+
+**Done signal:** `"E2-S3 done. Changed: DigitalMarketingActivationWizard.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---
 
@@ -924,6 +1014,8 @@ cd src/CP/BackEnd && python -m pytest tests/test_cp_profile.py -v
 > `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` lines 530-550 populate state from `nextActivation?.workspace.*`. Currently, `brandName`, `location`, `primaryLanguage`, `timezone` are only set from workspace data. Add a `useEffect` that on wizard mount calls `getProfile()` from `profile.service.ts`. If the workspace fields are empty but profile has values, pre-fill from profile. On step 5 save (handleContinue), if user changed these fields, also call `updateProfile()` to sync back.
 >
 > This eliminates repeat data entry — the customer enters these fields once, every agent benefits.
+>
+> **Mapping note:** `profile.business_name` maps to wizard `brandName` — no new profile field is needed for brand_name. The wizard state variable `brandName` reads from and writes to `profile.business_name`.
 
 **Files to read first (max 3):**
 
@@ -1053,21 +1145,19 @@ cd src/CP/FrontEnd && npx jest src/__tests__/WizardPlatforms.test.tsx --no-cover
 **BLOCKED UNTIL:** none (independent)
 **Estimated time:** 45 min
 **Branch:** `feat/cp-wiz-1-it2-e4` (same branch, continue from E4-S1)
-**CP BackEnd pattern:** C — existing Plant endpoint at `/api/v1/publish-receipts/{hired_instance_id}`, call via `gatewayRequestJson` from FE — no new BE file needed
+**CP BackEnd pattern:** B — create new `api/cp_publish_receipts.py` proxy route (no existing CP proxy for publish receipts — grep confirmed zero matches)
 
 **What to do:**
-> Plant Backend already has `/api/v1/publish-receipts/{hired_instance_id}` returning publish receipt records. CP Frontend never calls this endpoint. Create a new service `publishReceipts.service.ts` and add a "Publish History" section to the deliverable review in `MyAgents.tsx` (or the Deliverables page) showing:
-> - Publish date/time
-> - Platform (YouTube)
-> - Status (success/failed)
-> - Platform URL (link to published content)
->
-> The CP Backend already has a proxy route through the general hired-agents proxy. Use `gatewayRequestJson` to call the endpoint directly.
+> Plant Backend already has `/api/v1/publish-receipts/{hired_instance_id}` returning publish receipt records. CP Frontend never calls this endpoint and **no CP Backend proxy exists** (grep confirmed). Create:
+> 1. `src/CP/BackEnd/api/cp_publish_receipts.py` — thin proxy: GET `/cp/publish-receipts/{hired_instance_id}` → Plant GET `/api/v1/publish-receipts/{hired_instance_id}`. Use `PlantGatewayClient` + `_forward_headers` pattern (same as E1-S2). Register in `src/CP/BackEnd/main.py`.
+> 2. `src/CP/FrontEnd/src/services/publishReceipts.service.ts` — FE service calling the new CP proxy.
+> 3. Add a "Publish History" section to `MyAgents.tsx` showing publish date, platform, status badge, platform URL.
 
 **Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
+| `src/CP/BackEnd/api/marketing_review.py` | 1–60 | `PlantGatewayClient` proxy pattern, `_forward_headers`, `get_plant_gateway_client` — copy this pattern for cp_publish_receipts.py |
 | `src/CP/FrontEnd/src/services/hiredAgentDeliverables.service.ts` | 1–60 | Existing service pattern, `Deliverable` type, `listHiredAgentDeliverables` |
 | `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` | 1730–1760 | Where PerformancePanel is rendered — publish receipts section should go nearby |
 
@@ -1075,7 +1165,8 @@ cd src/CP/FrontEnd && npx jest src/__tests__/WizardPlatforms.test.tsx --no-cover
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/CP/FrontEnd/src/services/publishReceipts.service.ts` | create | Export `PublishReceipt` interface: `id: string`, `hired_instance_id: string`, `platform_key: string`, `published_at: string`, `status: string`, `platform_url?: string`, `error_message?: string`. Export `listPublishReceipts(hiredInstanceId: string): Promise<PublishReceipt[]>` calling GET `/cp/hired-agents/${id}/publish-receipts` via `gatewayRequestJson`. |
+| `src/CP/BackEnd/api/cp_publish_receipts.py` | create | Thin proxy: GET `/cp/publish-receipts/{hired_instance_id}` → Plant GET `/api/v1/publish-receipts/{hired_instance_id}`. Use `waooaw_router(prefix="/cp/publish-receipts")`, `PlantGatewayClient`, `_forward_headers`, `get_current_user`. Same pattern as `cp_content_analytics.py` from E1-S2. |
+| `src/CP/BackEnd/main.py` | modify | Add import and `app.include_router()` for `cp_publish_receipts` router. || `src/CP/FrontEnd/src/services/publishReceipts.service.ts` | create | Export `PublishReceipt` interface: `id: string`, `hired_instance_id: string`, `platform_key: string`, `published_at: string`, `status: string`, `platform_url?: string`, `error_message?: string`. Export `listPublishReceipts(hiredInstanceId: string): Promise<PublishReceipt[]>` calling GET `/cp/publish-receipts/${id}` via `gatewayRequestJson`. |
 | `src/CP/FrontEnd/src/pages/authenticated/MyAgents.tsx` | modify | After the `PerformancePanel` component, add a `PublishHistoryPanel` component that fetches `listPublishReceipts(hiredInstanceId)` and renders a list of publish receipts with date, platform, status badge (green for success, red for failed), and platform URL as a link. |
 
 **Code patterns to copy exactly:**
@@ -1096,7 +1187,7 @@ export interface PublishReceipt {
 
 export async function listPublishReceipts(hiredInstanceId: string): Promise<PublishReceipt[]> {
   const data = await gatewayRequestJson<unknown>(
-    `/cp/hired-agents/${encodeURIComponent(hiredInstanceId)}/publish-receipts`,
+    `/cp/publish-receipts/${encodeURIComponent(hiredInstanceId)}`,
     { method: 'GET' }
   )
   if (Array.isArray(data)) return data as PublishReceipt[]
@@ -1105,30 +1196,90 @@ export async function listPublishReceipts(hiredInstanceId: string): Promise<Publ
 }
 ```
 
+```python
+# CP Backend publish receipts proxy (copy exactly — same pattern as E1-S2):
+"""CP Publish Receipts proxy — CP-WIZ-1 E4-S2"""
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any, Dict
+
+from fastapi import Depends, HTTPException, Request
+
+from api.auth.dependencies import get_current_user
+from core.logging import PiiMaskingFilter
+from core.routing import waooaw_router
+from models.user import User
+from services.plant_gateway_client import PlantGatewayClient
+
+router = waooaw_router(prefix="/cp/publish-receipts", tags=["cp-publish-receipts"])
+
+logger = logging.getLogger(__name__)
+logger.addFilter(PiiMaskingFilter())
+
+
+def _get_plant_client() -> PlantGatewayClient:
+    base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
+    if not base_url:
+        raise HTTPException(status_code=503, detail="PLANT_GATEWAY_URL not configured")
+    return PlantGatewayClient(base_url=base_url)
+
+
+def _forward_headers(request: Request) -> Dict[str, str]:
+    headers: Dict[str, str] = {}
+    if auth := request.headers.get("authorization"):
+        headers["Authorization"] = auth
+    if cid := request.headers.get("x-correlation-id"):
+        headers["X-Correlation-ID"] = cid
+    return headers
+
+
+@router.get("/{hired_instance_id}")
+async def list_publish_receipts(
+    hired_instance_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    client = _get_plant_client()
+    resp = await client.request_json(
+        method="GET",
+        path=f"/api/v1/publish-receipts/{hired_instance_id}",
+        headers=_forward_headers(request),
+    )
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=503, detail="Plant Backend error")
+    return resp.json_body
+```
+
 **Acceptance criteria:**
-1. New `publishReceipts.service.ts` exports `PublishReceipt` type and `listPublishReceipts` function
-2. MyAgents page shows "Publish History" section for DMA agents
-3. Each receipt shows formatted date, platform name, status badge, and clickable URL
-4. Empty state: "No publish history yet" when array is empty
-5. Error state: error message shown when API fails
-6. Loading state: spinner while fetching
+1. New `cp_publish_receipts.py` backend proxy created with `waooaw_router`, `PlantGatewayClient`, `get_current_user` dependency
+2. New `publishReceipts.service.ts` exports `PublishReceipt` type and `listPublishReceipts` function
+3. MyAgents page shows "Publish History" section for DMA agents
+4. Each receipt shows formatted date, platform name, status badge, and clickable URL
+5. Empty state: "No publish history yet" when array is empty
+6. Error state: error message shown when API fails
+7. Loading state: spinner while fetching
 
 **Tests to write:**
 
 | Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| E4-S2-T1 | `src/CP/FrontEnd/src/__tests__/PublishHistoryPanel.test.tsx` | Mock `listPublishReceipts` returns 2 receipts (1 success, 1 failed) | Both rendered, success has green badge, failed has red badge |
-| E4-S2-T2 | same | Mock returns empty array | "No publish history yet" in DOM |
-| E4-S2-T3 | same | Mock rejects | Error message in DOM |
+| E4-S2-T1 | `src/CP/BackEnd/tests/test_cp_publish_receipts.py` | Mock PlantGatewayClient returns 200 with receipt list | Response 200, fields match |
+| E4-S2-T2 | same | Mock PlantGatewayClient returns 500 | Response 503 |
+| E4-S2-T3 | `src/CP/FrontEnd/src/__tests__/PublishHistoryPanel.test.tsx` | Mock `listPublishReceipts` returns 2 receipts (1 success, 1 failed) | Both rendered, success has green badge, failed has red badge |
+| E4-S2-T4 | same | Mock returns empty array | "No publish history yet" in DOM |
+| E4-S2-T5 | same | Mock rejects | Error message in DOM |
 
 **Test command:**
 ```bash
+cd src/CP/BackEnd && python -m pytest tests/test_cp_publish_receipts.py -v
 cd src/CP/FrontEnd && npx jest src/__tests__/PublishHistoryPanel.test.tsx --no-coverage
 ```
 
 **Commit message:** `feat(cp-wiz-1): wire publish receipts to Deliverables review panel`
 
-**Done signal:** `"E4-S2 done. Changed: publishReceipts.service.ts (created), MyAgents.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
+**Done signal:** `"E4-S2 done. Changed: cp_publish_receipts.py (created), main.py, publishReceipts.service.ts (created), MyAgents.tsx. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅"`
 
 ---
 
