@@ -28,7 +28,7 @@ class DestinationAdapter(ABC):
     DESTINATION_TYPE: str = ""  # Must be set by each subclass
 
     @abstractmethod
-    def publish(self, inp: PublishInput) -> PublishReceipt:
+    async def publish(self, inp: PublishInput) -> PublishReceipt:
         """Publish the post to the destination platform.
 
         Must be idempotent — calling twice with the same post_id
@@ -68,7 +68,7 @@ class PublisherEngine:
 
     Usage:
         engine = PublisherEngine(registry)
-        receipt = engine.publish(publish_input)
+        receipt = await engine.publish(publish_input)
     """
 
     def __init__(self, registry: DestinationRegistry) -> None:
@@ -110,7 +110,7 @@ class PublisherEngine:
 
         return None
 
-    def publish(self, inp: PublishInput) -> PublishReceipt:
+    async def publish(self, inp: PublishInput) -> PublishReceipt:
         dest_type = inp.post.destination.destination_type.lower()
         eligibility_failure = self._check_publish_eligibility(inp)
         if eligibility_failure is not None:
@@ -126,7 +126,7 @@ class PublisherEngine:
             )
         adapter = adapter_class()
         try:
-            return adapter.publish(inp)
+            return await adapter.publish(inp)
         except Exception as exc:
             return PublishReceipt(
                 post_id=inp.post.post_id,
@@ -141,11 +141,12 @@ class PublisherEngine:
 
 def build_default_registry() -> DestinationRegistry:
     from agent_mold.skills.adapters_publish import SimulatedAdapter
+    from agent_mold.skills.adapters_youtube import YouTubeAdapter
     registry = DestinationRegistry()
     registry.register("simulated", SimulatedAdapter)
     registry.register("x", SimulatedAdapter)          # X/Twitter: simulated in Phase 1
     registry.register("twitter", SimulatedAdapter)    # alias
-    registry.register("youtube", SimulatedAdapter)
+    registry.register("youtube", YouTubeAdapter)
     # Phase 2: uncomment when OAuth adapters are built
     # from agent_mold.skills.adapters_linkedin import LinkedInAdapter
     # registry.register("linkedin", LinkedInAdapter)
