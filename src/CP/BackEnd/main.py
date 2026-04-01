@@ -34,6 +34,8 @@ from api.cp_otp import router as cp_otp_router
 from api.cp_registration_otp import router as cp_registration_otp_router
 from api.feature_flags_proxy import router as feature_flags_proxy_router  # E2-S2 (It-7)
 from api.cp_profile import router as cp_profile_router  # E4-S1 (CP-NAV-1 It-2)
+from api.cp_content_analytics import router as cp_content_analytics_router
+from api.cp_brand_voice import router as cp_brand_voice_router
 from api.cp_runtime_redis import router as cp_runtime_redis_router
 from api.cp_catalog import router as cp_catalog_router
 from api.cp_youtube_connections import router as cp_youtube_connections_router
@@ -109,6 +111,8 @@ app.include_router(cp_otp_router, prefix="/api")
 app.include_router(cp_registration_otp_router, prefix="/api")
 app.include_router(feature_flags_proxy_router, prefix="/api")  # E2-S2 (It-7)
 app.include_router(cp_profile_router, prefix="/api")  # E4-S1 (CP-NAV-1 It-2)
+app.include_router(cp_content_analytics_router, prefix="/api")
+app.include_router(cp_brand_voice_router, prefix="/api")
 app.include_router(cp_runtime_redis_router, prefix="/api")
 app.include_router(cp_catalog_router, prefix="/api")
 app.include_router(cp_youtube_connections_router, prefix="/api")

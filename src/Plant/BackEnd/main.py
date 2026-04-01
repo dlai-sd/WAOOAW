@@ -720,6 +720,8 @@ if settings.enable_route_registration_logging:
 
 from api.v1.router import api_v1_router
 from api.v1 import publish_receipts
+from api.v1.brand_voice import router as brand_voice_router
+from api.v1.content_analytics import router as content_analytics_router
 
 if settings.enable_route_registration_logging:
     logger.info(f"api_v1_router prefix: {api_v1_router.prefix}")
@@ -731,6 +733,8 @@ if settings.enable_route_registration_logging:
 
 app.include_router(api_v1_router)
 app.include_router(publish_receipts.router)
+app.include_router(content_analytics_router, prefix="/api/v1")
+app.include_router(brand_voice_router, prefix="/api/v1")
 
 if settings.enable_route_registration_logging:
     logger.info("api_v1_router mounted to app")
