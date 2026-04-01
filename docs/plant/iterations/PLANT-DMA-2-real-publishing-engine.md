@@ -16,6 +16,16 @@
 
 ---
 
+## Gap Analysis Scope Declaration
+
+> This plan (PLANT-DMA-2) targets the **foundation layer**: real publishing + analytics feedback.
+> It fully closes 3 of 12 identified gaps and partially addresses 3 more.
+> **6 gaps remain for future plans** (PLANT-DMA-3+): visual assets, content repurposing,
+> SEO integration, approval UX, multi-format types, and competitor monitoring.
+> Each future gap is a separate plan — do NOT scope-creep this plan to cover them.
+
+---
+
 ## Zero-Cost Agent Constraints (READ FIRST)
 
 This plan is designed for **autonomous zero-cost model agents** (Gemini Flash, GPT-4o-mini, etc.)
@@ -64,6 +74,52 @@ with limited context windows. Every structural decision in this plan exists to p
 3. **Out of scope:** Other social platforms (Twitter, Instagram, LinkedIn), CP/PP/mobile UI changes, image/video generation pipelines, ad management, SEO automation, competitor monitoring.
 4. **Lane:** B — new backend code required (adapter, analytics service, schema changes).
 5. **Timeline:** 2 iterations.
+
+---
+
+## Gap Analysis Origin
+
+This plan was derived from a 12-point gap analysis comparing WAOOAW's DMA implementation against industry autonomous marketing agents (Jasper, HubSpot AI, Sprout Social, Buffer, Hootsuite). The full table and coverage mapping are below.
+
+### Plain English Summary
+
+We've built a solid skeleton — goal scheduler, content generation with Grok/deterministic fallback, platform client abstractions for 5 channels, approval mode enum, and a pluggable adapter registry. But the skeleton has no muscles: every platform adapter is simulated (fake publish), there's no image/video generation at all, and the AI generates content blind to past performance. In industry, autonomous DMA agents create visual-rich multi-format content, publish to real APIs, then self-optimize based on engagement data — we're currently stuck at "generate text, fake-publish, forget."
+
+### Gap Table
+
+| # | Capability | Industry Standard | WAOOAW Current State | Gap Severity |
+|---|---|---|---|---|
+| 1 | Real publishing adapters | Live OAuth2 adapters that actually call platform APIs (YouTube upload, LinkedIn UGC, IG Graph API) | `SimulatedAdapter` returns fake receipts for ALL platforms. `build_default_registry()` registers `SimulatedAdapter` even for YouTube. Real `YouTubeClient` exists in `integrations/social/` but is not wired into the publisher engine registry. | Critical |
+| 2 | Visual asset creation | AI-generated images/videos (DALL-E, Midjourney, Runway), auto-thumbnails, platform-specific sizing | Zero image/video generation. `post_text()` is the only publish method. No media pipeline exists anywhere in the codebase. | Critical |
+| 3 | Content repurposing | One piece of long-form content auto-adapted into 5-8 platform-specific formats (blog → thread → reel script → carousel → newsletter) | Each platform gets a separate LLM call with the same brief. No "source → derivative" chain. No carousel, reel script, or story format support. | High |
+| 4 | Analytics feedback loop | Post-publish metrics (impressions, CTR, engagement) feed back into the AI to optimize future content timing, tone, and topics | `PerformanceStatModel` stores metrics but it's a passive CRUD endpoint. No code reads past performance to influence future content generation. | High |
+| 5 | Intelligent scheduling | ML-driven optimal posting times per platform per audience | Scheduling is a static `preferred_hours_utc` field set once in the brief. No audience analysis, no platform-specific timing intelligence. | High |
+| 6 | SEO / keyword integration | Keyword research → content brief → SEO-optimized captions, alt-text, meta descriptions, hashtag strategy | "SEO" exists only as a seed data tag for agent types. No keyword research, no trending topic detection, no hashtag optimization beyond hardcoded list. | High |
+| 7 | Approval workflow UX | Drag-and-drop content calendars, inline editing, side-by-side previews, one-click approve/reject | Approval is a boolean `review_status` flip via API call. No calendar view, no inline editing, no preview rendering. | Medium |
+| 8 | Multi-format content types | Stories, Reels, Shorts, Carousels, Polls, Articles, Newsletters, Community Posts | Only `post_text()` — plain text posts. No video upload, no carousel builder, no poll creator. YouTube is community-post-only. | High |
+| 9 | Brand voice learning | AI trained on brand's past content, style guide uploaded, tone consistency scoring | A single `brand_voice_model` string selects the LLM model name. No brand corpus ingestion, no style guide parsing, no tone consistency validation. | Medium |
+| 10 | Competitor / trend monitoring | Track competitor posting frequency, trending topics in industry, content gap analysis | Completely absent. No competitor tracking, no trend detection, no market intelligence. | Medium |
+| 11 | Webhook / real-time status | Platform webhooks for post status (published, removed, flagged), real-time notifications | WhatsApp client has a placeholder comment. No inbound webhook receivers. Customer has no real-time visibility into publish outcomes. | Medium |
+| 12 | Dual-engine disconnect | N/A — industry tools have one pipeline | Two separate publishing paths: (a) `publisher_engine.py` with `SimulatedAdapter` registry, and (b) `marketing_scheduler.py` direct `YouTubeClient` calls. Neither is canonical. | High |
+
+### PLANT-DMA-2 Coverage Mapping
+
+| Gap # | Severity | Covered By | Coverage Level | Notes |
+|---|---|---|---|---|
+| 1 | Critical | **E1 (It.1)** | Full | YouTubeAdapter wrapping real `YouTubeClient` |
+| 2 | Critical | — | **Future plan** | Requires media pipeline, image generation SDK. Out of scope for DMA-2. |
+| 3 | High | — | **Future plan** | Requires "source → derivative" content chain. Out of scope for DMA-2. |
+| 4 | High | **E3 (It.2)** | Full | Analytics reader → content prompt injection |
+| 5 | High | **E3-S1 (It.2)** | Partial | `best_posting_hours` from analytics. No ML-driven per-audience optimization yet. |
+| 6 | High | — | **Future plan** | Requires keyword research API, trending topic integration. Out of scope for DMA-2. |
+| 7 | Medium | — | **Future plan** | Requires CP/PP frontend work (calendar UI, preview). Out of scope for DMA-2. |
+| 8 | High | — | **Future plan** | Requires video upload, carousel models, poll adapters. Out of scope for DMA-2. |
+| 9 | Medium | **E4 (It.2)** | Partial | Brand voice storage + prompt injection. No auto-learning from past content yet. |
+| 10 | Medium | — | **Future plan** | Requires competitor API integration. Out of scope for DMA-2. |
+| 11 | Medium | **E2-S2 (It.1)** | Partial | Publish receipts persisted + query endpoint. No inbound webhooks or push notifications yet. |
+| 12 | High | **E1-S2 (It.1)** | Full | Scheduler rewired to PublisherEngine. Single canonical path. |
+
+**Summary**: PLANT-DMA-2 fully closes gaps **1, 4, 12** and partially addresses gaps **5, 9, 11**. Gaps **2, 3, 6, 7, 8, 10** require separate follow-up plans (PLANT-DMA-3+).
 
 ---
 
@@ -636,7 +692,8 @@ class PublishReceiptModel(Base):
 1. `PublishReceiptModel` exists at `src/Plant/BackEnd/models/publish_receipt.py`
 2. Model has columns: `id`, `post_id`, `destination_type`, `success`, `platform_post_id`, `published_at`, `error`, `raw_response`, `created_at`
 3. Model is importable from `models` package
-4. Unit test verifies model instantiation with valid data
+4. Alembic migration file generated (`alembic revision --autogenerate -m "add publish_receipts table"`) and verified
+5. Unit test verifies model instantiation with valid data
 
 **Tests to write:**
 
@@ -717,10 +774,19 @@ async def list_publish_receipts(
     hired_instance_id: str,
     db: AsyncSession = Depends(get_read_db_session),
 ):
-    """List publish receipts for a hired agent instance."""
+    """List publish receipts for a hired agent instance.
+
+    Joins publish_receipts → campaign_posts → campaigns to scope by hired_instance_id.
+    Uses exact FK match — NEVER use LIKE with user-supplied input (SQL injection risk).
+    """
+    from models.campaign_post import CampaignPostModel
+    from models.campaign import CampaignModel
+
     stmt = (
         select(PublishReceiptModel)
-        .where(PublishReceiptModel.post_id.like(f"%{hired_instance_id}%"))
+        .join(CampaignPostModel, CampaignPostModel.post_id == PublishReceiptModel.post_id)
+        .join(CampaignModel, CampaignModel.campaign_id == CampaignPostModel.campaign_id)
+        .where(CampaignModel.hired_instance_id == hired_instance_id)
         .order_by(PublishReceiptModel.created_at.desc())
         .limit(100)
     )
@@ -750,7 +816,8 @@ session.add(receipt_row)
 2. `GET /api/v1/publish-receipts/{hired_instance_id}` returns 200 with list of receipts
 3. GET endpoint uses `get_read_db_session()` (read replica)
 4. Route uses `waooaw_router()`
-5. Tests cover both persist-on-success and persist-on-failure paths
+5. Query uses FK joins (`publish_receipts → campaign_posts → campaigns.hired_instance_id`) — **no `.like()` with user input** (SQL injection risk)
+6. Tests cover both persist-on-success and persist-on-failure paths
 
 **Tests to write:**
 
@@ -932,8 +999,27 @@ async def get_content_recommendations(
         f"Focus on content that drives engagement — prioritize educational and social proof dimensions."
     )
 
+    # Derive top dimensions from actual performance data.
+    # PerformanceStatModel.metrics may contain a "dimension" key if the publisher
+    # recorded which content dimension was used. Aggregate engagement by dimension.
+    dimension_engagement: defaultdict[str, List[float]] = defaultdict(list)
+    for row in rows:
+        metrics = row.metrics or {}
+        dim = metrics.get("dimension")
+        er = metrics.get("engagement_rate", 0.0)
+        if dim:
+            dimension_engagement[dim].append(er)
+
+    # Rank dimensions by average engagement rate
+    ranked_dims = sorted(
+        dimension_engagement,
+        key=lambda d: sum(dimension_engagement[d]) / len(dimension_engagement[d]),
+        reverse=True,
+    )
+    top_dims = ranked_dims[:5] if ranked_dims else []
+
     return ContentRecommendation(
-        top_dimensions=["education", "social proof"],  # TODO: derive from actual post-level data when available
+        top_dimensions=top_dims,
         best_posting_hours=best_hours,
         avg_engagement_rate=avg_er,
         total_posts_analyzed=total_posts,
@@ -951,9 +1037,10 @@ async def get_content_recommendations(
 
 | Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| E3-S1-T1 | `src/Plant/BackEnd/tests/unit/test_content_analytics.py` | Mock DB returns 10 `PerformanceStatModel` rows with varied metrics | `recommendation.total_posts_analyzed > 0`, `recommendation.avg_engagement_rate > 0`, `recommendation_text` non-empty |
+| E3-S1-T1 | `src/Plant/BackEnd/tests/unit/test_content_analytics.py` | Mock DB returns 10 `PerformanceStatModel` rows with varied metrics and dimension keys | `recommendation.total_posts_analyzed > 0`, `recommendation.avg_engagement_rate > 0`, `recommendation_text` non-empty |
 | E3-S1-T2 | same | Mock DB returns empty result | `recommendation.total_posts_analyzed == 0`, `recommendation_text` contains "No historical data" |
 | E3-S1-T3 | same | Mock DB returns rows with specific `collected_at` hours | `recommendation.best_posting_hours` lists correct hours sorted by impressions |
+| E3-S1-T4 | same | Mock DB returns rows with dimensions `{"dimension": "education", "engagement_rate": 0.08}` and `{"dimension": "social proof", "engagement_rate": 0.04}` | `recommendation.top_dimensions[0] == "education"` (higher engagement ranked first) |
 
 **Test command:**
 ```bash
