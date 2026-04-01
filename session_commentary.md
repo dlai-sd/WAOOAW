@@ -1,6 +1,47 @@
 
 ---
 
+## [2026-04-01 UTC] MOBILE-UX-1 — Mobile CP Parity + World-Class UX
+
+**Branch**: `docs/mobile-ux-1-plan` (to be created)
+**Plan file**: `docs/mobile/iterations/MOBILE-UX-1-cp-parity-ux.md` (to be created)
+**Status**: Vision intake — awaiting user confirmation
+
+### Goal
+Bring mobile app to same feature/UX state as CP application. Focus on bottom tab navigation, internal navigation, and world-class Expo UX experience for customers.
+
+### Research completed
+- [x] Full mobile screen inventory (25+ screens across 4 tabs)
+- [x] Full CP frontend feature inventory (15+ pages, sidebar nav, marketplace UX)
+- [x] Gap analysis: mobile vs CP
+
+### Key gaps identified
+1. Bottom tabs use emoji icons → need proper icon library (@expo/vector-icons)
+2. SearchResultsScreen is STUB — no search results rendered
+3. FilterAgentsScreen is STUB — no apply/reset action
+4. No Inbox / Deliverables screen (CP has full approval queue)
+5. No Subscriptions & Billing detail (only placeholder)
+6. No Command Centre / Dashboard parity
+7. No badge counts on tabs (CP has inbox badge)
+8. PaymentMethodsScreen uses placeholder data
+9. HomeScreen hero uses mock content
+10. No pull-to-refresh consistency across all list screens
+11. No haptic feedback or micro-animations
+12. Navigation transitions are default (no custom animations)
+
+### Checkpoint list
+- [ ] Vision intake confirmed by user
+- [ ] Branch created
+- [ ] Session commentary updated with confirmed scope
+- [ ] Plan skeleton committed + pushed
+- [ ] Iteration story cards written + committed
+- [ ] PR opened and plan reported
+
+### Recovery hint
+If session drops, check branch `docs/mobile-ux-1-plan`. Read this note to resume.
+
+---
+
 ## [2026-04-01 UTC] PLANT-DMA-2 — Real Publishing Engine + Analytics plan
 
 **Branch**: `docs/plant-dma-1-real-publishing-engine`
