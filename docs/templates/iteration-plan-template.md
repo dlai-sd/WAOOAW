@@ -136,7 +136,13 @@ EXECUTION ORDER:
 
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
-**Verify merge first:** confirm on GitHub that the Iteration 1 PR is merged to `main` before launching.
+**Prerequisite evidence:**
+- Iteration 1 merge status: `[PENDING HUMAN UPDATE BEFORE LAUNCH]`
+- Iteration 1 PR: `[PR URL or #NUMBER]`
+- Merge commit on `main`: `[FULL SHA]`
+- Merged at: `[UTC TIMESTAMP]`
+
+**Verify merge first:** use the Prerequisite evidence block above as the source of truth. If it is still marked pending or missing a merged PR number and merge commit, do not launch Iteration 2.
 
 **Steps to launch:** same as Iteration 1 (GitHub repository → Agents tab)
 
@@ -159,8 +165,9 @@ ENVIRONMENT REQUIREMENT:
 - Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
 
 PREREQUISITE CHECK (do before anything else):
-  Confirm from GitHub that the Iteration 1 PR for this plan is merged to `main`.
-  If you cannot verify that merge from the available GitHub context: post "Blocked: Iteration 1 merge to main could not be verified." and HALT.
+  Read the "Prerequisite evidence" block under Iteration 2 in this plan file.
+  Treat Iteration 2 as unlaunchable only if that block is still marked pending or does not include both a merged PR reference and a merge commit on `main`.
+  If the block is still pending or incomplete: post "Blocked: Iteration 1 merge evidence has not been recorded in the plan." and HALT.
 
 EXECUTION ORDER:
 1. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
