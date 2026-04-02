@@ -55,6 +55,9 @@ class ProfileResponse(BaseModel):
     phone: Optional[str] = None
     business_name: Optional[str] = None
     industry: Optional[str] = None
+    location: Optional[str] = None
+    timezone: Optional[str] = None
+    primary_language: Optional[str] = None
     picture: Optional[str] = None
 
 
@@ -67,6 +70,9 @@ class ProfileUpdate(BaseModel):
     phone: Optional[str] = None
     business_name: Optional[str] = None
     industry: Optional[str] = None
+    location: Optional[str] = None
+    timezone: Optional[str] = None
+    primary_language: Optional[str] = None
 
 
 def _to_response(user: User) -> ProfileResponse:
@@ -78,6 +84,9 @@ def _to_response(user: User) -> ProfileResponse:
         phone=user.phone,
         business_name=user.business_name,
         industry=user.industry,
+        location=user.location,
+        timezone=user.timezone,
+        primary_language=user.primary_language,
         picture=user.picture,
     )
 

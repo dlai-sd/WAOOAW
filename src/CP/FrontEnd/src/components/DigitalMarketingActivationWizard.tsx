@@ -1,5 +1,5 @@
 import { Badge, Button, Card, CardHeader, Spinner, Text, Input, Textarea } from '@fluentui/react-components'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
 import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
@@ -44,6 +44,7 @@ import {
   getBrandVoice,
   updateBrandVoice,
 } from '../services/brandVoice.service'
+import { getProfile, updateProfile, type ProfileData } from '../services/profile.service'
 import { redirectTo } from '../utils/browserNavigation'
 import {
   beginYouTubeOAuthFlow,
@@ -72,6 +73,8 @@ const PLATFORM_OPTIONS = [
   { key: 'whatsapp', label: 'WhatsApp', description: 'Outbound campaign and customer follow-up content.' },
   { key: 'x', label: 'X', description: 'Short-form social publishing and promotion.' },
 ]
+
+const SUPPORTED_PLATFORM_OPTIONS = PLATFORM_OPTIONS.filter((platform) => platform.key === 'youtube')
 
 
 function isNotFoundError(error: unknown): error is { status: number } {
@@ -357,6 +360,7 @@ export function DigitalMarketingActivationWizard({
   const [postActionStatus, setPostActionStatus] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
   const [postPublishReceipts, setPostPublishReceipts] = useState<Record<string, string>>({})
   const [queueDateTime, setQueueDateTime] = useState<Record<string, string>>({})
+  const profileRef = useRef<ProfileData | null>(null)
 
   const hiredInstanceId = useMemo(
     () => String(draft?.hired_instance_id || activeInstance?.hired_instance_id || '').trim(),
@@ -439,6 +443,23 @@ export function DigitalMarketingActivationWizard({
       setActiveStepIndex(1)
     }
   }, [instances, activeStepIndex, onSelectedInstanceChange])
+
+  useEffect(() => {
+    let cancelled = false
+    getProfile()
+      .then((profile) => {
+        profileRef.current = profile
+        if (cancelled) return
+        setBrandName((current) => current.trim() || normalizeText(profile.business_name))
+        setLocation((current) => current.trim() || normalizeText(profile.location))
+        setPrimaryLanguage((current) => current.trim() || normalizeText(profile.primary_language))
+        setTimezone((current) => current.trim() || normalizeText(profile.timezone))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // OAuth callback — detect ?code&state on mount and finalize connection
   useEffect(() => {
@@ -534,14 +555,15 @@ export function DigitalMarketingActivationWizard({
         }
       }
 
+      const profile = profileRef.current
       setDraft(nextDraft)
       setActivation(nextActivation)
       setNickname(normalizeText(nextDraft.nickname))
       setTheme(normalizeText(nextDraft.theme))
-      setBrandName(normalizeText(nextActivation?.workspace.brand_name))
-      setLocation(normalizeText(nextActivation?.workspace.location))
-      setPrimaryLanguage(normalizeText(nextActivation?.workspace.primary_language))
-      setTimezone(normalizeText(nextActivation?.workspace.timezone))
+      setBrandName(normalizeText(nextActivation?.workspace.brand_name) || normalizeText(profile?.business_name))
+      setLocation(normalizeText(nextActivation?.workspace.location) || normalizeText(profile?.location))
+      setPrimaryLanguage(normalizeText(nextActivation?.workspace.primary_language) || normalizeText(profile?.primary_language))
+      setTimezone(normalizeText(nextActivation?.workspace.timezone) || normalizeText(profile?.timezone))
       setBusinessContext(normalizeText(nextActivation?.workspace.business_context))
       setOfferingsText(formatListForTextarea(nextActivation?.workspace.offerings_services))
       setSelectedPlatforms(getSelectedMarketingPlatforms(nextActivation?.workspace))
@@ -736,11 +758,45 @@ export function DigitalMarketingActivationWizard({
     }
   }
 
+  const saveProfile = async (): Promise<boolean> => {
+    if (readOnly) return true
+
+    const payload = {
+      business_name: brandName.trim(),
+      location: location.trim(),
+      timezone: timezone.trim(),
+      primary_language: primaryLanguage.trim(),
+    }
+    const currentProfile = profileRef.current
+    const hasChanges = !currentProfile || (
+      normalizeText(currentProfile.business_name).trim() !== payload.business_name ||
+      normalizeText(currentProfile.location).trim() !== payload.location ||
+      normalizeText(currentProfile.timezone).trim() !== payload.timezone ||
+      normalizeText(currentProfile.primary_language).trim() !== payload.primary_language
+    )
+    const hasAnyValue = Object.values(payload).some((value) => value.trim())
+
+    if (!hasChanges || (!hasAnyValue && !currentProfile)) {
+      return true
+    }
+
+    try {
+      profileRef.current = await updateProfile(payload)
+      return true
+    } catch (e: any) {
+      setSaveError(e?.message || 'Failed to sync profile details')
+      setSaveStatus('error')
+      return false
+    }
+  }
+
   async function handleContinue() {
     if (currentStep.id !== 'select') {
       const saved = await saveWorkspace()
       if (!saved) return
       if (currentStep.id === 'theme') {
+        const savedProfile = await saveProfile()
+        if (!savedProfile) return
         const savedBrandVoice = await saveBrandVoice()
         if (!savedBrandVoice) return
       }
@@ -1410,37 +1466,34 @@ export function DigitalMarketingActivationWizard({
                   <div style={{ display: 'grid', gap: '1.25rem' }}>
                     <div>
                       <div className="dma-wizard-section-label">Select the channels for this agent to manage</div>
-                      <div className="dma-wizard-platform-grid">
-                        {[
-                          { key: 'youtube',   label: 'YouTube' },
-                          { key: 'instagram', label: 'Instagram' },
-                          { key: 'facebook',  label: 'Facebook' },
-                          { key: 'linkedin',  label: 'LinkedIn' },
-                          { key: 'whatsapp',  label: 'WhatsApp' },
-                          { key: 'x',        label: 'X (Twitter)' },
-                        ].map(({ key, label }) => {
-                          const isSelected = selectedPlatforms.includes(key)
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              className={`dma-wizard-platform-card${isSelected ? ' is-selected' : ''}`}
-                              onClick={() => {
-                                if (readOnly) return
-                                setSelectedPlatforms(prev =>
-                                  isSelected ? prev.filter(p => p !== key) : [...prev, key]
-                                )
-                              }}
-                              disabled={readOnly}
-                              aria-pressed={isSelected}
-                              data-testid={`platform-toggle-${key}`}
-                            >
-                              <span style={{ fontWeight: 600 }}>{label}</span>
-                              {isSelected ? <span style={{ color: '#00f2fe', marginLeft: 'auto' }}>✓</span> : null}
-                            </button>
-                          )
-                        })}
-                      </div>
+                        {SUPPORTED_PLATFORM_OPTIONS.length > 0 ? (
+                          <div className="dma-wizard-platform-grid">
+                            {SUPPORTED_PLATFORM_OPTIONS.map(({ key, label }) => {
+                              const isSelected = selectedPlatforms.includes(key)
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  className={`dma-wizard-platform-card${isSelected ? ' is-selected' : ''}`}
+                                  onClick={() => {
+                                    if (readOnly) return
+                                    setSelectedPlatforms(prev =>
+                                      isSelected ? prev.filter(p => p !== key) : [...prev, key]
+                                    )
+                                  }}
+                                  disabled={readOnly}
+                                  aria-pressed={isSelected}
+                                  data-testid={`platform-toggle-${key}`}
+                                >
+                                  <span style={{ fontWeight: 600 }}>{label}</span>
+                                  {isSelected ? <span style={{ color: '#00f2fe', marginLeft: 'auto' }}>✓</span> : null}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>No platforms available yet — YouTube is coming soon</div>
+                        )}
                     </div>
                     {selectedPlatforms.length > 0 ? (
                       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -1520,18 +1573,6 @@ export function DigitalMarketingActivationWizard({
                         Build Master Theme is next. The AI strategist will workshop your positioning, ask follow-up questions, and only unlock draft generation after you approve the final theme.
                       </div>
                     ) : null}
-
-                    {/* Other platforms */}
-                    {(['Instagram', 'Facebook', 'LinkedIn', 'WhatsApp', 'X'] as const).map((name) => (
-                      <div key={name} className="dma-wizard-platform-connect-row dma-wizard-platform-connect-row--disabled">
-                        <div className="dma-wizard-platform-connect-info">
-                          <span className="dma-wizard-platform-connect-name">{name}</span>
-                        </div>
-                        <div className="dma-wizard-platform-connect-action">
-                          <span className="dma-wizard-coming-soon-badge">Unavailable</span>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               )}

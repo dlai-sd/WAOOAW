@@ -35,6 +35,7 @@ import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPa
 import { listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 import { getContentRecommendations, type ContentRecommendation } from '../../services/contentAnalytics.service'
+import { listPublishReceipts, type PublishReceipt } from '../../services/publishReceipts.service'
 import { listYouTubeConnections, type YouTubeConnection } from '../../services/youtubeConnections.service'
 
 type MyAgentsSection = 'configure' | 'goals' | 'skills' | 'performance'
@@ -55,6 +56,16 @@ function formatLifecycleLabel(value: unknown): string | null {
   if (normalized === 'servicing_only') return 'Servicing only'
   if (normalized === 'retired_from_catalog') return 'Retired from catalog'
   return normalized.replace(/_/g, ' ')
+}
+
+function isTradingOrExchangeAgent(agentId?: string | null, agentTypeId?: string | null): boolean {
+  const normalizedAgentId = String(agentId || '').trim().toUpperCase()
+  const normalizedAgentType = String(agentTypeId || '').trim().toLowerCase()
+  return (
+    normalizedAgentId.startsWith('AGT-TRD-') ||
+    normalizedAgentType.startsWith('trading.') ||
+    normalizedAgentType.startsWith('exchange.')
+  )
 }
 
 function getLifecycleBadge(value: unknown) {
@@ -241,7 +252,7 @@ function JsonObjectTextarea(props: {
   return <Textarea value={localText} disabled={props.disabled} onChange={(_, data) => parseAndSet(String(data.value || ''))} />
 }
 
-function ConfigureAgentPanel(props: {
+export function ConfigureAgentPanel(props: {
   instance: MyAgentInstanceSummary
   readOnly: boolean
   onSaved: (updated: HiredAgentInstance) => void
@@ -383,6 +394,10 @@ function ConfigureAgentPanel(props: {
   }, [schemaFields, nickname, theme, config, constraintsJson])
 
   const canSave = !readOnly && !saving && Object.keys(requiredErrors).length === 0
+  const supportsExchangeCredentials = useMemo(
+    () => isTradingOrExchangeAgent(instance.agent_id, draft?.agent_type_id || instance.agent_type_id),
+    [draft?.agent_type_id, instance.agent_id, instance.agent_type_id]
+  )
 
   const setConfigKey = (key: string, value: unknown) => {
     setConfig((prev) => ({ ...prev, [key]: value }))
@@ -576,6 +591,11 @@ function ConfigureAgentPanel(props: {
     const key = field.key
     const err = requiredErrors[key]
     const touched = touchedFields[key]
+    const isExchangeOnlyField = key === 'exchange_credential_ref' || key === 'exchange_provider' || key === 'risk_limits' || key === 'allowed_coins' || key === 'default_coin'
+
+    if (isExchangeOnlyField && !supportsExchangeCredentials) {
+      return null
+    }
 
     const markTouched = () => setTouchedFields(prev => ({ ...prev, [key]: true }))
 
@@ -1879,6 +1899,102 @@ export function PerformancePanel(props: { instance: MyAgentInstanceSummary }) {
   )
 }
 
+function getPublishReceiptBadge(status: string) {
+  const normalized = String(status || '').trim().toLowerCase()
+  if (normalized === 'success' || normalized === 'published') {
+    return { color: 'success' as const, label: 'Success' }
+  }
+  if (normalized === 'failed' || normalized === 'error') {
+    return { color: 'danger' as const, label: 'Failed' }
+  }
+  return { color: 'informative' as const, label: status || 'Unknown' }
+}
+
+function formatPublishReceiptDate(value: string): string {
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return value
+  }
+}
+
+export function PublishHistoryPanel(props: { instance: MyAgentInstanceSummary }) {
+  const { instance } = props
+  const hiredInstanceId = String(instance.hired_instance_id || '').trim()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [receipts, setReceipts] = useState<PublishReceipt[]>([])
+
+  useEffect(() => {
+    if (!hiredInstanceId) return
+    let cancelled = false
+    const load = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const data = await listPublishReceipts(hiredInstanceId)
+        if (!cancelled) setReceipts(data)
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load publish history')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [hiredInstanceId])
+
+  return (
+    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--colorNeutralStroke2)' }}>
+      <div style={{ fontWeight: 700, marginBottom: '0.75rem' }}>Publish History</div>
+      {loading ? <LoadingIndicator message="Loading publish history..." size="small" /> : null}
+      {error ? <FeedbackMessage intent="error" title="Publish history unavailable" message={error} /> : null}
+      {!loading && !error && receipts.length === 0 ? (
+        <div style={{ opacity: 0.75, fontSize: '0.9rem' }}>No publish history yet</div>
+      ) : null}
+      {!loading && !error && receipts.length > 0 ? (
+        <div style={{ display: 'grid', gap: '0.75rem' }}>
+          {receipts.map((receipt) => {
+            const badge = getPublishReceiptBadge(receipt.status)
+            return (
+              <div
+                key={receipt.id}
+                style={{
+                  display: 'grid',
+                  gap: '0.35rem',
+                  padding: '0.75rem',
+                  borderRadius: '10px',
+                  border: '1px solid var(--colorNeutralStroke2)',
+                }}
+              >
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <strong>{receipt.platform_key}</strong>
+                  <Badge appearance="outline" color={badge.color} data-testid={`publish-receipt-status-${String(receipt.status || '').toLowerCase() || 'unknown'}`}>
+                    {badge.label}
+                  </Badge>
+                </div>
+                <div style={{ opacity: 0.8 }}>Published: {formatPublishReceiptDate(receipt.published_at)}</div>
+                {receipt.platform_url ? (
+                  <a href={receipt.platform_url} target="_blank" rel="noreferrer">
+                    View live post
+                  </a>
+                ) : null}
+                {!receipt.platform_url && receipt.error_message ? (
+                  <div style={{ color: 'var(--colorPaletteRedForeground1)' }}>{receipt.error_message}</div>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 
 export default function MyAgents({
   onNavigateToDiscover,
@@ -2451,6 +2567,9 @@ export default function MyAgents({
                       Daily activity metrics from your agent’s runs.
                     </div>
                     <PerformancePanel instance={selectedInstance} />
+                    {isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
+                      <PublishHistoryPanel instance={selectedInstance} />
+                    ) : null}
                   </>
                 )}
               </div>

@@ -333,11 +333,11 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E2-S1 | 1 | Customer sees actionable recommendations in Performance tab | Wire Performance tab to show content recommendations | 🔴 Not Started | — |
 | E2-S2 | 1 | Customer sees actionable recommendations in Performance tab | Add brand voice editor to wizard step 5 | 🔴 Not Started | — |
 | E2-S3 | 1 | Customer sees actionable recommendations in Performance tab | Render strategy preview before approval gate | 🔴 Not Started | — |
-| E3-S1 | 2 | Customer profile owns identity fields — wizard pre-fills | Extend profile model with location, timezone, primary_language | 🔴 Not Started | — |
-| E3-S2 | 2 | Customer profile owns identity fields — wizard pre-fills | Wizard pre-fills from profile and saves back | 🔴 Not Started | — |
-| E4-S1 | 2 | Customer sees polished, honest platform status | Hide unsupported platforms from wizard step 3 | 🔴 Not Started | — |
-| E4-S2 | 2 | Customer sees polished, honest platform status | Wire publish receipts to Deliverables review panel | 🔴 Not Started | — |
-| E4-S3 | 2 | Customer sees polished, honest platform status | Hide exchange credentials section for DMA agents | 🔴 Not Started | — |
+| E3-S1 | 2 | Customer profile owns identity fields — wizard pre-fills | Extend profile model with location, timezone, primary_language | 🟢 Done | — |
+| E3-S2 | 2 | Customer profile owns identity fields — wizard pre-fills | Wizard pre-fills from profile and saves back | 🟢 Done | — |
+| E4-S1 | 2 | Customer sees polished, honest platform status | Hide unsupported platforms from wizard step 3 | 🟢 Done | — |
+| E4-S2 | 2 | Customer sees polished, honest platform status | Wire publish receipts to Deliverables review panel | 🟢 Done | — |
+| E4-S3 | 2 | Customer sees polished, honest platform status | Hide exchange credentials section for DMA agents | 🟢 Done | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
@@ -1311,4 +1311,3 @@ cd src/CP/FrontEnd && npx jest src/__tests__/ExchangeCredentialsVisibility.test.
 **Commit message:** `feat(cp-wiz-1): hide exchange credentials section for DMA agents`
 
 **Done signal:** `"E4-S3 done. Changed: MyAgents.tsx. Tests: T1 ✅ T2 ✅"`
-
