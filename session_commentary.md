@@ -1,6 +1,51 @@
 
 ---
 
+## [2026-04-02 UTC] INFRA-CODESPACE-1 — Fast local iteration in GitHub Codespaces
+
+**Branch**: `docs/cp-codespace-fast-loop-plan`
+**Plan file**: `docs/infra/iterations/INFRA-CODESPACE-1-fast-local-loop.md` (to be created)
+**Status**: Vision intake extracted from user request
+
+### Goal
+Create a single-iteration, agent-executable plan for a Docker-first GitHub Codespaces workflow that can rebuild/restart Plant, CP, PP, and routing locally against demo-grade cloud dependencies, then expose the running stack via Codespaces URLs for fast iteration from a laptop.
+
+### Checkpoint list
+- [x] Read planning prompt and required platform context
+- [x] Create plan branch
+- [x] Extract vision intake from user request
+- [ ] Create plan skeleton with objective guardrails
+- [ ] Present vision intake for user correction
+- [ ] Write single-iteration epic/story cards after confirmation
+- [ ] Commit skeleton checkpoint
+- [ ] Commit final plan checkpoint
+
+### Next save point
+After the plan skeleton is created and the vision intake is posted for correction.
+
+---
+
+## [2026-04-02 UTC] Get-ready prompt follow-up — deployed latest CP plan against PLANT-DMA-2
+
+**Branch**: `copilot/mobile-ux-iteration-2`
+**Status**: In progress
+
+### Goal
+Explain what to expect after deploying the latest CP work that surfaces the PLANT-DMA-2 backend capabilities, using fresh repo context only.
+
+### Checkpoint list
+- [x] Read AGENTS.md
+- [x] Read CLAUDE.md
+- [x] Read docs/CONTEXT_AND_INDEX.md required sections
+- [x] Read docs/CP/iterations/NFRReusable.md required sections
+- [x] Re-read PLANT-DMA-2 and CP-WIZ-1 iteration scope relevant to deployed behavior
+- [ ] Summarize expected post-deploy behavior for user
+
+### Next save point
+After the expectation summary is delivered.
+
+---
+
 ## [2026-04-01 UTC] MOBILE-UX-1 — Mobile CP Parity + World-Class UX
 
 **Branch**: `docs/mobile-ux-1-plan` (to be created)
