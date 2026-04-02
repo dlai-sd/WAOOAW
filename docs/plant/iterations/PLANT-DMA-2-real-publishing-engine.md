@@ -167,19 +167,21 @@ The current DMA has two critical architectural gaps:
 
 ## How to Launch Each Iteration
 
-> Launch these tasks from the GitHub repository Agents tab.
-> These tasks must not assume shell, git, gh, or docker access is available.
-> Use the GitHub task branch and PR flow provided by the execution surface.
-
 ### Iteration 1
 
+**Pre-flight check:**
+```bash
+git status && git log --oneline -3
+# Must show: clean tree on main.
+```
+
 **Steps to launch:**
-1. Open this repository on GitHub
-2. Open the **Agents** tab
-3. Start a new agent task
-4. If the UI exposes repository agents, select **platform-engineer**; otherwise use the default coding agent
-5. Copy the block below and paste it into the task
-6. Start the run
+1. Open VS Code
+2. Open Copilot Chat: `Ctrl+Alt+I` (Windows/Linux) or `Cmd+Alt+I` (Mac)
+3. Click the model dropdown → select **Agent mode**
+4. Click `+` to start a new agent session
+5. Type `@` → select **platform-engineer** from the dropdown
+6. Copy the block below and paste → press **Enter**
 7. Go away. Come back at: **2026-04-01 17:00 UTC**
 
 **Iteration 1 agent task** (paste verbatim):
@@ -195,26 +197,14 @@ PLAN FILE: docs/plant/iterations/PLANT-DMA-2-real-publishing-engine.md
 YOUR SCOPE: Iteration 1 only — Epics E1, E2. Do not touch Iteration 2 content.
 TIME BUDGET: 5h. If you reach 6h without finishing, follow STUCK PROTOCOL now.
 
-ENVIRONMENT REQUIREMENT:
-- This task is intended for the GitHub repository Agents tab.
-- Shell/git/gh/docker tools may be unavailable on this execution surface.
-- Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
-
-FAIL-FAST VALIDATION GATE (complete before reading story cards or editing files):
-1. Verify the plan file is readable and the Iteration 1 section exists.
-2. Verify this execution surface allows repository writes on the current task branch.
-3. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
-4. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
-
 EXECUTION ORDER:
-1. Read the "Agent Execution Rules" section in this plan file.
-2. Read the "Iteration 1" section in this plan file.
-3. Read nothing else before starting.
-4. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
-5. Execute Epics in this order: E1 → E2.
-6. Add or update the tests listed in each story before moving on.
-7. If this execution surface exposes validation tools, run the narrowest relevant tests and record the result. If not, state: "Validation deferred: GitHub Agents tab on this run did not expose shell/docker test execution."
-8. Open or update the iteration PR to `main`, post the PR URL, and HALT.
+1. Run: git status && git log --oneline -3
+   You must be on main with a clean tree. If not, post why and HALT.
+2. Read the "Agent Execution Rules" section in this plan file.
+3. Read the "Iteration 1" section in this plan file.
+4. Read nothing else before starting.
+5. Execute Epics in this order: E1 → E2
+6. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
 ```
 
 **When you return:** Check Copilot Chat for a PR URL. If you see a draft PR titled `WIP:` — an agent got stuck. Read the PR comment for the exact blocker.
@@ -225,9 +215,13 @@ EXECUTION ORDER:
 
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
-**Verify merge first:** confirm on GitHub that the Iteration 1 PR is merged to `main` before launching.
+**Verify merge first:**
+```bash
+git fetch origin && git log --oneline origin/main | head -3
+# Must show: feat(plant-dma-2): iteration 1 — unified YouTube publishing
+```
 
-**Steps to launch:** same as Iteration 1 (GitHub repository → Agents tab)
+**Steps to launch:** same as Iteration 1 (VS Code → Copilot Chat → Agent mode → platform-engineer)
 
 **Iteration 2 agent task** (paste verbatim):
 
@@ -242,29 +236,15 @@ PLAN FILE: docs/plant/iterations/PLANT-DMA-2-real-publishing-engine.md
 YOUR SCOPE: Iteration 2 only — Epics E3, E4. Do not touch Iteration 1 content.
 TIME BUDGET: 5h.
 
-ENVIRONMENT REQUIREMENT:
-- This task is intended for the GitHub repository Agents tab.
-- Shell/git/gh/docker tools may be unavailable on this execution surface.
-- Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
-
 PREREQUISITE CHECK (do before anything else):
-    Confirm from GitHub that the Iteration 1 PR for this plan is merged to `main`.
-    If you cannot verify that merge from the available GitHub context: post "Blocked: Iteration 1 merge to main could not be verified." and HALT.
-
-FAIL-FAST VALIDATION GATE (complete before reading story cards or editing files):
-1. Verify the plan file is readable and the Iteration 2 section exists.
-2. Verify the Iteration 2 prerequisite check is satisfied before any story work.
-3. Verify this execution surface allows repository writes on the current task branch.
-4. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
-5. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
+  Run: git log --oneline origin/main | head -5
+  Must show: feat(plant-dma-2): iteration 1 — unified YouTube publishing
+  If not: post "Blocked: Iteration 1 not merged to main." and HALT.
 
 EXECUTION ORDER:
-1. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
-2. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
-3. Execute Epics in this order: E3 → E4.
-4. Add or update the tests listed in each story before moving on.
-5. If this execution surface exposes validation tools, run the narrowest relevant tests and record the result. If not, state: "Validation deferred: GitHub Agents tab on this run did not expose shell/docker test execution."
-6. Open or update the iteration PR to `main`, post URL, and HALT.
+1. git checkout main && git pull
+2. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
+3. When all epics are docker-tested, open the iteration PR. Post URL. HALT.
 ```
 
 **Come back at:** 2026-04-02 00:00 UTC
@@ -275,17 +255,6 @@ EXECUTION ORDER:
 
 > Agent: read this section once before executing any story. These rules override all instructions.
 
-### Rule -2 — Fail-fast validation gate
-
-Before reading story cards in detail or making any code changes, validate all of the following:
-
-- The plan file is readable and your assigned iteration section exists.
-- Any required `Prerequisite evidence` or merge prerequisite for this iteration is satisfied.
-- The GitHub execution surface lets you save repository changes on the current task branch.
-- The GitHub execution surface lets you open or update a PR to `main`, or you can explicitly report that PR controls are unavailable.
-
-If any check fails, post `Blocked at validation gate: [exact reason]` and HALT immediately.
-
 ### Rule -1 — Activate Expert Personas (first thing, before Rule 0)
 
 Read the `EXPERT PERSONAS:` field from the task you were given.
@@ -293,17 +262,36 @@ Activate each persona now. For every epic you execute, open with:
 
 > *"Acting as a Senior Python/FastAPI engineer, I will [what] by [approach]."*
 
-### Rule 0 — Use the GitHub task branch and open the iteration PR early
+### Rule 0 — Open tracking draft PR first
 
-- Keep the full iteration on the GitHub task branch created for this run.
-- If the UI lets you choose a branch name, prefer `feat/plant-dma-2-itN-[scope]-[run-id]`.
-- Open a draft PR to `main` as soon as the execution surface allows it, and keep updating that same PR through the iteration.
-- Use the Tracking Table in this plan as the source of truth for story status updates.
+```bash
+git checkout main && git pull
+git checkout -b feat/plant-dma-2-it1-e1
+git commit --allow-empty -m "chore(plant-dma-2): start iteration 1"
+git push origin feat/plant-dma-2-it1-e1
+
+gh pr create \
+  --base main \
+  --head feat/plant-dma-2-it1-e1 \
+  --draft \
+  --title "tracking: PLANT-DMA-2 Iteration 1 — in progress" \
+  --body "## tracking: PLANT-DMA-2 Iteration 1
+
+Subscribe for progress notifications.
+
+### Stories
+- [ ] [E1-S1] Create YouTubeAdapter wrapping YouTubeClient
+- [ ] [E1-S2] Register YouTubeAdapter and rewire scheduler
+- [ ] [E2-S1] Create publish_receipt DB model
+- [ ] [E2-S2] Persist receipts from PublisherEngine and add query endpoint
+
+_Live updates posted as comments below ↓_"
+```
 
 ### Rule 1 — Branch discipline
-One iteration = one GitHub task branch and one PR.
-Treat every `Branch:` value in story cards as a logical label only; on the GitHub Agents tab, keep the full iteration on the single branch created for the run.
-Never push or merge directly to `main`.
+One epic = one branch: `feat/plant-dma-2-itN-eN`.
+All stories in one epic commit to the same branch sequentially.
+Never push to `main` directly.
 
 ### Rule 2 — Scope lock
 Implement exactly the acceptance criteria in the story card.
@@ -311,33 +299,47 @@ Do not fix unrelated code. Do not refactor. Do not gold-plate.
 
 ### Rule 3 — Tests before the next story
 Write every test in the story's test table before advancing.
-If this execution surface exposes test execution, run the story's listed command or the narrowest equivalent.
-If not, add the tests anyway and note that execution is deferred to CI or local follow-up.
 
-### Rule 4 — Save progress after every story
-- Update this plan file's Tracking Table: change the story status to Done or Blocked.
-- Save code and plan updates to the GitHub task branch for this run.
-- If the PR already exists, add a concise progress update in the PR description or comments with files changed, tests added/run, and the next story.
+### Rule 4 — Commit + push after every story
+```bash
+git add -A
+git commit -m "feat(plant-dma-2): [story title]"
+git push origin feat/plant-dma-2-itN-eN
+```
 
-### Rule 5 — Validate after every epic
-- Prefer the narrowest relevant automated validation for the files you changed.
-- If GitHub Agents exposes execution tools, run the relevant test command and record the result.
-- If execution tools are unavailable, state clearly that validation is deferred to CI or local follow-up and continue.
-- After validation, add `**Epic complete ✅**` under the epic heading if the epic is complete.
+### Rule 5 — Docker integration test after every epic
+```bash
+docker compose -f docker-compose.test.yml run plant-test pytest --cov=app --cov-fail-under=80 -v
+```
 
 ### Rule 6 — STUCK PROTOCOL (3 failures = stop)
-- Mark the blocked story as `🚫 Blocked` in the Tracking Table.
-- Open or update a draft PR titled `WIP: PLANT-DMA-2 [story-id] — blocked` if PR controls are available.
-- Include the exact blocker, the exact error message, and 1-2 attempted fixes.
-- Post the PR URL if available. Otherwise post the blocker in the GitHub agent thread. **HALT.**
+```bash
+git add -A && git commit -m "WIP: plant-dma-2 [story-id] blocked — [error]"
+git push origin feat/plant-dma-2-itN-eN
+gh pr create --base main --head feat/plant-dma-2-itN-eN --draft \
+  --title "WIP: PLANT-DMA-2 [story-id] — blocked" \
+  --body "Blocked on: [test name]\nError: [exact message]"
+```
+Post the PR URL. **HALT.**
 
 ### Rule 7 — Iteration PR (after ALL epics complete)
-Use the same GitHub task branch for the final iteration PR to `main`.
-Title format: `feat(plant-dma-2): iteration N — [summary]`.
-PR body must include completed stories for this iteration, validation status or deferral note, and key NFR confirmations.
+```bash
+git checkout main && git pull
+git checkout -b feat/plant-dma-2-itN
+git merge --no-ff feat/plant-dma-2-itN-e1 feat/plant-dma-2-itN-e2
+git push origin feat/plant-dma-2-itN
+
+gh pr create --base main --head feat/plant-dma-2-itN \
+  --title "feat(plant-dma-2): iteration N — [summary]" \
+  --body "## PLANT-DMA-2 Iteration N\n\n[stories completed]\n\nDocker: all tests pass ✅"
+```
 
 ### CHECKPOINT RULE
-After completing each epic, make sure the GitHub task branch and iteration PR both reflect the finished work before starting the next epic. If interrupted, the already-complete epic must still be visible in the branch diff and Tracking Table.
+After completing each epic (all tests passing), run:
+```bash
+git add -A && git commit -m "feat(plant-dma-2): [epic-id] — [epic title]" && git push
+```
+Do this BEFORE starting the next epic. If interrupted, completed epics are already saved.
 
 ---
 

@@ -84,19 +84,23 @@ with limited context windows. Every structural decision in this plan exists to p
 
 ## How to Launch Each Iteration
 
-> Instructions for running the development agent from the GitHub repository Agents tab.
-> These plans are written for GitHub-hosted agents, where shell, git, gh, and docker tools may be unavailable.
-> Do not make terminal access a prerequisite to start the iteration.
+> Instructions for running the development agent from the GitHub Copilot agent interface in VS Code.
 
 ### Iteration 1
 
+**Pre-flight check (run in terminal before launching):**
+```bash
+git status && git log --oneline -3
+# Must show: clean tree on main. If not, resolve before launching.
+```
+
 **Steps to launch:**
-1. Open this repository on GitHub
-2. Open the **Agents** tab
-3. Start a new agent task
-4. If the UI exposes repository agents, select **platform-engineer**; otherwise use the default coding agent
-5. Copy the block below and paste it into the task
-6. Start the run
+1. Open VS Code
+2. Open Copilot Chat: `Ctrl+Alt+I` (Windows/Linux) or `Cmd+Alt+I` (Mac)
+3. Click the model dropdown at the top of the chat panel → select **Agent mode**
+4. Click `+` to start a new agent session
+5. Type `@` in the message box → select **platform-engineer** from the dropdown
+6. Copy the block below and paste into the message box → press **Enter**
 7. Go away. Come back at: **[DATE HH:MM TZ]**
 
 **Iteration 1 agent task** (paste verbatim — do not modify):
@@ -112,26 +116,16 @@ PLAN FILE: docs/[path/to/this/plan.md]
 YOUR SCOPE: Iteration 1 only — Epics [E1, E2, E3]. Do not touch Iteration 2 or 3 content.
 TIME BUDGET: [Xh]. If you reach [X+1h] without finishing, follow STUCK PROTOCOL now.
 
-ENVIRONMENT REQUIREMENT:
-- This task is intended for the GitHub repository Agents tab.
-- Shell/git/gh/docker tools may be unavailable on this execution surface.
-- Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
-
-FAIL-FAST VALIDATION GATE (complete before reading story cards or editing files):
-1. Verify the plan file is readable and the assigned iteration section exists.
-2. Verify this execution surface allows repository writes on the current task branch.
-3. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
-4. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
-
 EXECUTION ORDER:
-1. Read the "Agent Execution Rules" section in this plan file.
-2. Read the "Iteration 1" section in this plan file.
-3. Read nothing else before starting.
-4. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
-5. Execute Epics in this order: [E1] → [E2] → [E3]
-6. Add or update the tests listed in each story before moving on.
-7. If this execution surface exposes validation tools, run the narrowest relevant tests and record the result. If not, state: "Validation deferred: GitHub Agents tab on this run did not expose shell/docker test execution."
-8. Open or update the iteration PR to `main`, post the PR URL, and HALT.
+1. Run: git checkout main && git pull origin main
+   (GitHub cloud agents start on a copilot/* branch — this is normal. Always checkout main first.)
+2. Run: git status && git log --oneline -3
+   Confirm: clean tree on main. If untracked/modified files exist, stash them.
+3. Read the "Agent Execution Rules" section in this plan file.
+4. Read the "Iteration 1" section in this plan file.
+5. Read nothing else before starting.
+6. Execute Epics in this order: [E1] → [E2] → [E3]
+7. When all epics are docker-tested, open the iteration PR. Post the PR URL. HALT.
 ```
 
 **When you return:** Check Copilot Chat for a PR URL. If you see a draft PR titled `WIP:` — an agent got stuck. Read the PR comment for the exact blocker.
@@ -142,15 +136,13 @@ EXECUTION ORDER:
 
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
-**Prerequisite evidence:**
-- Iteration 1 merge status: `[PENDING HUMAN UPDATE BEFORE LAUNCH]`
-- Iteration 1 PR: `[PR URL or #NUMBER]`
-- Merge commit on `main`: `[FULL SHA]`
-- Merged at: `[UTC TIMESTAMP]`
+**Verify merge first:**
+```bash
+git fetch origin && git log --oneline origin/main | head -3
+# Must show: feat([plan-id]): iteration 1 — [summary]
+```
 
-**Verify merge first:** use the Prerequisite evidence block above as the source of truth. If it is still marked pending or missing a merged PR number and merge commit, do not launch Iteration 2.
-
-**Steps to launch:** same as Iteration 1 (GitHub repository → Agents tab)
+**Steps to launch:** same as Iteration 1 (VS Code → Copilot Chat → Agent mode → platform-engineer)
 
 **Iteration 2 agent task** (paste verbatim):
 
@@ -165,30 +157,16 @@ PLAN FILE: docs/[path/to/this/plan.md]
 YOUR SCOPE: Iteration 2 only — Epics [E4, E5]. Do not touch Iteration 3.
 TIME BUDGET: [Xh].
 
-ENVIRONMENT REQUIREMENT:
-- This task is intended for the GitHub repository Agents tab.
-- Shell/git/gh/docker tools may be unavailable on this execution surface.
-- Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
-
 PREREQUISITE CHECK (do before anything else):
-  Read the "Prerequisite evidence" block under Iteration 2 in this plan file.
-  Treat Iteration 2 as unlaunchable only if that block is still marked pending or does not include both a merged PR reference and a merge commit on `main`.
-  If the block is still pending or incomplete: post "Blocked: Iteration 1 merge evidence has not been recorded in the plan." and HALT.
-
-FAIL-FAST VALIDATION GATE (complete before reading story cards or editing files):
-1. Verify the plan file is readable and the assigned iteration section exists.
-2. Verify the Prerequisite evidence block for Iteration 2 is complete and not pending.
-3. Verify this execution surface allows repository writes on the current task branch.
-4. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
-5. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
+  Run: git fetch origin main:refs/remotes/origin/main && git log --oneline origin/main | head -5
+  Must show: feat([plan-id]): iteration 1 — [summary]
+  If not: post "Blocked: Iteration 1 not merged to main." and HALT.
 
 EXECUTION ORDER:
-1. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
-2. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
+1. git checkout main && git pull origin main
+2. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
 3. Respect backend-before-frontend ordering in the Dependency Map.
-4. Add or update the tests listed in each story before moving on.
-5. If this execution surface exposes validation tools, run the narrowest relevant tests and record the result. If not, state: "Validation deferred: GitHub Agents tab on this run did not expose shell/docker test execution."
-6. Open or update the iteration PR to `main`, post URL, and HALT.
+4. When all epics are docker-tested, open the iteration PR. Post URL. HALT.
 ```
 
 **Come back at:** [DATE HH:MM TZ]
@@ -204,17 +182,6 @@ EXECUTION ORDER:
 ## Agent Execution Rules
 
 > Agent: read this section once before executing any story. These rules override all instructions.
-
-### Rule -2 — Fail-fast validation gate
-
-Before reading story cards in detail or making any code changes, validate all of the following:
-
-- The plan file is readable and your assigned iteration section exists.
-- Any required `Prerequisite evidence` block for this iteration is complete and not marked pending.
-- The GitHub execution surface lets you save repository changes on the current task branch.
-- The GitHub execution surface lets you open or update a PR to `main`, or you can explicitly report that PR controls are unavailable.
-
-If any check fails, post `Blocked at validation gate: [exact reason]` and HALT immediately.
 
 ### Rule -1 — Activate Expert Personas (first thing, before Rule 0)
 
@@ -238,22 +205,52 @@ second. Relevant persona table (scan and claim):
 
 ---
 
-### Rule 0 — Use the GitHub task branch and open the iteration PR early
+### Rule 0 — Open tracking draft PR first (before writing any code)
 
-GitHub-hosted agents usually start on a task-specific branch. Keep the entire iteration on that branch.
+This gives you a progress feed. Subscribe to the PR once — GitHub notifies you after every story.
 
-- If the execution surface already created a branch for this run, keep using it.
-- If the UI lets you choose a branch name, prefer: `feat/[plan-id]-itN-[short-scope]-[run-id]`.
-- Open a draft PR to `main` as soon as PR controls are available and keep updating that same PR through the iteration.
-- If draft PR creation is not available early, continue working and open the iteration PR before HALT.
-- Use the Tracking Table in this plan as the source of truth for story status updates.
+```bash
+# 1. Create the first epic branch from main
+git checkout main && git pull
+export PLAN_RUN_ID="$(date -u +%Y%m%d%H%M%S)"
+export TRACKING_BRANCH="feat/[plan-id]-it1-e1-${PLAN_RUN_ID}"
+git checkout -b "$TRACKING_BRANCH"
+
+# 2. Push an empty init commit so the branch exists on remote
+git commit --allow-empty -m "chore([plan-id]): start iteration 1"
+git push origin "$TRACKING_BRANCH"
+
+# 3. Open draft PR — this is the progress tracker, not the final iteration PR
+gh pr create \
+  --base main \
+  --head "$TRACKING_BRANCH" \
+  --draft \
+  --title "tracking: [PLAN-ID] Iteration 1 — in progress" \
+  --body "## tracking: [PLAN-ID] Iteration 1
+
+Subscribe to this PR to receive one notification per story completion.
+
+### Stories
+- [ ] [E1-S1] [story title]
+- [ ] [E1-S2] [story title]
+- [ ] [E2-S1] [story title]
+
+_Live updates posted as comments below ↓_"
+
+export TRACKING_PR_NUMBER="$(gh pr list --head "$TRACKING_BRANCH" --json number -q '.[0].number')"
+```
+
+**PM instruction for plan files:** replace the `- [ ]` list above with the actual story IDs and titles from this plan's Tracking Table.
+
+After the agent posts the draft PR URL: go to GitHub, open the PR, click **Subscribe**. Do not merge this PR — it will be superseded by the iteration PR in Rule 7.
 
 ---
 
 ### Rule 1 — Branch discipline
-One iteration = one GitHub task branch and one PR.
-Treat every `Branch:` value in story cards as a logical label only; on the GitHub Agents tab, keep the full iteration on the single branch created for the run.
-Never push or merge directly to `main`.
+One epic = one branch: `feat/[plan-id]-itN-eN-$PLAN_RUN_ID`.
+Treat every `Branch:` value in story cards as a base name only; append `-$PLAN_RUN_ID` to the actual git branch you create and push.
+All stories in one epic commit to the same branch sequentially.
+Never push to `main` directly.
 
 ### Rule 2 — Scope lock
 Implement exactly the acceptance criteria in the story card.
@@ -262,36 +259,94 @@ If you notice a bug outside your scope: add a TODO comment and move on.
 
 **File scope**: Only create or modify files listed in your story card's "Files to create / modify" table. Do not edit any other file — not Dockerfiles, not CI workflows, not other services — even if you see an obvious improvement. Record it as a PR description note instead.
 
-**Missing iteration HALT rule**: Before writing any code, verify your assigned iteration section exists in the plan file.
-If the section is missing, post: "Iteration N not found in [plan file]. Cannot proceed." and HALT.
+**Missing iteration HALT rule**: Before writing any code, verify your assigned iteration section exists:
+```bash
+grep -n "## Iteration N" [PLAN FILE]
+# Zero results → HALT. Post: "Iteration N not found in [plan file]. Cannot proceed."
+```
+If the section is missing, do not create story cards. The plan is incomplete — a human must add the iteration content first.
 
 ### Rule 3 — Tests before the next story
 Write every test in the story's test table before advancing to the next story.
-If this execution surface exposes test execution, run the story's listed command or the narrowest equivalent.
-If not, add the tests anyway and note that execution is deferred to CI or local follow-up.
+Run the test command listed in the story card — not a generic command.
 
-### Rule 4 — Save progress after every story
-- Update this plan file's Tracking Table: change the story status to Done or Blocked.
-- Save code and plan updates to the GitHub task branch for this run.
-- If the PR already exists, add a concise progress update in the PR description or comments with files changed, tests added/run, and the next story.
+### Rule 4 — Commit + push + notify after every story
+```bash
+git add -A
+git commit -m "feat([plan-id]): [story title]"
+git push origin HEAD
 
-### Rule 5 — Validate after every epic
-- Prefer the narrowest relevant automated validation for the files you changed.
-- If GitHub Agents exposes execution tools, run the relevant test command and record the result.
-- If execution tools are unavailable, state clearly that validation is deferred to CI or local follow-up and continue.
-- After validation, add `**Epic complete ✅**` under the epic heading if the epic is complete.
+# Update this file's Tracking Table: change story status to Done
+git add docs/[path/to/this/plan.md]
+git commit -m "docs([plan-id]): mark [story-id] done"
+git push origin HEAD
+
+# Post progress comment to tracking draft PR (notifies the subscriber)
+gh pr comment \
+  "$TRACKING_PR_NUMBER" \
+  --body "✅ **[story-id] done** — $(git rev-parse --short HEAD)
+Files changed: [list]
+Tests: [T1 ✅ T2 ✅ ...]
+Next: [next-story-id]"
+```
+
+### Rule 5 — Docker integration test after every epic
+```bash
+docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+exit_code=$?; docker compose -f docker-compose.test.yml down; exit $exit_code
+```
+Exit 0 → add `**Epic complete ✅**` under the epic heading, commit, push.
+Non-zero → fix on same branch, retry. Max 3 attempts. Then: STUCK PROTOCOL.
 
 ### Rule 6 — STUCK PROTOCOL (3 failures = stop immediately)
-- Mark the blocked story as `🚫 Blocked` in the Tracking Table.
-- Open or update a draft PR titled `WIP: [story-id] — blocked` if PR controls are available.
-- Include the exact blocker, the exact error message, and 1-2 attempted fixes.
-- Post the PR URL if available. Otherwise post the blocker in the GitHub agent thread. **HALT. Do not start the next story.**
+```bash
+git add -A && git commit -m "WIP: [story-id] blocked — [exact error]"
+git push origin HEAD
+gh pr create \
+  --base main \
+  --head "$(git branch --show-current)" \
+  --title "WIP: [story-id] — blocked" \
+  --draft \
+  --body "Blocked on: [test name]
+Error: [exact error message — paste in full]
+Attempted fixes:
+1. [what I tried]
+2. [what I tried]"
+```
+Post the draft PR URL. **HALT. Do not start the next story.**
 
 ### Rule 7 — Iteration PR (after ALL epics complete)
-- Use the same GitHub task branch for the final iteration PR to `main`.
-- Title format: `feat([plan-id]): iteration N — [one-line summary]`.
-- PR body must include: completed stories for this iteration, validation status or deferral note, and the NFR checklist.
-- Post the PR URL in the task thread. **HALT — do not start the next iteration.**
+```bash
+git checkout main && git pull
+export ITERATION_BRANCH="feat/[plan-id]-itN-${PLAN_RUN_ID}"
+git checkout -b "$ITERATION_BRANCH"
+# Merge all epic branches for this iteration:
+git merge --no-ff "feat/[plan-id]-itN-e1-${PLAN_RUN_ID}" "feat/[plan-id]-itN-e2-${PLAN_RUN_ID}"
+git push origin "$ITERATION_BRANCH"
+
+gh pr create \
+  --base main \
+  --head "$ITERATION_BRANCH" \
+  --title "feat([plan-id]): iteration N — [one-line summary]" \
+  --body "## [PLAN-ID] Iteration N
+
+### Stories completed
+[paste tracking table rows for this iteration]
+
+### Docker integration
+All containers exited 0 ✅
+
+### NFR checklist
+- [ ] waooaw_router() — no bare APIRouter
+- [ ] GET routes use get_read_db_session()
+- [ ] PIIMaskingFilter on all new loggers
+- [ ] circuit_breaker on PlantGatewayClient and all external HTTP calls
+- [ ] No env-specific values in Dockerfile or code
+- [ ] New env vars added to infrastructure/terraform/envs/ (or N/A)
+- [ ] FE: loading + error + empty states on all data-fetching components
+- [ ] Tests >= 80% coverage on new BE code"
+```
+Post the PR URL in chat. **HALT — do not start the next iteration.**
 
 **CHECKPOINT RULE**: After completing each epic (all tests passing), run:
 ```bash
