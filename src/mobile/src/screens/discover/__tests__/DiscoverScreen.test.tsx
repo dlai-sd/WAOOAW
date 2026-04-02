@@ -1,8 +1,6 @@
 import React from 'react';
 import TestRenderer from 'react-test-renderer';
 
-const mockNavigate = jest.fn();
-
 jest.mock('@shopify/flash-list', () => {
   const ReactLib = require('react');
 
@@ -68,12 +66,6 @@ jest.mock('../../../hooks/usePerformanceMonitoring', () => ({
   usePerformanceMonitoring: jest.fn(),
 }));
 
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({
-    navigate: mockNavigate,
-  }),
-}));
-
 import { DiscoverScreen } from '../DiscoverScreen';
 
 const { useAgents } = jest.requireMock('../../../hooks/useAgents') as {
@@ -94,18 +86,23 @@ describe('DiscoverScreen', () => {
       isFetching: false,
     });
 
-    const tree = TestRenderer.create(
-      <DiscoverScreen
-        navigation={{ navigate: jest.fn() } as any}
-        route={{ key: 'discover', name: 'Discover', params: {} } as any}
-      />
-    );
+    let tree: TestRenderer.ReactTestRenderer;
+    TestRenderer.act(() => {
+      tree = TestRenderer.create(
+        <DiscoverScreen
+          navigation={{ navigate: jest.fn(), getParent: jest.fn() } as any}
+          route={{ key: 'discover', name: 'Discover', params: {} } as any}
+        />
+      );
+    });
 
-    const flashList = tree.root.findByType('FlashList');
+    const flashList = tree!.root.findByType('FlashList');
     expect(flashList.props.refreshControl).toBeTruthy();
   });
 
   it('opens the FilterAgents screen from the more filters chip', () => {
+    const mockNavigate = jest.fn();
+
     useAgents.mockReturnValue({
       data: [],
       isLoading: false,
@@ -114,14 +111,17 @@ describe('DiscoverScreen', () => {
       isFetching: false,
     });
 
-    const tree = TestRenderer.create(
-      <DiscoverScreen
-        navigation={{ navigate: jest.fn() } as any}
-        route={{ key: 'discover', name: 'Discover', params: { industry: 'marketing', minRating: 4, maxPrice: 12000 } } as any}
-      />
-    );
+    let tree: TestRenderer.ReactTestRenderer;
+    TestRenderer.act(() => {
+      tree = TestRenderer.create(
+        <DiscoverScreen
+          navigation={{ navigate: mockNavigate, getParent: jest.fn() } as any}
+          route={{ key: 'discover', name: 'Discover', params: { industry: 'marketing', minRating: 4, maxPrice: 12000 } } as any}
+        />
+      );
+    });
 
-    const moreFiltersButton = tree.root.findAllByType('TouchableOpacity').find(
+    const moreFiltersButton = tree!.root.findAllByType('TouchableOpacity').find(
       (node) => node.findAllByType('Text').some((textNode) => textNode.props.children === '+ More Filters')
     );
 

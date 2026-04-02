@@ -17,7 +17,6 @@ import {
   TextInput,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useAgents } from '../../hooks/useAgents';
 import { AgentCard } from '../../components/AgentCard';
@@ -32,9 +31,8 @@ import type { DiscoverStackScreenProps } from '../../navigation/types';
 
 type Props = DiscoverStackScreenProps<'Discover'>;
 
-export const DiscoverScreen = ({ route }: Props) => {
+export const DiscoverScreen = ({ route, navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
-  const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(
     (route.params?.industry as Industry | undefined) ?? null
@@ -291,11 +289,11 @@ export const DiscoverScreen = ({ route }: Props) => {
                   },
                 ]}
                 onPress={() =>
-                  navigation.navigate('FilterAgents' as never, {
+                  navigation.navigate('FilterAgents', {
                     industry: selectedIndustry ?? undefined,
                     minRating: minRating || undefined,
                     maxPrice: maxPrice || undefined,
-                  } as never)
+                  })
                 }
               >
                 <Text

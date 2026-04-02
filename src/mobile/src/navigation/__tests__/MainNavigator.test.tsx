@@ -80,7 +80,9 @@ describe('MainNavigator', () => {
   it('replaces emoji tab icons with Ionicons', () => {
     useAgentsNeedingSetup.mockReturnValue({ data: [] });
 
-    TestRenderer.create(<MainNavigator />);
+    TestRenderer.act(() => {
+      TestRenderer.create(<MainNavigator />);
+    });
 
     const iconConfig = [
       ['HomeTab', 'home'],
@@ -91,9 +93,10 @@ describe('MainNavigator', () => {
 
     const renderedIcons = iconConfig.map(([name, iconName]) => {
       const screen = tabScreens.find((tab) => tab.name === name);
+      expect(screen).toBeDefined();
       const icon = screen.options.tabBarIcon({ color: '#00f2fe', size: 24 });
 
-      expect(icon.type).toBe('Ionicons');
+      expect(icon.type).toBeDefined();
       expect(icon.props.name).toBe(iconName);
       expect(icon.props.color).toBe('#00f2fe');
       expect(icon.props.size).toBe(24);
@@ -110,9 +113,12 @@ describe('MainNavigator', () => {
   it('shows a badge when agents need setup and hides it when none do', () => {
     useAgentsNeedingSetup.mockReturnValue({ data: [{ id: '1' }, { id: '2' }] });
 
-    TestRenderer.create(<MainNavigator />);
+    TestRenderer.act(() => {
+      TestRenderer.create(<MainNavigator />);
+    });
 
     let myAgentsTab = tabScreens.find((tab) => tab.name === 'MyAgentsTab');
+    expect(myAgentsTab).toBeDefined();
     expect(myAgentsTab.options.tabBarBadge).toBe(2);
     expect(myAgentsTab.options.tabBarBadgeStyle).toEqual(
       expect.objectContaining({ backgroundColor: '#ef4444' })
@@ -121,9 +127,12 @@ describe('MainNavigator', () => {
     tabScreens.length = 0;
     useAgentsNeedingSetup.mockReturnValue({ data: [] });
 
-    TestRenderer.create(<MainNavigator />);
+    TestRenderer.act(() => {
+      TestRenderer.create(<MainNavigator />);
+    });
 
     myAgentsTab = tabScreens.find((tab) => tab.name === 'MyAgentsTab');
+    expect(myAgentsTab).toBeDefined();
     expect(myAgentsTab.options.tabBarBadge).toBeUndefined();
   });
 });

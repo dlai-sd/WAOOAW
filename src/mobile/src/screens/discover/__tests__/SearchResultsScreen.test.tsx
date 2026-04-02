@@ -26,7 +26,11 @@ jest.mock('../../../hooks/useAgents', () => ({
 }));
 
 jest.mock('../../../components/AgentCard', () => ({
-  AgentCard: ({ agent }: any) => <>{agent.name}</>,
+  AgentCard: ({ agent }: any) => {
+    const ReactLib = require('react');
+    const { Text } = require('react-native');
+    return ReactLib.createElement(Text, null, agent.name);
+  },
 }));
 
 import SearchResultsScreen from '../SearchResultsScreen';

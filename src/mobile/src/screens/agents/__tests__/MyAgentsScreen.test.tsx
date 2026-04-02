@@ -1,6 +1,5 @@
 import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import TestRenderer from 'react-test-renderer'
 
 import { MyAgentsScreen } from '../MyAgentsScreen'
 
@@ -230,10 +229,10 @@ describe('MyAgentsScreen', () => {
       refetch: jest.fn(),
     })
 
-    const tree = TestRenderer.create(
+    const rendered = render(
       <MyAgentsScreen navigation={navigation} route={{ key: 'my-agents', name: 'MyAgents' } as any} />
     )
 
-    expect(tree.root.findByType('ScrollView').props.refreshControl).toBeTruthy()
+    expect(rendered.UNSAFE_getByType('ScrollView').props.refreshControl).toBeTruthy()
   })
 })
