@@ -13,6 +13,9 @@ export interface ProfileData {
   phone?: string
   business_name?: string
   industry?: string
+  location?: string
+  timezone?: string
+  primary_language?: string
   picture?: string
 }
 
@@ -21,6 +24,9 @@ export interface ProfileUpdatePayload {
   phone?: string
   business_name?: string
   industry?: string
+  location?: string
+  timezone?: string
+  primary_language?: string
 }
 
 export async function getProfile(): Promise<ProfileData> {

@@ -35,6 +35,9 @@ class User(UserBase):
     phone: Optional[str] = None
     business_name: Optional[str] = None
     industry: Optional[str] = None
+    location: Optional[str] = None
+    timezone: Optional[str] = None
+    primary_language: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

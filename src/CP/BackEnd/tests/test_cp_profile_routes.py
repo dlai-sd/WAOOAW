@@ -80,3 +80,45 @@ def test_patch_profile_updates_industry(client, auth_headers):
     )
     assert resp.status_code == 200
     assert resp.json()["industry"] == "marketing"
+
+
+@pytest.mark.unit
+def test_patch_profile_updates_location_timezone_and_primary_language(client, auth_headers):
+    """PATCH /api/cp/profile updates the new profile identity fields."""
+    response = client.patch(
+        "/api/cp/profile",
+        json={
+            "location": "Mumbai",
+            "timezone": "Asia/Kolkata",
+            "primary_language": "Hindi",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["location"] == "Mumbai"
+    assert data["timezone"] == "Asia/Kolkata"
+    assert data["primary_language"] == "Hindi"
+
+
+@pytest.mark.unit
+def test_get_profile_returns_location_timezone_and_primary_language_after_patch(client, auth_headers):
+    """GET /api/cp/profile returns the newly persisted identity fields."""
+    client.patch(
+        "/api/cp/profile",
+        json={
+            "location": "Mumbai",
+            "timezone": "Asia/Kolkata",
+            "primary_language": "Hindi",
+        },
+        headers=auth_headers,
+    )
+
+    response = client.get("/api/cp/profile", headers=auth_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["location"] == "Mumbai"
+    assert data["timezone"] == "Asia/Kolkata"
+    assert data["primary_language"] == "Hindi"
