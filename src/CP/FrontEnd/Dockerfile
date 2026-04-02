@@ -32,19 +32,9 @@ CMD ["npm", "run", "test", "--", "--run"]
 # Runtime stage - Nginx
 FROM nginx:alpine
 
-# Select nginx config at build time.
-# - cloudrun (default): no /api proxy; relies on LB routing
-# - local: proxies /api to the cp-backend container (Docker/Codespaces)
-ARG NGINX_MODE=cloudrun
-
-# Copy both configs, then activate the selected one.
-COPY nginx.conf /etc/nginx/conf.d/default.cloudrun.conf
-COPY nginx.local.conf /etc/nginx/conf.d/default.local.conf
-RUN if [ "$NGINX_MODE" = "local" ]; then \
-        cp /etc/nginx/conf.d/default.local.conf /etc/nginx/conf.d/default.conf; \
-    else \
-        cp /etc/nginx/conf.d/default.cloudrun.conf /etc/nginx/conf.d/default.conf; \
-    fi
+# Ship both configs in the same image and choose at container start.
+COPY nginx.conf /etc/nginx/nginx.cloudrun.conf
+COPY nginx.local.conf /etc/nginx/nginx.local.conf
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
