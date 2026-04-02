@@ -5,7 +5,7 @@
 
 **Branch**: `docs/cp-codespace-fast-loop-plan`
 **Plan file**: `docs/infra/iterations/INFRA-CODESPACE-1-fast-local-loop.md` (to be created)
-**Status**: Vision intake extracted from user request
+**Status**: Plan drafted and pushed for review
 
 ### Goal
 Create a single-iteration, agent-executable plan for a Docker-first GitHub Codespaces workflow that can rebuild/restart Plant, CP, PP, and routing locally against demo-grade cloud dependencies, then expose the running stack via Codespaces URLs for fast iteration from a laptop.
@@ -14,14 +14,14 @@ Create a single-iteration, agent-executable plan for a Docker-first GitHub Codes
 - [x] Read planning prompt and required platform context
 - [x] Create plan branch
 - [x] Extract vision intake from user request
-- [ ] Create plan skeleton with objective guardrails
-- [ ] Present vision intake for user correction
-- [ ] Write single-iteration epic/story cards after confirmation
-- [ ] Commit skeleton checkpoint
+- [x] Create plan skeleton with objective guardrails
+- [x] Present vision intake for user correction
+- [x] Write single-iteration epic/story cards after confirmation
+- [x] Commit skeleton checkpoint
 - [ ] Commit final plan checkpoint
 
 ### Next save point
-After the plan skeleton is created and the vision intake is posted for correction.
+After the completed plan is committed and pushed.
 
 ---
 
