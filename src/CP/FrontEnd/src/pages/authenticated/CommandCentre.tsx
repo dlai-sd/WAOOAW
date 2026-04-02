@@ -1,4 +1,10 @@
-import { Button, Card } from '@fluentui/react-components'
+import { Button, Card, Spinner } from '@fluentui/react-components'
+import { useEffect, useMemo, useState } from 'react'
+
+import {
+  getMyAgentsSummary,
+  type MyAgentInstanceSummary,
+} from '../../services/myAgentsSummary.service'
 
 interface CommandCentreProps {
   onOpenDiscover: () => void
@@ -7,26 +13,102 @@ interface CommandCentreProps {
   onOpenGoals: () => void
 }
 
-export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyAgents, onOpenGoals }: CommandCentreProps) {
+export default function CommandCentre({
+  onOpenDiscover,
+  onOpenBilling,
+  onOpenMyAgents,
+  onOpenGoals,
+}: CommandCentreProps) {
+  const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const readinessCards = [
-    { label: 'Agent summary', sublabel: 'Review activity after your agents begin working', value: '⏳' },
-    { label: 'Billing', sublabel: 'View subscriptions, invoices, and receipts', value: '🧾' },
-    { label: 'Approvals', sublabel: 'Review items that need your decision', value: '✅' },
-    { label: 'Profile', sublabel: 'Review or update your account details', value: '👤' },
-  ]
+  useEffect(() => {
+    let cancelled = false
 
-  const priorities = [
-    'Open My Agents to review setup and current activity.',
-    'Review billing to check subscriptions, invoices, and receipts.',
-    'Use Goals to set the next business outcome for your agents.',
-  ]
+    getMyAgentsSummary()
+      .then((response) => {
+        if (!cancelled) {
+          setInstances(response?.instances || [])
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Failed to load dashboard data.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const totalAgents = instances.length
+  const inTrial = instances.filter((instance) => instance.trial_status === 'active').length
+  const needsSetup = instances.filter((instance) => !instance.configured || !instance.goals_completed).length
+  const configured = instances.filter((instance) => instance.configured).length
+
+  const readinessCards = useMemo(
+    () => [
+      { label: 'Total agents', sublabel: 'Hired agents in your workspace', value: String(totalAgents) },
+      { label: 'In trial', sublabel: 'Agents in their 7-day trial period', value: String(inTrial) },
+      { label: 'Need setup', sublabel: 'Agents waiting for configuration', value: String(needsSetup) },
+      { label: 'Configured', sublabel: 'Agents ready and producing output', value: String(configured) },
+    ],
+    [configured, inTrial, needsSetup, totalAgents]
+  )
+
+  const priorities = useMemo(() => {
+    const next: string[] = []
+
+    if (needsSetup > 0) {
+      next.push(
+        `${needsSetup} agent${needsSetup > 1 ? 's' : ''} need${needsSetup === 1 ? 's' : ''} setup — open My Agents to configure.`
+      )
+    }
+    if (inTrial > 0) {
+      next.push(
+        `${inTrial} agent${inTrial > 1 ? 's' : ''} in trial — review output before trial ends.`
+      )
+    }
+    if (totalAgents === 0) {
+      next.push('Hire your first agent from Discover to get started.')
+    }
+    if (prioritiesAreClear(totalAgents, needsSetup, inTrial)) {
+      next.push('All agents are set up and running. Check Deliverables for latest output.')
+    }
+
+    return next
+  }, [inTrial, needsSetup, totalAgents])
+
+  if (loading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <Spinner label="Loading dashboard data..." />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard-page">
+        <div className="error-banner" style={{ padding: '1rem', color: '#ef4444' }}>
+          {error}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="dashboard-page">
       <div className="dashboard-stats">
-        {readinessCards.map((stat, idx) => (
-          <Card key={idx} className="stat-card">
+        {readinessCards.map((stat) => (
+          <Card key={stat.label} className="stat-card">
             <div className="stat-icon">{stat.value}</div>
             <div className="stat-label">{stat.label}</div>
             <div className="stat-sublabel">{stat.sublabel}</div>
@@ -38,7 +120,7 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
         <Card className="command-centre-panel">
           <div className="section-header">
             <h2>Today&#39;s Flight Plan</h2>
-            <span className="live-indicator">Top 3 priorities</span>
+            <span className="live-indicator">Top priorities</span>
           </div>
           <div className="command-centre-checklist">
             {priorities.map((item) => (
@@ -61,15 +143,15 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
           </div>
           <div className="command-centre-pulse-grid">
             <div>
-              <div className="command-centre-pulse-value">0</div>
-              <div className="command-centre-pulse-label">Pinned alerts right now</div>
+              <div className="command-centre-pulse-value">{needsSetup}</div>
+              <div className="command-centre-pulse-label">Agents needing setup</div>
             </div>
             <div>
-              <div className="command-centre-pulse-value">1</div>
-              <div className="command-centre-pulse-label">Billing area to review</div>
+              <div className="command-centre-pulse-value">{inTrial}</div>
+              <div className="command-centre-pulse-label">Trials to review</div>
             </div>
             <div>
-              <div className="command-centre-pulse-value">3</div>
+              <div className="command-centre-pulse-value">{priorities.length}</div>
               <div className="command-centre-pulse-label">Suggested next actions</div>
             </div>
           </div>
@@ -86,9 +168,23 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
         </div>
         <div className="activity-feed">
           <Card className="activity-card">
-            <div className="activity-agent">No live agent activity yet</div>
-            <div className="activity-action">Once a hired agent begins running, the latest output and approvals will appear here.</div>
-            <div className="activity-meta">What to do next: finish setup in My Agents or hire your first agent from Discover.</div>
+            <div className="activity-agent">
+              {totalAgents === 0 ? 'No hired agents yet' : 'Live activity summary'}
+            </div>
+            <div className="activity-action">
+              {totalAgents === 0
+                ? 'Hire your first agent from Discover to start seeing output and approvals here.'
+                : needsSetup > 0
+                  ? 'Some agents still need setup before they can start delivering output.'
+                  : inTrial > 0
+                    ? 'Your trial agents are producing output — review Deliverables and decide what to keep.'
+                    : 'Your configured agents are running. Check Deliverables for the latest work.'}
+            </div>
+            <div className="activity-meta">
+              {totalAgents === 0
+                ? 'What to do next: browse Discover and hire the first agent that matches your workflow.'
+                : `Configured agents: ${configured} · Agents needing setup: ${needsSetup} · Trials active: ${inTrial}`}
+            </div>
           </Card>
         </div>
       </section>
@@ -112,4 +208,8 @@ export default function CommandCentre({ onOpenDiscover, onOpenBilling, onOpenMyA
       </section>
     </div>
   )
+}
+
+function prioritiesAreClear(totalAgents: number, needsSetup: number, inTrial: number): boolean {
+  return totalAgents > 0 && needsSetup === 0 && inTrial === 0
 }

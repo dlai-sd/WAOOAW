@@ -444,23 +444,6 @@ export function DigitalMarketingActivationWizard({
     }
   }, [instances, activeStepIndex, onSelectedInstanceChange])
 
-  useEffect(() => {
-    let cancelled = false
-    getProfile()
-      .then((profile) => {
-        profileRef.current = profile
-        if (cancelled) return
-        setBrandName((current) => current.trim() || normalizeText(profile.business_name))
-        setLocation((current) => current.trim() || normalizeText(profile.location))
-        setPrimaryLanguage((current) => current.trim() || normalizeText(profile.primary_language))
-        setTimezone((current) => current.trim() || normalizeText(profile.timezone))
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
   // OAuth callback — detect ?code&state on mount and finalize connection
   useEffect(() => {
     const result = readYouTubeOAuthResult()
@@ -555,12 +538,21 @@ export function DigitalMarketingActivationWizard({
         }
       }
 
-      const profile = profileRef.current
+      let profile = profileRef.current
+      const workspaceBrandName = normalizeText(nextActivation?.workspace.brand_name)
+      if (!workspaceBrandName && !profile) {
+        try {
+          profile = await getProfile()
+          profileRef.current = profile
+        } catch {
+          profile = profileRef.current
+        }
+      }
       setDraft(nextDraft)
       setActivation(nextActivation)
       setNickname(normalizeText(nextDraft.nickname))
       setTheme(normalizeText(nextDraft.theme))
-      setBrandName(normalizeText(nextActivation?.workspace.brand_name) || normalizeText(profile?.business_name))
+      setBrandName(workspaceBrandName || normalizeText(profile?.business_name))
       setLocation(normalizeText(nextActivation?.workspace.location) || normalizeText(profile?.location))
       setPrimaryLanguage(normalizeText(nextActivation?.workspace.primary_language) || normalizeText(profile?.primary_language))
       setTimezone(normalizeText(nextActivation?.workspace.timezone) || normalizeText(profile?.timezone))
@@ -1850,7 +1842,10 @@ export function DigitalMarketingActivationWizard({
 
                       <StrategyPreviewPanel
                         isThemeApproved={isThemeApproved}
-                        strategySummary={strategySummary.first_content_direction ?? strategyWorkshop.checkpoint_summary ?? strategyWorkshop.assistant_message ?? ''}
+                        masterTheme={masterTheme}
+                        derivedThemes={derivedThemes}
+                        strategySummary={strategySummary}
+                        fallbackSummary={strategyWorkshop.checkpoint_summary || strategyWorkshop.assistant_message || ''}
                         messages={strategyPreviewMessages}
                       />
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -2051,33 +2046,90 @@ export function DigitalMarketingActivationWizard({
 
 export function StrategyPreviewPanel({
   isThemeApproved,
+  masterTheme,
+  derivedThemes,
   strategySummary,
+  fallbackSummary = '',
   messages,
 }: {
   isThemeApproved: boolean
-  strategySummary: string
+  masterTheme?: string
+  derivedThemes?: DigitalMarketingDerivedTheme[]
+  strategySummary: DigitalMarketingStrategyWorkshopSummary | string
+  fallbackSummary?: string
   messages: Array<{ role: 'assistant' | 'user'; content: string }>
 }) {
   if (isThemeApproved) return null
 
+  const strictPreviewMode = masterTheme !== undefined || derivedThemes !== undefined
+  const resolvedMasterTheme = masterTheme || ''
+  const resolvedDerivedThemes = derivedThemes || []
+  const hasPreview = Boolean(resolvedMasterTheme.trim()) || resolvedDerivedThemes.length > 0
   const thread = messages.slice(-5)
+  const summary = typeof strategySummary === 'string'
+    ? strategySummary
+    : strategySummary.first_content_direction
+      || strategySummary.business_goal
+      || strategySummary.positioning
+      || fallbackSummary
+
+  if (!hasPreview) {
+    if (strictPreviewMode) return null
+    if (!summary) return null
+
+    return (
+      <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #333', borderRadius: '0.75rem', background: '#1a1a1a' }}>
+        <h4 style={{ margin: '0 0 0.5rem', color: '#00f2fe' }}>Review your content strategy before approving</h4>
+        <blockquote style={{ borderLeft: '3px solid #667eea', paddingLeft: '1rem', margin: '0.5rem 0', color: '#ccc' }}>
+          {summary}
+        </blockquote>
+        {thread.map((msg, index) => (
+          <div key={`${msg.role}-${index}`} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? '#00f2fe' : '#ccc' }}>
+            <strong>{msg.role === 'assistant' ? 'Agent' : 'You'}:</strong> {msg.content}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
-    <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #333', borderRadius: '0.75rem', background: '#1a1a1a' }}>
-      <h4 style={{ margin: '0 0 0.5rem', color: '#00f2fe' }}>Review your content strategy before approving</h4>
-      {strategySummary ? (
-        <blockquote style={{ borderLeft: '3px solid #667eea', paddingLeft: '1rem', margin: '0.5rem 0', color: '#ccc' }}>
-          {strategySummary}
-        </blockquote>
-      ) : (
-        <p style={{ color: '#666' }}>No strategy generated yet — the agent will create one after you provide your business context.</p>
-      )}
-      {thread.map((msg, i) => (
-        <div key={`${msg.role}-${i}`} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? '#00f2fe' : '#ccc' }}>
+    <Card style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--colorNeutralBackground3)' }}>
+      <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.7, marginBottom: '0.5rem' }}>
+        Strategy Preview — review before approving
+      </div>
+      {resolvedMasterTheme ? (
+        <div style={{ fontWeight: 600, fontSize: '1.05rem', marginBottom: '0.5rem' }}>
+          Master Theme: {resolvedMasterTheme}
+        </div>
+      ) : null}
+      {resolvedDerivedThemes.length > 0 ? (
+        <div style={{ marginBottom: '0.75rem' }}>
+          <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>Derived Themes:</div>
+          <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+            {resolvedDerivedThemes.map((theme, index) => (
+              <li key={`${theme.title}-${index}`} style={{ marginBottom: '0.25rem' }}>
+                <strong>{theme.title}</strong>
+                {theme.description ? ` — ${theme.description}` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {typeof strategySummary !== 'string' ? (
+        <div style={{ display: 'grid', gap: '0.25rem', marginBottom: thread.length ? '0.75rem' : 0 }}>
+          {strategySummary.business_goal ? <div><strong>Business goal:</strong> {strategySummary.business_goal}</div> : null}
+          {strategySummary.positioning ? <div><strong>Positioning:</strong> {strategySummary.positioning}</div> : null}
+          {strategySummary.first_content_direction ? <div><strong>First content direction:</strong> {strategySummary.first_content_direction}</div> : null}
+        </div>
+      ) : summary ? (
+        <div style={{ marginBottom: thread.length ? '0.75rem' : 0 }}>{summary}</div>
+      ) : null}
+      {thread.map((msg, index) => (
+        <div key={`${msg.role}-${index}`} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? '#00f2fe' : '#ccc' }}>
           <strong>{msg.role === 'assistant' ? 'Agent' : 'You'}:</strong> {msg.content}
         </div>
       ))}
-    </div>
+    </Card>
   )
 }
 
