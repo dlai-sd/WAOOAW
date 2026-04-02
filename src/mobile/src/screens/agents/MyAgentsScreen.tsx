@@ -125,6 +125,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   const {
     data: allAgents,
     isLoading: isLoadingAll,
+    isFetching: isFetchingAll,
     error: errorAll,
     refetch: refetchAll,
   } = useHiredAgents();
@@ -133,11 +134,13 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   const {
     data: trialAgents,
     isLoading: isLoadingTrials,
+    isFetching: isFetchingTrials,
     error: errorTrials,
     refetch: refetchTrials,
   } = useAgentsInTrial();
 
   const isLoading = activeTab === 'trials' ? isLoadingTrials : isLoadingAll;
+  const isFetching = activeTab === 'trials' ? isFetchingTrials : isFetchingAll;
   const error = activeTab === 'trials' ? errorTrials : errorAll;
   const refetch = activeTab === 'trials' ? refetchTrials : refetchAll;
 
@@ -159,12 +162,8 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   const count = agents.length;
   const needsAttentionCount = (allAgents || []).filter((agent) => getAttentionReasons(agent).length > 0).length
 
-  // Pull-to-refresh handler
-  const [refreshing, setRefreshing] = React.useState(false);
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
+  const onRefresh = React.useCallback(() => {
+    refetch();
   }, [refetch]);
 
   // Navigate to trial dashboard or agent detail
@@ -221,7 +220,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   }, []);
 
   // Loading state
-  if (isLoading && !refreshing) {
+  if (isLoading) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
         <LoadingSpinner message="Loading your agents..." />
@@ -230,7 +229,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
   }
 
   // Error state
-  if (error && !refreshing) {
+  if (error) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
         <ErrorView
@@ -383,7 +382,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
           ]}
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
+              refreshing={isFetching && !isLoading}
               onRefresh={onRefresh}
               tintColor={colors.neonCyan}
               colors={[colors.neonCyan]}
@@ -627,7 +626,7 @@ export const MyAgentsScreen = ({ navigation }: Props) => {
             }}
             refreshControl={
               <RefreshControl
-                refreshing={refreshing}
+                refreshing={isFetching && !isLoading}
                 onRefresh={onRefresh}
                 tintColor={colors.neonCyan}
                 colors={[colors.neonCyan]}

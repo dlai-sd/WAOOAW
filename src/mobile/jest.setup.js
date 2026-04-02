@@ -2,6 +2,7 @@
 // require('@testing-library/react-native/extend-expect');
 
 global.__DEV__ = true;
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const originalConsoleError = console.error;
 const originalConsoleLog = console.log;
@@ -58,6 +59,19 @@ jest.mock("expo-font", () => ({
 
 jest.mock("expo-status-bar", () => ({
   StatusBar: "StatusBar",
+}));
+
+jest.mock("@expo/vector-icons", () => ({
+  __esModule: true,
+  Ionicons: "Ionicons",
+  AntDesign: "AntDesign",
+  Entypo: "Entypo",
+  EvilIcons: "EvilIcons",
+  Feather: "Feather",
+  FontAwesome: "FontAwesome",
+  FontAwesome5: "FontAwesome5",
+  MaterialIcons: "MaterialIcons",
+  MaterialCommunityIcons: "MaterialCommunityIcons",
 }));
 
 jest.mock("expo-speech", () => ({

@@ -302,11 +302,11 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E1-S3 | 1 | Customer sees real deliverables | Wire Command Centre to live agent summary data | 🟢 Done | — |
 | E2-S1 | 1 | DMA Wizard stops wasting time | Deduplicate DMA Wizard fields — pull from customer profile | 🟢 Done | — |
 | E2-S2 | 1 | DMA Wizard stops wasting time | Show draft preview before strategy approval gate | 🟢 Done | — |
-| E3-S1 | 2 | Mobile feels professional | Replace emoji tab icons with vector icons | 🔴 Not Started | — |
-| E3-S2 | 2 | Mobile feels professional | Wire SearchResults + FilterAgents to API | 🔴 Not Started | — |
-| E3-S3 | 2 | Mobile feels professional | Add tab badge counts for pending actions | 🔴 Not Started | — |
-| E4-S1 | 2 | Mobile shows agent output | Create mobile Deliverables screen | 🔴 Not Started | — |
-| E4-S2 | 2 | Mobile shows agent output | Wire SubscriptionManagement to real billing data | 🔴 Not Started | — |
+| E3-S1 | 2 | Mobile feels professional | Replace emoji tab icons with vector icons | 🟢 Done | #1007 |
+| E3-S2 | 2 | Mobile feels professional | Add tab badge counts for pending actions | 🟢 Done | #1007 |
+| E3-S3 | 2 | Mobile feels professional | Add Apply button to FilterAgentsScreen with navigation back | 🟢 Done | #1007 |
+| E4-S1 | 2 | Mobile search shows real results | Wire SearchResultsScreen to useSearchAgents hook | 🟢 Done | #1007 |
+| E4-S2 | 2 | Mobile search shows real results | Add pull-to-refresh on DiscoverScreen and MyAgentsScreen | 🟢 Done | #1007 |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
@@ -989,6 +989,8 @@ cd src/mobile && npx jest src/screens/discover/__tests__/FilterAgentsScreen.test
 
 **Done signal:** `"E3-S3 done. Changed: FilterAgentsScreen.tsx, types.ts, test. Tests: T1 ✅ T2 ✅"`
 
+**Epic complete ✅**
+
 ---
 
 ### Epic E4: Mobile search shows real results
@@ -1174,3 +1176,5 @@ cd src/mobile && npx jest src/screens/discover/__tests__/DiscoverScreen.test.tsx
 **Commit message:** `feat(mobile-ux-1): add pull-to-refresh to discover and my agents`
 
 **Done signal:** `"E4-S2 done. Changed: DiscoverScreen.tsx, MyAgentsScreen.tsx, tests. Tests: T1 ✅ T2 ✅"`
+
+**Epic complete ✅**

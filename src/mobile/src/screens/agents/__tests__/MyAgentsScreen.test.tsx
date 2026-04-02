@@ -94,12 +94,14 @@ describe('MyAgentsScreen', () => {
         },
       ],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
     useAgentsInTrial.mockReturnValue({
       data: [],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
@@ -131,12 +133,14 @@ describe('MyAgentsScreen', () => {
         },
       ],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
     useAgentsInTrial.mockReturnValue({
       data: [],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
@@ -187,12 +191,14 @@ describe('MyAgentsScreen', () => {
         },
       ],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
     useAgentsInTrial.mockReturnValue({
       data: [],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
@@ -205,5 +211,28 @@ describe('MyAgentsScreen', () => {
 
     expect(screen.getByText('Subscription ending soon')).toBeTruthy()
     expect(screen.getByText('Subscription ending soon • Runtime configuration incomplete • Goals need review')).toBeTruthy()
+  })
+
+  it('provides a RefreshControl for pull-to-refresh', () => {
+    useHiredAgents.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: jest.fn(),
+    })
+    useAgentsInTrial.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: jest.fn(),
+    })
+
+    const rendered = render(
+      <MyAgentsScreen navigation={navigation} route={{ key: 'my-agents', name: 'MyAgents' } as any} />
+    )
+
+    expect(rendered.UNSAFE_getByType('ScrollView').props.refreshControl).toBeTruthy()
   })
 })
