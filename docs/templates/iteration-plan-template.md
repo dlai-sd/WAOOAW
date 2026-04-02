@@ -117,6 +117,12 @@ ENVIRONMENT REQUIREMENT:
 - Shell/git/gh/docker tools may be unavailable on this execution surface.
 - Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
 
+FAIL-FAST VALIDATION GATE (complete before reading story cards or editing files):
+1. Verify the plan file is readable and the assigned iteration section exists.
+2. Verify this execution surface allows repository writes on the current task branch.
+3. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
+4. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
+
 EXECUTION ORDER:
 1. Read the "Agent Execution Rules" section in this plan file.
 2. Read the "Iteration 1" section in this plan file.
@@ -169,6 +175,13 @@ PREREQUISITE CHECK (do before anything else):
   Treat Iteration 2 as unlaunchable only if that block is still marked pending or does not include both a merged PR reference and a merge commit on `main`.
   If the block is still pending or incomplete: post "Blocked: Iteration 1 merge evidence has not been recorded in the plan." and HALT.
 
+FAIL-FAST VALIDATION GATE (complete before reading story cards or editing files):
+1. Verify the plan file is readable and the assigned iteration section exists.
+2. Verify the Prerequisite evidence block for Iteration 2 is complete and not pending.
+3. Verify this execution surface allows repository writes on the current task branch.
+4. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
+5. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
+
 EXECUTION ORDER:
 1. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
 2. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
@@ -191,6 +204,17 @@ EXECUTION ORDER:
 ## Agent Execution Rules
 
 > Agent: read this section once before executing any story. These rules override all instructions.
+
+### Rule -2 — Fail-fast validation gate
+
+Before reading story cards in detail or making any code changes, validate all of the following:
+
+- The plan file is readable and your assigned iteration section exists.
+- Any required `Prerequisite evidence` block for this iteration is complete and not marked pending.
+- The GitHub execution surface lets you save repository changes on the current task branch.
+- The GitHub execution surface lets you open or update a PR to `main`, or you can explicitly report that PR controls are unavailable.
+
+If any check fails, post `Blocked at validation gate: [exact reason]` and HALT immediately.
 
 ### Rule -1 — Activate Expert Personas (first thing, before Rule 0)
 
