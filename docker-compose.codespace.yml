@@ -9,7 +9,7 @@ services:
     environment:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       ENVIRONMENT: codespace
-    depends_on: {}
+    depends_on: !reset []
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -20,7 +20,7 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PLANT_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
-    depends_on:
+    depends_on: !override
       redis:
         condition: service_healthy
       plant-migrations:
@@ -35,6 +35,11 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PLANT_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
+    depends_on: !override
+      redis:
+        condition: service_healthy
+      plant-backend:
+        condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -56,7 +61,7 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
-    depends_on:
+    depends_on: !override
       redis:
         condition: service_healthy
       plant-gateway:
@@ -79,7 +84,7 @@ services:
       REDIS_URL: ${CP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
       CORS_ORIGINS: http://localhost:3002,http://localhost:3001,https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://${CODESPACE_NAME:-localhost}-3001.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
-    depends_on:
+    depends_on: !override
       redis:
         condition: service_healthy
       plant-gateway:
@@ -98,5 +103,6 @@ services:
       CP_API_BASE_URL: /api
 
   adminer:
+    depends_on: !reset []
     extra_hosts:
       - "host.docker.internal:host-gateway"

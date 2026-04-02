@@ -153,8 +153,7 @@ run_doctor() {
 run_clean() {
   ensure_env_file
   require_docker
-  docker compose --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" down --remove-orphans --rmi local || true
-  docker volume rm waooaw_postgres-data waooaw_redis-data waooaw_plant-data waooaw_pp-frontend-node-modules waooaw_cp-frontend-node-modules >/dev/null 2>&1 || true
+  docker compose --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" down --remove-orphans --rmi local -v || true
   echo "Removed WAOOAW-local Docker artifacts."
 }
 
