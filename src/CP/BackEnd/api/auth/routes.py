@@ -175,16 +175,18 @@ async def google_login(source: str):
 
 async def google_callback(code: Optional[str], state: Optional[str], error: Optional[str], user_store: UserStore):
     """Handle Google OAuth callback"""
+    callback_frontend_url = f"{settings.FRONTEND_URL}/auth/callback"
+
     if error:
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error={error}", status_code=302)
+        return RedirectResponse(url=f"{callback_frontend_url}?error={error}", status_code=302)
     
     if not code or not state:
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=missing_params", status_code=302)
+        return RedirectResponse(url=f"{callback_frontend_url}?error=missing_params", status_code=302)
     
     # Verify state
     source = _state_store.pop(state, None)
     if not source:
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=invalid_state", status_code=302)
+        return RedirectResponse(url=f"{callback_frontend_url}?error=invalid_state", status_code=302)
     
     try:
         import api.auth.google_oauth as google_oauth
@@ -216,20 +218,25 @@ async def google_callback(code: Optional[str], state: Optional[str], error: Opti
         tokens = create_tokens(jwt_subject, user.email)
 
         response = RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/?access_token={tokens['access_token']}&refresh_token={tokens['refresh_token']}",
+            url=f"{callback_frontend_url}?access_token={tokens['access_token']}&refresh_token={tokens['refresh_token']}",
             status_code=302
         )
         _set_refresh_cookie(response, tokens["refresh_token"])
         return response
     except Exception:
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?error=auth_failed", status_code=302)
+        return RedirectResponse(url=f"{callback_frontend_url}?error=auth_failed", status_code=302)
 
 @router.get("/google/login")
 async def google_login_route(source: str = Query("cp", description="Source application: cp, pp, or mobile")):
     return await google_login(source)
 
 @router.get("/google/callback")
-async def google_callback_route(code: Optional[str], state: Optional[str], error: Optional[str], user_store: UserStore = Depends(get_user_store)):
+async def google_callback_route(
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    user_store: UserStore = Depends(get_user_store),
+):
     return await google_callback(code, state, error, user_store)
 
 @router.post("/google/verify", response_model=Token)

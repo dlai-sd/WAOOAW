@@ -20,6 +20,10 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PLANT_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
+    entrypoint:
+      - sh
+      - /app/docker-entrypoint.sh
+    command: []
     depends_on: !override
       redis:
         condition: service_healthy
@@ -35,6 +39,15 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PLANT_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
+    entrypoint:
+      - celery
+      - -A
+      - worker.celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=4
+      - -Q
+      - email,events,celery
     depends_on: !override
       redis:
         condition: service_healthy
@@ -46,6 +59,13 @@ services:
   plant-flower:
     env_file:
       - .codespace/demo.env
+    entrypoint:
+      - celery
+      - -A
+      - worker.celery_app
+      - flower
+      - --port=5555
+      - --broker=redis://redis:6379/4
 
   plant-gateway:
     env_file:
@@ -53,6 +73,13 @@ services:
     environment:
       REDIS_URL: ${PLANT_GATEWAY_REDIS_URL}
       ENVIRONMENT: codespace
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
 
   pp-backend:
     env_file:
@@ -61,6 +88,13 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8015"
     depends_on: !override
       redis:
         condition: service_healthy
@@ -84,7 +118,16 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${CP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
+      API_URL: https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}/api
+      FRONTEND_URL: https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
       CORS_ORIGINS: http://localhost:3002,http://localhost:3001,https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://${CODESPACE_NAME:-localhost}-3001.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8020"
     depends_on: !override
       redis:
         condition: service_healthy

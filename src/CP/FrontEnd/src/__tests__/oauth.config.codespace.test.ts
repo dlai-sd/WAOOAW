@@ -13,6 +13,11 @@ describe('cp oauth config in codespaces', () => {
   })
 
   it('uses current origin plus /api for github.dev hosts', async () => {
+    ;(window as any).__WAOOAW_RUNTIME_CONFIG__ = {
+      environment: 'codespace',
+      googleClientId: 'runtime-client-id'
+    }
+
     Object.defineProperty(window, 'location', {
       value: new URL('https://demo-space-3002.app.github.dev/'),
       configurable: true,
@@ -22,5 +27,6 @@ describe('cp oauth config in codespaces', () => {
     const { config } = await import('../config/oauth.config')
 
     expect(config.apiBaseUrl).toBe('https://demo-space-3002.app.github.dev/api')
+    expect(config.googleClientId).toBe('runtime-client-id')
   })
 })

@@ -6,10 +6,11 @@
  * Linear sign-in aesthetics. The SDK iframe handles all OAuth state safely.
  */
 
-import { makeStyles } from '@fluentui/react-components'
+import { Button, makeStyles } from '@fluentui/react-components'
 import { GoogleLogin } from '@react-oauth/google'
 import { jwtDecode } from 'jwt-decode'
 import { useAuth } from '../../hooks/useAuth'
+import { API_ENDPOINTS } from '../../config/oauth.config'
 
 interface GoogleLoginButtonProps {
   mode?: 'signin' | 'prefill'
@@ -34,6 +35,7 @@ const useStyles = makeStyles({
 export default function GoogleLoginButton({ mode = 'signin', onSuccess, onError, onPrefill }: GoogleLoginButtonProps) {
   const styles = useStyles()
   const { login } = useAuth()
+  const isCodespacesSignin = mode === 'signin' && window.location.hostname.includes('github.dev')
 
   const handleSuccess = async (credentialResponse: any) => {
     try {
@@ -56,6 +58,20 @@ export default function GoogleLoginButton({ mode = 'signin', onSuccess, onError,
   const handleError = () => {
     console.error('Google login failed')
     onError?.('Google login failed')
+  }
+
+  const handleCodespacesRedirect = () => {
+    window.location.href = `${API_ENDPOINTS.googleLogin}?source=cp`
+  }
+
+  if (isCodespacesSignin) {
+    return (
+      <div className={`${styles.frame} auth-google-frame`}>
+        <Button appearance="secondary" size="large" onClick={handleCodespacesRedirect} style={{ width: '100%', maxWidth: 480 }}>
+          Continue with Google
+        </Button>
+      </div>
+    )
   }
 
   return (

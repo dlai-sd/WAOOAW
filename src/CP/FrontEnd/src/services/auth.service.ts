@@ -293,13 +293,18 @@ class AuthService {
   handleOAuthCallback(): TokenResponse | null {
     const params = new URLSearchParams(window.location.search)
     const accessToken = params.get('access_token')
+    const refreshToken = params.get('refresh_token') || undefined
     const expiresIn = params.get('expires_in')
 
-    if (accessToken && expiresIn) {
+    if (accessToken) {
+      const decoded = this.decodeToken(accessToken)
+      const nowSeconds = Math.floor(Date.now() / 1000)
+      const derivedExpiresIn = decoded?.exp ? Math.max(decoded.exp - nowSeconds, 0) : 0
       const tokens: TokenResponse = {
         access_token: accessToken,
+        refresh_token: refreshToken,
         token_type: 'bearer',
-        expires_in: parseInt(expiresIn)
+        expires_in: expiresIn ? parseInt(expiresIn) : derivedExpiresIn
       }
 
       // E1-S4: memory only
