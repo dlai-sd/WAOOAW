@@ -25,7 +25,7 @@
 ## Objective
 
 1. Run WAOOAW local application surfaces in GitHub Codespaces through Docker images and Docker Compose.
-2. Point the local stack at demo-grade dependencies where safe and practical: Cloud SQL, managed Redis, Google OAuth, and runtime secrets pulled from GCP.
+2. Point the local stack at demo-grade dependencies where they are actually reachable from Codespaces: Cloud SQL, Google OAuth, and runtime secrets pulled from GCP, while keeping Redis local because demo Memorystore is private-network only.
 3. Give developers one repeatable local command surface to build, restart, clean stale images, and reopen the stack on Codespaces URLs.
 4. Keep the work focused on the local iteration loop; no production deploy redesign, no unrelated product features, no environment-specific hacks baked into images.
 
@@ -36,13 +36,13 @@
 
 ## Zero-Cost Agent Constraints (READ FIRST)
 
-This plan is designed for autonomous GitHub-hosted agents and small-context models.
+This plan is designed for autonomous coding agents operating inside a Codespace or a VS Code session attached to that Codespace.
 Every structural choice below is optimized to keep the agent on one narrow, testable path.
 
 | Constraint | How this plan handles it |
 |---|---|
 | Limited context window | Every story card is self-contained and names exact edit files |
-| No reliable shell access in GitHub-hosted runs | Story cards prefer file edits and narrow validation; iteration rules allow deferred Docker execution when shell tools are unavailable |
+| Shell/docker access is required | Story cards stay narrow and validation stays focused so a terminal-capable Codespaces agent can complete the loop end-to-end |
 | Infra work can drift easily | Objective section and every epic title are outcome-based, not implementation-first |
 | Secrets/config work can become unsafe | Every config story explicitly keeps values in Secret Manager, generated local env files, or runtime env only |
 
@@ -61,7 +61,7 @@ Every structural choice below is optimized to keep the agent on one narrow, test
 - [x] Every config-changing story keeps secrets/runtime values out of images and committed env files
 - [x] Every story has `BLOCKED UNTIL`
 - [x] Iteration has time estimate and come-back datetime
-- [x] Iteration has a complete GitHub agent launch block
+- [x] Iteration has a complete terminal-capable agent launch block
 - [x] STUCK PROTOCOL is in Agent Execution Rules
 - [x] Iteration count minimized to one
 - [x] Related backend/frontend/runtime work kept in the same iteration
@@ -72,7 +72,7 @@ Every structural choice below is optimized to keep the agent on one narrow, test
 ## Vision Intake
 
 - **Area**: `infra`, with cross-service local runtime wiring for Plant, CP, PP, and routing inside GitHub Codespaces.
-- **Outcome**: A developer can rebuild or restart the local Docker stack in Codespaces, have it run against demo-aligned cloud dependencies, and open the live Codespaces URLs from a laptop for fast iteration.
+- **Outcome**: A developer can rebuild or restart the local Docker stack in Codespaces, have it run against demo-aligned cloud dependencies where reachable from Codespaces, and open the live Codespaces URLs from a laptop for fast iteration.
 - **Out of scope**: Production Cloud Run deployment redesign, unrelated product UX changes, and backend business-feature work that does not directly improve the local iteration loop.
 - **Lane**: `Lane B` — new local orchestration surfaces and configuration wiring are required.
 - **Urgency**: Single iteration only; one merge should materially reduce the current PR-approval plus deployment wait loop.
@@ -83,7 +83,7 @@ Every structural choice below is optimized to keep the agent on one narrow, test
 
 | Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
 |---|---|---|---|---|---|
-| 1 | Demo-aligned Docker runtime, one-command stack control, and Codespaces public URL stability for Plant + CP + PP | 3 | 6 | 5h 30m | 2026-04-02 23:30 UTC |
+| 1 | Cloud-SQL-and-secrets demo alignment, local Redis fallback, one-command stack control, and Codespaces public URL stability for Plant + CP + PP | 3 | 6 | 5h 30m | 2026-04-02 23:30 UTC |
 
 **Estimate basis:** env bootstrap = 45 min | compose/runtime overlay = 60 min | orchestration script = 60 min | cleanup/doctor = 45 min | CP local proxy wiring = 60 min | focused validation = 60 min | 20% buffer already included.
 
@@ -93,11 +93,14 @@ Every structural choice below is optimized to keep the agent on one narrow, test
 
 ### Iteration 1
 
+**Execution surface required:**
+This iteration must run from a terminal-capable coding agent inside the Codespace or a VS Code session attached to the Codespace. GitHub-hosted Agents-tab runs are not sufficient for this iteration because Docker Compose, health checks, and local URL smoke validation are core acceptance criteria.
+
 **Steps to launch:**
-1. Open this repository on GitHub
-2. Open the **Agents** tab
-3. Start a new agent task
-4. If the UI exposes repository agents, select **platform-engineer**; otherwise use the default coding agent
+1. Open this repository in the active Codespace or attach VS Code to that Codespace
+2. Open Copilot Chat
+3. Switch to Agent mode
+4. Select **platform-engineer** if repository agents are shown; otherwise use the default coding agent with terminal access
 5. Copy the block below and paste it into the task
 6. Start the run
 7. Go away. Come back at: **2026-04-02 23:30 UTC**
@@ -116,15 +119,15 @@ YOUR SCOPE: Iteration 1 only — Epics E1, E2, E3. Do not invent Iteration 2.
 TIME BUDGET: 5h 30m. If you reach 6h 30m without finishing, follow STUCK PROTOCOL immediately.
 
 ENVIRONMENT REQUIREMENT:
-- This task is intended for the GitHub repository Agents tab.
-- Shell/git/gh/docker tools may be unavailable on this execution surface.
-- Do not HALT only because terminal tools are unavailable; make the code changes, record exactly what could not be validated, and keep the PR flow moving.
+- This task requires shell and docker access inside the Codespace.
+- If shell or docker is unavailable on this execution surface: post `Blocked at validation gate: Codespaces shell/docker access is required for INFRA-CODESPACE-1.` and HALT.
 
 FAIL-FAST VALIDATION GATE (complete before reading story cards or editing files):
 1. Verify the plan file is readable and the Iteration 1 section exists.
 2. Verify this execution surface allows repository writes on the current task branch.
-3. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
-4. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
+3. Verify this execution surface allows shell/docker execution in the Codespace.
+4. Verify this execution surface allows opening or updating a PR to `main`, or at minimum posting that PR controls are unavailable.
+5. If any validation gate fails: post `Blocked at validation gate: [exact reason]` and HALT before code changes.
 
 EXECUTION ORDER:
 1. Read the "Agent Execution Rules" section in this plan file.
@@ -133,7 +136,7 @@ EXECUTION ORDER:
 4. Work on the GitHub task branch created for this run. Do not assume terminal checkout or manual branch creation.
 5. Execute Epics in this order: E1 → E2 → E3.
 6. Add or update the tests listed in each story before moving on.
-7. If shell/docker validation is unavailable, state exactly: "Validation deferred: GitHub Agents tab on this run did not expose shell/docker execution."
+7. Run the narrowest shell/docker validations listed in each story before moving on.
 8. Open or update the iteration PR to `main`, post the PR URL, and HALT.
 ```
 
@@ -148,8 +151,9 @@ EXECUTION ORDER:
 Before reading story cards in detail or making any code changes, validate all of the following:
 
 - The plan file is readable and the assigned iteration section exists.
-- The GitHub execution surface lets you save repository changes on the current task branch.
-- The GitHub execution surface lets you open or update a PR to `main`, or you can explicitly report that PR controls are unavailable.
+- The execution surface lets you save repository changes on the current task branch.
+- The execution surface provides shell and docker access inside the Codespace.
+- The execution surface lets you open or update a PR to `main`, or you can explicitly report that PR controls are unavailable.
 
 If any check fails, post `Blocked at validation gate: [exact reason]` and HALT immediately.
 
@@ -213,7 +217,7 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 
 ### Outcome
 
-After this iteration, a WAOOAW engineer can bring up a Codespaces-local Docker stack that points at demo-aligned cloud dependencies, rebuild or restart that stack from one script, and open stable public Codespaces URLs for CP, PP, and the supporting APIs from a laptop.
+After this iteration, a WAOOAW engineer can bring up a Codespaces-local Docker stack that uses demo-aligned Cloud SQL plus runtime secrets, keeps Redis local because Memorystore is unreachable from Codespaces, rebuild or restart that stack from one script, and open stable public Codespaces URLs for CP, PP, and the supporting APIs from a laptop.
 
 ### Dependency Map
 
@@ -249,21 +253,21 @@ After this iteration, a WAOOAW engineer can bring up a Codespaces-local Docker s
 
 **Context**
 
-Codespaces already has `.devcontainer/gcp-auth.sh`, which authenticates to GCP, starts the Cloud SQL Auth Proxy on `127.0.0.1:15432`, and reads the demo Plant database URL secret. What is still missing is a Docker-consumable, uncommitted env file that normalizes those secrets for containers, including managed Redis URLs and the OAuth/runtime secrets the local stack actually needs.
+Codespaces already has `.devcontainer/gcp-auth.sh`, which authenticates to GCP, starts the Cloud SQL Auth Proxy on `127.0.0.1:15432`, and reads the demo Plant database URL secret. What is still missing is a Docker-consumable, uncommitted env file that normalizes the demo Cloud SQL path and the runtime secrets the stack actually needs. Redis must stay local in Codespaces because demo Memorystore URLs point at private-network endpoints and are not reachable from Codespaces.
 
 **Files to read first (max 3)**
 
 | File | Lines | Why |
 |---|---|---|
-| `.devcontainer/gcp-auth.sh` | 1-180 | Reuse the Cloud SQL proxy and secret-reading conventions already used in Codespaces |
-| `cloud/terraform/stacks/plant/main.tf` | 120-220 | Confirm demo secret naming for Plant backend and Plant gateway Redis |
-| `cloud/terraform/stacks/cp/main.tf` | 90-150 | Confirm demo secret naming for CP backend Redis and runtime secret injection patterns |
+| `.devcontainer/gcp-auth.sh` | 1-180 | Reuse the Cloud SQL proxy bootstrap and DB secret conventions already used in Codespaces |
+| `src/PP/BackEnd/core/config.py` | 20-55 | Confirm PP backend runtime requirements for OAuth, JWT, URLs, and Redis |
+| `src/CP/FrontEnd/docker-entrypoint.sh` | 1-40 | Confirm CP frontend runtime-config keys that must be written via env, not hardcoded |
 
 **Files to create / modify**
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `scripts/codespace-demo-env.sh` | create | Create a bash script that assumes `.devcontainer/gcp-auth.sh` has already run, reads the demo secrets it needs from Secret Manager, normalizes the Plant DB URL to `host.docker.internal:15432`, and writes `.codespace/demo.env` for Docker Compose consumption. |
+| `scripts/codespace-demo-env.sh` | create | Create a bash script that assumes `.devcontainer/gcp-auth.sh` has already run, reads the demo secrets it needs from Secret Manager, normalizes the Plant DB URL to `host.docker.internal:15432`, writes local Redis URLs for Codespaces, and emits `.codespace/demo.env` for Docker Compose consumption. |
 | `.gitignore` | modify | Ignore `.codespace/*.env` and any generated runtime env artifacts created by the Codespaces local loop. |
 
 **Required secret set**
@@ -281,6 +285,20 @@ The generated `.codespace/demo.env` must include these runtime values at minimum
 - `TURNSTILE_SECRET_KEY`
 - `TURNSTILE_SITE_KEY`
 - `WAOOAW_CLOUDSQL_ENV`
+
+Use these exact Secret Manager names where applicable:
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `JWT_SECRET`
+- `CP_REGISTRATION_KEY`
+- `TURNSTILE_SECRET_KEY`
+- `TURNSTILE_SITE_KEY`
+
+Use these exact local Redis values in Codespaces instead of Secret Manager Redis URLs:
+- `PLANT_BACKEND_REDIS_URL=redis://redis:6379/0`
+- `PLANT_GATEWAY_REDIS_URL=redis://redis:6379/1`
+- `PP_BACKEND_REDIS_URL=redis://redis:6379/2`
+- `CP_BACKEND_REDIS_URL=redis://redis:6379/3`
 
 **Code patterns to copy exactly**
 
@@ -306,8 +324,8 @@ chmod 600 "$ENV_FILE"
 
 1. Running `bash scripts/codespace-demo-env.sh` after `.devcontainer/gcp-auth.sh` creates `.codespace/demo.env` without manual edits.
 2. The generated Plant DB URL points containers to `host.docker.internal:15432`, not raw localhost or a committed Cloud SQL host.
-3. Managed Redis URLs for Plant backend, Plant gateway, CP backend, and PP backend are written from Secret Manager values, not local `redis://redis:6379/*` defaults.
-4. OAuth/runtime secrets required for CP and PP local login flows are written to the generated env file.
+3. Redis URLs for Plant backend, Plant gateway, CP backend, and PP backend are intentionally written as local Codespaces values `redis://redis:6379/*` because demo Memorystore is private-network only.
+4. OAuth/runtime secrets required for CP and PP local login flows are written to the generated env file with exact source-of-truth secret names, not guessed aliases.
 5. `.codespace/demo.env` is git-ignored and written with restrictive file permissions.
 
 **Tests / validation**
@@ -334,7 +352,7 @@ chmod 600 "$ENV_FILE"
 
 **Context**
 
-`docker-compose.local.yml` is currently local-regression first: it defaults to local Postgres, local Redis, and partial port exposure. For a real Codespaces iteration loop, the stack needs an overlay that consumes `.codespace/demo.env`, points app containers at demo-aligned dependencies, and exposes the CP, PP, backend, gateway, and admin ports the laptop browser will actually need.
+`docker-compose.local.yml` is currently local-regression first: it defaults to local Postgres, local Redis, and partial port exposure. For a real Codespaces iteration loop, the stack needs an overlay that consumes `.codespace/demo.env`, points app containers at the Cloud SQL proxy plus local Redis fallback, and exposes the CP, PP, backend, gateway, and admin ports the laptop browser will actually need.
 
 **Files to read first (max 3)**
 
@@ -348,7 +366,7 @@ chmod 600 "$ENV_FILE"
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `docker-compose.codespace.yml` | create | Create a Docker Compose overlay for Codespaces that consumes `.codespace/demo.env`, points services at host-proxied Cloud SQL and managed Redis URLs, and keeps the same service names as `docker-compose.local.yml`. |
+| `docker-compose.codespace.yml` | create | Create a Docker Compose overlay for Codespaces that consumes `.codespace/demo.env`, points services at host-proxied Cloud SQL and local Redis fallback URLs, and keeps the same service names as `docker-compose.local.yml`. |
 | `.devcontainer/devcontainer.json` | modify | Forward the ports needed for the local Codespaces loop: `3001`, `3002`, `8000`, `8001`, `8015`, `8020`, `8081`, `5555`, and `15432`. |
 | `start-local-no-docker.sh` | modify | Keep it as a tiny wrapper, but redirect users to the new orchestration script once that script exists instead of telling them to run bare `docker compose -f docker-compose.local.yml up --build`. |
 
@@ -375,7 +393,7 @@ services:
 **Acceptance criteria**
 
 1. `docker compose --env-file .codespace/demo.env -f docker-compose.local.yml -f docker-compose.codespace.yml config` renders successfully.
-2. The overlay uses generated runtime values from `.codespace/demo.env` instead of hardcoded localhost or committed secret values.
+2. The overlay uses generated runtime values from `.codespace/demo.env` instead of hardcoded localhost or committed secret values, with Redis explicitly remaining local in Codespaces.
 3. Codespaces forwards CP frontend, PP frontend, CP backend, PP backend, Plant gateway, Plant backend, Adminer, Flower, and Cloud SQL proxy ports.
 4. The base local compose file remains usable for pure local regression; Codespaces-specific behavior lives in the overlay rather than breaking the default local path.
 
@@ -419,7 +437,7 @@ Right now the repo has scattered local entrypoints: `start-local-no-docker.sh`, 
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `scripts/codespace-stack.sh` | create | Create a bash orchestration script with subcommands `bootstrap-env`, `build`, `up`, `restart`, `down`, `logs`, `status`, and `urls`. It must use `docker-compose.local.yml` plus `docker-compose.codespace.yml` and default to `.codespace/demo.env`. |
+| `scripts/codespace-stack.sh` | create | Create a bash orchestration script with subcommands `bootstrap-env`, `build`, `up`, `restart`, `down`, `logs`, `status`, and `urls`. It must use `docker-compose.local.yml` plus `docker-compose.codespace.yml`, default to `.codespace/demo.env`, and fail early if Docker or the Cloud SQL proxy are missing. |
 | `start-local-no-docker.sh` | modify | Make this script delegate to `scripts/codespace-stack.sh up` for the Codespaces-first path rather than duplicating compose logic. |
 
 **Supported command surface**
@@ -487,7 +505,7 @@ fi
 
 **Context**
 
-Codespaces loses speed when Docker layers, stopped containers, and stale builder cache pile up. At the same time, destructive cleanup is dangerous in a shared dev container. The orchestration script needs two explicit safety valves: a `doctor` command that explains what is broken, and a `clean` command that removes only WAOOAW-local build artifacts instead of carpet-bombing the entire Docker daemon.
+Codespaces loses speed when Docker layers, stopped containers, and stale WAOOAW build artifacts pile up. At the same time, destructive cleanup is dangerous in a shared dev container. The orchestration script needs two explicit safety valves: a `doctor` command that explains what is broken, and a `clean` command that removes only WAOOAW-local artifacts instead of touching the whole Docker daemon.
 
 **Files to read first (max 3)**
 
@@ -501,7 +519,7 @@ Codespaces loses speed when Docker layers, stopped containers, and stale builder
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `scripts/codespace-stack.sh` | modify | Add `doctor` and `clean` subcommands. `doctor` must validate Docker, compose files, `.codespace/demo.env`, Cloud SQL proxy state, and health endpoints. `clean` must remove only WAOOAW-local containers/images/build cache and never use `docker system prune -a`. |
+| `scripts/codespace-stack.sh` | modify | Add `doctor` and `clean` subcommands. `doctor` must validate Docker, compose files, `.codespace/demo.env`, Cloud SQL proxy state, and health endpoints. `clean` must remove only WAOOAW-local containers, compose-built images, and named WAOOAW volumes; it must never use daemon-wide prune commands. |
 
 **Code patterns to copy exactly**
 
@@ -513,17 +531,16 @@ fi
 ```
 
 ```bash
-# Safe cleanup only — do not wipe the whole daemon.
-docker compose --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" down --remove-orphans || true
-docker image prune -f >/dev/null 2>&1 || true
-docker builder prune -f --filter 'until=24h' >/dev/null 2>&1 || true
+# Safe cleanup only — remove WAOOAW-local artifacts, not the whole daemon.
+docker compose --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" down --remove-orphans --rmi local || true
+docker volume rm waooaw_postgres-data waooaw_redis-data waooaw_plant-data waooaw_pp-frontend-node-modules waooaw_cp-frontend-node-modules >/dev/null 2>&1 || true
 ```
 
 **Acceptance criteria**
 
 1. `doctor` reports missing env file, missing proxy, missing Docker, and unhealthy services with specific next actions.
-2. `clean` removes WAOOAW-local stopped containers, dangling images, and stale builder cache without using `docker system prune -a`.
-3. The script still preserves non-WAOOAW Docker resources in the Codespace.
+2. `clean` removes WAOOAW-local stopped containers, compose-built images, and named WAOOAW volumes without using `docker system prune -a`, `docker image prune`, or global builder prune.
+3. The script preserves non-WAOOAW Docker resources in the Codespace.
 4. `doctor` includes at least CP frontend, PP frontend, CP backend, PP backend, Plant gateway, and Plant backend health checks when those services are up.
 
 **Tests / validation**
@@ -663,7 +680,7 @@ CODESPACE_NAME=test-space bash scripts/codespace-stack.sh urls | grep 'app.githu
 1. CP frontend has an automated test proving Codespaces hosts resolve to `current origin + /api`.
 2. PP frontend has the same regression guard.
 3. The orchestration script has a small executable validation surface that checks syntax and URL output.
-4. The final iteration can state exactly which narrow validations passed, even if full Docker runtime smoke is deferred on GitHub-hosted execution.
+4. The final iteration can state exactly which narrow validations passed from the Codespaces execution surface, including at least one shell script validation and one frontend runtime-config validation.
 
 **Tests / validation**
 
