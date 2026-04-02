@@ -56,7 +56,6 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
-      FRONTEND_URL: https://${CODESPACE_NAME:-localhost}-3001.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
     depends_on:
       redis:
         condition: service_healthy
@@ -79,7 +78,7 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${CP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
-      CORS_ORIGINS: https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://${CODESPACE_NAME:-localhost}-3001.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
+      CORS_ORIGINS: http://localhost:3002,http://localhost:3001,https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://${CODESPACE_NAME:-localhost}-3001.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
     depends_on:
       redis:
         condition: service_healthy
@@ -89,6 +88,9 @@ services:
       - "host.docker.internal:host-gateway"
 
   cp-frontend:
+    build:
+      args:
+        NGINX_MODE: local
     env_file:
       - .codespace/demo.env
     environment:
