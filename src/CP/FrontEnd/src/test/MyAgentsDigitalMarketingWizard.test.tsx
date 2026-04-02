@@ -68,6 +68,25 @@ vi.mock('../services/marketingReview.service', () => ({
   scheduleDraftPost: vi.fn(),
 }))
 
+vi.mock('../services/profile.service', () => ({
+  getProfile: vi.fn().mockResolvedValue({
+    id: 'customer-1',
+    email: 'customer@example.com',
+    business_name: 'Profile Business',
+    location: 'Pune',
+    timezone: 'Asia/Kolkata',
+    primary_language: 'en',
+  }),
+  updateProfile: vi.fn().mockResolvedValue({
+    id: 'customer-1',
+    email: 'customer@example.com',
+    business_name: 'Profile Business',
+    location: 'Pune',
+    timezone: 'Asia/Kolkata',
+    primary_language: 'en',
+  }),
+}))
+
 const mockInstance = {
   subscription_id: 'SUB-1',
   agent_id: 'AGT-MKT-DMA-001',
@@ -947,6 +966,215 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
   })
 
+  it('prefills brand name from the customer profile when the activation workspace is empty', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const profileModule = await import('../services/profile.service')
+
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: '',
+        location: '',
+        primary_language: '',
+        timezone: '',
+        business_context: '',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: true,
+        missing_requirements: [],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any)
+    vi.mocked(profileModule.getProfile).mockResolvedValueOnce({
+      id: 'customer-1',
+      email: 'customer@example.com',
+      business_name: 'TestCo',
+      location: 'Pune',
+      timezone: 'Asia/Kolkata',
+      primary_language: 'en',
+    })
+
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Brand name')).toHaveValue('TestCo')
+    })
+  })
+
+  it('keeps the existing workspace brand name instead of replacing it from profile', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const profileModule = await import('../services/profile.service')
+
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'ExistingBrand',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: '',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        campaign_setup: structuredClone(defaultWorkspace).campaign_setup,
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: true,
+        missing_requirements: [],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any)
+    vi.mocked(profileModule.getProfile).mockResolvedValueOnce({
+      id: 'customer-1',
+      email: 'customer@example.com',
+      business_name: 'IgnoredProfileName',
+      location: 'Pune',
+      timezone: 'Asia/Kolkata',
+      primary_language: 'en',
+    })
+
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Brand name')).toHaveValue('ExistingBrand')
+    })
+    expect(profileModule.getProfile).not.toHaveBeenCalled()
+  })
+
+  it('shows a strategy preview before approval when the strategy is pending', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: 'Growth marketing',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        campaign_setup: {
+          ...structuredClone(defaultWorkspace).campaign_setup,
+          master_theme: 'Growth content',
+          derived_themes: [
+            { title: 'Proof-led content', description: 'Show customer outcomes', frequency: 'weekly' },
+          ],
+          strategy_workshop: {
+            status: 'approval_ready',
+            assistant_message: 'Pending approval',
+            checkpoint_summary: 'Ready for review',
+            current_focus_question: '',
+            next_step_options: [],
+            time_saving_note: '',
+            follow_up_questions: [],
+            messages: [],
+            summary: {
+              business_goal: 'Increase qualified inbound leads',
+              positioning: 'Operator-led growth partner',
+              first_content_direction: 'Show proof-led content',
+            },
+            approved_at: null,
+          },
+        },
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: false,
+        missing_requirements: [],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any)
+
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.getByText('Strategy Preview — review before approving')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Master Theme: Growth content')).toBeInTheDocument()
+    expect(screen.getByText(/Proof-led content/i)).toBeInTheDocument()
+  })
+
+  it('hides the strategy preview after the strategy is approved', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+
+    vi.mocked(serviceModule.getDigitalMarketingActivationWorkspace).mockResolvedValueOnce({
+      hired_instance_id: 'HAI-1',
+      customer_id: 'CUST-1',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      workspace: {
+        brand_name: 'WAOOAW',
+        location: 'Pune',
+        primary_language: 'en',
+        timezone: 'Asia/Kolkata',
+        business_context: 'Growth marketing',
+        offerings_services: ['Activation'],
+        platforms_enabled: ['youtube'],
+        campaign_setup: {
+          ...structuredClone(defaultWorkspace).campaign_setup,
+          master_theme: 'Growth content',
+          derived_themes: [
+            { title: 'Proof-led content', description: 'Show customer outcomes', frequency: 'weekly' },
+          ],
+          strategy_workshop: {
+            status: 'approved',
+            assistant_message: 'Approved strategy',
+            checkpoint_summary: 'Approved',
+            current_focus_question: '',
+            next_step_options: [],
+            time_saving_note: '',
+            follow_up_questions: [],
+            messages: [],
+            summary: {
+              business_goal: 'Increase qualified inbound leads',
+              positioning: 'Operator-led growth partner',
+              first_content_direction: 'Show proof-led content',
+            },
+            approved_at: '2026-03-18T09:15:00Z',
+          },
+        },
+      },
+      readiness: {
+        brief_complete: true,
+        youtube_selected: true,
+        youtube_connection_ready: true,
+        configured: true,
+        can_finalize: true,
+        missing_requirements: [],
+      },
+      updated_at: '2026-03-18T09:00:00Z',
+    } as any)
+
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.queryByText('Strategy Preview — review before approving')).not.toBeInTheDocument()
+    })
+  })
+
   it('runs the AI strategy workshop and lets the customer approve the resulting theme', async () => {
     const serviceModule = await import('../services/digitalMarketingActivation.service')
 
@@ -1140,4 +1368,3 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
   })
 })
-

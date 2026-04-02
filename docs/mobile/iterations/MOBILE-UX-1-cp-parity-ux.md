@@ -297,11 +297,11 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | Customer sees real deliverables | Wire Deliverables page to listHiredAgentDeliverables API | 🔴 Not Started | — |
-| E1-S2 | 1 | Customer sees real deliverables | Add deliverable review actions (approve/reject) | 🔴 Not Started | — |
-| E1-S3 | 1 | Customer sees real deliverables | Wire Command Centre to live agent summary data | 🔴 Not Started | — |
-| E2-S1 | 1 | DMA Wizard stops wasting time | Deduplicate DMA Wizard fields — pull from customer profile | 🔴 Not Started | — |
-| E2-S2 | 1 | DMA Wizard stops wasting time | Show draft preview before strategy approval gate | 🔴 Not Started | — |
+| E1-S1 | 1 | Customer sees real deliverables | Wire Deliverables page to listHiredAgentDeliverables API | 🟢 Done | — |
+| E1-S2 | 1 | Customer sees real deliverables | Add deliverable review actions (approve/reject) | 🟢 Done | — |
+| E1-S3 | 1 | Customer sees real deliverables | Wire Command Centre to live agent summary data | 🟢 Done | — |
+| E2-S1 | 1 | DMA Wizard stops wasting time | Deduplicate DMA Wizard fields — pull from customer profile | 🟢 Done | — |
+| E2-S2 | 1 | DMA Wizard stops wasting time | Show draft preview before strategy approval gate | 🟢 Done | — |
 | E3-S1 | 2 | Mobile feels professional | Replace emoji tab icons with vector icons | 🔴 Not Started | — |
 | E3-S2 | 2 | Mobile feels professional | Wire SearchResults + FilterAgents to API | 🔴 Not Started | — |
 | E3-S3 | 2 | Mobile feels professional | Add tab badge counts for pending actions | 🔴 Not Started | — |
