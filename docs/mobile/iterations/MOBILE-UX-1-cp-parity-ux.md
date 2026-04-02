@@ -302,11 +302,11 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E1-S3 | 1 | Customer sees real deliverables | Wire Command Centre to live agent summary data | 🟢 Done | — |
 | E2-S1 | 1 | DMA Wizard stops wasting time | Deduplicate DMA Wizard fields — pull from customer profile | 🟢 Done | — |
 | E2-S2 | 1 | DMA Wizard stops wasting time | Show draft preview before strategy approval gate | 🟢 Done | — |
-| E3-S1 | 2 | Mobile feels professional | Replace emoji tab icons with vector icons | 🟢 Done | — |
-| E3-S2 | 2 | Mobile feels professional | Add tab badge counts for pending actions | 🟢 Done | — |
-| E3-S3 | 2 | Mobile feels professional | Add Apply button to FilterAgentsScreen with navigation back | 🟢 Done | — |
-| E4-S1 | 2 | Mobile search shows real results | Wire SearchResultsScreen to useSearchAgents hook | 🟢 Done | — |
-| E4-S2 | 2 | Mobile search shows real results | Add pull-to-refresh on DiscoverScreen and MyAgentsScreen | 🟢 Done | — |
+| E3-S1 | 2 | Mobile feels professional | Replace emoji tab icons with vector icons | 🟢 Done | #1007 |
+| E3-S2 | 2 | Mobile feels professional | Add tab badge counts for pending actions | 🟢 Done | #1007 |
+| E3-S3 | 2 | Mobile feels professional | Add Apply button to FilterAgentsScreen with navigation back | 🟢 Done | #1007 |
+| E4-S1 | 2 | Mobile search shows real results | Wire SearchResultsScreen to useSearchAgents hook | 🟢 Done | #1007 |
+| E4-S2 | 2 | Mobile search shows real results | Add pull-to-refresh on DiscoverScreen and MyAgentsScreen | 🟢 Done | #1007 |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
