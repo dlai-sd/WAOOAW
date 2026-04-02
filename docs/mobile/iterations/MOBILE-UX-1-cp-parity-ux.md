@@ -303,10 +303,10 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E2-S1 | 1 | DMA Wizard stops wasting time | Deduplicate DMA Wizard fields — pull from customer profile | 🟢 Done | — |
 | E2-S2 | 1 | DMA Wizard stops wasting time | Show draft preview before strategy approval gate | 🟢 Done | — |
 | E3-S1 | 2 | Mobile feels professional | Replace emoji tab icons with vector icons | 🟢 Done | — |
-| E3-S2 | 2 | Mobile feels professional | Wire SearchResults + FilterAgents to API | 🟢 Done | — |
-| E3-S3 | 2 | Mobile feels professional | Add tab badge counts for pending actions | 🟢 Done | — |
-| E4-S1 | 2 | Mobile shows agent output | Create mobile Deliverables screen | 🟢 Done | — |
-| E4-S2 | 2 | Mobile shows agent output | Wire SubscriptionManagement to real billing data | 🟢 Done | — |
+| E3-S2 | 2 | Mobile feels professional | Add tab badge counts for pending actions | 🟢 Done | — |
+| E3-S3 | 2 | Mobile feels professional | Add Apply button to FilterAgentsScreen with navigation back | 🟢 Done | — |
+| E4-S1 | 2 | Mobile search shows real results | Wire SearchResultsScreen to useSearchAgents hook | 🟢 Done | — |
+| E4-S2 | 2 | Mobile search shows real results | Add pull-to-refresh on DiscoverScreen and MyAgentsScreen | 🟢 Done | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 

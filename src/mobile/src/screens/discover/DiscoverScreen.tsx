@@ -290,6 +290,13 @@ export const DiscoverScreen = ({ route }: Props) => {
                     paddingVertical: spacing.sm,
                   },
                 ]}
+                onPress={() =>
+                  navigation.navigate('FilterAgents' as never, {
+                    industry: selectedIndustry ?? undefined,
+                    minRating: minRating || undefined,
+                    maxPrice: maxPrice || undefined,
+                  } as never)
+                }
               >
                 <Text
                   style={[
