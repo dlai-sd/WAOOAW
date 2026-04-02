@@ -1,5 +1,6 @@
 import React from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
+import TestRenderer from 'react-test-renderer'
 
 import { MyAgentsScreen } from '../MyAgentsScreen'
 
@@ -94,12 +95,14 @@ describe('MyAgentsScreen', () => {
         },
       ],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
     useAgentsInTrial.mockReturnValue({
       data: [],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
@@ -131,12 +134,14 @@ describe('MyAgentsScreen', () => {
         },
       ],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
     useAgentsInTrial.mockReturnValue({
       data: [],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
@@ -187,12 +192,14 @@ describe('MyAgentsScreen', () => {
         },
       ],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
     useAgentsInTrial.mockReturnValue({
       data: [],
       isLoading: false,
+      isFetching: false,
       error: null,
       refetch: jest.fn(),
     })
@@ -205,5 +212,28 @@ describe('MyAgentsScreen', () => {
 
     expect(screen.getByText('Subscription ending soon')).toBeTruthy()
     expect(screen.getByText('Subscription ending soon • Runtime configuration incomplete • Goals need review')).toBeTruthy()
+  })
+
+  it('provides a RefreshControl for pull-to-refresh', () => {
+    useHiredAgents.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: jest.fn(),
+    })
+    useAgentsInTrial.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: jest.fn(),
+    })
+
+    const tree = TestRenderer.create(
+      <MyAgentsScreen navigation={navigation} route={{ key: 'my-agents', name: 'MyAgents' } as any} />
+    )
+
+    expect(tree.root.findByType('ScrollView').props.refreshControl).toBeTruthy()
   })
 })

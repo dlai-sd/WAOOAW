@@ -76,7 +76,13 @@ export type HomeStackScreenProps<T extends keyof HomeStackParamList> =
 // ============================================================================
 
 export type DiscoverStackParamList = {
-  Discover: undefined;
+  Discover:
+    | {
+        industry?: string;
+        minRating?: number;
+        maxPrice?: number;
+      }
+    | undefined;
   AgentDetail: { agentId: string };
   HireWizard: { agentId: string; step?: number };
   SearchResults: { query: string };

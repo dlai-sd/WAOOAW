@@ -6,6 +6,7 @@
  */
 
 import React from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type {
@@ -16,8 +17,8 @@ import type {
   ProfileStackParamList,
 } from "./types";
 import { useTheme } from "../hooks/useTheme";
+import { useAgentsNeedingSetup } from "../hooks/useHiredAgents";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { View, Text } from "react-native";
 
 // Import real screens
 import { HomeScreen } from "../screens/home/HomeScreen";
@@ -133,6 +134,8 @@ const ProfileNavigator = () => {
 export const MainNavigator = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { data: agentsNeedingSetup } = useAgentsNeedingSetup();
+  const needsSetupCount = agentsNeedingSetup?.length ?? 0;
 
   return (
     <Tab.Navigator
@@ -161,20 +164,7 @@ export const MainNavigator = () => {
           title: "Today",
           tabBarButtonTestID: 'mobile-home-tab',
           tabBarIcon: ({ color, size }) => (
-            <View
-              style={{
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                backgroundColor: color + "20", // 20% opacity background
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
-                🏠
-              </Text>
-            </View>
+            <Ionicons name="home" size={size} color={color} />
           ),
         }}
       />
@@ -185,20 +175,7 @@ export const MainNavigator = () => {
           title: "Discover",
           tabBarButtonTestID: 'mobile-discover-tab',
           tabBarIcon: ({ color, size }) => (
-            <View
-              style={{
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                backgroundColor: color + "20",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
-                🔍
-              </Text>
-            </View>
+            <Ionicons name="search" size={size} color={color} />
           ),
         }}
       />
@@ -208,21 +185,14 @@ export const MainNavigator = () => {
         options={{
           title: "Ops",
           tabBarButtonTestID: 'mobile-my-agents-tab',
+          tabBarBadge: needsSetupCount > 0 ? needsSetupCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: "#ef4444",
+            fontSize: 10,
+            fontWeight: "700",
+          },
           tabBarIcon: ({ color, size }) => (
-            <View
-              style={{
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                backgroundColor: color + "20",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
-                🤖
-              </Text>
-            </View>
+            <Ionicons name="grid" size={size} color={color} />
           ),
         }}
       />
@@ -233,20 +203,7 @@ export const MainNavigator = () => {
           title: "Profile",
           tabBarButtonTestID: 'mobile-profile-tab',
           tabBarIcon: ({ color, size }) => (
-            <View
-              style={{
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                backgroundColor: color + "20",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color, fontSize: size * 0.6, fontWeight: "bold" }}>
-                👤
-              </Text>
-            </View>
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />

@@ -28,12 +28,19 @@ import { VoiceControl } from '../../components/voice/VoiceControl';
 import { VoiceHelpModal } from '../../components/voice/VoiceHelpModal';
 import { usePerformanceMonitoring } from '../../hooks/usePerformanceMonitoring';
 import type { Agent, AgentListParams, Industry } from '../../types/agent.types';
+import type { DiscoverStackScreenProps } from '../../navigation/types';
 
-export const DiscoverScreen = () => {
+type Props = DiscoverStackScreenProps<'Discover'>;
+
+export const DiscoverScreen = ({ route }: Props) => {
   const { colors, spacing, typography } = useTheme();
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(null);
+  const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(
+    (route.params?.industry as Industry | undefined) ?? null
+  );
+  const [minRating, setMinRating] = React.useState(route.params?.minRating ?? 0);
+  const [maxPrice, setMaxPrice] = React.useState(route.params?.maxPrice ?? 0);
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
 
   const navigateToMainTab = React.useCallback(
@@ -65,14 +72,31 @@ export const DiscoverScreen = () => {
     isLoading,
     error,
     refetch,
-    isRefetching,
+    isFetching,
   } = useAgents(filterParams);
+
+  React.useEffect(() => {
+    setSelectedIndustry((route.params?.industry as Industry | undefined) ?? null);
+    setMinRating(route.params?.minRating ?? 0);
+    setMaxPrice(route.params?.maxPrice ?? 0);
+  }, [route.params?.industry, route.params?.minRating, route.params?.maxPrice]);
 
   const onRefresh = React.useCallback(() => {
     refetch();
   }, [refetch]);
 
   const industries: Industry[] = ['marketing', 'education', 'sales'];
+  const filteredAgents = React.useMemo(() => {
+    return (agents || []).filter((agent) => {
+      if (minRating > 0 && (agent.rating ?? 0) < minRating) {
+        return false;
+      }
+      if (maxPrice > 0 && (agent.price ?? Number.MAX_SAFE_INTEGER) > maxPrice) {
+        return false;
+      }
+      return true;
+    });
+  }, [agents, minRating, maxPrice]);
 
   // Voice command handlers
   const handleVoiceNavigate = React.useCallback(
@@ -296,7 +320,7 @@ export const DiscoverScreen = () => {
               },
             ]}
           >
-            {agents?.length || 0} agents found
+            {filteredAgents.length} agents found
             {selectedIndustry && ` in ${selectedIndustry}`}
             {searchQuery && ` for "${searchQuery}"`}
           </Text>
@@ -305,7 +329,7 @@ export const DiscoverScreen = () => {
 
       {/* Agent List */}
       <FlashList
-        data={agents || []}
+        data={filteredAgents}
         renderItem={({ item }: { item: Agent }) => <AgentCard agent={item} />}
         keyExtractor={(item: Agent) => item.id}
         contentContainerStyle={{
@@ -316,7 +340,7 @@ export const DiscoverScreen = () => {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={isRefetching}
+            refreshing={isFetching && !isLoading}
             onRefresh={onRefresh}
             tintColor={colors.neonCyan}
             colors={[colors.neonCyan]}

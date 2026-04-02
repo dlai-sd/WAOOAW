@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useTheme } from '../../hooks/useTheme';
 import type { DiscoverStackScreenProps } from '../../navigation/types';
 
 const industries = ['Marketing', 'Education', 'Sales'];
 
-const FilterAgentsScreen: React.FC<DiscoverStackScreenProps<'FilterAgents'>> = ({ route }) => {
+const FilterAgentsScreen: React.FC<DiscoverStackScreenProps<'FilterAgents'>> = ({ route, navigation }) => {
   const { colors, spacing, typography } = useTheme();
   const [selectedIndustry, setSelectedIndustry] = useState(route.params?.industry || '');
   const [minRating, setMinRating] = useState(route.params?.minRating || 0);
@@ -41,7 +41,24 @@ const FilterAgentsScreen: React.FC<DiscoverStackScreenProps<'FilterAgents'>> = (
           value={maxPrice.toString()}
           onChangeText={(val) => setMaxPrice(Number(val))}
         />
-        {/* TODO: Add filter action button */}
+        <TouchableOpacity
+          style={{
+            backgroundColor: '#00f2fe',
+            paddingVertical: 14,
+            paddingHorizontal: 24,
+            borderRadius: 12,
+            alignItems: 'center',
+            marginTop: spacing.lg,
+            width: '100%',
+          }}
+          onPress={() => navigation.navigate('Discover', {
+            industry: selectedIndustry ? selectedIndustry.toLowerCase() : undefined,
+            minRating: minRating || undefined,
+            maxPrice: maxPrice || undefined,
+          })}
+        >
+          <Text style={{ color: '#0a0a0a', fontWeight: '700', fontSize: 16 }}>Apply Filters</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
