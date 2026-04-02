@@ -107,4 +107,4 @@ describe('CommandCentre', () => {
       expect(screen.getByText('Hire your first agent from Discover to get started.')).toBeInTheDocument()
     })
   })
-}
+})
