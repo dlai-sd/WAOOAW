@@ -74,6 +74,7 @@ services:
       - .codespace/demo.env
     environment:
       ENVIRONMENT: codespace
+      NGINX_MODE: local
       PP_API_BASE_URL: /api
 
   cp-backend:
@@ -93,13 +94,11 @@ services:
       - "host.docker.internal:host-gateway"
 
   cp-frontend:
-    build:
-      args:
-        NGINX_MODE: local
     env_file:
       - .codespace/demo.env
     environment:
       ENVIRONMENT: codespace
+      NGINX_MODE: local
       CP_API_BASE_URL: /api
 
   adminer:

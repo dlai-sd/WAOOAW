@@ -6,6 +6,7 @@
 set -eu
 
 CONFIG_PATH="/usr/share/nginx/html/pp-runtime-config.js"
+NGINX_MODE_VALUE="${NGINX_MODE:-cloudrun}"
 
 cat > "$CONFIG_PATH" <<EOF
 window.__WAOOAW_PP_RUNTIME_CONFIG__ = {
@@ -15,4 +16,11 @@ window.__WAOOAW_PP_RUNTIME_CONFIG__ = {
 };
 EOF
 
-exec nginx -g 'daemon off;'
+case "$NGINX_MODE_VALUE" in
+  local)
+    exec nginx -c /etc/nginx/nginx.local.conf -g 'daemon off;'
+    ;;
+  cloudrun|*)
+    exec nginx -c /etc/nginx/nginx.cloudrun.conf -g 'daemon off;'
+    ;;
+esac
