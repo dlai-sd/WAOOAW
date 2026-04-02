@@ -152,7 +152,14 @@ EXECUTION ORDER:
 
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
-**Verify merge first:** confirm on GitHub that the Iteration 1 PR is merged to `main` before launching.
+**Prerequisite evidence:**
+- Iteration 1 merge status: `VERIFIED MERGED`
+- Iteration 1 PR: `#999` — `feat(cp-wiz-1): iteration 1 — analytics, brand voice, and strategy preview`
+- PR URL: `https://github.com/dlai-sd/WAOOAW/pull/999`
+- Merge commit on `main`: `5c2d23a36e517a7c85b39ff17bf090a914077a91`
+- Merged at: `2026-04-01T18:19:24Z`
+
+**Verify merge first:** use the Prerequisite evidence block above as the source of truth. Iteration 2 is eligible to launch because this evidence is already recorded in the plan.
 
 **Steps to launch:** same as Iteration 1 (GitHub repository → Agents tab)
 
@@ -175,8 +182,9 @@ ENVIRONMENT REQUIREMENT:
 - Do not HALT only because terminal tools are unavailable; use the GitHub task branch/PR flow for this run.
 
 PREREQUISITE CHECK (do before anything else):
-  Confirm from GitHub that the Iteration 1 PR for this plan is merged to `main`.
-  If you cannot verify that merge from the available GitHub context: post "Blocked: Iteration 1 merge to main could not be verified." and HALT.
+  Read the "Prerequisite evidence" block under Iteration 2 in this plan file.
+  Treat Iteration 2 as unlaunchable only if that block is still marked pending or does not include both a merged PR reference and a merge commit on `main`.
+  If the block is still pending or incomplete: post "Blocked: Iteration 1 merge evidence has not been recorded in the plan." and HALT.
 
 EXECUTION ORDER:
 1. Read "Agent Execution Rules" and "Iteration 2" sections. Read nothing else.
