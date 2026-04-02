@@ -206,6 +206,8 @@ celerybeat.pid
 
 # Codespace specific
 .devcontainer/devcontainer.local.json
+.codespace/*.env
+.codespace/*.env.*
 data/
 
 # Terraform (never commit state/plan)

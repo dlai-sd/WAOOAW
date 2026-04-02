@@ -1,10 +1,9 @@
 #!/bin/bash
-# Quick Start Script (Docker-first)
 
 set -euo pipefail
 
-echo "=== WAOOAW Local Setup (Docker) ==="
-echo "Running Docker Compose using docker-compose.local.yml"
+echo "=== WAOOAW Codespaces Local Setup ==="
+echo "Delegating to scripts/codespace-stack.sh up all"
 echo ""
 
-docker compose -f docker-compose.local.yml up --build
+bash scripts/codespace-stack.sh up all
