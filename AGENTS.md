@@ -5,6 +5,29 @@ and others that follow the AGENTS.md convention).
 
 ---
 
+## Platform objective and current priority
+
+WAOOAW exists to develop and rent value-generating agents to customers. Work in
+this repo should favor agents that are self-sufficient, autonomous, effective,
+efficient, and commercially useful over generic platform polish.
+
+Current product priority order:
+
+1. **Digital Marketing Agent (DMA)** — first commercial priority
+2. **YouTube-first DMA execution** — creation, approval, scheduling, posting,
+   and performance review must be strongest here first
+3. **DMA channel expansion** — adapt one shared theme into platform-native
+   variants for LinkedIn, Facebook, X, Instagram, WhatsApp, and later channels
+4. **Autonomous DMA tuning** — use outreach or posting performance to improve
+   the next cycle of content and recommendations
+5. **Share Trader** — next major agent lane after DMA
+
+When assessing scope, explicitly state whether the work advances DMA value, DMA
+enablement, Share Trader value, or Share Trader enablement. If it advances none
+of these, challenge the task before spending substantial effort.
+
+---
+
 ## Required reading before touching any code
 
 Read these files in order — they prevent 90 % of mistakes:
