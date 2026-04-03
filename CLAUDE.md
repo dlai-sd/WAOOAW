@@ -3,6 +3,31 @@
 > **Start every session**: read `docs/CONTEXT_AND_INDEX.md` §1, §3, §5, §11,
 > §17 before writing any code. It is the authoritative platform reference.
 
+## Platform objective and current priority
+
+WAOOAW exists to develop and rent value-generating agents to customers. The
+current bias is toward work that makes agents more autonomous, effective,
+efficient, and commercially useful, not toward generic UI or architecture work
+with no clear customer-value path.
+
+Priority order:
+
+1. **Digital Marketing Agent (DMA)** — first commercial priority
+2. **YouTube-first DMA execution** — strongest flow first for content
+  generation, approval, scheduling, posting, and performance review
+3. **DMA multi-platform expansion** — adapt one theme into platform-specific
+  variants for LinkedIn, Facebook, X, Instagram, WhatsApp, and later channels
+4. **Autonomous tuning loop** — use outreach or posting performance to improve
+  future DMA output
+5. **Share Trader** — second major agent lane with exchange setup,
+  connectivity validation, strategy configuration, execution, performance, and
+  recommendations
+
+Before deep work, classify scope as DMA value, DMA enablement, Share Trader
+value, or Share Trader enablement. If it does not map to one of those, reduce,
+defer, or challenge it unless it is a real blocker to runtime correctness,
+deployability, promotion, or security.
+
 ## What this repo is
 
 AI agent marketplace platform. Four Python/FastAPI backends + React Native

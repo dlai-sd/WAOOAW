@@ -24,12 +24,25 @@ mandatory NFR invariants (`waooaw_router`, `get_read_db_session`, `PIIMaskingFil
 `@circuit_breaker`); the four backends + mobile structure; and the design system
 (dark `#0a0a0a`, neon cyan `#00f2fe`, agent cards with live status).
 
+**Non-negotiable Platform Objective**
+WAOOAW exists to develop and rent value-generating agents to customers.
+
+Current priority order:
+- **First:** Digital Marketing Agent (DMA)
+- **YouTube first:** strongest content creation, approval, scheduling, posting, and performance review flow must land there before platform breadth becomes the priority
+- **Then channel expansion:** LinkedIn, Facebook, X, Instagram, WhatsApp, and later more channels using platform-specific variants from one shared theme
+- **Second major agent lane:** Share Trader with exchange/API setup, connectivity validation, script/frequency/condition setup, trade execution, performance review, and recommendations
+
+Any plan that does not clearly advance DMA value, DMA enablement, Share Trader value, or Share Trader enablement is drifting and should be challenged before you write stories.
+
 **Quality gates activated by both lenses (apply to every epic/story):**
 - Epic title = customer outcome, not technical action  
   ✅ "Customer sees live agent status" ❌ "Add status field to API"
 - Acceptance criteria = observable user behaviour, not internal state
 - Edge cases must include lifecycle states: empty roster, trial expiry,
   agent offline mid-goal, payment failure
+- Every iteration and story must explicitly state which of these it advances: DMA value, DMA enablement, Share Trader value, or Share Trader enablement
+- Generic infra or UI work with no clear objective mapping must be reduced, reframed as enablement, or rejected
 
 ---
 
@@ -57,6 +70,7 @@ The user's vision is in the message that triggered this command. Extract answers
 3. **Out of scope** — what is explicitly NOT being built?
 4. **Lane** — Lane A (wire existing APIs only) or Lane B (new backend endpoints required)?
 5. **Urgency** — any deadline or iteration count constraint?
+6. **Objective alignment** — how does this work advance DMA or Share Trader, or what exact blocker does it remove?
 
 State your answers as bullet points. Pause and let the user correct them before writing a single story.
 
@@ -82,6 +96,7 @@ Once the vision intake is confirmed:
 - **Image promotion and secret-management rule:** Every story that introduces or changes environment-specific configuration must state that values live in GCP Secret Manager or Cloud Run runtime env/secret references only. Do not bake environment-specific values into Dockerfiles, committed `.env` files, Terraform defaults, or source code. The same image must promote cleanly from demo → uat → prod.
 - **GCP-first infra rule:** If the user explicitly asks for live infra creation from GCP first, plan the resource creation as script/CLI automation against GCP, then add Terraform only to reference, import, or reconcile the already-created resource. Do not make Terraform the creation source of truth for that iteration.
 - **Deployment workflow note:** assume deployment happens via the `waooaw deploy` GitHub workflow after merge to `main`. Do not add per-iteration deploy steps unless the scope changes infrastructure, environment variables, or database migrations.
+- **Platform objective note:** the plan intro and each iteration summary must foreground DMA-first customer value. If a story is enablement, say which DMA or Share Trader outcome it unlocks.
 
 ## Step 4 — Report to user
 
