@@ -65,6 +65,8 @@ Plant (Core API) - 1 service:
 
 **Demo deploy quick pick:** To push code to the demo URL, run `waooaw-deploy.yml` with `environment: demo` and `terraform_action: apply` (builds/pushes images, applies app stacks). For a CP-only fast path without LB changes, use `cp-pipeline.yml` with `target_environment: demo` and `image_tag: auto`.
 
+**Prebuilt-tag promotion quick pick:** When images are validated locally in Codespaces and already pushed to Artifact Registry, run `waooaw-promote-prebuilt-tag.yml` with `environment: demo|uat|prod`, `terraform_action: apply`, and the exact immutable `image_tag`. This skips repo-side builds and promotes the same tag unchanged across environments.
+
 ---
 
 ## Latest Updates (Jan 12, 2026)
