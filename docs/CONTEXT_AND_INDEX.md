@@ -12,6 +12,7 @@
 
 0. [How To Use This Document](#0-how-to-use-this-document)
 1. [Problem Statement & Vision](#1-problem-statement--vision)
+  - [1.1 Platform Objective And Priority Ladder](#11-platform-objective-and-priority-ladder)
 2. [Solution Hypothesis](#2-solution-hypothesis)
 3. [Constitutional Design Pattern](#3-constitutional-design-pattern)
 4. [Four Major Components](#4-four-major-components)
@@ -109,6 +110,50 @@ If you are handing work to a lower-cost or small-context agent, this document is
 | **Tagline** | "Agents Earn Your Business" |
 | **Business model** | 7-day free trial → monthly subscription (₹8K–18K/month). Agents across Marketing, Education, Sales. |
 | **Differentiator** | Constitutional governance (single Governor, L0/L1 compliance), agent personality/status, marketplace DNA (browse, compare, hire like Upwork — not a SaaS landing page). |
+
+### 1.1 Platform Objective And Priority Ladder
+
+WAOOAW exists to develop and rent value-generating agents to customers. The platform objective is not generic AI tooling or abstract workflow polish; it is to ship agents that are self-sufficient, autonomous, effective, efficient, and commercially useful in real customer environments.
+
+| Priority | Objective | What success looks like |
+|---|---|---|
+| **P0** | Rent value-generating agents | Customers receive measurable business outcomes, not demo-only automation |
+| **P1** | Digital Marketing Agent (DMA) is the first product priority | DMA creates customer-ready work that can be approved, scheduled, published, and improved from feedback |
+| **P2** | YouTube-first DMA execution | YouTube content creation, approval, posting, scheduling, and performance review are strongest before broadening platform coverage |
+| **P3** | Multi-platform DMA expansion | One theme becomes platform-native variants for LinkedIn, Facebook, X, Instagram, WhatsApp, and later channels |
+| **P4** | Autonomous tuning loop | Outreach or posting performance feeds recommendations and improvements for the next content cycle |
+| **P5** | Share Trader is the next major agent lane | Customer can connect exchange credentials, validate them, configure strategies, execute trades, review performance, and receive recommendations |
+
+#### DMA scope that should dominate current prioritization
+
+| Capability | Required outcome |
+|---|---|
+| Theme-to-content generation | One core theme can be transformed into platform-specific content, not duplicated copy |
+| Approval workflow | Customer can review and approve content before release |
+| Scheduling and posting | Customer can schedule approved content and trust the agent to post it correctly |
+| Performance review | DMA can review post or outreach performance and feed that back into future suggestions or execution |
+| Customer-value test | The work should feel like meaningful marketing output, not back-office UI polish detached from outcomes |
+
+#### Share Trader scope after DMA
+
+| Capability | Required outcome |
+|---|---|
+| Exchange connectivity | Customer can set up and verify exchange/API credentials |
+| Strategy definition | Customer can define script, interval/frequency, and conditions such as RSI cutovers |
+| Trade execution | Agent can execute approved trade flows against the configured exchange |
+| Performance visibility | Customer can review executed trades and outcome history |
+| Recommendations | Agent can recommend future trades based on runtime evidence |
+
+#### Priority gate for planning and execution
+
+| If a task is... | Default decision |
+|---|---|
+| Direct DMA value delivery | Prioritize first |
+| Required enablement for DMA or Share Trader to run, deploy, promote, observe, or stay secure | Prioritize when it unblocks delivery |
+| Generic polish without a path to agent value | Deprioritize |
+| Architecture cleanup with no immediate product or runtime payoff | Reject or split down |
+
+**Operating rule:** every plan, story, bug fix, infra change, and prompt update should explicitly name which objective above it advances. If it advances none of them, challenge the work before doing it.
 
 ---
 
@@ -2573,11 +2618,24 @@ git push origin <branch>
 | **Docker-only testing** | All tests run inside Docker containers or Codespace (devcontainer). **NO venv, virtualenv, or conda.** |
 | **No auth changes** | Do NOT modify authentication architecture (JWT flow, OAuth, Gateway auth middleware, RBAC). If a story requires auth changes, flag it and ask user. |
 | **No constitutional changes** | Do NOT modify BaseEntity 7-section schema or L0 constitutional rules without explicit user approval |
+| **Objective alignment first** | Before execution, state whether the work advances DMA value, DMA enablement, Share Trader value, or Share Trader enablement. If it does none of these, challenge scope before coding. |
 | **Test suite placement** | Tests go in the correct suite per Section 11. Do not create ad-hoc test files outside established paths. |
 | **Status accuracy** | 🔵 = code done + tests written but not executed. 🟢 = tests pass. Never mark 🟢 without passing tests. |
 | **Commit messages** | Follow conventional commits: `<type>(<scope>): <subject>` (see Section 7) |
 | **Branch discipline** | Work on the feature branch, never commit directly to `main` |
 | **Image promotion path** | **ONE Docker image per service, promoted unchanged demo → uat → prod.** Never bake env-specific values (DB URL, timeouts, tracing, log levels, feature flags) into images. All config comes from env vars, Secret Manager, or tfvars. See "Environment Configuration Rules" below. |
+
+### Product-priority compliance gate
+
+Before planning or executing substantial work, classify it against §1.1.
+
+| Question | Required answer |
+|---|---|
+| Does this directly improve DMA customer value? | Say exactly how: content creation, approval, scheduling, publishing, or performance tuning |
+| If not direct DMA, does it unblock DMA or Share Trader delivery? | Say what it enables at runtime, deployment, or customer workflow level |
+| If neither applies, should this work be reduced, deferred, or rejected? | Default to yes |
+
+Do not let generic portal polish, abstract architecture, or convenience refactors outrank DMA-first customer value unless they are a real blocker to deployability, promotion, security, or runtime correctness.
 | **Customer-visible proof** | For any sellable portal feature, do NOT mark the story complete unless the deployed CP/PP/mobile journey is visible with real demo/UAT runtime data and a recorded walkthrough. |
 
 ### Environment Configuration Rules (Image Promotion Path)
