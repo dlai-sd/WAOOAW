@@ -1,0 +1,107 @@
+services:
+  postgres:
+    profiles:
+      - local-db
+
+  plant-migrations:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      DATABASE_URL: ${PLANT_DATABASE_URL}
+      ENVIRONMENT: codespace
+    depends_on: !reset []
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  plant-backend:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      DATABASE_URL: ${PLANT_DATABASE_URL}
+      REDIS_URL: ${PLANT_BACKEND_REDIS_URL}
+      ENVIRONMENT: codespace
+    depends_on: !override
+      redis:
+        condition: service_healthy
+      plant-migrations:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  plant-worker:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      DATABASE_URL: ${PLANT_DATABASE_URL}
+      REDIS_URL: ${PLANT_BACKEND_REDIS_URL}
+      ENVIRONMENT: codespace
+    depends_on: !override
+      redis:
+        condition: service_healthy
+      plant-backend:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  plant-flower:
+    env_file:
+      - .codespace/demo.env
+
+  plant-gateway:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      REDIS_URL: ${PLANT_GATEWAY_REDIS_URL}
+      ENVIRONMENT: codespace
+
+  pp-backend:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      DATABASE_URL: ${PLANT_DATABASE_URL}
+      REDIS_URL: ${PP_BACKEND_REDIS_URL}
+      ENVIRONMENT: codespace
+    depends_on: !override
+      redis:
+        condition: service_healthy
+      plant-gateway:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  pp-frontend:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      ENVIRONMENT: codespace
+      NGINX_MODE: local
+      PP_API_BASE_URL: /api
+
+  cp-backend:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      DATABASE_URL: ${PLANT_DATABASE_URL}
+      REDIS_URL: ${CP_BACKEND_REDIS_URL}
+      ENVIRONMENT: codespace
+      CORS_ORIGINS: http://localhost:3002,http://localhost:3001,https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://${CODESPACE_NAME:-localhost}-3001.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
+    depends_on: !override
+      redis:
+        condition: service_healthy
+      plant-gateway:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  cp-frontend:
+    env_file:
+      - .codespace/demo.env
+    environment:
+      ENVIRONMENT: codespace
+      NGINX_MODE: local
+      CP_API_BASE_URL: /api
+
+  adminer:
+    depends_on: !reset []
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

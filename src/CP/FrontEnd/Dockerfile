@@ -32,8 +32,9 @@ CMD ["npm", "run", "test", "--", "--run"]
 # Runtime stage - Nginx
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Ship both configs in the same image and choose at container start.
+COPY nginx.conf /etc/nginx/nginx.cloudrun.conf
+COPY nginx.local.conf /etc/nginx/nginx.local.conf
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

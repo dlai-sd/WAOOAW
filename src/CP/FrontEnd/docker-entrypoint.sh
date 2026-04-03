@@ -2,6 +2,7 @@
 set -eu
 
 CONFIG_PATH="/usr/share/nginx/html/runtime-config.js"
+NGINX_MODE_VALUE="${NGINX_MODE:-cloudrun}"
 
 ENVIRONMENT_VALUE="${ENVIRONMENT:-}"
 API_BASE_URL_VALUE="${CP_API_BASE_URL:-}"
@@ -17,4 +18,11 @@ window.__WAOOAW_RUNTIME_CONFIG__ = {
 };
 EOF
 
-exec nginx -g 'daemon off;'
+case "$NGINX_MODE_VALUE" in
+  local)
+    exec nginx -c /etc/nginx/nginx.local.conf -g 'daemon off;'
+    ;;
+  cloudrun|*)
+    exec nginx -c /etc/nginx/nginx.cloudrun.conf -g 'daemon off;'
+    ;;
+esac
