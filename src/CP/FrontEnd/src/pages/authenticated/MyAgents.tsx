@@ -2299,36 +2299,52 @@ export default function MyAgents({
 
       {instances.length > 0 ? (
         allDma ? (
-          <Card className="agent-detail-card dma-wizard-fullwidth-card" style={{ marginTop: '1rem' }}>
-            <DigitalMarketingActivationWizard
-              instances={instances}
-              instance={selectedInstance}
-              readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-              onStaleReference={async ({ subscriptionId }) => {
-                await refreshAfterStaleSelection(subscriptionId)
-              }}
-              onSaved={(updated) => {
-                setInstances((prev) =>
-                  prev.map((x) =>
-                    x.subscription_id === (selectedInstance?.subscription_id ?? '')
-                      ? {
-                          ...x,
-                          nickname: updated.nickname ?? x.nickname,
-                          configured: updated.configured ?? x.configured,
-                          goals_completed: updated.goals_completed ?? x.goals_completed,
-                          hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
-                          agent_type_id: updated.agent_type_id ?? x.agent_type_id,
-                          catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
-                          internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
-                          external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
-                          catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
-                        }
-                      : x
-                  )
-                )
-              }}
-              onSelectedInstanceChange={(sub_id) => setSelectedSubscriptionId(sub_id)}
-            />
+          <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0, width: '100%', maxWidth: '500px', flex: '1 1 260px' }}>
+                <AgentSelector
+                  agents={instances}
+                  selectedId={selectedSubscriptionId}
+                  onChange={setSelectedSubscriptionId}
+                  loading={loading}
+                  disabled={loading}
+                  label="Selected DMA Hire"
+                  helperText={selectedReadOnlyExpired ? "This agent's trial has ended. Select another hire or review retained access." : "Select and manage your DMA hire"}
+                />
+              </div>
+            </div>
+
+            {selectedInstance ? (
+              <div style={{ marginTop: '1rem' }}>
+                <DigitalMarketingActivationWizard
+                  instance={selectedInstance}
+                  readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                  onStaleReference={async ({ subscriptionId }) => {
+                    await refreshAfterStaleSelection(subscriptionId)
+                  }}
+                  onSaved={(updated) => {
+                    setInstances((prev) =>
+                      prev.map((x) =>
+                        x.subscription_id === (selectedInstance?.subscription_id ?? '')
+                          ? {
+                              ...x,
+                              nickname: updated.nickname ?? x.nickname,
+                              configured: updated.configured ?? x.configured,
+                              goals_completed: updated.goals_completed ?? x.goals_completed,
+                              hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
+                              agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                              catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
+                              internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
+                              external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
+                              catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
+                            }
+                          : x
+                      )
+                    )
+                  }}
+                />
+              </div>
+            ) : null}
           </Card>
         ) : (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>

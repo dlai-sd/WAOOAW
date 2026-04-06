@@ -429,12 +429,13 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByText('Now')).toBeInTheDocument()
   })
 
-  it('starts on step 1 — Induct Agent panel visible (auto-advanced from step 0 with 1 instance)', async () => {
+  it('starts on step 1 — Induct Agent panel visible when controlled instance is provided', async () => {
     renderWizard()
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('Nickname')).toBeInTheDocument()
+    expect(screen.queryByTestId('dma-step-panel-select')).not.toBeInTheDocument()
   })
 
   it('Continue button advances to step 2', async () => {
@@ -463,7 +464,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
   })
 
-  it('Back button disabled on step 0 (Select Agent)', async () => {
+  it('renders agent selector when external selection control is needed', async () => {
     const onSelectedInstanceChange = vi.fn()
     render(
       <MemoryRouter>
@@ -480,7 +481,10 @@ describe('DMA Activation Wizard — step navigation', () => {
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-select')).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+    expect(screen.getByText('Growth Copilot')).toBeInTheDocument()
+    expect(screen.getByText('SEO Pilot')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Growth Copilot').closest('button')!)
+    expect(onSelectedInstanceChange).toHaveBeenCalledWith('SUB-1')
   })
 
   it('Activate Agent button visible on step 7', async () => {
@@ -511,7 +515,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByLabelText('Nickname')).toBeInTheDocument()
   })
 
-  it('renders Step 0 agent select panel when instances provided', async () => {
+  it('renders agent selector when instances provided with no selection', async () => {
     const onSelectedInstanceChange = vi.fn()
     render(
       <MemoryRouter>
