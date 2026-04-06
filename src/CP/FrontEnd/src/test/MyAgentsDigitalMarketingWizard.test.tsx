@@ -438,29 +438,46 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.queryByTestId('dma-step-panel-select')).not.toBeInTheDocument()
   })
 
-  it('Continue button advances to step 2', async () => {
+  it('does not show Select Agent step when controlled instance is provided', async () => {
     renderWizard()
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+      expect(screen.queryByTestId('dma-step-panel-select')).not.toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-    await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
-    })
+    // First visible panel should be connect (channel ready)
+    expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
   })
 
-  it('Back button goes back from step 2 to step 1', async () => {
+  it('first visible stage is productive customer outcome not internal mechanics', async () => {
     renderWizard()
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    // Should show "Channel Ready" not "Select Agent" or "Induct Agent"
+    expect(screen.getByText('Channel Ready')).toBeInTheDocument()
+  })
+
+  it('Continue and Back navigation works across reduced stage model', async () => {
+    renderWizard()
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    
+    // Navigate to next stage
+    const themeBtn = screen.getByText('Brief Chat').closest('button')
+    expect(themeBtn).not.toBeNull()
+    fireEvent.click(themeBtn!)
+    
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
+    })
+    
+    // Navigate back
+    const connectBtn = screen.getByText('Channel Ready').closest('button')
+    expect(connectBtn).not.toBeNull()
+    fireEvent.click(connectBtn!)
+    
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
   })
 
@@ -487,10 +504,10 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(onSelectedInstanceChange).toHaveBeenCalledWith('SUB-1')
   })
 
-  it('Activate Agent button visible on step 7', async () => {
+  it('Activate Agent button visible on final stage', async () => {
     renderWizard()
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
     const reviewActivateBtn = screen.getByText('Review & Activate').closest('button')
     expect(reviewActivateBtn).not.toBeNull()
@@ -508,11 +525,10 @@ describe('DMA Activation Wizard — step navigation', () => {
     renderWizard()
 
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
 
     expect(screen.queryByText('Activation unavailable')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Nickname')).toBeInTheDocument()
   })
 
   it('renders agent selector when instances provided with no selection', async () => {
@@ -560,7 +576,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))

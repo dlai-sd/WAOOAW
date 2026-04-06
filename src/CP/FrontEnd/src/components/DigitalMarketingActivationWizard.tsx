@@ -58,13 +58,10 @@ import {
 const DIGITAL_MARKETING_AGENT_TYPE_ID = 'marketing.digital_marketing.v1'
 
 const DMA_STEPS = [
-  { id: 'select',    title: 'Select Agent',         description: 'Choose which hired agent to configure.' },
-  { id: 'induct',    title: 'Induct Agent',          description: 'Set the agent nickname and brand identity.' },
-  { id: 'platforms', title: 'Choose Platforms',      description: 'Select which social channels this agent will manage.' },
-  { id: 'connect',   title: 'Connect Platforms',     description: 'Authorise each selected platform channel.' },
-  { id: 'theme',     title: 'Build Master Theme',    description: 'Define brand brief and generate an AI content strategy.' },
-  { id: 'schedule',  title: 'Confirm Schedule',      description: 'Set posting frequency and preferred days.' },
-  { id: 'activate',  title: 'Review & Activate',     description: 'Check readiness then activate the agent.' },
+  { id: 'connect',   title: 'Channel Ready',        description: 'Connect or confirm the YouTube channel.' },
+  { id: 'theme',     title: 'Brief Chat',           description: 'Guide the customer to a usable YouTube direction.' },
+  { id: 'schedule',  title: 'Plan',                 description: 'Confirm posting rhythm only after the brief is coherent.' },
+  { id: 'activate',  title: 'Review & Activate',    description: 'Show exactly what is ready and what is blocked.' },
 ] as const
 
 const PLATFORM_OPTIONS = [
@@ -457,13 +454,15 @@ export function DigitalMarketingActivationWizard({
     return Boolean(attachedYouTubeConnection && (status === 'connected' || status === 'active'))
   }, [attachedYouTubeConnection])
 
-  // Auto-select + advance if only one instance and we are on step 0
+  // Auto-select + advance if only one instance and we are on step 0 (select panel)
   useEffect(() => {
-    if (activeStepIndex === 0 && instances.length === 1) {
+    // With the new reduced step model, activeStepIndex 0 is now 'connect', not 'select'
+    // The 'select' step only exists when instances array is provided and no instance is selected
+    if (activeStepIndex === 0 && currentStep.id === 'select' && instances.length === 1) {
       onSelectedInstanceChange?.(instances[0].subscription_id)
       setActiveStepIndex(1)
     }
-  }, [instances, activeStepIndex, onSelectedInstanceChange])
+  }, [instances, activeStepIndex, currentStep.id, onSelectedInstanceChange])
 
   // OAuth callback — detect ?code&state on mount and finalize connection
   useEffect(() => {
