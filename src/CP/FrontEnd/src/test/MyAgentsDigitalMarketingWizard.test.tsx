@@ -1468,4 +1468,34 @@ describe('DMA Activation Wizard — step navigation', () => {
       )
     })
   })
+
+  it('hides advanced business input fields during initial consultative phase', async () => {
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.getByText('Brief your DMA hire')).toBeInTheDocument()
+    })
+
+    // Dense fields should be in a collapsed section
+    expect(screen.queryByText('Direct input fields')).not.toBeVisible()
+  })
+
+  it('reveals advanced fields when section is expanded', async () => {
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.getByText('Optional business context fields')).toBeInTheDocument()
+    })
+
+    // Expand the details section
+    const summary = screen.getByText('Optional business context fields')
+    fireEvent.click(summary)
+
+    // Now fields should be accessible
+    await waitFor(() => {
+      expect(screen.getByText('Direct input fields')).toBeVisible()
+    })
+  })
 })
