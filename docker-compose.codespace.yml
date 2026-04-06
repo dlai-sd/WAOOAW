@@ -61,6 +61,8 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${PP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
+      FRONTEND_URL: https://${CODESPACE_NAME:-localhost}-${PP_FRONTEND_PORT:-3001}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
+      CORS_ORIGINS: http://localhost:${PP_FRONTEND_PORT:-3001},https://${CODESPACE_NAME:-localhost}-${PP_FRONTEND_PORT:-3001}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
     depends_on: !override
       redis:
         condition: service_healthy
@@ -84,7 +86,9 @@ services:
       DATABASE_URL: ${PLANT_DATABASE_URL}
       REDIS_URL: ${CP_BACKEND_REDIS_URL}
       ENVIRONMENT: codespace
-      CORS_ORIGINS: http://localhost:3002,http://localhost:3001,https://${CODESPACE_NAME:-localhost}-3002.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://${CODESPACE_NAME:-localhost}-3001.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
+      API_URL: https://${CODESPACE_NAME:-localhost}-${CP_FRONTEND_PORT:-3002}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}/api
+      FRONTEND_URL: https://${CODESPACE_NAME:-localhost}-${CP_FRONTEND_PORT:-3002}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
+      CORS_ORIGINS: http://localhost:${CP_FRONTEND_PORT:-3002},http://localhost:${PP_FRONTEND_PORT:-3001},https://${CODESPACE_NAME:-localhost}-${CP_FRONTEND_PORT:-3002}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://${CODESPACE_NAME:-localhost}-${PP_FRONTEND_PORT:-3001}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
     depends_on: !override
       redis:
         condition: service_healthy

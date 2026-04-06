@@ -971,7 +971,6 @@ export default function AuthPanel({
             )}
 
             <div className={styles.formIntro}>
-              <div className={styles.formEyebrow}>Fast entry</div>
               <h2 className={styles.formHeading}>Sign in without the usual auth friction.</h2>
               <p className={styles.formBody}>
                 Pick the fastest route in. Use Google for instant access, or verify your work email and continue in one clean flow.
@@ -982,7 +981,6 @@ export default function AuthPanel({
               <div className={styles.stageCardHeader}>
                 <div className={styles.stageCardEyebrow}>Instant option</div>
                 <div className={styles.stageCardTitle}>Continue with Google</div>
-                <div className={styles.stageCardBody}>Best for founders and operators who just want to get to the portal immediately.</div>
               </div>
               <GoogleLoginButton onSuccess={handleSuccess} onError={handleError} />
             </div>

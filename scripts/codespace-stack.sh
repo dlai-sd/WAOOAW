@@ -10,6 +10,20 @@ COMPOSE_FILES=(-f docker-compose.local.yml -f docker-compose.codespace.yml)
 ENV_FILE=".codespace/demo.env"
 DC=(docker compose --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}")
 PORT_DOMAIN="${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
+CP_FRONTEND_PORT="${WAOOAW_CP_FRONTEND_PORT:-3002}"
+PP_FRONTEND_PORT="${WAOOAW_PP_FRONTEND_PORT:-3001}"
+CP_BACKEND_PORT="${WAOOAW_CP_BACKEND_PORT:-8020}"
+PP_BACKEND_PORT="${WAOOAW_PP_BACKEND_PORT:-8015}"
+PLANT_GATEWAY_PORT="${WAOOAW_PLANT_GATEWAY_PORT:-8000}"
+PLANT_BACKEND_PORT="${WAOOAW_PLANT_BACKEND_PORT:-8001}"
+
+export PORT_DOMAIN
+export CP_FRONTEND_PORT
+export PP_FRONTEND_PORT
+export CP_BACKEND_PORT
+export PP_BACKEND_PORT
+export PLANT_GATEWAY_PORT
+export PLANT_BACKEND_PORT
 
 case "${1:-}" in
   up|build|restart|down|logs|status|urls|bootstrap-env|doctor|clean) ;;
@@ -76,21 +90,21 @@ load_services() {
 
 print_urls() {
   if [[ -n "${CODESPACE_NAME:-}" ]]; then
-    echo "CP Frontend: https://${CODESPACE_NAME}-3002.${PORT_DOMAIN}/"
-    echo "PP Frontend: https://${CODESPACE_NAME}-3001.${PORT_DOMAIN}/"
-    echo "CP Backend: https://${CODESPACE_NAME}-8020.${PORT_DOMAIN}/"
-    echo "PP Backend: https://${CODESPACE_NAME}-8015.${PORT_DOMAIN}/"
-    echo "Plant Gateway: https://${CODESPACE_NAME}-8000.${PORT_DOMAIN}/"
-    echo "Plant Backend: https://${CODESPACE_NAME}-8001.${PORT_DOMAIN}/"
+    echo "CP Frontend: https://${CODESPACE_NAME}-${CP_FRONTEND_PORT}.${PORT_DOMAIN}/"
+    echo "PP Frontend: https://${CODESPACE_NAME}-${PP_FRONTEND_PORT}.${PORT_DOMAIN}/"
+    echo "CP Backend: https://${CODESPACE_NAME}-${CP_BACKEND_PORT}.${PORT_DOMAIN}/"
+    echo "PP Backend: https://${CODESPACE_NAME}-${PP_BACKEND_PORT}.${PORT_DOMAIN}/"
+    echo "Plant Gateway: https://${CODESPACE_NAME}-${PLANT_GATEWAY_PORT}.${PORT_DOMAIN}/"
+    echo "Plant Backend: https://${CODESPACE_NAME}-${PLANT_BACKEND_PORT}.${PORT_DOMAIN}/"
     return
   fi
 
-  echo "CP Frontend: http://localhost:3002/"
-  echo "PP Frontend: http://localhost:3001/"
-  echo "CP Backend: http://localhost:8020/"
-  echo "PP Backend: http://localhost:8015/"
-  echo "Plant Gateway: http://localhost:8000/"
-  echo "Plant Backend: http://localhost:8001/"
+  echo "CP Frontend: http://localhost:${CP_FRONTEND_PORT}/"
+  echo "PP Frontend: http://localhost:${PP_FRONTEND_PORT}/"
+  echo "CP Backend: http://localhost:${CP_BACKEND_PORT}/"
+  echo "PP Backend: http://localhost:${PP_BACKEND_PORT}/"
+  echo "Plant Gateway: http://localhost:${PLANT_GATEWAY_PORT}/"
+  echo "Plant Backend: http://localhost:${PLANT_BACKEND_PORT}/"
 }
 
 run_doctor() {
@@ -131,12 +145,12 @@ run_doctor() {
   echo "Compose config: OK"
 
   local names=(
-    "cp-frontend|http://127.0.0.1:3002/health"
-    "pp-frontend|http://127.0.0.1:3001/health"
-    "cp-backend|http://127.0.0.1:8020/health"
-    "pp-backend|http://127.0.0.1:8015/health"
-    "plant-gateway|http://127.0.0.1:8000/health"
-    "plant-backend|http://127.0.0.1:8001/health"
+    "cp-frontend|http://127.0.0.1:${CP_FRONTEND_PORT}/health"
+    "pp-frontend|http://127.0.0.1:${PP_FRONTEND_PORT}/health"
+    "cp-backend|http://127.0.0.1:${CP_BACKEND_PORT}/health"
+    "pp-backend|http://127.0.0.1:${PP_BACKEND_PORT}/health"
+    "plant-gateway|http://127.0.0.1:${PLANT_GATEWAY_PORT}/health"
+    "plant-backend|http://127.0.0.1:${PLANT_BACKEND_PORT}/health"
   )
 
   for entry in "${names[@]}"; do
