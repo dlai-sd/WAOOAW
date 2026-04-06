@@ -89,7 +89,23 @@ IMAGE_TAG=10da6e2-20260403T154500
 
 ## Step 3: Build and push every deployable image from Codespaces
 
-Authenticate Docker to Artifact Registry:
+Preferred path: use the one-command helper script.
+
+```bash
+cd /workspaces/WAOOAW
+bash scripts/codespace-build-push.sh --tag "${IMAGE_TAG}"
+```
+
+Scope examples:
+
+```bash
+bash scripts/codespace-build-push.sh --scope cp
+bash scripts/codespace-build-push.sh --scope plant --tag "${IMAGE_TAG}"
+```
+
+Under the hood, the script authenticates Docker to Artifact Registry, ensures a Buildx builder exists, builds every required image for the chosen scope, pushes the immutable tag, and verifies the pushed image references when permissions allow.
+
+Manual equivalent if you need to debug one image build:
 
 ```bash
 cd /workspaces/WAOOAW
@@ -123,7 +139,7 @@ for spec in "${BUILDS[@]}"; do
 done
 ```
 
-Verify the pushed tags exist before dispatching a deployment:
+Verify the pushed tags exist before dispatching a deployment if you did the manual path:
 
 ```bash
 cd /workspaces/WAOOAW

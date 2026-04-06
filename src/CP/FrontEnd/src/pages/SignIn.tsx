@@ -73,7 +73,6 @@ export default function SignIn({ theme, toggleTheme }: SignInProps) {
               <section className="auth-left-panel" aria-label="Why use WAOOAW">
                 <div className="auth-left-step">
                   <div className="auth-left-illustration">{p.illustration}</div>
-                  <div className="auth-side-kicker">Customer Command Centre</div>
                   <h2 className="auth-left-heading">{p.heading}</h2>
                   <p className="auth-left-tagline">{p.tagline}</p>
                   <div className="auth-proof-grid">

@@ -6,14 +6,15 @@ import { useNavigate } from 'react-router-dom'
 interface HeaderProps {
   theme: 'light' | 'dark'
   toggleTheme: () => void
+  variant?: 'default' | 'landing'
 }
 
-export default function Header({ theme, toggleTheme }: HeaderProps) {
+export default function Header({ theme, toggleTheme, variant = 'default' }: HeaderProps) {
   const navigate = useNavigate()
 
   return (
     <>
-      <header className="header">
+      <header className={`header${variant === 'landing' ? ' header--landing' : ''}`}>
         <div className="container">
           <div className="header-content">
             <div className="logo">

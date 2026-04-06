@@ -6,6 +6,10 @@ export const mockAgents = [
     rating: 4.8,
     industry: 'Marketing',
     specialty: 'Healthcare specialist',
+    description: 'Builds proof-led blog, newsletter, and landing-page content for clinics and health brands that need authority and pipeline.',
+    bestFor: 'Clinics and health brands that need trusted inbound growth',
+    proofMetric: '18 qualified leads in 30 days',
+    responseTime: 'Responds in 2 hrs',
     price: 12000,
     status: 'available' as const
   },
@@ -16,6 +20,10 @@ export const mockAgents = [
     rating: 4.9,
     industry: 'Sales',
     specialty: 'B2B SaaS specialist',
+    description: 'Runs outbound prospecting, follow-up cadence, and qualification for SaaS teams that need more meetings without adding headcount.',
+    bestFor: 'Founders and revenue teams selling mid-market SaaS',
+    proofMetric: '42 meetings booked last month',
+    responseTime: 'Lead follow-up in 15 min',
     price: 15000,
     status: 'available' as const
   },
@@ -26,6 +34,10 @@ export const mockAgents = [
     rating: 4.7,
     industry: 'Education',
     specialty: 'JEE/NEET specialist',
+    description: 'Delivers concept breakdowns, practice plans, and doubt resolution for exam-focused students who need disciplined progress.',
+    bestFor: 'Students preparing for JEE and NEET under tight timelines',
+    proofMetric: '91% weekly completion rate',
+    responseTime: 'Doubt help in under 1 hr',
     price: 10000,
     status: 'working' as const
   },
@@ -36,6 +48,10 @@ export const mockAgents = [
     rating: 4.6,
     industry: 'Marketing',
     specialty: 'B2B specialist',
+    description: 'Plans posts, adapts themes per channel, and keeps your brand consistently active with business-focused social content.',
+    bestFor: 'B2B brands that need consistent LinkedIn and Instagram output',
+    proofMetric: '23 posts published this week',
+    responseTime: 'Same-day content turnaround',
     price: 11000,
     status: 'available' as const
   },
@@ -46,6 +62,10 @@ export const mockAgents = [
     rating: 4.8,
     industry: 'Sales',
     specialty: 'Enterprise sales',
+    description: 'Handles discovery, proposal shaping, and follow-through for longer-cycle deals where stakeholders need clarity and momentum.',
+    bestFor: 'Enterprise pipelines with multi-step buying committees',
+    proofMetric: '₹18L pipeline influenced',
+    responseTime: 'Proposal draft in 24 hrs',
     price: 18000,
     status: 'available' as const
   },
@@ -56,6 +76,10 @@ export const mockAgents = [
     rating: 4.7,
     industry: 'Education',
     specialty: 'CBSE specialist',
+    description: 'Supports school learners with chapter planning, concept revision, and structured practice designed for board outcomes.',
+    bestFor: 'CBSE students who need steady weekly science support',
+    proofMetric: '3 chapter plans shipped weekly',
+    responseTime: 'Homework help in 90 min',
     price: 10000,
     status: 'available' as const
   }

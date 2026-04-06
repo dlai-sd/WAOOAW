@@ -9,10 +9,18 @@ interface AgentCardProps {
     job_role?: { name: string }
     rating?: number
     price?: number
+    specialty?: string
+    bestFor?: string
+    proofMetric?: string
+    responseTime?: string
   }) | (CatalogAgent & {
     status?: AgentStatus | 'available' | 'working' | 'offline'
     avatar?: string
     rating?: number
+    specialty?: string
+    bestFor?: string
+    proofMetric?: string
+    responseTime?: string
   })
   onTryAgent?: (agentId: string) => void
 }
@@ -30,9 +38,13 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
     : `${agent.industry.charAt(0).toUpperCase()}${agent.industry.slice(1)}`
   const description = isCatalogAgent ? agent.short_description : agent.description
   const jobRoleName = isCatalogAgent ? agent.job_role_label : agent.job_role?.name
+  const specialtyLabel = isCatalogAgent ? agent.job_role_label : agent.specialty || agent.specialization || agent.job_role?.name
   const price = isCatalogAgent ? agent.monthly_price_inr : agent.price
   const lifecycleState = isCatalogAgent ? agent.lifecycle_state : null
   const catalogVersion = isCatalogAgent ? agent.external_catalog_version : null
+  const bestFor = agent.bestFor
+  const proofMetric = agent.proofMetric
+  const responseTime = agent.responseTime
 
   const getStatusBadge = () => {
     switch (resolvedStatus) {
@@ -76,30 +88,56 @@ export default function AgentCard({ agent, onTryAgent }: AgentCardProps) {
 
   return (
     <div className="agent-card" data-testid={`cp-agent-card-${agent.id}`}>
-      <div className="agent-avatar-large">
-        {getAvatar()}
-      </div>
-      <div className="agent-info">
-        <h3>{displayName}</h3>
-        <div className="agent-meta">
-          {'rating' in agent && agent.rating && (
-            <span className="agent-rating">
-              <Star20Filled className="agent-rating-icon" />
-              {agent.rating.toFixed(1)}
-            </span>
-          )}
-          {getStatusBadge()}
-          {getLifecycleBadge(lifecycleState)}
-          {catalogVersion ? <Badge appearance="outline" size="small">{catalogVersion}</Badge> : null}
+      <div className="agent-card-head">
+        <div className="agent-avatar-large">
+          {getAvatar()}
         </div>
-        <p className="agent-industry">
-          <Briefcase20Regular className="agent-industry-icon" />
-          {industryLabel}
-        </p>
-        {jobRoleName && (
-          <p className="agent-specialty">{jobRoleName}</p>
-        )}
+        <div className="agent-identity">
+          <div className="agent-name-row">
+            <h3>{displayName}</h3>
+            {getStatusBadge()}
+          </div>
+          {specialtyLabel && (
+            <p className="agent-specialty agent-specialty--lead">{specialtyLabel}</p>
+          )}
+          <div className="agent-meta">
+            {'rating' in agent && agent.rating && (
+              <span className="agent-rating">
+                <Star20Filled className="agent-rating-icon" />
+                {agent.rating.toFixed(1)}
+              </span>
+            )}
+            {getLifecycleBadge(lifecycleState)}
+            {catalogVersion ? <Badge appearance="outline" size="small">{catalogVersion}</Badge> : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="agent-info">
+        <div className="agent-pill-row">
+          <span className="agent-industry-pill">
+            <Briefcase20Regular className="agent-industry-icon" />
+            {industryLabel}
+          </span>
+          {responseTime ? <span className="agent-speed-pill">{responseTime}</span> : null}
+        </div>
+
+        {bestFor ? (
+          <p className="agent-best-for">
+            <span className="agent-best-for-label">Best for</span>
+            {bestFor}
+          </p>
+        ) : null}
+
         <p className="agent-description">{description}</p>
+
+        {proofMetric || jobRoleName ? (
+          <div className="agent-proof-row">
+            {proofMetric ? <div className="agent-proof-card">{proofMetric}</div> : null}
+            {jobRoleName ? <div className="agent-proof-card agent-proof-card--secondary">{jobRoleName}</div> : null}
+          </div>
+        ) : null}
+
         <div className="agent-footer">
           {price ? (
             <span className="agent-price">₹{price.toLocaleString()}/mo</span>
