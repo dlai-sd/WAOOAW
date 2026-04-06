@@ -16,6 +16,36 @@
 
 set -euo pipefail
 
+STRICT_MODE=1
+
+for arg in "$@"; do
+    case "$arg" in
+        --best-effort)
+            STRICT_MODE=0
+            ;;
+        --strict)
+            STRICT_MODE=1
+            ;;
+    esac
+done
+
+finish_with_error() {
+    local message="$1"
+    shift || true
+
+    echo "$message"
+    for extra in "$@"; do
+        echo "$extra"
+    done
+
+    if [[ "$STRICT_MODE" == "1" ]]; then
+        exit 1
+    fi
+
+    echo "⚠️  Continuing without GCP bootstrap because this run is best-effort."
+    exit 0
+}
+
 TARGET_ENV="${WAOOAW_CLOUDSQL_ENV:-demo}"
 PROJECT_ID="${WAOOAW_GCP_PROJECT_ID:-waooaw-oauth}"
 REGION="${WAOOAW_GCP_REGION:-asia-south1}"
@@ -24,9 +54,9 @@ case "$TARGET_ENV" in
     demo|uat|prod)
         ;;
     *)
-        echo "❌ Unsupported WAOOAW_CLOUDSQL_ENV: ${TARGET_ENV}"
-        echo "   Allowed values: demo, uat, prod"
-        exit 1
+        finish_with_error \
+            "❌ Unsupported WAOOAW_CLOUDSQL_ENV: ${TARGET_ENV}" \
+            "   Allowed values: demo, uat, prod"
         ;;
 esac
 
@@ -62,10 +92,10 @@ PUBLIC_IP_ENABLED=$(gcloud sql instances describe "$INSTANCE_NAME" \
     --format='value(settings.ipConfiguration.ipv4Enabled)' 2>/dev/null || true)
 
 if [[ "$PUBLIC_IP_ENABLED" != "True" && "$PUBLIC_IP_ENABLED" != "true" ]]; then
-    echo "❌ Cloud SQL public IP is disabled for ${INSTANCE_NAME}."
-    echo "   Codespaces uses the public-IP-backed Auth Proxy path documented in docs/CONTEXT_AND_INDEX.md."
-    echo "   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=${PROJECT_ID} --quiet"
-    exit 1
+    finish_with_error \
+        "❌ Cloud SQL public IP is disabled for ${INSTANCE_NAME}." \
+        "   Codespaces uses the public-IP-backed Auth Proxy path documented in docs/CONTEXT_AND_INDEX.md." \
+        "   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=${PROJECT_ID} --quiet"
 fi
 
 # ── 2. Cloud SQL Auth Proxy ───────────────────────────────────────────────────
@@ -95,12 +125,14 @@ sleep 4
 if kill -0 "$PROXY_PID" 2>/dev/null && grep -q "ready for new connections" "$PROXY_LOG"; then
     echo "✅ Cloud SQL Proxy listening on ${PROXY_ADDRESS}:${PROXY_PORT} (PID ${PROXY_PID})"
 else
-    echo "❌ Cloud SQL Proxy failed to start — check $PROXY_LOG"
-    cat "$PROXY_LOG" || true
+    PROXY_FAILURE_NOTE=""
     if grep -q 'instance does not have IP of type "PUBLIC"' "$PROXY_LOG"; then
-        echo "   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=${PROJECT_ID} --quiet"
+        PROXY_FAILURE_NOTE="   Fix: gcloud sql instances patch ${INSTANCE_NAME} --assign-ip --project=${PROJECT_ID} --quiet"
     fi
-    exit 1
+    finish_with_error \
+        "❌ Cloud SQL Proxy failed to start — check $PROXY_LOG" \
+        "$(cat "$PROXY_LOG" 2>/dev/null || true)" \
+        "$PROXY_FAILURE_NOTE"
 fi
 
 # ── 3. DB credentials from Secret Manager ────────────────────────────────────
@@ -131,9 +163,9 @@ EOF
     echo "✅ DB ready — connect: source ${DB_ENV_FILE} && psql"
     echo "   Environment: ${TARGET_ENV} | Instance: ${INSTANCE_NAME} | DB: ${DB_NAME} | User: ${DB_USER}"
 else
-    echo "⚠️  Could not read DB credentials from Secret Manager."
-    echo "   SA may need roles/secretmanager.secretAccessor"
-    echo "   Expected secret: ${DATABASE_URL_SECRET}"
-    echo "   Once granted or corrected, re-run: bash .devcontainer/gcp-auth.sh"
-    exit 1
+    finish_with_error \
+        "⚠️  Could not read DB credentials from Secret Manager." \
+        "   SA may need roles/secretmanager.secretAccessor" \
+        "   Expected secret: ${DATABASE_URL_SECRET}" \
+        "   Once granted or corrected, re-run: bash .devcontainer/gcp-auth.sh"
 fi
