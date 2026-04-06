@@ -7,6 +7,9 @@
     },
     "ghcr.io/devcontainers/features/github-cli:1": {
       "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/google-cloud-cli:1": {
+      "version": "latest"
     }
   },
   "customizations": {
@@ -26,7 +29,7 @@
       }
     }
   },
-  "postCreateCommand": "bash .devcontainer/setup-slim.sh && bash .devcontainer/gcp-auth.sh",
+  "postCreateCommand": "install -m 0755 .devcontainer/00-token-alias.sh /etc/profile.d/00-waooaw-token-alias.sh && bash .devcontainer/gcp-auth.sh",
   "forwardPorts": [3001, 3002, 8000, 8001, 8015, 8020, 8081, 5555, 15432],
   "remoteUser": "root"
 }
