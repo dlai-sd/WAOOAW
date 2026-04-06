@@ -164,6 +164,30 @@ If the session drops, stay on `docs/plant-redis-1-plan-and-get-plan`, verify com
 
 ---
 
+## [2026-04-06 UTC] DMA-YT-VALUE-1 — My Agents DMA + YouTube value-first plan
+
+**Branch**: `docs/cp-dma-youtube-value-plan`
+**Plan file**: `docs/CP/iterations/DMA-YT-VALUE-1-my-agents-dma-youtube-value.md`
+**Status**: Plan drafted and ready to push
+
+### Goal
+Create a sharper implementation plan that closes the highest customer-impact gaps in DMA plus YouTube on My Agents, with a consultative chat-like flow, less form-heavy wizarding, top-of-page agent selection, and connect/reconnect UX that feels world-class for a paying customer.
+
+### Checkpoint list
+- [x] Read planning prompt and required platform context that exists on this branch
+- [x] Confirm `docs/CP/iterations/NFRReusable.md` is missing on this branch
+- [x] Fall back to live NFR source: `docs/CONTEXT_AND_INDEX.md` §5.6 plus current `core/` implementations
+- [x] Create plan branch
+- [x] Extract vision intake from user request
+- [x] Resolve unclear items using the default decisions already stated in-session
+- [x] Create plan file with objective guardrails, value-ranked gaps, target state, and story cards
+- [ ] Commit and push final plan checkpoint
+
+### Next save point
+After the plan commit is pushed to the remote branch.
+
+---
+
 ## [2026-03-04 16:30 UTC] Diagnosed and fixed Razorpay 502 (receipt too long)
 
 **Branch**: `fix/razorpay-receipt-length-plant`
@@ -218,6 +242,53 @@ User replaced `src/CP/FrontEnd/src/Waooaw-Logo.png` with new brand asset and ask
 1. Check CI: `gh pr checks 854` — expect 12/12 green
 2. Merge PR #854 on GitHub
 3. Deploy to demo (Cloud Run `waooaw-plant-backend-demo` + `waooaw-cp-frontend-demo`)
+
+---
+
+## [2026-04-06 UTC] Objective alignment review — DMA and Share Trader code status
+
+**Branch**: `feat/cp-youtube-test-persist`
+**Status**: In progress
+
+### Goal
+Re-ground on the required platform context, then assess where the current codebase stands against WAOOAW's stated objective: DMA first (YouTube-first creation, approval, scheduling, posting, performance-led tuning), then Share Trader.
+
+### Checkpoint list
+- [x] Read AGENTS.md
+- [x] Read CLAUDE.md
+- [x] Read docs/CONTEXT_AND_INDEX.md required sections
+- [x] Read docs/CP/iterations/NFRReusable.md required sections
+- [x] Capture branch and persist working note
+- [ ] Inventory implemented DMA flows across CP, Plant, Gateway, and mobile
+- [ ] Inventory implemented Share Trader flows and adapters
+- [ ] Summarize objective fit, strongest areas, and major gaps
+
+### Next save point
+After the code inventory is complete and the objective-gap summary is delivered.
+
+---
+
+## [2026-04-06 UTC] Get-ready prompt follow-up — objective + DMA/YouTube code status
+
+**Branch**: `feat/cp-youtube-test-persist`
+**Status**: In progress
+
+### Goal
+Restate the WAOOAW objective from the required platform files, confirm readiness constraints, and assess where DMA plus YouTube stand today from the live code paths rather than deleted plan docs.
+
+### Checkpoint list
+- [x] Read AGENTS.md
+- [x] Read CLAUDE.md
+- [x] Read docs/CONTEXT_AND_INDEX.md required sections
+- [x] Attempt read of docs/CP/iterations/NFRReusable.md
+- [x] Fall back to CONTEXT §5.6 + live core files because NFRReusable is deleted on this branch
+- [ ] Trace CP frontend DMA setup and YouTube callback flow
+- [ ] Trace CP backend thin-proxy DMA and connection routes
+- [ ] Trace Plant DMA draft, approval, publish, and YouTube integration routes
+- [ ] Summarize objective fit, strongest implemented areas, and major gaps
+
+### Next save point
+After the live DMA + YouTube path summary is delivered.
 4. Open demo, click any agent → "Start 7-Day Free Trial" → "Pay Now" → Razorpay popup should open with UPI/card/netbanking options
 5. PR #853 (`docs/session-commentary-agent-protocol`) is also open and docs-only — safe to merge anytime
 
