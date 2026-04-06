@@ -1677,97 +1677,13 @@ export function DigitalMarketingActivationWizard({
               {currentStep.id === 'theme' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-theme">
                   <div style={{ display: 'grid', gap: '1.75rem' }}>
-                    <div>
-                      <div className="dma-wizard-section-label">Business brief</div>
-                      <div className="dma-wizard-form-grid" style={{ marginBottom: '0.85rem' }}>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Brand name</span>
-                          <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Location</span>
-                          <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Primary language</span>
-                          <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Timezone</span>
-                          <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} placeholder="e.g. Asia/Kolkata" />
-                        </label>
-                      </div>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.85rem' }}>
-                        <span>Offerings and services</span>
-                        <Textarea
-                          aria-label="Offerings and services"
-                          value={offeringsText}
-                          onChange={(_, data) => setOfferingsText(data.value)}
-                          disabled={readOnly}
-                          resize="vertical"
-                          rows={3}
-                          placeholder="Comma-separated list of what you sell or offer"
-                        />
-                      </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <span>Business context</span>
-                        <Textarea
-                          aria-label="Business context"
-                          value={businessContext}
-                          onChange={(_, data) => setBusinessContext(data.value)}
-                          disabled={readOnly}
-                          resize="vertical"
-                          rows={3}
-                          placeholder="Describe your business, target audience, key differentiators"
-                        />
-                      </label>
-                      <details open style={{ marginTop: '1rem' }}>
-                        <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: '0.75rem' }}>Brand Voice</summary>
-                        <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.75rem' }}>
-                          {brandVoiceLoading ? <Spinner size="tiny" /> : null}
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Voice description</span>
-                            <Textarea
-                              aria-label="Voice description"
-                              value={voiceDescription}
-                              onChange={(_, data) => setVoiceDescription(data.value)}
-                              disabled={readOnly}
-                              resize="vertical"
-                              rows={3}
-                              placeholder="Describe how your brand should sound."
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Tone keywords</span>
-                            <Input
-                              aria-label="Tone keywords"
-                              value={toneKeywords}
-                              onChange={(_, data) => setToneKeywords(data.value)}
-                              disabled={readOnly}
-                              placeholder="e.g. warm, credible, direct"
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Example phrases</span>
-                            <Textarea
-                              aria-label="Example phrases"
-                              value={examplePhrases}
-                              onChange={(_, data) => setExamplePhrases(data.value)}
-                              disabled={readOnly}
-                              resize="vertical"
-                              rows={4}
-                              placeholder="One phrase per line"
-                            />
-                          </label>
-                        </div>
-                      </details>
-                    </div>
 
+                    {/* PRIMARY: AI Strategy Workshop - Consultative chat-like interface */}
                     <div className="dma-wizard-theme-workshop-card">
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
-                          <div className="dma-wizard-section-label">AI strategy workshop</div>
-                          <div style={{ fontWeight: 600 }}>A consultative strategist that keeps the customer moving</div>
+                          <div className="dma-wizard-section-label">Brief your DMA hire</div>
+                          <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>The assistant will ask only what it needs to build your first YouTube theme</div>
                         </div>
                         <Badge
                           appearance="outline"
@@ -1780,22 +1696,20 @@ export function DigitalMarketingActivationWizard({
 
                       <div className="dma-wizard-theme-workshop-thread" data-testid="strategy-workshop-thread">
                         <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
-                          <div className="dma-wizard-theme-workshop-message-role">Strategist</div>
+                          <div className="dma-wizard-theme-workshop-message-role">Marketing Strategist</div>
                           <div>
                             {strategyWorkshop.assistant_message || 'Start the workshop and the strategist will quickly lock the strongest direction, not run a long intake interview.'}
                           </div>
                         </div>
 
-                        <div className="dma-wizard-theme-workshop-insights">
-                          <div className="dma-wizard-theme-insight-card" data-testid="strategy-checkpoint-summary">
-                            <div className="dma-wizard-theme-insight-label">What we have locked</div>
-                            <div>{strategyWorkshop.checkpoint_summary || 'The strategist will keep a compact running summary here so the customer does not need to reread the full exchange.'}</div>
+                        {strategyWorkshop.checkpoint_summary ? (
+                          <div className="dma-wizard-theme-workshop-insights">
+                            <div className="dma-wizard-theme-insight-card" data-testid="strategy-checkpoint-summary">
+                              <div className="dma-wizard-theme-insight-label">What we've locked</div>
+                              <div>{strategyWorkshop.checkpoint_summary}</div>
+                            </div>
                           </div>
-                          <div className="dma-wizard-theme-insight-card">
-                            <div className="dma-wizard-theme-insight-label">Time-saving note</div>
-                            <div>{strategyWorkshop.time_saving_note || 'The AI will reduce repeated questions and move to a recommendation as soon as the direction is strong enough.'}</div>
-                          </div>
-                        </div>
+                        ) : null}
 
                         {latestCustomerNote ? (
                           <div className="dma-wizard-theme-latest-note">
@@ -1807,14 +1721,14 @@ export function DigitalMarketingActivationWizard({
 
                       {strategyWorkshop.current_focus_question ? (
                         <div>
-                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Current focus</div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Next question</div>
                           <div className="dma-wizard-theme-follow-up-question" data-testid="strategy-current-focus-question">{strategyWorkshop.current_focus_question}</div>
                         </div>
                       ) : null}
 
                       {(strategyWorkshop.next_step_options || []).length > 0 ? (
                         <div>
-                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Suggested next moves</div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick answers</div>
                           <div className="dma-wizard-theme-option-list">
                             {(strategyWorkshop.next_step_options || []).map((option, index) => (
                               <Button
@@ -1833,7 +1747,7 @@ export function DigitalMarketingActivationWizard({
                       ) : null}
 
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <span>Your answer or instruction</span>
+                        <span style={{ fontWeight: 600 }}>Your answer or instruction</span>
                         <Textarea
                           aria-label="Strategy workshop reply"
                           value={strategyReply}
@@ -1970,6 +1884,101 @@ export function DigitalMarketingActivationWizard({
 
                       {renderDraftGenerationPanel()}
                     </div>
+
+                    {/* SECONDARY: Optional structured business fields (collapsed by default) */}
+                    <details style={{ marginTop: '1rem' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.75rem', background: 'var(--colorNeutralBackground3)', borderRadius: '8px' }}>
+                        Optional business context fields
+                      </summary>
+                      <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '8px' }}>
+                        <div className="dma-wizard-section-label" style={{ marginBottom: '0.75rem' }}>Direct input fields</div>
+                        <div style={{ opacity: 0.75, fontSize: '0.85rem', marginBottom: '1rem' }}>
+                          The assistant will ask for most of this progressively. Use these only if you already know the exact inputs.
+                        </div>
+                        <div className="dma-wizard-form-grid" style={{ marginBottom: '0.85rem' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Brand name</span>
+                            <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Location</span>
+                            <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Primary language</span>
+                            <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Timezone</span>
+                            <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} placeholder="e.g. Asia/Kolkata" />
+                          </label>
+                        </div>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.85rem' }}>
+                          <span>Offerings and services</span>
+                          <Textarea
+                            aria-label="Offerings and services"
+                            value={offeringsText}
+                            onChange={(_, data) => setOfferingsText(data.value)}
+                            disabled={readOnly}
+                            resize="vertical"
+                            rows={3}
+                            placeholder="Comma-separated list of what you sell or offer"
+                          />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Business context</span>
+                          <Textarea
+                            aria-label="Business context"
+                            value={businessContext}
+                            onChange={(_, data) => setBusinessContext(data.value)}
+                            disabled={readOnly}
+                            resize="vertical"
+                            rows={3}
+                            placeholder="Describe your business, target audience, key differentiators"
+                          />
+                        </label>
+                        <details style={{ marginTop: '1rem' }}>
+                          <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: '0.75rem' }}>Brand Voice</summary>
+                          <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.75rem' }}>
+                            {brandVoiceLoading ? <Spinner size="tiny" /> : null}
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Voice description</span>
+                              <Textarea
+                                aria-label="Voice description"
+                                value={voiceDescription}
+                                onChange={(_, data) => setVoiceDescription(data.value)}
+                                disabled={readOnly}
+                                resize="vertical"
+                                rows={3}
+                                placeholder="Describe how your brand should sound."
+                              />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Tone keywords</span>
+                              <Input
+                                aria-label="Tone keywords"
+                                value={toneKeywords}
+                                onChange={(_, data) => setToneKeywords(data.value)}
+                                disabled={readOnly}
+                                placeholder="e.g. warm, credible, direct"
+                              />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Example phrases</span>
+                              <Textarea
+                                aria-label="Example phrases"
+                                value={examplePhrases}
+                                onChange={(_, data) => setExamplePhrases(data.value)}
+                                disabled={readOnly}
+                                resize="vertical"
+                                rows={4}
+                                placeholder="One phrase per line"
+                              />
+                            </label>
+                          </div>
+                        </details>
+                      </div>
+                    </details>
                   </div>
                 </div>
               )}

@@ -1413,4 +1413,59 @@ describe('DMA Activation Wizard — step navigation', () => {
       })
     })
   })
+
+  it('shows workshop panel as the primary DMA brief interface', async () => {
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.getByText('Brief your DMA hire')).toBeInTheDocument()
+    })
+    expect(screen.getByText('The assistant will ask only what it needs to build your first YouTube theme')).toBeInTheDocument()
+    expect(screen.getByTestId('strategy-workshop-thread')).toBeInTheDocument()
+  })
+
+  it('shows suggested next answers as clickable options', async () => {
+    renderWizard()
+    await goToThemeStep()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('strategy-assistant-message')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('start-theme-workshop-btn'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('strategy-option-0')).toBeInTheDocument()
+    })
+
+    expect(screen.getByTestId('strategy-option-0')).toHaveTextContent('Frame this around trust-building')
+    expect(screen.getByTestId('strategy-option-1')).toHaveTextContent('Start with process and rigor proof')
+    expect(screen.getByTestId('strategy-option-2')).toHaveTextContent('Suggest first 3 content angles')
+  })
+
+  it('calls theme plan API with pending_input when replying to workshop', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    
+    renderWizard()
+    await goToThemeStep()
+
+    fireEvent.change(screen.getByLabelText('Strategy workshop reply'), {
+      target: { value: 'My target audience is enterprise sales leaders' },
+    })
+    fireEvent.click(screen.getByTestId('start-theme-workshop-btn'))
+
+    await waitFor(() => {
+      expect(serviceModule.generateDigitalMarketingThemePlan).toHaveBeenCalledWith(
+        'HAI-1',
+        expect.objectContaining({
+          campaign_setup: expect.objectContaining({
+            strategy_workshop: expect.objectContaining({
+              pending_input: 'My target audience is enterprise sales leaders',
+            }),
+          }),
+        })
+      )
+    })
+  })
 })
