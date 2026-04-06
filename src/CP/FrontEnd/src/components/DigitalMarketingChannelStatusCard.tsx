@@ -111,6 +111,48 @@ export function DigitalMarketingChannelStatusCard(props: DigitalMarketingChannel
         </div>
       ) : null}
 
+      {props.validationResult?.recent_uploads && props.validationResult.recent_uploads.length > 0 ? (
+        <div data-testid="youtube-recent-uploads" style={{ marginTop: '8px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground3)', marginBottom: '6px', fontWeight: 600 }}>Recent uploads (proof)</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {props.validationResult.recent_uploads.map((upload) => (
+              <div
+                key={upload.video_id}
+                style={{
+                  padding: '8px',
+                  borderRadius: '4px',
+                  background: 'var(--colorNeutralBackground1Hover)',
+                  fontSize: '13px',
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: '2px' }}>{upload.title}</div>
+                <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground3)' }}>
+                  {new Date(upload.published_at).toLocaleDateString()} · {Math.floor(upload.duration_seconds / 60)}:{String(upload.duration_seconds % 60).padStart(2, '0')}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {props.validationResult?.next_action_hint ? (
+        <div data-testid="youtube-next-action-hint" style={{ marginTop: '8px' }}>
+          {props.validationResult.next_action_hint === 'reconnect_required' ? (
+            <div style={{ padding: '8px', borderRadius: '4px', background: 'var(--colorPaletteRedBackground1)', border: '1px solid var(--colorPaletteRedBorder1)', fontSize: '13px' }}>
+              ⚠️ Token expired — reconnect with Google to restore access
+            </div>
+          ) : props.validationResult.next_action_hint === 'token_expiring_soon' ? (
+            <div style={{ padding: '8px', borderRadius: '4px', background: 'var(--colorPaletteYellowBackground1)', border: '1px solid var(--colorPaletteYellowBorder1)', fontSize: '13px' }}>
+              ⏰ Token expires soon — consider reconnecting to avoid disruption
+            </div>
+          ) : props.validationResult.next_action_hint === 'connected_ready' ? (
+            <div style={{ padding: '8px', borderRadius: '4px', background: 'var(--colorPaletteGreenBackground1)', border: '1px solid var(--colorPaletteGreenBorder1)', fontSize: '13px' }}>
+              ✅ Connected and ready — your DMA can access this channel
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {props.actionMessage ? (
         <div style={{ fontSize: '13px', color: 'var(--colorNeutralForeground2)' }}>{props.actionMessage}</div>
       ) : null}

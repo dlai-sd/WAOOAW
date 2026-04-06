@@ -718,6 +718,8 @@ describe('DMA Activation Wizard — step navigation', () => {
       recent_long_video_count: 35,
       subscriber_count: 1200,
       view_count: 54000,
+      recent_uploads: [],
+      next_action_hint: 'connected_ready',
     })
     vi.mocked(ytModule.attachYouTubeConnection).mockResolvedValue({
       id: 'conn-youtube-1',
@@ -1455,5 +1457,156 @@ describe('DMA Activation Wizard — step navigation', () => {
     await waitFor(() => {
       expect(screen.getByText('Direct input fields')).toBeVisible()
     })
+  })
+
+  // E4-S2 Tests: Enriched YouTube validation response rendering
+  it('renders recent upload proof when enriched validate response contains preview items', async () => {
+    const ytModule = await import('../services/youtubeConnections.service')
+    vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-youtube-1',
+        customer_id: 'CUST-1',
+        platform_key: 'youtube',
+        display_name: 'My Channel',
+        granted_scopes: [],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        created_at: '2026-04-01T10:00:00Z',
+        updated_at: '2026-04-01T10:00:00Z',
+      },
+    ])
+    vi.mocked(ytModule.validateYouTubeConnection).mockResolvedValue({
+      id: 'cred-youtube-1',
+      customer_id: 'CUST-1',
+      platform_key: 'youtube',
+      display_name: 'My Channel',
+      verification_status: 'verified',
+      connection_status: 'connected',
+      channel_count: 1,
+      total_video_count: 10,
+      recent_short_count: 2,
+      recent_long_video_count: 3,
+      subscriber_count: 500,
+      view_count: 5000,
+      recent_uploads: [
+        {
+          video_id: 'vid-1',
+          title: 'Recent Video 1',
+          published_at: '2026-04-01T10:00:00Z',
+          duration_seconds: 300,
+        },
+        {
+          video_id: 'vid-2',
+          title: 'Recent Video 2',
+          published_at: '2026-04-02T10:00:00Z',
+          duration_seconds: 120,
+        },
+      ],
+      next_action_hint: 'connected_ready',
+    })
+
+    renderWizard()
+    await goToConnectStep()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('youtube-recent-uploads')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Recent Video 1')).toBeInTheDocument()
+    expect(screen.getByText('Recent Video 2')).toBeInTheDocument()
+  })
+
+  it('renders reconnect guidance when next_action_hint indicates reconnect needed', async () => {
+    const ytModule = await import('../services/youtubeConnections.service')
+    vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-youtube-1',
+        customer_id: 'CUST-1',
+        platform_key: 'youtube',
+        display_name: 'My Channel',
+        granted_scopes: [],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        created_at: '2026-04-01T10:00:00Z',
+        updated_at: '2026-04-01T10:00:00Z',
+      },
+    ])
+    vi.mocked(ytModule.validateYouTubeConnection).mockResolvedValue({
+      id: 'cred-youtube-1',
+      customer_id: 'CUST-1',
+      platform_key: 'youtube',
+      display_name: 'My Channel',
+      verification_status: 'verified',
+      connection_status: 'connected',
+      channel_count: 1,
+      total_video_count: 10,
+      recent_short_count: 2,
+      recent_long_video_count: 3,
+      subscriber_count: 500,
+      view_count: 5000,
+      recent_uploads: [],
+      next_action_hint: 'reconnect_required',
+    })
+
+    renderWizard()
+    await goToConnectStep()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('youtube-next-action-hint')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/Token expired — reconnect with Google/)).toBeInTheDocument()
+  })
+
+  it('existing validate action works when preview fields are absent or empty', async () => {
+    const ytModule = await import('../services/youtubeConnections.service')
+    vi.mocked(ytModule.listYouTubeConnections).mockResolvedValue([
+      {
+        id: 'cred-youtube-1',
+        customer_id: 'CUST-1',
+        platform_key: 'youtube',
+        display_name: 'My Channel',
+        granted_scopes: [],
+        verification_status: 'verified',
+        connection_status: 'connected',
+        created_at: '2026-04-01T10:00:00Z',
+        updated_at: '2026-04-01T10:00:00Z',
+      },
+    ])
+    vi.mocked(ytModule.validateYouTubeConnection).mockResolvedValue({
+      id: 'cred-youtube-1',
+      customer_id: 'CUST-1',
+      platform_key: 'youtube',
+      display_name: 'My Channel',
+      verification_status: 'verified',
+      connection_status: 'connected',
+      channel_count: 1,
+      total_video_count: 10,
+      recent_short_count: 2,
+      recent_long_video_count: 3,
+      subscriber_count: 500,
+      view_count: 5000,
+      recent_uploads: [],
+      next_action_hint: 'connected_ready',
+    })
+
+    renderWizard()
+    await goToConnectStep()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('youtube-validation-metrics')).toBeInTheDocument()
+    })
+
+    // Fallback metrics view still works
+    expect(screen.getByText('10')).toBeInTheDocument()
+    expect(screen.getByText('500')).toBeInTheDocument()
+    // No upload preview or error should appear
+    expect(screen.queryByTestId('youtube-recent-uploads')).not.toBeInTheDocument()
   })
 })

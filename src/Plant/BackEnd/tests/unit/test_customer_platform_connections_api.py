@@ -240,6 +240,8 @@ async def test_validate_customer_platform_credential_maps_validation_result(mock
         recent_long_video_count=35,
         subscriber_count=1200,
         view_count=54000,
+        recent_uploads=[],
+        next_action_hint="connected_ready",
     )
 
     with patch(
@@ -255,3 +257,141 @@ async def test_validate_customer_platform_credential_maps_validation_result(mock
     assert response.id == "cred-1"
     assert response.total_video_count == 42
     assert response.recent_short_count == 7
+
+
+# E4-S1 Tests: Enriched YouTube validation with recent upload proof
+@pytest.mark.asyncio
+async def test_validate_with_preview_items_includes_recent_uploads(mock_db):
+    """E4-S1-T1: Mock validate result with preview items — response includes preview list and next-action hint."""
+    from api.v1.platform_connections import ValidateCustomerCredentialRequest, validate_customer_platform_credential
+    from services.youtube_connection_service import RecentUploadPreview
+
+    now = datetime.now(timezone.utc)
+    credential = CustomerPlatformCredentialModel(
+        id="cred-1",
+        customer_id="cust-1",
+        platform_key="youtube",
+        provider_account_id="channel-1",
+        display_name="Channel One",
+        granted_scopes=["scope-a"],
+        verification_status="verified",
+        connection_status="connected",
+        secret_ref="projects/waooaw-oauth/secrets/customer-platform-youtube-cust-1/versions/latest",
+        last_verified_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    
+    preview_items = [
+        RecentUploadPreview(
+            video_id="vid-1",
+            title="Recent Video 1",
+            published_at="2026-04-01T10:00:00Z",
+            duration_seconds=300,
+        ),
+        RecentUploadPreview(
+            video_id="vid-2",
+            title="Recent Video 2",
+            published_at="2026-04-02T10:00:00Z",
+            duration_seconds=120,
+        ),
+    ]
+    
+    service_result = MagicMock(
+        credential=credential,
+        channel_count=1,
+        total_video_count=42,
+        recent_short_count=1,
+        recent_long_video_count=1,
+        subscriber_count=1200,
+        view_count=54000,
+        recent_uploads=preview_items,
+        next_action_hint="connected_ready",
+    )
+
+    with patch(
+        "api.v1.platform_connections.YouTubeConnectionService.validate_connection",
+        AsyncMock(return_value=service_result),
+    ):
+        response = await validate_customer_platform_credential(
+            "cred-1",
+            ValidateCustomerCredentialRequest(customer_id="cust-1"),
+            db=mock_db,
+        )
+
+    assert response.id == "cred-1"
+    assert len(response.recent_uploads) == 2
+    assert response.recent_uploads[0].video_id == "vid-1"
+    assert response.recent_uploads[0].title == "Recent Video 1"
+    assert response.next_action_hint == "connected_ready"
+
+
+@pytest.mark.asyncio
+async def test_validate_preserves_existing_aggregate_fields(mock_db):
+    """E4-S1-T2: Existing customer-scoped validate call — aggregate fields still exist."""
+    from api.v1.platform_connections import ValidateCustomerCredentialRequest, validate_customer_platform_credential
+
+    now = datetime.now(timezone.utc)
+    credential = CustomerPlatformCredentialModel(
+        id="cred-1",
+        customer_id="cust-1",
+        platform_key="youtube",
+        provider_account_id="channel-1",
+        display_name="Channel One",
+        granted_scopes=["scope-a"],
+        verification_status="verified",
+        connection_status="connected",
+        secret_ref="projects/waooaw-oauth/secrets/customer-platform-youtube-cust-1/versions/latest",
+        last_verified_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    service_result = MagicMock(
+        credential=credential,
+        channel_count=1,
+        total_video_count=42,
+        recent_short_count=7,
+        recent_long_video_count=35,
+        subscriber_count=1200,
+        view_count=54000,
+        recent_uploads=[],
+        next_action_hint="connected_ready",
+    )
+
+    with patch(
+        "api.v1.platform_connections.YouTubeConnectionService.validate_connection",
+        AsyncMock(return_value=service_result),
+    ):
+        response = await validate_customer_platform_credential(
+            "cred-1",
+            ValidateCustomerCredentialRequest(customer_id="cust-1"),
+            db=mock_db,
+        )
+
+    assert response.total_video_count == 42
+    assert response.recent_short_count == 7
+    assert response.recent_long_video_count == 35
+    assert response.subscriber_count == 1200
+    assert response.view_count == 54000
+    assert response.channel_count == 1
+
+
+@pytest.mark.asyncio
+async def test_validate_handles_missing_credential_error(mock_db):
+    """E4-S1-T3: Wrong or missing credential — existing error contract remains intact."""
+    from api.v1.platform_connections import ValidateCustomerCredentialRequest, validate_customer_platform_credential
+    from services.youtube_connection_service import YouTubeConnectionError
+
+    with patch(
+        "api.v1.platform_connections.YouTubeConnectionService.validate_connection",
+        AsyncMock(side_effect=YouTubeConnectionError("customer_platform_credential_not_found")),
+    ):
+        with pytest.raises(HTTPException) as excinfo:
+            await validate_customer_platform_credential(
+                "cred-1",
+                ValidateCustomerCredentialRequest(customer_id="cust-1"),
+                db=mock_db,
+            )
+
+    assert excinfo.value.status_code == 404
+    assert "not found" in excinfo.value.detail.lower()

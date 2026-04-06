@@ -261,6 +261,33 @@ function formatListForTextarea(value: unknown): string {
     .join('\n')
 }
 
+function formatDurationLabel(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, Math.trunc(totalSeconds || 0))
+  const minutes = Math.floor(safeSeconds / 60)
+  const seconds = safeSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function formatPublishedDateLabel(value: string | null | undefined): string {
+  if (!value) return 'Unknown publish date'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return 'Unknown publish date'
+  return parsed.toLocaleDateString()
+}
+
+function getYouTubeNextActionCopy(nextActionHint: string | null | undefined): string | null {
+  if (nextActionHint === 'reconnect_required') {
+    return 'Token expired — reconnect with Google to restore access'
+  }
+  if (nextActionHint === 'token_expiring_soon') {
+    return 'Token expires soon — consider reconnecting to avoid disruption'
+  }
+  if (nextActionHint === 'connected_ready') {
+    return 'Connected and ready — your DMA can access this channel'
+  }
+  return null
+}
+
 function parseListTextarea(value: string): string[] {
   return String(value || '')
     .split(/\n|,/g)
@@ -1516,6 +1543,56 @@ export function DigitalMarketingActivationWizard({
                         <div><strong>Long videos</strong><div>{youtubeValidationResult.recent_long_video_count}</div></div>
                         <div><strong>Subscribers</strong><div>{youtubeValidationResult.subscriber_count}</div></div>
                         <div><strong>Views</strong><div>{youtubeValidationResult.view_count}</div></div>
+                      </div>
+                    ) : null}
+
+                    {youtubeValidationResult?.recent_uploads?.length ? (
+                      <div
+                        data-testid="youtube-recent-uploads"
+                        style={{
+                          display: 'grid',
+                          gap: '0.6rem',
+                          padding: '0.9rem 1rem',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          borderRadius: '0.9rem',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700 }}>Recent uploads (proof)</div>
+                        <div style={{ display: 'grid', gap: '0.5rem' }}>
+                          {youtubeValidationResult.recent_uploads.map((upload) => (
+                            <div
+                              key={upload.video_id}
+                              style={{
+                                padding: '0.75rem 0.85rem',
+                                borderRadius: '0.75rem',
+                                background: 'rgba(0, 242, 254, 0.05)',
+                                border: '1px solid rgba(0, 242, 254, 0.12)',
+                              }}
+                            >
+                              <div style={{ fontWeight: 600 }}>{upload.title}</div>
+                              <div style={{ fontSize: '0.85rem', opacity: 0.78 }}>
+                                {formatPublishedDateLabel(upload.published_at)} · {formatDurationLabel(upload.duration_seconds)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {getYouTubeNextActionCopy(youtubeValidationResult?.next_action_hint) ? (
+                      <div
+                        data-testid="youtube-next-action-hint"
+                        style={{
+                          padding: '0.9rem 1rem',
+                          borderRadius: '0.9rem',
+                          border: '1px solid rgba(245, 158, 11, 0.28)',
+                          background: 'rgba(245, 158, 11, 0.08)',
+                          color: '#fcd34d',
+                          fontSize: '0.95rem',
+                        }}
+                      >
+                        {getYouTubeNextActionCopy(youtubeValidationResult?.next_action_hint)}
                       </div>
                     ) : null}
 
