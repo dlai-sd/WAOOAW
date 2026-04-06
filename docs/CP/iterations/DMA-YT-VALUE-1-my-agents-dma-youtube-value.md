@@ -355,8 +355,8 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E2-S2 | 1 | Customer gets consultative guidance instead of a form dump | Reveal structured inputs only when the chat flow actually needs them | 🔴 Not Started | — |
 | E3-S1 | 1 | Customer can manage YouTube without leaving the operating surface | Upgrade channel control to always-available connect or reconnect or retest actions | 🔴 Not Started | — |
 | E3-S2 | 1 | Customer can manage YouTube without leaving the operating surface | Unify approval and publish-readiness into one operating rail | 🔴 Not Started | — |
-| E4-S1 | 2 | Customer sees proof of the real YouTube channel before trusting the agent | Enrich Plant YouTube validation with recent upload proof and next-action hints | 🔴 Not Started | — |
-| E4-S2 | 2 | Customer sees proof of the real YouTube channel before trusting the agent | Render recent upload proof and reconnect guidance in My Agents | 🔴 Not Started | — |
+| E4-S1 | 2 | Customer sees proof of the real YouTube channel before trusting the agent | Enrich Plant YouTube validation with recent upload proof and next-action hints | 🟢 Done | copilot/iteration-2-epics-e4-e5 |
+| E4-S2 | 2 | Customer sees proof of the real YouTube channel before trusting the agent | Render recent upload proof and reconnect guidance in My Agents | 🟢 Done | copilot/iteration-2-epics-e4-e5 |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
