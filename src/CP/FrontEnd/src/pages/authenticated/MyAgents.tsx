@@ -36,7 +36,21 @@ import { listPlatformConnections, type PlatformConnection } from '../../services
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 import { getContentRecommendations, type ContentRecommendation } from '../../services/contentAnalytics.service'
 import { listPublishReceipts, type PublishReceipt } from '../../services/publishReceipts.service'
-import { listYouTubeConnections, type YouTubeConnection } from '../../services/youtubeConnections.service'
+import {
+  attachYouTubeConnection,
+  listYouTubeConnections,
+  startYouTubeConnection,
+  validateYouTubeConnection,
+  type ValidateYouTubeConnectionResponse,
+  type YouTubeConnection,
+} from '../../services/youtubeConnections.service'
+import { redirectTo } from '../../utils/browserNavigation'
+import {
+  beginYouTubeOAuthFlow,
+  clearYouTubeOAuthResult,
+  getYouTubeOAuthCallbackUri,
+  readYouTubeOAuthResult,
+} from '../../utils/youtubeOAuthFlow'
 
 type MyAgentsSection = 'configure' | 'goals' | 'skills' | 'performance'
 
@@ -946,6 +960,12 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
   const [connectionsError, setConnectionsError] = useState<string | null>(null)
   const [connections, setConnections] = useState<PlatformConnection[]>([])
   const [youtubeCredentials, setYouTubeCredentials] = useState<YouTubeConnection[]>([])
+  const [youtubeOauthLoading, setYoutubeOauthLoading] = useState(false)
+  const [youtubeValidationLoading, setYoutubeValidationLoading] = useState(false)
+  const [youtubePersistLoading, setYoutubePersistLoading] = useState(false)
+  const [youtubeValidationResult, setYoutubeValidationResult] = useState<ValidateYouTubeConnectionResponse | null>(null)
+  const [youtubeControlMessage, setYoutubeControlMessage] = useState<string | null>(null)
+  const [youtubeControlError, setYoutubeControlError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -1038,55 +1058,85 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
     }
   }, [hiredInstanceId])
 
+  const reloadConnections = useCallback(async () => {
+    if (!isDigitalMarketingInstance || !hiredInstanceId) {
+      setConnections([])
+      setYouTubeCredentials([])
+      setConnectionsError(null)
+      return
+    }
+
+    setConnectionsLoading(true)
+    setConnectionsError(null)
+    try {
+      const [nextConnections, nextYouTubeCredentials] = await Promise.all([
+        listPlatformConnections(hiredInstanceId),
+        listYouTubeConnections(),
+      ])
+      setConnections(nextConnections)
+      setYouTubeCredentials(nextYouTubeCredentials)
+    } catch (e: any) {
+      setConnections([])
+      setYouTubeCredentials([])
+      setConnectionsError(e?.message || 'Failed to load YouTube connection state')
+    } finally {
+      setConnectionsLoading(false)
+    }
+  }, [hiredInstanceId, isDigitalMarketingInstance])
+
   useEffect(() => {
     let cancelled = false
 
-    const loadConnections = async () => {
-      if (!isDigitalMarketingInstance || !hiredInstanceId) {
-        setConnections([])
-        setConnectionsError(null)
-        return
-      }
-
-      setConnectionsLoading(true)
-      setConnectionsError(null)
-      try {
-        const [nextConnections, nextYouTubeCredentials] = await Promise.all([
-          listPlatformConnections(hiredInstanceId),
-          listYouTubeConnections(),
-        ])
-        if (!cancelled) {
-          setConnections(nextConnections)
-          setYouTubeCredentials(nextYouTubeCredentials)
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setConnections([])
-          setYouTubeCredentials([])
-          setConnectionsError(e?.message || 'Failed to load YouTube connection state')
-        }
-      } finally {
-        if (!cancelled) setConnectionsLoading(false)
-      }
+    const load = async () => {
+      if (cancelled) return
+      await reloadConnections()
     }
 
-    void loadConnections()
+    void load()
     return () => {
       cancelled = true
     }
-  }, [hiredInstanceId, isDigitalMarketingInstance])
+  }, [reloadConnections])
+
+  useEffect(() => {
+    const result = readYouTubeOAuthResult()
+    if (!result || result.returnTo !== '/my-agents') return
+    if (result.hiredInstanceId && hiredInstanceId && result.hiredInstanceId !== hiredInstanceId) return
+
+    clearYouTubeOAuthResult()
+    setYoutubeControlError(null)
+    setYoutubeControlMessage(result.message)
+    void reloadConnections()
+  }, [hiredInstanceId, reloadConnections])
 
   const activeDeliverable = useMemo(() => {
     if (!activeDeliverableId) return null
     return deliverables.find((d) => d.deliverable_id === activeDeliverableId) || null
   }, [deliverables, activeDeliverableId])
 
+  const attachedYouTubeConnection = useMemo(() => {
+    return connections.find((connection) => String(connection.platform_key || '').trim().toLowerCase() === 'youtube') || null
+  }, [connections])
+
+  const savedYouTubeCredential = useMemo(() => {
+    if (attachedYouTubeConnection?.customer_platform_credential_id) {
+      return youtubeCredentials.find((connection) => connection.id === attachedYouTubeConnection.customer_platform_credential_id) || null
+    }
+
+    return youtubeCredentials.find((connection) => {
+      const status = String(connection.connection_status || '').trim().toLowerCase()
+      return status === 'connected' || status === 'reconnect_required' || status === 'needs_attention'
+    }) || null
+  }, [attachedYouTubeConnection?.customer_platform_credential_id, youtubeCredentials])
+
+  const youtubeSkillId = useMemo(() => {
+    return String(attachedYouTubeConnection?.skill_id || 'default').trim() || 'default'
+  }, [attachedYouTubeConnection?.skill_id])
+
   const youtubeConnectionSummary = useMemo(() => {
     if (!isDigitalMarketingInstance) return null
-    const attached = connections.find((connection) => String(connection.platform_key || '').trim().toLowerCase() === 'youtube') || null
-    const attachedCredential = attached?.customer_platform_credential_id
-      ? youtubeCredentials.find((connection) => connection.id === attached.customer_platform_credential_id) || null
-      : youtubeCredentials.find((connection) => connection.connection_status === 'connected') || null
+    const attached = attachedYouTubeConnection
+    const attachedCredential = savedYouTubeCredential
 
     const labelPrefix = attachedCredential?.display_name || 'YouTube'
     const lastVerified = attachedCredential?.last_verified_at
@@ -1164,19 +1214,24 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
       isReady: false,
       connection: attached,
     }
-  }, [connections, isDigitalMarketingInstance, youtubeCredentials])
+  }, [attachedYouTubeConnection, isDigitalMarketingInstance, savedYouTubeCredential])
 
-  const youtubeConnectionAction = useMemo(() => {
-    if (!isDigitalMarketingInstance || !youtubeConnectionSummary || youtubeConnectionSummary.isReady) return null
-    return {
-      label: 'Open YouTube setup',
-      onAction: () => {
-        navigate(
-          `/hire/setup/${encodeURIComponent(instance.subscription_id)}?agentId=${encodeURIComponent(instance.agent_id)}&agentTypeId=${encodeURIComponent(String(instance.agent_type_id || ''))}&step=3&focus=youtube`
-        )
-      },
+  const youtubeCredentialForActions = useMemo(() => {
+    if (attachedYouTubeConnection?.customer_platform_credential_id) {
+      return youtubeCredentials.find((connection) => connection.id === attachedYouTubeConnection.customer_platform_credential_id) || null
     }
-  }, [instance.agent_id, instance.agent_type_id, instance.subscription_id, isDigitalMarketingInstance, navigate, youtubeConnectionSummary])
+    return savedYouTubeCredential
+  }, [attachedYouTubeConnection?.customer_platform_credential_id, savedYouTubeCredential, youtubeCredentials])
+
+  const persistableYouTubeCredentialId = useMemo(() => {
+    return String(youtubeValidationResult?.id || youtubeCredentialForActions?.id || '').trim() || null
+  }, [youtubeCredentialForActions?.id, youtubeValidationResult?.id])
+
+  const canPersistYouTubeConnection = Boolean(
+    persistableYouTubeCredentialId &&
+    !attachedYouTubeConnection &&
+    youtubeValidationResult?.id === persistableYouTubeCredentialId
+  )
 
   const activeDeliverableReadiness = useMemo(() => {
     if (!activeDeliverable || !isDigitalMarketingInstance) return null
@@ -1185,6 +1240,120 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
       platformLabel: 'YouTube',
     })
   }, [activeDeliverable, isDigitalMarketingInstance, youtubeConnectionSummary])
+
+  const operatingRailNextStep = useMemo(() => {
+    if (!youtubeConnectionSummary?.isReady) {
+      return 'Next action: connect, reconnect, or reattach YouTube before this hire can act on the channel.'
+    }
+    if (!activeDeliverableReadiness) {
+      return 'Next action: load a deliverable to review approval and publish readiness.'
+    }
+    if (activeDeliverableReadiness.key === 'blocked_missing_approval') {
+      return 'Next action: approve or reject the exact deliverable before any external YouTube action can happen.'
+    }
+    if (activeDeliverableReadiness.key === 'blocked_rejected') {
+      return 'Next action: request a revision before anything can upload or publish.'
+    }
+    if (activeDeliverableReadiness.key === 'blocked_missing_channel_connection') {
+      return 'Next action: restore the YouTube connection, then the approved deliverable can move forward.'
+    }
+    if (activeDeliverableReadiness.key === 'ready_for_public_release') {
+      return 'Next action: this deliverable is fully ready for a public YouTube release.'
+    }
+    if (activeDeliverableReadiness.key === 'ready_for_upload') {
+      return 'Next action: this deliverable is approved and the channel is ready for upload.'
+    }
+    return 'Next action: check the approval and channel state below before taking the next YouTube step.'
+  }, [activeDeliverableReadiness, youtubeConnectionSummary?.isReady])
+
+  const handleStartYouTubeReconnect = async () => {
+    setYoutubeOauthLoading(true)
+    setYoutubeControlError(null)
+    setYoutubeControlMessage(null)
+    try {
+      const redirectUri = getYouTubeOAuthCallbackUri()
+      const response = await startYouTubeConnection(redirectUri)
+      beginYouTubeOAuthFlow({
+        state: response.state,
+        source: 'activation-wizard',
+        returnTo: '/my-agents',
+        redirectUri,
+        hiredInstanceId,
+        skillId: youtubeSkillId,
+      })
+      redirectTo(response.authorization_url)
+    } catch (e: any) {
+      setYoutubeControlError(e?.message || 'Could not start YouTube connection. Please try again.')
+    } finally {
+      setYoutubeOauthLoading(false)
+    }
+  }
+
+  const handleTestYouTubeConnection = async () => {
+    if (!youtubeCredentialForActions?.id) {
+      setYoutubeControlError('Connect a YouTube channel first.')
+      return
+    }
+
+    setYoutubeValidationLoading(true)
+    setYoutubeControlError(null)
+    setYoutubeControlMessage(null)
+    try {
+      const result = await validateYouTubeConnection(youtubeCredentialForActions.id)
+      setYoutubeValidationResult(result)
+      setYoutubeControlMessage(`Connection test succeeded for ${result.display_name || 'your YouTube channel'}.`)
+      setYouTubeCredentials((current) =>
+        current.map((connection) =>
+          connection.id === result.id
+            ? {
+                ...connection,
+                display_name: result.display_name,
+                provider_account_id: result.provider_account_id,
+                verification_status: result.verification_status,
+                connection_status: result.connection_status,
+                token_expires_at: result.token_expires_at,
+                last_verified_at: result.last_verified_at,
+              }
+            : connection
+        )
+      )
+    } catch (e: any) {
+      setYoutubeValidationResult(null)
+      setYoutubeControlError(e?.message || 'The YouTube connection test failed. Please try again.')
+    } finally {
+      setYoutubeValidationLoading(false)
+    }
+  }
+
+  const handlePersistYouTubeConnection = async () => {
+    if (!persistableYouTubeCredentialId) {
+      setYoutubeControlError('Connect and test a YouTube channel before saving it for this hire.')
+      return
+    }
+    if (youtubeValidationResult?.id !== persistableYouTubeCredentialId) {
+      setYoutubeControlError('Run a successful connection test before saving it for this hire.')
+      return
+    }
+    if (!hiredInstanceId) {
+      setYoutubeControlError('Missing hired agent context for YouTube persistence.')
+      return
+    }
+
+    setYoutubePersistLoading(true)
+    setYoutubeControlError(null)
+    try {
+      await attachYouTubeConnection(persistableYouTubeCredentialId, {
+        hired_instance_id: hiredInstanceId,
+        skill_id: youtubeSkillId,
+      })
+      setYoutubeControlMessage('YouTube connection saved for future agent use.')
+      await reloadConnections()
+    } catch (e: any) {
+      setYoutubeControlError(e?.message || 'Could not save the YouTube connection for this hire.')
+    } finally {
+      setYoutubePersistLoading(false)
+    }
+  }
 
   const onReviewDeliverable = async (decision: 'approved' | 'rejected') => {
     if (readOnly) return
@@ -1686,17 +1855,45 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                       {isActive ? (
                         <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                           {isDigitalMarketingInstance ? (
-                            <DigitalMarketingChannelStatusCard
-                              summary={youtubeConnectionSummary}
-                              loading={connectionsLoading}
-                              error={connectionsError}
-                              actionLabel={youtubeConnectionAction?.label || null}
-                              onAction={youtubeConnectionAction?.onAction || null}
-                            />
-                          ) : null}
+                            <Card style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                              <div>
+                                <div style={{ fontWeight: 700, marginBottom: '4px' }}>YouTube operating decision</div>
+                                <div style={{ fontSize: '13px', color: 'var(--colorNeutralForeground2)' }}>{operatingRailNextStep}</div>
+                              </div>
 
-                          {isDigitalMarketingInstance && activeDeliverableReadiness ? (
-                            <DigitalMarketingPublishReadinessCard readiness={activeDeliverableReadiness} />
+                              <DigitalMarketingChannelStatusCard
+                                embedded
+                                summary={youtubeConnectionSummary}
+                                loading={connectionsLoading}
+                                error={connectionsError || youtubeControlError}
+                                credential={youtubeCredentialForActions}
+                                validationResult={youtubeValidationResult}
+                                actionMessage={youtubeControlMessage}
+                                connectionLoading={youtubeOauthLoading}
+                                validationLoading={youtubeValidationLoading}
+                                persistLoading={youtubePersistLoading}
+                                onConnectOrReconnect={handleStartYouTubeReconnect}
+                                onTestConnection={youtubeCredentialForActions ? handleTestYouTubeConnection : null}
+                                onPersistConnection={canPersistYouTubeConnection ? handlePersistYouTubeConnection : null}
+                                canPersistConnection={canPersistYouTubeConnection}
+                              />
+
+                              {activeDeliverableReadiness ? (
+                                <DigitalMarketingPublishReadinessCard embedded readiness={activeDeliverableReadiness} />
+                              ) : null}
+
+                              <DigitalMarketingApprovalCard
+                                embedded
+                                deliverable={d}
+                                reviewNotes={reviewNotes}
+                                reviewing={reviewing}
+                                reviewSaved={Boolean(reviewSavedAt)}
+                                readOnly={readOnly}
+                                onReviewNotesChange={setReviewNotes}
+                                onApprove={() => onReviewDeliverable('approved')}
+                                onReject={() => onReviewDeliverable('rejected')}
+                              />
+                            </Card>
                           ) : null}
 
                           <div>
@@ -1704,18 +1901,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
                             <Textarea value={stableJsonStringify(d.payload || {})} readOnly />
                           </div>
 
-                          {isDigitalMarketingInstance ? (
-                            <DigitalMarketingApprovalCard
-                              deliverable={d}
-                              reviewNotes={reviewNotes}
-                              reviewing={reviewing}
-                              reviewSaved={Boolean(reviewSavedAt)}
-                              readOnly={readOnly}
-                              onReviewNotesChange={setReviewNotes}
-                              onApprove={() => onReviewDeliverable('approved')}
-                              onReject={() => onReviewDeliverable('rejected')}
-                            />
-                          ) : (
+                          {isDigitalMarketingInstance ? null : (
                             <>
                               <div>
                                 <div style={{ fontWeight: 600 }}>Review notes</div>
@@ -2299,36 +2485,52 @@ export default function MyAgents({
 
       {instances.length > 0 ? (
         allDma ? (
-          <Card className="agent-detail-card dma-wizard-fullwidth-card" style={{ marginTop: '1rem' }}>
-            <DigitalMarketingActivationWizard
-              instances={instances}
-              instance={selectedInstance}
-              readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-              onStaleReference={async ({ subscriptionId }) => {
-                await refreshAfterStaleSelection(subscriptionId)
-              }}
-              onSaved={(updated) => {
-                setInstances((prev) =>
-                  prev.map((x) =>
-                    x.subscription_id === (selectedInstance?.subscription_id ?? '')
-                      ? {
-                          ...x,
-                          nickname: updated.nickname ?? x.nickname,
-                          configured: updated.configured ?? x.configured,
-                          goals_completed: updated.goals_completed ?? x.goals_completed,
-                          hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
-                          agent_type_id: updated.agent_type_id ?? x.agent_type_id,
-                          catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
-                          internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
-                          external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
-                          catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
-                        }
-                      : x
-                  )
-                )
-              }}
-              onSelectedInstanceChange={(sub_id) => setSelectedSubscriptionId(sub_id)}
-            />
+          <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0, width: '100%', maxWidth: '500px', flex: '1 1 260px' }}>
+                <AgentSelector
+                  agents={instances}
+                  selectedId={selectedSubscriptionId}
+                  onChange={setSelectedSubscriptionId}
+                  loading={loading}
+                  disabled={loading}
+                  label="Selected DMA Hire"
+                  helperText={selectedReadOnlyExpired ? "This agent's trial has ended. Select another hire or review retained access." : "Select and manage your DMA hire"}
+                />
+              </div>
+            </div>
+
+            {selectedInstance ? (
+              <div style={{ marginTop: '1rem' }}>
+                <DigitalMarketingActivationWizard
+                  instance={selectedInstance}
+                  readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                  onStaleReference={async ({ subscriptionId }) => {
+                    await refreshAfterStaleSelection(subscriptionId)
+                  }}
+                  onSaved={(updated) => {
+                    setInstances((prev) =>
+                      prev.map((x) =>
+                        x.subscription_id === (selectedInstance?.subscription_id ?? '')
+                          ? {
+                              ...x,
+                              nickname: updated.nickname ?? x.nickname,
+                              configured: updated.configured ?? x.configured,
+                              goals_completed: updated.goals_completed ?? x.goals_completed,
+                              hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
+                              agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                              catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
+                              internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
+                              external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
+                              catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
+                            }
+                          : x
+                      )
+                    )
+                  }}
+                />
+              </div>
+            ) : null}
           </Card>
         ) : (
         <Card className="agent-detail-card" style={{ marginTop: '1rem' }}>

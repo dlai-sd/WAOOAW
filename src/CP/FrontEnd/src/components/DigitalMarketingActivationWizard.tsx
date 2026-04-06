@@ -58,13 +58,10 @@ import {
 const DIGITAL_MARKETING_AGENT_TYPE_ID = 'marketing.digital_marketing.v1'
 
 const DMA_STEPS = [
-  { id: 'select',    title: 'Select Agent',         description: 'Choose which hired agent to configure.' },
-  { id: 'induct',    title: 'Induct Agent',          description: 'Set the agent nickname and brand identity.' },
-  { id: 'platforms', title: 'Choose Platforms',      description: 'Select which social channels this agent will manage.' },
-  { id: 'connect',   title: 'Connect Platforms',     description: 'Authorise each selected platform channel.' },
-  { id: 'theme',     title: 'Build Master Theme',    description: 'Define brand brief and generate an AI content strategy.' },
-  { id: 'schedule',  title: 'Confirm Schedule',      description: 'Set posting frequency and preferred days.' },
-  { id: 'activate',  title: 'Review & Activate',     description: 'Check readiness then activate the agent.' },
+  { id: 'connect',   title: 'Channel Ready',        description: 'Connect or confirm the YouTube channel.' },
+  { id: 'theme',     title: 'Brief Chat',           description: 'Guide the customer to a usable YouTube direction.' },
+  { id: 'schedule',  title: 'Plan',                 description: 'Confirm posting rhythm only after the brief is coherent.' },
+  { id: 'activate',  title: 'Review & Activate',    description: 'Show exactly what is ready and what is blocked.' },
 ] as const
 
 const PLATFORM_OPTIONS = [
@@ -457,14 +454,6 @@ export function DigitalMarketingActivationWizard({
     return Boolean(attachedYouTubeConnection && (status === 'connected' || status === 'active'))
   }, [attachedYouTubeConnection])
 
-  // Auto-select + advance if only one instance and we are on step 0
-  useEffect(() => {
-    if (activeStepIndex === 0 && instances.length === 1) {
-      onSelectedInstanceChange?.(instances[0].subscription_id)
-      setActiveStepIndex(1)
-    }
-  }, [instances, activeStepIndex, onSelectedInstanceChange])
-
   // OAuth callback — detect ?code&state on mount and finalize connection
   useEffect(() => {
     const result = readYouTubeOAuthResult()
@@ -802,15 +791,13 @@ export function DigitalMarketingActivationWizard({
   }
 
   async function handleContinue() {
-    if (currentStep.id !== 'select') {
-      const saved = await saveWorkspace()
-      if (!saved) return
-      if (currentStep.id === 'theme') {
-        const savedProfile = await saveProfile()
-        if (!savedProfile) return
-        const savedBrandVoice = await saveBrandVoice()
-        if (!savedBrandVoice) return
-      }
+    const saved = await saveWorkspace()
+    if (!saved) return
+    if (currentStep.id === 'theme') {
+      const savedProfile = await saveProfile()
+      if (!savedProfile) return
+      const savedBrandVoice = await saveBrandVoice()
+      if (!savedBrandVoice) return
     }
     setActiveStepIndex(i => Math.min(DMA_STEPS.length - 1, i + 1))
   }
@@ -1382,15 +1369,15 @@ export function DigitalMarketingActivationWizard({
     }
   }
 
-  if (!activeInstance && (currentStep.id !== 'select' || instances.length === 0)) {
+  if (!activeInstance) {
     return <FeedbackMessage intent="warning" title="Activation unavailable" message="Select a hired agent before opening the digital marketing activation workspace." />
   }
 
-  if (loading && currentStep.id !== 'select') {
+  if (loading) {
     return <LoadingIndicator message="Loading digital marketing activation..." size="medium" />
   }
 
-  if (error && currentStep.id !== 'select') {
+  if (error) {
     return <FeedbackMessage intent="error" title="Activation unavailable" message={error} action={{ label: 'Retry', onClick: () => void loadState() }} />
   }
 
@@ -1445,130 +1432,9 @@ export function DigitalMarketingActivationWizard({
             {/* SCROLLABLE BODY */}
             <div className="dma-wizard-canvas-body">
 
-              {/* STEP 0 — Select Agent */}
-              {currentStep.id === 'select' && (
-                <div data-testid="dma-step-panel-select" className="dma-wizard-canvas-body-inner">
-                  {instances.length === 0 ? (
-                    <div>No agents found.</div>
-                  ) : (
-                    <div className="dma-wizard-agent-select-grid">
-                      {instances.map((inst) => (
-                        <button
-                          key={inst.subscription_id}
-                          type="button"
-                          className={`dma-wizard-agent-card${inst.subscription_id === activeInstance?.subscription_id ? ' is-selected' : ''}`}
-                          onClick={() => {
-                            onSelectedInstanceChange?.(inst.subscription_id)
-                            setActiveStepIndex(1)
-                          }}
-                        >
-                          <div className="dma-wizard-agent-card-name">
-                            {inst.nickname || inst.agent_id}
-                          </div>
-                          <div className="dma-wizard-agent-card-meta">
-                            {inst.status}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* STEP 1 — Induct Agent */}
-              {currentStep.id === 'induct' && (
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-induct">
-                  <div style={{ display: 'grid', gap: '1.25rem' }}>
-                    <div>
-                      <div className="dma-wizard-section-label">Agent identity</div>
-                      <div className="dma-wizard-form-grid">
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Nickname</span>
-                          <Input
-                            aria-label="Nickname"
-                            value={nickname}
-                            onChange={(_, data) => setNickname(data.value)}
-                            disabled={readOnly}
-                            placeholder="e.g. Growth Copilot"
-                          />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Theme</span>
-                          <Input
-                            aria-label="Theme"
-                            value={theme}
-                            onChange={(_, data) => setTheme(data.value)}
-                            disabled={readOnly}
-                            placeholder="e.g. dark"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <Badge appearance="outline" color={readiness.configured ? 'success' : 'warning'}>
-                        {readiness.configured ? 'Identity configured ✓' : 'Nickname and theme required'}
-                      </Badge>
-                      {hiredInstanceId ? (
-                        <span style={{ opacity: 0.65, fontSize: '0.85rem' }}>
-                          Hire ID: {hiredInstanceId}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 2 — Choose Platforms */}
-              {currentStep.id === 'platforms' && (
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-platforms">
-                  <div style={{ display: 'grid', gap: '1.25rem' }}>
-                    <div>
-                      <div className="dma-wizard-section-label">Select the channels for this agent to manage</div>
-                        {SUPPORTED_PLATFORM_OPTIONS.length > 0 ? (
-                          <div className="dma-wizard-platform-grid">
-                            {SUPPORTED_PLATFORM_OPTIONS.map(({ key, label }) => {
-                              const isSelected = selectedPlatforms.includes(key)
-                              return (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  className={`dma-wizard-platform-card${isSelected ? ' is-selected' : ''}`}
-                                  onClick={() => {
-                                    if (readOnly) return
-                                    setSelectedPlatforms(prev =>
-                                      isSelected ? prev.filter(p => p !== key) : [...prev, key]
-                                    )
-                                  }}
-                                  disabled={readOnly}
-                                  aria-pressed={isSelected}
-                                  data-testid={`platform-toggle-${key}`}
-                                >
-                                  <span style={{ fontWeight: 600 }}>{label}</span>
-                                  {isSelected ? <span style={{ color: '#00f2fe', marginLeft: 'auto' }}>✓</span> : null}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>No platforms available yet — YouTube is coming soon</div>
-                        )}
-                    </div>
-                    {selectedPlatforms.length > 0 ? (
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        {selectedPlatforms.map(p => (
-                          <Badge key={p} appearance="outline" color="informative">{p}</Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>Select at least one platform to continue.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3 — Connect Platforms */}
+              {/* STEP 1 — Channel Ready */}
               {currentStep.id === 'connect' && (
-                <div data-testid="dma-step-panel-connect" className="dma-wizard-canvas-body-inner">
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-connect">
                   <div className="dma-wizard-platform-connect-list">
 
                     {/* YouTube */}
@@ -1674,101 +1540,17 @@ export function DigitalMarketingActivationWizard({
                 </div>
               )}
 
-              {/* STEP 4 — Build Master Theme */}
+              {/* STEP 2 — Build Master Theme */}
               {currentStep.id === 'theme' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-theme">
                   <div style={{ display: 'grid', gap: '1.75rem' }}>
-                    <div>
-                      <div className="dma-wizard-section-label">Business brief</div>
-                      <div className="dma-wizard-form-grid" style={{ marginBottom: '0.85rem' }}>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Brand name</span>
-                          <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Location</span>
-                          <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Primary language</span>
-                          <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Timezone</span>
-                          <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} placeholder="e.g. Asia/Kolkata" />
-                        </label>
-                      </div>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.85rem' }}>
-                        <span>Offerings and services</span>
-                        <Textarea
-                          aria-label="Offerings and services"
-                          value={offeringsText}
-                          onChange={(_, data) => setOfferingsText(data.value)}
-                          disabled={readOnly}
-                          resize="vertical"
-                          rows={3}
-                          placeholder="Comma-separated list of what you sell or offer"
-                        />
-                      </label>
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <span>Business context</span>
-                        <Textarea
-                          aria-label="Business context"
-                          value={businessContext}
-                          onChange={(_, data) => setBusinessContext(data.value)}
-                          disabled={readOnly}
-                          resize="vertical"
-                          rows={3}
-                          placeholder="Describe your business, target audience, key differentiators"
-                        />
-                      </label>
-                      <details open style={{ marginTop: '1rem' }}>
-                        <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: '0.75rem' }}>Brand Voice</summary>
-                        <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.75rem' }}>
-                          {brandVoiceLoading ? <Spinner size="tiny" /> : null}
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Voice description</span>
-                            <Textarea
-                              aria-label="Voice description"
-                              value={voiceDescription}
-                              onChange={(_, data) => setVoiceDescription(data.value)}
-                              disabled={readOnly}
-                              resize="vertical"
-                              rows={3}
-                              placeholder="Describe how your brand should sound."
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Tone keywords</span>
-                            <Input
-                              aria-label="Tone keywords"
-                              value={toneKeywords}
-                              onChange={(_, data) => setToneKeywords(data.value)}
-                              disabled={readOnly}
-                              placeholder="e.g. warm, credible, direct"
-                            />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Example phrases</span>
-                            <Textarea
-                              aria-label="Example phrases"
-                              value={examplePhrases}
-                              onChange={(_, data) => setExamplePhrases(data.value)}
-                              disabled={readOnly}
-                              resize="vertical"
-                              rows={4}
-                              placeholder="One phrase per line"
-                            />
-                          </label>
-                        </div>
-                      </details>
-                    </div>
 
+                    {/* PRIMARY: AI Strategy Workshop - Consultative chat-like interface */}
                     <div className="dma-wizard-theme-workshop-card">
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
-                          <div className="dma-wizard-section-label">AI strategy workshop</div>
-                          <div style={{ fontWeight: 600 }}>A consultative strategist that keeps the customer moving</div>
+                          <div className="dma-wizard-section-label">Brief your DMA hire</div>
+                          <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>The assistant will ask only what it needs to build your first YouTube theme</div>
                         </div>
                         <Badge
                           appearance="outline"
@@ -1781,22 +1563,20 @@ export function DigitalMarketingActivationWizard({
 
                       <div className="dma-wizard-theme-workshop-thread" data-testid="strategy-workshop-thread">
                         <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
-                          <div className="dma-wizard-theme-workshop-message-role">Strategist</div>
+                          <div className="dma-wizard-theme-workshop-message-role">Marketing Strategist</div>
                           <div>
                             {strategyWorkshop.assistant_message || 'Start the workshop and the strategist will quickly lock the strongest direction, not run a long intake interview.'}
                           </div>
                         </div>
 
-                        <div className="dma-wizard-theme-workshop-insights">
-                          <div className="dma-wizard-theme-insight-card" data-testid="strategy-checkpoint-summary">
-                            <div className="dma-wizard-theme-insight-label">What we have locked</div>
-                            <div>{strategyWorkshop.checkpoint_summary || 'The strategist will keep a compact running summary here so the customer does not need to reread the full exchange.'}</div>
+                        {strategyWorkshop.checkpoint_summary ? (
+                          <div className="dma-wizard-theme-workshop-insights">
+                            <div className="dma-wizard-theme-insight-card" data-testid="strategy-checkpoint-summary">
+                              <div className="dma-wizard-theme-insight-label">What we've locked</div>
+                              <div>{strategyWorkshop.checkpoint_summary}</div>
+                            </div>
                           </div>
-                          <div className="dma-wizard-theme-insight-card">
-                            <div className="dma-wizard-theme-insight-label">Time-saving note</div>
-                            <div>{strategyWorkshop.time_saving_note || 'The AI will reduce repeated questions and move to a recommendation as soon as the direction is strong enough.'}</div>
-                          </div>
-                        </div>
+                        ) : null}
 
                         {latestCustomerNote ? (
                           <div className="dma-wizard-theme-latest-note">
@@ -1808,14 +1588,14 @@ export function DigitalMarketingActivationWizard({
 
                       {strategyWorkshop.current_focus_question ? (
                         <div>
-                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Current focus</div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Next question</div>
                           <div className="dma-wizard-theme-follow-up-question" data-testid="strategy-current-focus-question">{strategyWorkshop.current_focus_question}</div>
                         </div>
                       ) : null}
 
                       {(strategyWorkshop.next_step_options || []).length > 0 ? (
                         <div>
-                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Suggested next moves</div>
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick answers</div>
                           <div className="dma-wizard-theme-option-list">
                             {(strategyWorkshop.next_step_options || []).map((option, index) => (
                               <Button
@@ -1834,7 +1614,7 @@ export function DigitalMarketingActivationWizard({
                       ) : null}
 
                       <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <span>Your answer or instruction</span>
+                        <span style={{ fontWeight: 600 }}>Your answer or instruction</span>
                         <Textarea
                           aria-label="Strategy workshop reply"
                           value={strategyReply}
@@ -1971,6 +1751,101 @@ export function DigitalMarketingActivationWizard({
 
                       {renderDraftGenerationPanel()}
                     </div>
+
+                    {/* SECONDARY: Optional structured business fields (collapsed by default) */}
+                    <details style={{ marginTop: '1rem' }}>
+                      <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.75rem', background: 'var(--colorNeutralBackground3)', borderRadius: '8px' }}>
+                        Optional business context fields
+                      </summary>
+                      <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '8px' }}>
+                        <div className="dma-wizard-section-label" style={{ marginBottom: '0.75rem' }}>Direct input fields</div>
+                        <div style={{ opacity: 0.75, fontSize: '0.85rem', marginBottom: '1rem' }}>
+                          The assistant will ask for most of this progressively. Use these only if you already know the exact inputs.
+                        </div>
+                        <div className="dma-wizard-form-grid" style={{ marginBottom: '0.85rem' }}>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Brand name</span>
+                            <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Location</span>
+                            <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Primary language</span>
+                            <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <span>Timezone</span>
+                            <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} placeholder="e.g. Asia/Kolkata" />
+                          </label>
+                        </div>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.85rem' }}>
+                          <span>Offerings and services</span>
+                          <Textarea
+                            aria-label="Offerings and services"
+                            value={offeringsText}
+                            onChange={(_, data) => setOfferingsText(data.value)}
+                            disabled={readOnly}
+                            resize="vertical"
+                            rows={3}
+                            placeholder="Comma-separated list of what you sell or offer"
+                          />
+                        </label>
+                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          <span>Business context</span>
+                          <Textarea
+                            aria-label="Business context"
+                            value={businessContext}
+                            onChange={(_, data) => setBusinessContext(data.value)}
+                            disabled={readOnly}
+                            resize="vertical"
+                            rows={3}
+                            placeholder="Describe your business, target audience, key differentiators"
+                          />
+                        </label>
+                        <details style={{ marginTop: '1rem' }}>
+                          <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: '0.75rem' }}>Brand Voice</summary>
+                          <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.75rem' }}>
+                            {brandVoiceLoading ? <Spinner size="tiny" /> : null}
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Voice description</span>
+                              <Textarea
+                                aria-label="Voice description"
+                                value={voiceDescription}
+                                onChange={(_, data) => setVoiceDescription(data.value)}
+                                disabled={readOnly}
+                                resize="vertical"
+                                rows={3}
+                                placeholder="Describe how your brand should sound."
+                              />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Tone keywords</span>
+                              <Input
+                                aria-label="Tone keywords"
+                                value={toneKeywords}
+                                onChange={(_, data) => setToneKeywords(data.value)}
+                                disabled={readOnly}
+                                placeholder="e.g. warm, credible, direct"
+                              />
+                            </label>
+                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                              <span>Example phrases</span>
+                              <Textarea
+                                aria-label="Example phrases"
+                                value={examplePhrases}
+                                onChange={(_, data) => setExamplePhrases(data.value)}
+                                disabled={readOnly}
+                                resize="vertical"
+                                rows={4}
+                                placeholder="One phrase per line"
+                              />
+                            </label>
+                          </div>
+                        </details>
+                      </div>
+                    </details>
                   </div>
                 </div>
               )}

@@ -9,6 +9,7 @@ type DigitalMarketingApprovalCardProps = {
   reviewing: boolean
   reviewSaved: boolean
   readOnly: boolean
+  embedded?: boolean
   onReviewNotesChange: (value: string) => void
   onApprove: () => void
   onReject: () => void
@@ -17,9 +18,13 @@ type DigitalMarketingApprovalCardProps = {
 export function DigitalMarketingApprovalCard(props: DigitalMarketingApprovalCardProps) {
   const reviewStatus = String(props.deliverable.review_status || '').trim().toLowerCase() || 'pending_review'
   const statusLabel = reviewStatus.replace(/_/g, ' ')
+  const Container = props.embedded ? 'div' : Card
+  const containerProps = props.embedded
+    ? { style: { display: 'flex', flexDirection: 'column' as const, gap: '12px' } }
+    : { style: { padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: '12px' } }
 
   return (
-    <Card style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <Container {...containerProps}>
       <div>
         <div style={{ fontWeight: 700, marginBottom: '4px' }}>Customer approval</div>
         <div style={{ fontSize: '13px', color: 'var(--colorNeutralForeground2)' }}>
@@ -58,7 +63,7 @@ export function DigitalMarketingApprovalCard(props: DigitalMarketingApprovalCard
         </Button>
         <SaveIndicator status={props.reviewing ? 'saving' : props.reviewSaved ? 'saved' : 'idle'} />
       </div>
-    </Card>
+    </Container>
   )
 }
 
