@@ -105,6 +105,13 @@ class ValidateCustomerCredentialRequest(BaseModel):
     customer_id: str
 
 
+class RecentUploadPreviewResponse(BaseModel):
+    video_id: str
+    title: str
+    published_at: str
+    duration_seconds: int
+
+
 class ValidateCustomerCredentialResponse(BaseModel):
     id: str
     customer_id: str
@@ -121,6 +128,8 @@ class ValidateCustomerCredentialResponse(BaseModel):
     recent_long_video_count: int
     subscriber_count: int
     view_count: int
+    recent_uploads: List[RecentUploadPreviewResponse]
+    next_action_hint: str
 
 
 def _optional_string(value: object) -> Optional[str]:
@@ -190,6 +199,16 @@ def _to_validated_customer_credential_response(
         recent_long_video_count=result.recent_long_video_count,
         subscriber_count=result.subscriber_count,
         view_count=result.view_count,
+        recent_uploads=[
+            RecentUploadPreviewResponse(
+                video_id=preview.video_id,
+                title=preview.title,
+                published_at=preview.published_at,
+                duration_seconds=preview.duration_seconds,
+            )
+            for preview in result.recent_uploads
+        ],
+        next_action_hint=result.next_action_hint,
     )
 
 

@@ -39,6 +39,14 @@ class FinalizedCredentialResult:
 
 
 @dataclass(frozen=True)
+class RecentUploadPreview:
+    video_id: str
+    title: str
+    published_at: str
+    duration_seconds: int
+
+
+@dataclass(frozen=True)
 class ValidatedCredentialResult:
     credential: CustomerPlatformCredentialModel
     channel_count: int
@@ -47,6 +55,8 @@ class ValidatedCredentialResult:
     recent_long_video_count: int
     subscriber_count: int
     view_count: int
+    recent_uploads: list[RecentUploadPreview]
+    next_action_hint: str
 
 
 class YouTubeConnectionService:
@@ -316,6 +326,7 @@ class YouTubeConnectionService:
 
         recent_short_count = 0
         recent_long_video_count = 0
+        recent_uploads: list[RecentUploadPreview] = []
         if uploads_playlist_id:
             try:
                 playlist_payload = await client._make_api_call_with_retry(
@@ -340,7 +351,7 @@ class YouTubeConnectionService:
                         method="GET",
                         access_token=access_token,
                         params={
-                            "part": "contentDetails",
+                            "part": "contentDetails,snippet",
                             "id": ",".join(video_ids),
                             "maxResults": "50",
                         },
@@ -357,12 +368,27 @@ class YouTubeConnectionService:
                             recent_short_count += 1
                         else:
                             recent_long_video_count += 1
+                        
+                        # Collect preview data for up to 5 recent uploads
+                        if len(recent_uploads) < 5:
+                            video_id = str(video.get("id") or "").strip()
+                            video_snippet = video.get("snippet") or {}
+                            title = str(video_snippet.get("title") or "Untitled").strip()
+                            published_at = str(video_snippet.get("publishedAt") or "").strip()
+                            
+                            recent_uploads.append(RecentUploadPreview(
+                                video_id=video_id,
+                                title=title,
+                                published_at=published_at,
+                                duration_seconds=duration_seconds,
+                            ))
             except SocialPlatformError as exc:
                 raise YouTubeConnectionError(exc.message) from exc
             except Exception:
                 # Non-critical enrichment failure: keep validation successful with core channel stats.
                 recent_short_count = 0
                 recent_long_video_count = 0
+                recent_uploads = []
 
         now = datetime.now(timezone.utc)
         credential.display_name = str(snippet.get("title") or credential.display_name or "YouTube Channel")
@@ -373,6 +399,15 @@ class YouTubeConnectionService:
         await self._db.commit()
         await self._db.refresh(credential)
 
+        # Determine next_action_hint based on token expiry and connection health
+        next_action_hint = "connected_ready"
+        if credential.token_expires_at:
+            days_until_expiry = (credential.token_expires_at - now).days
+            if days_until_expiry < 0:
+                next_action_hint = "reconnect_required"
+            elif days_until_expiry < 7:
+                next_action_hint = "token_expiring_soon"
+
         return ValidatedCredentialResult(
             credential=credential,
             channel_count=len(items),
@@ -381,6 +416,8 @@ class YouTubeConnectionService:
             recent_long_video_count=recent_long_video_count,
             subscriber_count=int(statistics.get("subscriberCount") or 0),
             view_count=int(statistics.get("viewCount") or 0),
+            recent_uploads=recent_uploads,
+            next_action_hint=next_action_hint,
         )
 
     async def _get_pending_session(self, *, customer_id: str, state: str) -> OAuthConnectionSessionModel:
