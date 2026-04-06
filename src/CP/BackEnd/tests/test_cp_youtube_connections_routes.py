@@ -180,6 +180,41 @@ def test_attach_youtube_connection_proxies_hired_agent_binding(client, auth_head
     app.dependency_overrides.clear()
 
 
+def test_validate_youtube_connection_proxies_customer_credential_check(client, auth_headers, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
+
+    from api.cp_youtube_connections import get_plant_gateway_client
+    from main import app
+
+    fake = _FakePlantClient(
+        response_json={
+            "id": "cred-1",
+            "platform_key": "youtube",
+            "display_name": "Channel One",
+            "channel_count": 1,
+            "total_video_count": 42,
+            "recent_short_count": 7,
+            "recent_long_video_count": 35,
+            "subscriber_count": 1200,
+            "view_count": 54000,
+        }
+    )
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    resp = client.post(
+        "/api/cp/youtube-connections/cred-1/validate",
+        headers=auth_headers,
+        json={},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["total_video_count"] == 42
+    assert fake.calls[0]["path"] == "api/v1/customer-platform-connections/cred-1/validate"
+    customer_id = fake.calls[0]["json"]["customer_id"]
+    assert not customer_id.startswith("CUST-"), f"validate must forward raw WAOOAW customer ID, got: {customer_id}"
+    app.dependency_overrides.clear()
+
+
 def test_start_youtube_connect_surfaces_upstream_oauth_config_error(client, auth_headers, monkeypatch):
     monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
 

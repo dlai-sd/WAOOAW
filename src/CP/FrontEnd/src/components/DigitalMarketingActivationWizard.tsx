@@ -33,6 +33,8 @@ import {
   startYouTubeConnection,
   attachYouTubeConnection,
   listYouTubeConnections,
+  validateYouTubeConnection,
+  type ValidateYouTubeConnectionResponse,
   type YouTubeConnection,
 } from '../services/youtubeConnections.service'
 import {
@@ -352,6 +354,10 @@ export function DigitalMarketingActivationWizard({
   const [oauthLoading, setOauthLoading] = useState(false)
   const [oauthError, setOauthError] = useState<string | null>(null)
   const [oauthMessage, setOauthMessage] = useState<string | null>(null)
+  const [youtubeValidationLoading, setYoutubeValidationLoading] = useState(false)
+  const [youtubePersistLoading, setYoutubePersistLoading] = useState(false)
+  const [youtubeValidationError, setYoutubeValidationError] = useState<string | null>(null)
+  const [youtubeValidationResult, setYoutubeValidationResult] = useState<ValidateYouTubeConnectionResponse | null>(null)
 
   const [generatedBatch, setGeneratedBatch] = useState<DraftBatch | null>(null)
   const [draftPosts, setDraftPosts] = useState<DraftPost[]>([])
@@ -386,9 +392,11 @@ export function DigitalMarketingActivationWizard({
 
   function markYouTubeConnected(connection: YouTubeConnection | null, successMessage: string) {
     setSavedYouTubeConnection(connection)
-    setYoutubeConnected(true)
+    setYoutubeConnected(Boolean(connection))
     setOauthMessage(successMessage)
     setOauthError(null)
+    setYoutubeValidationError(null)
+    setYoutubeValidationResult(null)
     setActivation((current) => {
       if (!current) return current
       return {
@@ -406,6 +414,19 @@ export function DigitalMarketingActivationWizard({
             },
           },
         },
+      }
+    })
+  }
+
+  function markYouTubeAttached(connection: PlatformConnection, successMessage: string) {
+    setAttachedYouTubeConnection(connection)
+    setYoutubeConnected(true)
+    setOauthMessage(successMessage)
+    setOauthError(null)
+    setActivation((current) => {
+      if (!current) return current
+      return {
+        ...current,
         readiness: {
           ...current.readiness,
           youtube_connection_ready: true,
@@ -452,7 +473,6 @@ export function DigitalMarketingActivationWizard({
 
     clearYouTubeOAuthResult()
     markYouTubeConnected(result.connection, result.message)
-    void refreshAttachedYouTubeConnection(result.hiredInstanceId || hiredInstanceId)
     setActiveStepIndex(DMA_STEPS.findIndex((s) => s.id === 'connect'))
   }, [hiredInstanceId])
 
@@ -460,20 +480,19 @@ export function DigitalMarketingActivationWizard({
   useEffect(() => {
     listYouTubeConnections()
       .then((connections) => {
-        setSavedYouTubeConnection(pickReusableYouTubeConnection(connections))
+        const reusableConnection = pickReusableYouTubeConnection(connections)
+        setSavedYouTubeConnection(reusableConnection)
+        setYoutubeConnected(Boolean(reusableConnection))
       })
       .catch(() => {
         setSavedYouTubeConnection(null)
+        setYoutubeConnected(false)
       })
   }, [])
 
   useEffect(() => {
     void refreshAttachedYouTubeConnection(hiredInstanceId)
   }, [hiredInstanceId])
-
-  useEffect(() => {
-    setYoutubeConnected(Boolean(activation?.readiness?.youtube_connection_ready))
-  }, [activation?.readiness?.youtube_connection_ready])
 
   const campaignSetup = activation?.workspace.campaign_setup || {}
   const schedule = campaignSetup.schedule || {}
@@ -806,22 +825,6 @@ export function DigitalMarketingActivationWizard({
         return
       }
 
-      const knownConnection = savedYouTubeConnection || pickReusableYouTubeConnection(await listYouTubeConnections())
-      if (knownConnection) {
-        try {
-          const attachedConnection = await attachYouTubeConnection(knownConnection.id, {
-            hired_instance_id: hiredInstanceId,
-            skill_id: youtubeSkillId,
-          })
-          markYouTubeConnected(knownConnection, 'Saved YouTube connection linked successfully.')
-          setAttachedYouTubeConnection(attachedConnection)
-          return
-        } catch {
-          setSavedYouTubeConnection(null)
-          setAttachedYouTubeConnection(null)
-        }
-      }
-
       const redirectUri = getYouTubeOAuthCallbackUri()
       const { state, authorization_url } = await startYouTubeConnection(redirectUri)
       beginYouTubeOAuthFlow({
@@ -837,6 +840,69 @@ export function DigitalMarketingActivationWizard({
       setOauthError('Could not start YouTube connection. Please try again.')
     } finally {
       setOauthLoading(false)
+    }
+  }
+
+  async function handleTestYouTubeConnection() {
+    if (!savedYouTubeConnection?.id) {
+      setYoutubeValidationError('Connect a YouTube channel first.')
+      return
+    }
+
+    setYoutubeValidationLoading(true)
+    setYoutubeValidationError(null)
+    setOauthError(null)
+    try {
+      const result = await validateYouTubeConnection(savedYouTubeConnection.id)
+      setYoutubeValidationResult(result)
+      setSavedYouTubeConnection((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          display_name: result.display_name,
+          provider_account_id: result.provider_account_id,
+          verification_status: result.verification_status,
+          connection_status: result.connection_status,
+          token_expires_at: result.token_expires_at,
+          last_verified_at: result.last_verified_at,
+        }
+      })
+      setYoutubeConnected(true)
+      setOauthMessage(`Connection test succeeded for ${result.display_name || 'your YouTube channel'}.`)
+    } catch (caughtError: any) {
+      setYoutubeValidationResult(null)
+      setYoutubeValidationError(caughtError?.message || 'The YouTube connection test failed. Please try again.')
+    } finally {
+      setYoutubeValidationLoading(false)
+    }
+  }
+
+  async function handlePersistYouTubeConnection() {
+    if (!savedYouTubeConnection?.id) {
+      setOauthError('Connect and test a YouTube channel before saving it for the agent.')
+      return
+    }
+    if (!youtubeValidationResult || youtubeValidationResult.id !== savedYouTubeConnection.id) {
+      setOauthError('Run a successful connection test before saving it for the agent.')
+      return
+    }
+    if (!hiredInstanceId) {
+      setOauthError('This agent is not ready yet. Please reload the page and try again.')
+      return
+    }
+
+    setYoutubePersistLoading(true)
+    setOauthError(null)
+    try {
+      const attachedConnection = await attachYouTubeConnection(savedYouTubeConnection.id, {
+        hired_instance_id: hiredInstanceId,
+        skill_id: youtubeSkillId,
+      })
+      markYouTubeAttached(attachedConnection, 'YouTube connection saved for future agent use.')
+    } catch (caughtError: any) {
+      setOauthError(caughtError?.message || 'Could not save the YouTube connection for the agent.')
+    } finally {
+      setYoutubePersistLoading(false)
     }
   }
 
@@ -1522,38 +1588,77 @@ export function DigitalMarketingActivationWizard({
                         ) : null}
                         {savedYouTubeConnection && savedYouTubeConnection.verification_status !== 'verified' ? (
                           <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
-                            Verification pending — reconnect to refresh.
+                            Verification pending. Run Test connection to verify this channel.
                           </span>
                         ) : null}
-                        {youtubeConnected && !isYouTubeAttached ? (
+                        {youtubeValidationResult && !isYouTubeAttached ? (
                           <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
-                            Connection needs to be attached.
+                            Connection tested successfully. Save it for the agent when ready.
                           </span>
                         ) : null}
                       </div>
-                      <div className="dma-wizard-platform-connect-action">
+                      <div className="dma-wizard-platform-connect-action" style={{ display: 'grid', gap: '0.6rem', justifyItems: 'end' }}>
                         {isYouTubeAttached ? (
                           <span className="dma-wizard-connected-badge" data-testid="youtube-connected-badge">✓ Connected</span>
-                        ) : (
+                        ) : null}
+                        <Button
+                          appearance="primary"
+                          disabled={oauthLoading || readOnly}
+                          onClick={() => void handleConnectYouTube()}
+                        >
+                          {oauthLoading
+                            ? 'Connecting…'
+                            : savedYouTubeConnection
+                              ? 'Reconnect with Google'
+                              : 'Connect with Google'}
+                        </Button>
+                        <Button
+                          appearance="secondary"
+                          disabled={!savedYouTubeConnection || youtubeValidationLoading || readOnly}
+                          onClick={() => void handleTestYouTubeConnection()}
+                        >
+                          {youtubeValidationLoading ? 'Testing…' : 'Test connection'}
+                        </Button>
+                        {!isYouTubeAttached && youtubeValidationResult && youtubeValidationResult.id === savedYouTubeConnection?.id ? (
                           <Button
-                            appearance="primary"
-                            disabled={oauthLoading || readOnly}
-                            onClick={() => void handleConnectYouTube()}
+                            appearance="outline"
+                            disabled={youtubePersistLoading || readOnly}
+                            onClick={() => void handlePersistYouTubeConnection()}
                           >
-                            {oauthLoading
-                              ? 'Connecting…'
-                              : savedYouTubeConnection
-                                ? 'Attach saved YouTube connection'
-                                : youtubeConnected
-                                  ? 'Reconnect YouTube'
-                                  : 'Connect with Google'}
+                            {youtubePersistLoading ? 'Saving…' : 'Persist connection for future use by Agent'}
                           </Button>
-                        )}
+                        ) : null}
                       </div>
                     </div>
 
+                    {youtubeValidationResult ? (
+                      <div
+                        data-testid="youtube-validation-metrics"
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(8rem, 1fr))',
+                          gap: '0.75rem',
+                          padding: '0.9rem 1rem',
+                          border: '1px solid rgba(0, 242, 254, 0.18)',
+                          borderRadius: '0.9rem',
+                          background: 'rgba(0, 242, 254, 0.05)',
+                        }}
+                      >
+                        <div><strong>Channels</strong><div>{youtubeValidationResult.channel_count}</div></div>
+                        <div><strong>Videos</strong><div>{youtubeValidationResult.total_video_count}</div></div>
+                        <div><strong>Shorts</strong><div>{youtubeValidationResult.recent_short_count}</div></div>
+                        <div><strong>Long videos</strong><div>{youtubeValidationResult.recent_long_video_count}</div></div>
+                        <div><strong>Subscribers</strong><div>{youtubeValidationResult.subscriber_count}</div></div>
+                        <div><strong>Views</strong><div>{youtubeValidationResult.view_count}</div></div>
+                      </div>
+                    ) : null}
+
                     {oauthMessage && (
                       <div className="dma-wizard-oauth-success">{oauthMessage}</div>
+                    )}
+
+                    {youtubeValidationError && (
+                      <div className="dma-wizard-oauth-error">{youtubeValidationError}</div>
                     )}
 
                     {oauthError && (

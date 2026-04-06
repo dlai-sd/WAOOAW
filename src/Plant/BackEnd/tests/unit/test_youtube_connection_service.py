@@ -244,3 +244,77 @@ async def test_attach_connection_to_hired_agent_uses_customer_credential():
 
     assert connection.customer_platform_credential_id == "cred-1"
     assert connection.status == "connected"
+
+
+@pytest.mark.asyncio
+async def test_validate_connection_returns_channel_metrics_and_refreshes_credential():
+    db = AsyncMock()
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+
+    credential = CustomerPlatformCredentialModel(
+        id="cred-1",
+        customer_id="cust-1",
+        platform_key="youtube",
+        provider_account_id="channel-1",
+        display_name="Channel One",
+        granted_scopes=["scope-a"],
+        verification_status="pending",
+        connection_status="pending",
+        secret_ref="CRED-youtube-1",
+        last_verified_at=None,
+    )
+
+    credential_result = MagicMock()
+    credential_result.scalars.return_value.first.return_value = credential
+    db.execute = AsyncMock(return_value=credential_result)
+
+    resolver = MagicMock()
+    service = YouTubeConnectionService(db=db, credential_resolver=resolver)
+    client = AsyncMock()
+    client._get_access_token = AsyncMock(return_value="access-token")
+    client._make_api_call_with_retry = AsyncMock(
+        side_effect=[
+            {
+                "items": [
+                    {
+                        "id": "channel-1",
+                        "snippet": {"title": "Channel One"},
+                        "statistics": {
+                            "videoCount": "42",
+                            "subscriberCount": "1200",
+                            "viewCount": "54000",
+                        },
+                        "contentDetails": {"relatedPlaylists": {"uploads": "uploads-1"}},
+                    }
+                ]
+            },
+            {
+                "items": [
+                    {"contentDetails": {"videoId": "video-1"}},
+                    {"contentDetails": {"videoId": "video-2"}},
+                ]
+            },
+            {
+                "items": [
+                    {"contentDetails": {"duration": "PT45S"}},
+                    {"contentDetails": {"duration": "PT5M"}},
+                ]
+            },
+        ]
+    )
+
+    with patch("services.youtube_connection_service.YouTubeClient", return_value=client):
+        result = await service.validate_connection(customer_id="cust-1", credential_id="cred-1")
+
+    assert result.credential.id == "cred-1"
+    assert result.channel_count == 1
+    assert result.total_video_count == 42
+    assert result.recent_short_count == 1
+    assert result.recent_long_video_count == 1
+    assert result.subscriber_count == 1200
+    assert result.view_count == 54000
+    assert credential.verification_status == "verified"
+    assert credential.connection_status == "connected"
+    db.commit.assert_awaited_once()
+    db.refresh.assert_awaited_once_with(credential)

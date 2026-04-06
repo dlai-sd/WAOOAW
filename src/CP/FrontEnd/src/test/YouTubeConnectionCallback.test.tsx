@@ -15,7 +15,6 @@ import {
 
 vi.mock('../services/youtubeConnections.service', () => ({
   finalizeYouTubeConnection: vi.fn(),
-  attachYouTubeConnection: vi.fn(),
 }))
 
 describe('YouTubeConnectionCallback', () => {
@@ -24,6 +23,7 @@ describe('YouTubeConnectionCallback', () => {
     sessionStorage.clear()
     clearPendingYouTubeOAuthContext()
     clearYouTubeOAuthResult()
+    window.history.replaceState({}, '', '/')
   })
 
   it('restores auth, finalizes the connection, and stores the resume result', async () => {
@@ -68,6 +68,8 @@ describe('YouTubeConnectionCallback', () => {
       redirectUri: 'http://localhost/auth/youtube/callback',
       subscriptionId: 'SUB-1',
     })
+
+    window.history.replaceState({}, '', '/auth/youtube/callback?code=auth-code-1&state=oauth-state-1')
 
     render(
       <FluentProvider theme={waooawLightTheme}>
