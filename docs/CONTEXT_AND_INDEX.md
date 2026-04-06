@@ -600,8 +600,8 @@ Start with these files when the problem is observability, production diagnosis, 
 
 ## 5.6 Platform NFR Standards — Mandatory Patterns for Every New Route
 
-> **Full source of truth**: [`docs/CP/iterations/NFRReusable.md`](CP/iterations/NFRReusable.md)  
-> This section is the quick-reference summary every agent needs before writing any API route.
+> **Active source of truth in this branch**: this section plus the live routing/dependency implementations in `src/CP/BackEnd/core/`, `src/Plant/BackEnd/core/`, and `src/PP/BackEnd/core/`.  
+> Older iteration-plan references were removed during doc cleanup; keep the next agent on the live source files above.
 
 ### What is implemented (as of PRs #809, #810, #811 — 2026-02-27)
 
@@ -871,31 +871,6 @@ debug/<description>           # Investigation branches
 5. Terraform plan (per environment)
 6. Terraform apply (creates/updates Cloud Run services + LB)
 ```
-
-### Codespaces prebuilt-tag promotion flow
-
-Use this when validating locally in Codespaces first, then promoting the same exact images to demo.
-
-```bash
-bash .devcontainer/gcp-auth.sh
-bash scripts/codespace-stack.sh bootstrap-env
-bash scripts/codespace-stack.sh up all
-
-export IMAGE_TAG="$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)"
-bash scripts/codespace-build-push.sh --tag "${IMAGE_TAG}"
-
-# Then dispatch WAOOAW Promote Prebuilt Tag with environment=demo and image_tag=${IMAGE_TAG}
-```
-
-Canonical references:
-
-| Surface | Path |
-|---|---|
-| Local Docker stack control | `scripts/codespace-stack.sh` |
-| Demo-aligned env bootstrap | `scripts/codespace-demo-env.sh` |
-| Build + push immutable images from Codespaces | `scripts/codespace-build-push.sh` |
-| Promotion runbook | `docs/runbooks/codespaces-prebuilt-tag-promotion.md` |
-| Promotion workflow | `.github/workflows/waooaw-promote-prebuilt-tag.yml` |
 
 ### Component → Docker image mapping
 
@@ -1612,7 +1587,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 | PR | Branch | Summary | Key files |
 |----|--------|---------|----------|
-| **branch-only** | `docs/cp-studio-1-plan` | **CP-STUDIO-1 execution plan for inline customer activation studio** — adds a self-sufficient one-iteration delivery plan that makes `My Agents` the real setup surface, reduces `Hire Setup` to a payment/handoff step, and aligns the target CP shell with the PP Agent Studio pattern of fixed chrome plus a scrollable working pane. | `docs/CP/iterations/CP-STUDIO-1-my-agents-inline-studio.md`, `docs/CONTEXT_AND_INDEX.md`, `docs/tech_debt.md` |
+| **branch-only** | `docs/cp-studio-1-plan` | **CP studio direction remains relevant, but the plan file itself is gone** — use the surviving UX note plus the live CP surfaces that still carry the setup and operations flow. | `docs/CP/navigation-ux-analysis.md`, `src/CP/FrontEnd/src/pages/AuthenticatedPortal.tsx`, `src/CP/FrontEnd/src/pages/HireSetupWizard.tsx`, `docs/tech_debt.md` |
 | **branch-only** | `feat/plant-catalog-1-it1-e1` | **Plant runtime vocabulary convergence + hire-ready catalog direction** — repo-wide documentation alignment now treats [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) as the executable runtime source of truth; active governance/spec surfaces were updated to reinterpret `Agent DNA`, `Base Agent Anatomy`, `ConfigureMe`, `OperateMe`, `EEPROM`, and filesystem-memory language as historical or conceptual only; the current PP/CP product direction is now explicit: PP is the internal design board and release gate for hire-ready agent supply, while CP should expose only approved catalog releases and preserve customer continuity for existing hired agents. | `docs/CONTEXT_AND_INDEX.md`, `docs/WAOOAW_agents.md`, `docs/PP/README.md`, `README.md`, `main/README.md`, `main/Foundation.md`, `main/Foundation/template/*.yml`, `main/Foundation/amendments/*.md`, `docs/plant/README.md` |
 
 ### Ready to PR — 2026-03-11
@@ -1631,7 +1606,7 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 | PR | Branch | Summary | Key files |
 |----|--------|---------|----------|
-| **#885** | `docs/mould-gap-1-plan` | **MOULD-GAP-1 iteration plan** — `docs/PP/iterations/MOULD-GAP-1-construct-hardening.md`; covers E1 (LifecycleHooks), E2 (ConstraintPolicy enforcement), E3 (HiredAgentsListScreen discriminator), E4 (mobile notifications per agent), E5 (DeltaTradeAdapter), E6 (PP HiredAgentsOps deep-links); skeleton + all 6 epics committed incrementally. | `docs/PP/iterations/MOULD-GAP-1-construct-hardening.md` |
+| **#885** | `docs/mould-gap-1-plan` | **MOULD-GAP-1 outcomes still matter even though the plan file is gone** — use the runtime authority doc plus the PP ops surfaces that were actually merged. | `docs/PP/AGENT-CONSTRUCT-DESIGN.md`, `src/PP/BackEnd/api/ops_hired_agents.py`, `src/PP/FrontEnd/src/components/ConstructHealthPanel.tsx`, `src/PP/FrontEnd/src/components/HookTracePanel.tsx` |
 | **#884** | `copilot/execute-iteration-2-epics-e4-e5` | **PP-MOULD-1 Iteration 2: ConstructHealthPanel, SchedulerDiagnosticsPanel, HookTracePanel** — PP FrontEnd diagnostic trio: 6-card construct health drawer, scheduler detail tab (cron + lag + DLQ), hook trace table (last 50 events); PP Backend `ops_hired_agents.py` with `GET /pp/ops/hired-agents/{id}/construct-health`, `.../scheduler-diagnostics`, `.../hook-trace`; ConstraintPolicyLiveTuneDrawer + `PATCH .../constraint-policy`; React Query hooks for all 3 endpoints. | `src/PP/BackEnd/api/ops_hired_agents.py`, `src/PP/FrontEnd/src/components/ConstructHealthPanel.tsx`, `src/PP/FrontEnd/src/components/SchedulerDiagnosticsPanel.tsx`, `src/PP/FrontEnd/src/components/HookTracePanel.tsx`, `src/PP/FrontEnd/src/components/ConstraintPolicyLiveTuneDrawer.tsx` |
 | **#883** | `copilot/execute-iteration-1-epics-pp-mould` | **PP-MOULD-1 Iteration 1: DLQ console + RBAC** — `ops_dlq.py` routes (`GET /pp/ops/dlq`, `POST .../requeue`); `core/authorization.py` with 7-role hierarchy + `require_role(min_role)` FastAPI dependency. | `src/PP/BackEnd/api/ops_dlq.py`, `src/PP/BackEnd/core/authorization.py` |
 
@@ -1773,12 +1748,15 @@ Use this shortlist first when the task is about Agent/Skill/Component runtime be
 | Need | First file | Then inspect | Why |
 |---|---|---|---|
 | Canonical runtime vocabulary | `docs/PP/AGENT-CONSTRUCT-DESIGN.md` | `docs/CONTEXT_AND_INDEX.md` §4.6–§4.7 | Executable runtime source of truth for AgentSpec, hired-agent hierarchy, construct bindings, lifecycle hooks, skills, runs, and deliverables |
-| Current agent-management and catalog direction | `docs/WAOOAW_agents.md` | `docs/plant/iterations/PLANT-CATALOG-1-hire-ready-agent-lifecycle.md` | Fastest way to recover the latest PP design-board, hire-ready release, and CP listing rules |
+| Current agent-management and catalog direction | `docs/WAOOAW_agents.md` | `docs/PP/AGENT-CONSTRUCT-DESIGN.md`, `src/Plant/BackEnd/agent_mold/reference_agents.py`, `src/Plant/BackEnd/api/v1/reference_agents.py` | Fastest way to recover the live runtime vocabulary, hire-ready supply model, and catalog-facing API surfaces |
+| DMA customer setup and approval loop | `src/CP/FrontEnd/src/pages/HireSetupWizard.tsx` | `src/CP/BackEnd/api/marketing_review.py`, `src/Plant/BackEnd/api/v1/marketing_drafts.py`, `src/Plant/BackEnd/agent_mold/skills/publisher_engine.py` | Shortest path from customer setup to draft generation, approval, and publish flow |
+| Legacy marketing flow-run path | `src/CP/BackEnd/api/cp_flow_runs.py` | `src/Plant/BackEnd/api/v1/flow_runs.py`, `src/Plant/BackEnd/marketing_agent_flows.py`, `src/Plant/BackEnd/flow_executor.py` | Use this when a task mentions old DMA flow definitions or run-history APIs |
 | CP hired-agent skills flow | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `src/CP/BackEnd/api/cp_skills.py` → `src/Plant/BackEnd/api/v1/agent_skills.py` | Full FE → proxy → Plant chain |
 | Customer skill config save | `src/CP/BackEnd/api/cp_skills.py` | `src/Plant/BackEnd/api/v1/skill_configs.py` | Canonical hired-agent skill config write path |
 | Skill/component run history | `src/CP/BackEnd/api/cp_flow_runs.py` | `src/Plant/BackEnd/api/v1/flow_runs.py` | CP proxy and Plant route registration meet here |
 | Approval queue and review actions | `src/CP/BackEnd/api/cp_approvals_proxy.py` | `src/Plant/BackEnd/api/v1/deliverables_simple.py` | Prevents drift back to nonexistent deliverable status patch paths |
 | Hired-agent identity lookup | `src/Plant/BackEnd/api/v1/hired_agents_simple.py` | `src/Plant/BackEnd/tests/unit/test_hired_agents_api.py` | Canonical by-id surface and validation entry point |
+| Share Trader runtime path | `src/Plant/BackEnd/share_trader_flows.py` | `src/Plant/BackEnd/api/v1/trading.py`, `src/CP/BackEnd/api/trading.py`, `src/Plant/BackEnd/integrations/delta_exchange/client.py` | Shortest route into trading setup, execution boundaries, and exchange integration |
 
 ### Fast-path index for platform ownership and operations
 
@@ -2229,9 +2207,6 @@ Use this shortlist when the task is broader than runtime routes.
 | `generate_test_report.py` | Test report generator |
 | `validate_github_script_blocks.py` | Script validation |
 | `deploy-gateway.sh` | Gateway deployment script |
-| `codespace-demo-env.sh` | Creates `.codespace/demo.env` from GCP secrets for Codespaces runtime validation |
-| `codespace-stack.sh` | Docker Compose wrapper for Codespaces local runtime (`bootstrap-env`, `up`, `restart`, `doctor`, `urls`) |
-| `codespace-build-push.sh` | Buildx wrapper that builds and pushes immutable CP/PP/Plant image tags to Artifact Registry |
 
 ### cloud/terraform/ — Infrastructure as Code
 
@@ -2356,21 +2331,6 @@ pytest tests/ -v
 2. Select environment (demo/uat/prod)
 3. Select terraform_action (plan first, then apply)
 
-### Codespaces fast local-to-demo loop
-```bash
-bash .devcontainer/gcp-auth.sh
-bash scripts/codespace-stack.sh bootstrap-env
-bash scripts/codespace-stack.sh up all
-
-export IMAGE_TAG="$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)"
-bash scripts/codespace-build-push.sh --tag "${IMAGE_TAG}"
-```
-
-Then run the `WAOOAW Promote Prebuilt Tag` workflow with:
-- `environment=demo`
-- `terraform_action=plan` then `apply`
-- `image_tag=${IMAGE_TAG}`
-
 ### Check service health
 ```bash
 curl http://localhost:8001/health   # Plant Backend
@@ -2427,7 +2387,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **PII masking is automatic** | `PIIMaskingFilter` is wired at the root logger. Don't try to mask fields manually in route code. Debug by correlation ID or user_id — not by email (masked in logs). |
 | **C8 (PII DB encryption) is PARKED** | Decision: never implement application-layer field encryption for `email`/`phone`/`full_name`. CMEK + masking + email_hash + GDPR erasure cover the compliance requirement. See Section 5.6. |
 | **GCP auth is permanent in Codespace** | `waooaw-codespace-reader` SA activates automatically via `gcp-auth.sh` on every Codespace start. Run `gcloud auth list` to verify. Cloud SQL Proxy starts on port 15432 automatically. No user action needed. |
-| **Cloud SQL Auth Proxy required** | Always connect to `plant-sql-demo` via Cloud SQL Auth Proxy on `127.0.0.1:15432` for IAM auth. Never connect directly on port 5432. If you get `connection refused` on 15432, proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. If proxy startup or first connect fails with `instance does not have IP of type "PUBLIC"`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, wait for the operation to finish, then rerun the auth script. gcloud is provided by the devcontainer `google-cloud-cli` feature; `source /root/.env.db && psql` is the canonical connect path after the proxy starts. For persistence work, this demo DB is the canonical validation target before Docker regression. |
+| **Cloud SQL Auth Proxy required** | Always connect to `plant-sql-demo` via Cloud SQL Auth Proxy on `127.0.0.1:15432` for IAM auth. Never connect directly on port 5432. If you get `connection refused` on 15432, proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. If proxy startup or first connect fails with `instance does not have IP of type "PUBLIC"`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, wait for the operation to finish, then rerun the auth script. On cleaned-up devcontainer branches, gcloud comes from the devcontainer feature rather than the old shell bootstrap; `source /root/.env.db && psql` is still the canonical connect path after the proxy starts. For persistence work, this demo DB is the canonical validation target before Docker regression. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config MUST come from env vars (non-sensitive) or GCP Secret Manager (sensitive) — injected by terraform at deploy time. See §8.1 for the full checklist and §19 for code examples. **Terraform template anti-pattern that is BANNED**: `SOME_VAR = var.x != "" ? var.x : (var.environment == "demo" ? "value_a" : "value_b")` — this bakes environment-conditional logic into the template. Defaults belong in `variables.tf default =`, not in `main.tf` ternaries. Violations are reverted on review. This was found and fixed in PR #851 for CP Backend `PAYMENTS_MODE` and `OTP_DELIVERY_MODE`. |
 | **Plant Gateway needs the shared VPC connector for Redis-backed flows** | Plant Gateway now depends on Memorystore-backed Redis paths used in customer signup and related throttled/runtime operations. Keep the shared VPC connector attached for private ranges while leaving public egress direct; removing it can break Redis-backed flows even when public HTTP ingress still looks healthy. |
@@ -3441,10 +3401,10 @@ START: User reports an issue
 
 ## 23. Mobile Application — CP Mobile
 
-> **Full reference**: `docs/mobile/mobile_approach.md`  
-> **Current status**: Active — Android (Play Store internal testing) + iOS (EAS profile added, Apple Sign-In wired — MOBILE-NFR-1 #868).  
-> **Current focus**: `demo` environment. Use `uat`/`prod` only when those environments are needed.  
-> **Last updated**: 2026-03-11
+> **Live reference set in this branch**: `src/mobile/package.json`, `src/mobile/src/navigation/MainNavigator.tsx`, `src/mobile/src/config/api.config.ts`, `src/mobile/src/services/`, `src/mobile/src/screens/`  
+> **Current status**: Active React Native / Expo app with direct Plant Gateway usage for most runtime flows.  
+> **Current focus**: `demo` environment unless the task explicitly needs `uat` or `prod`.  
+> **Last updated**: 2026-04-06
 
 ---
 
@@ -3459,20 +3419,22 @@ START: User reports an issue
 | **EAS account** | `waooaw` (https://expo.dev/accounts/waooaw) |
 | **EAS project ID** | `fdb3bbde-a0e0-43f9-bf55-e780ecc563e7` |
 | **Source path** | `src/mobile/` |
-| **Full docs** | `docs/mobile/mobile_approach.md` |
+| **Primary entrypoints** | `src/mobile/package.json`, `src/mobile/src/navigation/MainNavigator.tsx`, `src/mobile/src/config/api.config.ts` |
 
 ---
 
-### Mobile Iterations (Living Log)
+### Mobile Fast-Path Files
 
-Mobile work is tracked in `docs/mobile/iterations/`.
+Historical mobile iteration docs are gone in this branch. Start with the live source files below instead of searching `docs/mobile/`.
 
-| Doc | What it’s for | Key takeaways for implementers/testers |
-|---|---|---|
-| `docs/mobile/iterations/it_1.md` | Iteration 1 delivery log (branch: `feat/mobile-it1-safe-area-logo-signup`, status: complete) | Safe-area handling is mandatory on Android edge-to-edge; logo assets were standardized; SignUp form is now web-CP parity; Plant auth OTP endpoints must exist and be public in Gateway. |
-| `docs/mobile/iterations/registration.md` | Registration issues from real Firebase Test Lab / CI evidence | Mobile registration is Plant-Gateway-direct and has **no CAPTCHA**; historical failures were caused by (1) React version mismatch crash and (2) Plant Gateway PolicyMiddleware treating unauth auth routes as JWT-required; watch for API base URL misconfiguration pointing at CP instead of Plant. |
-| `docs/mobile/iterations/MOBILE-FUNC-1-functional-completeness.md` | All 3 iterations merged — real deliverables API, 9 missing screens created and registered, Razorpay SDK un-stubbed, FCM push notification registration (PRs #864, #865, #866, #867 — 2026-03-06) | `TrialDashboardScreen.tsx` now uses React Query against real `GET /api/v1/deliverables` (replaces static mock). `EditProfileScreen.tsx` calls Plant Gateway `PATCH /api/v1/customers/profile` directly (not CP Backend). `pushNotifications.service.ts` registers FCM token after sign-in via Plant Backend `POST /api/v1/customers/fcm-token` (PR #866). New screens live in `src/mobile/src/screens/{discover,agents,profile}/` and are registered in `MainNavigator`. Razorpay SDK is fully un-stubbed — `razorpay.service.ts` imports real `RazorpayCheckout`. |
-| `docs/mobile/iterations/MOBILE-NFR-1-nfr-hardening.md` | Both iterations merged — Sentry active, React Query retry + interceptor retry, sign-up throttle, OTP cooldown, iOS EAS profile, Apple Sign-In (PR #868 — 2026-03-06) | `@sentry/react-native` real import; DSN injected per-environment (env-gated). React Query hooks have `retryDelay` exponential back-off. `cpApiClient.ts` response interceptor retries 429/5xx up to 3 times. Sign-Up submit throttle (2s cooldown) + 60s OTP resend timer added. iOS EAS build profile added to `eas.json`; `expo-apple-authentication` added and Apple Sign-In button wired. |
+| Need | First file | Then inspect | Why |
+|---|---|---|---|
+| App entry and commands | `src/mobile/package.json` | `src/mobile/app.json`, `src/mobile/eas.json` | Confirms Expo scripts, test commands, and build targets |
+| Screen map / navigation | `src/mobile/src/navigation/MainNavigator.tsx` | `src/mobile/src/navigation/types.ts`, `src/mobile/src/screens/` | Shows the current tabs, stacks, and routed surfaces |
+| API base URL and environment wiring | `src/mobile/src/config/api.config.ts` | `src/mobile/src/config/environment.config.ts`, `src/mobile/src/lib/cpApiClient.ts` | First place to debug wrong backend targets or environment drift |
+| Auth and session recovery | `src/mobile/src/services/auth.service.ts` | `src/mobile/src/store/authStore.ts`, `src/mobile/src/screens/auth/` | Canonical mobile sign-in, OTP, and token handling path |
+| Hired-agent operations | `src/mobile/src/screens/agents/AgentOperationsScreen.tsx` | `src/mobile/src/services/hiredAgents/hiredAgents.service.ts`, `src/mobile/src/components/ContentDraftApprovalCard.tsx` | Best entry into approvals, operations, and customer action surfaces |
+| Push notifications | `src/mobile/src/services/notifications/pushNotifications.service.ts` | `src/mobile/src/config/sentry.config.ts`, `src/mobile/src/services/monitoring/` | Covers device registration, alerts, and runtime signal capture |
 
 > **Testing rule (mobile)**: All tests are executed in Docker/Codespace (no local venv/virtualenv assumption for backend parity). Mobile unit tests run via `cd src/mobile && npm test` in the devcontainer environment.
 >
@@ -3806,7 +3768,7 @@ eas submit --platform android --profile demo --id <BUILD_ID> --non-interactive
 | Unit | `cd src/mobile && npm test` | Jest + React Native Testing Library |
 | Unit (coverage) | `cd src/mobile && npm run test:coverage` | Jest coverage |
 | E2E (Android) | `cd src/mobile && npm run test:e2e:android` | Detox |
-| Firebase Test Lab | See `docs/mobile/mobile_approach.md` §13 | gcloud FTL (Robo test) |
+| Firebase Test Lab | `src/mobile/package.json`, `src/mobile/eas.json`, CI workflow/test scripts | gcloud FTL (Robo test) |
 
 **Verified FTL device matrix** (2026-02-21):
 - `oriole` (Pixel 6), version `33` (Android 13) ✅
@@ -4561,7 +4523,7 @@ This document is the **single source of truth** for all construct-pipeline desig
 | §8 | End-to-end execution flow diagram | — |
 | §9 | NFR requirements per construct | See §17 (Gotchas) |
 | §10 | Environment flags: `CAMPAIGN_PERSISTENCE_MODE`, `CIRCUIT_BREAKER_ENABLED`, `SCHEDULER_ENABLED`, `APPROVAL_GATE_ENABLED` | See §14 |
-| §11 | Gap register (G1–G13) | `docs/PP/iterations/MOULD-GAP-1-construct-hardening.md` |
+| §11 | Historical mould-gap outcomes now reflected in live runtime + PP ops files | `docs/PP/AGENT-CONSTRUCT-DESIGN.md`, `src/PP/BackEnd/api/ops_hired_agents.py`, `src/PP/FrontEnd/src/components/ConstructHealthPanel.tsx` |
 | §13 | CP UX — construct surfaces in Customer Portal; 5 missing CP routes; screen-by-screen changes | See §4.3 |
 | §14 | PP Service-Centre vision; 7-role RBAC; 10 missing PP routes; 7 new PP screens | See §4.4 |
 | §15 | Key DB tables quick reference (12 tables) | See §10 |
