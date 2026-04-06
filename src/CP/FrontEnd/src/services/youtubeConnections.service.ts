@@ -46,6 +46,24 @@ export type AttachYouTubeConnectionResponse = {
   updated_at: string
 }
 
+export type ValidateYouTubeConnectionResponse = {
+  id: string
+  customer_id: string
+  platform_key: string
+  provider_account_id?: string | null
+  display_name?: string | null
+  verification_status: string
+  connection_status: string
+  token_expires_at?: string | null
+  last_verified_at?: string | null
+  channel_count: number
+  total_video_count: number
+  recent_short_count: number
+  recent_long_video_count: number
+  subscriber_count: number
+  view_count: number
+}
+
 export async function startYouTubeConnection(redirectUri: string): Promise<StartYouTubeConnectionResponse> {
   return gatewayRequestJson<StartYouTubeConnectionResponse>('/cp/youtube-connections/connect/start', {
     method: 'POST',
@@ -86,6 +104,19 @@ export async function attachYouTubeConnection(
         skill_id: input.skill_id,
         platform_key: input.platform_key || 'youtube',
       }),
+    }
+  )
+}
+
+export async function validateYouTubeConnection(
+  credentialId: string
+): Promise<ValidateYouTubeConnectionResponse> {
+  return gatewayRequestJson<ValidateYouTubeConnectionResponse>(
+    `/cp/youtube-connections/${encodeURIComponent(credentialId)}/validate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
     }
   )
 }

@@ -34,6 +34,7 @@ def test_customer_platform_connections_routes_registered():
     assert any("POST" in methods and path.endswith("/youtube/connect/finalize") for methods, path in routes)
     assert any("GET" in methods and path.endswith("/{customer_id}") for methods, path in routes)
     assert any("POST" in methods and path.endswith("/{credential_id}/attach") for methods, path in routes)
+    assert any("POST" in methods and path.endswith("/{credential_id}/validate") for methods, path in routes)
 
 
 @pytest.mark.asyncio
@@ -210,3 +211,47 @@ async def test_attach_customer_platform_credential_maps_connection(mock_db):
 
     assert response.id == "conn-1"
     assert response.customer_platform_credential_id == "cred-1"
+
+
+@pytest.mark.asyncio
+async def test_validate_customer_platform_credential_maps_validation_result(mock_db):
+    from api.v1.platform_connections import ValidateCustomerCredentialRequest, validate_customer_platform_credential
+
+    now = datetime.now(timezone.utc)
+    credential = CustomerPlatformCredentialModel(
+        id="cred-1",
+        customer_id="cust-1",
+        platform_key="youtube",
+        provider_account_id="channel-1",
+        display_name="Channel One",
+        granted_scopes=["scope-a"],
+        verification_status="verified",
+        connection_status="connected",
+        secret_ref="projects/waooaw-oauth/secrets/customer-platform-youtube-cust-1/versions/latest",
+        last_verified_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    service_result = MagicMock(
+        credential=credential,
+        channel_count=1,
+        total_video_count=42,
+        recent_short_count=7,
+        recent_long_video_count=35,
+        subscriber_count=1200,
+        view_count=54000,
+    )
+
+    with patch(
+        "api.v1.platform_connections.YouTubeConnectionService.validate_connection",
+        AsyncMock(return_value=service_result),
+    ):
+        response = await validate_customer_platform_credential(
+            "cred-1",
+            ValidateCustomerCredentialRequest(customer_id="cust-1"),
+            db=mock_db,
+        )
+
+    assert response.id == "cred-1"
+    assert response.total_video_count == 42
+    assert response.recent_short_count == 7

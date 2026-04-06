@@ -143,6 +143,14 @@ section[id] {
   box-shadow: var(--shadow4);
 }
 
+.header--landing {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--colorNeutralBackground3) 88%, var(--colorNeutralBackground1) 12%) 0%, color-mix(in srgb, var(--colorNeutralBackground3) 72%, transparent 28%) 100%);
+  border-bottom: none;
+  box-shadow: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 .header-content {
   display: flex;
   justify-content: space-between;
@@ -222,7 +230,7 @@ section[id] {
 
 /* Hero Section */
 .hero-section {
-  padding: 48px 0 36px;    /* top/bottom reduced 50% — removes excess whitespace above hero and between hero and agent grid */
+  padding: 8px 0 10px;
   background: linear-gradient(135deg, var(--colorNeutralBackground3) 0%, var(--colorNeutralBackground1) 100%);
 }
 
@@ -233,21 +241,22 @@ section[id] {
 }
 
 .hero-layout {
-  display: flex;
-  align-items: stretch;     /* columns stretch to image height */
-  justify-content: flex-start;
-  gap: 40px;               /* ≈ 1 cm gap between text and image */
+  display: grid;
+  grid-template-columns: minmax(340px, 0.92fr) minmax(520px, 1.08fr);
+  align-items: center;
+  gap: 28px;
 }
 
 .hero-media {
-  flex: 1 1 0;         /* grow to fill all remaining space after text + gap */
+  width: 100%;
   min-width: 0;
   align-self: stretch;
-  border-radius: 16px;
+  justify-self: stretch;
+  border-radius: 18px;
   overflow: hidden;
-  background-color: var(--colorBrandBackground2);
+  background-color: color-mix(in srgb, var(--colorBrandBackground2) 72%, var(--colorNeutralBackground1) 28%);
   border: 1px solid var(--colorNeutralStroke2);
-  box-shadow: var(--shadow16);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.14);
 }
 
 /* hero-media img rule no longer needed — carousel manages its own image */
@@ -264,7 +273,7 @@ section[id] {
 .hero-carousel-stage {
   position: relative;
   width: 100%;
-  height: 480px;
+  height: 360px;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -286,11 +295,10 @@ section[id] {
 
 .hero-carousel-img {
   width: 100%;
-  height: 480px;
+  height: 360px;
   object-fit: cover;   /* crop intelligently — no more forced square distortion */
   display: block;
-  /* Desaturate + darken so image tones harmonise with the dark hero background */
-  filter: brightness(0.82) saturate(0.6);
+  filter: brightness(0.94) saturate(0.58) contrast(0.92);
 }
 
 /* Edge vignette: bleeds image borders into the page background so the
@@ -302,8 +310,8 @@ section[id] {
   pointer-events: none;
   z-index: 2;
   background:
-    linear-gradient(to right,  rgba(12, 12, 15, 0.55) 0%, transparent 18%, transparent 82%, rgba(12, 12, 15, 0.35) 100%),
-    linear-gradient(to bottom, rgba(12, 12, 15, 0.4)  0%, transparent 20%, transparent 78%, rgba(12, 12, 15, 0.55) 100%);
+    linear-gradient(to right,  rgba(12, 12, 15, 0.22) 0%, transparent 20%, transparent 84%, rgba(12, 12, 15, 0.16) 100%),
+    linear-gradient(to bottom, rgba(12, 12, 15, 0.18)  0%, transparent 24%, transparent 80%, rgba(12, 12, 15, 0.24) 100%);
 }
 
 /* Centered text overlay — sits above vignette (z-index 2), below arrows (z-index 10) */
@@ -392,12 +400,12 @@ section[id] {
 }
 
 .hero-content {
-  flex: 0 0 auto;
-  max-width: 440px;
+  max-width: 640px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
+  padding-right: 8px;
 }
 
 .hero-title {
@@ -418,7 +426,7 @@ section[id] {
   margin-top: auto;   /* together with actions margin-top:auto, this centers
                          the subtitle exactly between title-bottom and actions-top */
   margin-bottom: 0;
-  max-width: 400px;
+  max-width: 520px;
   margin-left: 0;
   margin-right: 0;
 }
@@ -471,16 +479,19 @@ section[id] {
 
 @media (max-width: 960px) {
   .hero-layout {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: stretch;
+    gap: 28px;
   }
 
   .hero-content {
     max-width: 100%;
+    padding-right: 0;
   }
 
   .hero-media {
     max-width: 100%;
+    border-radius: 18px;
   }
 
   .hero-actions {
@@ -986,6 +997,121 @@ section[id] {
   .auth-left-panel    { padding: 20px 20px 22px; flex-basis: auto; }
   .auth-panel-divider { width: 100%; height: 1px; }
   .auth-right-panel   { padding: 22px 20px 30px; }
+
+  .auth-unified-card--signin .auth-right-panel {
+    order: 1;
+    padding-top: 18px;
+  }
+
+  .auth-unified-card--signin .auth-panel-divider {
+    order: 2;
+  }
+
+  .auth-unified-card--signin .auth-left-panel {
+    order: 3;
+    padding: 16px 20px 18px;
+  }
+
+  .auth-unified-card--signin .auth-left-step {
+    gap: 10px;
+  }
+
+  .auth-unified-card--signin .auth-left-illustration {
+    display: none;
+  }
+
+  .auth-unified-card--signin .auth-left-heading {
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+
+  .auth-unified-card--signin .auth-left-tagline {
+    font-size: 0.84rem;
+  }
+
+  .auth-unified-card--signin .auth-proof-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 8px 0;
+  }
+
+  .auth-unified-card--signin .auth-proof-card {
+    padding: 12px;
+  }
+
+  .auth-unified-card--signin .auth-left-bullets {
+    min-height: 0;
+    gap: 6px;
+  }
+
+  .auth-unified-card--signin .auth-left-bullets li:nth-child(n + 3) {
+    display: none;
+  }
+
+  .auth-unified-card--signin .auth-left-footnote {
+    margin-top: 0;
+  }
+
+  .auth-unified-card--signup .auth-right-panel {
+    order: 1;
+    padding-top: 18px;
+  }
+
+  .auth-unified-card--signup .auth-panel-divider {
+    order: 2;
+  }
+
+  .auth-unified-card--signup .auth-left-panel {
+    order: 3;
+    padding: 16px 20px 18px;
+  }
+
+  .auth-unified-card--signup .auth-left-step {
+    gap: 10px;
+  }
+
+  .auth-unified-card--signup .auth-side-kicker,
+  .auth-unified-card--signup .auth-left-illustration {
+    display: none;
+  }
+
+  .auth-unified-card--signup .auth-left-heading {
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+
+  .auth-unified-card--signup .auth-left-tagline {
+    font-size: 0.84rem;
+  }
+
+  .auth-unified-card--signup .auth-milestone-list {
+    gap: 8px;
+    margin: 8px 0;
+  }
+
+  .auth-unified-card--signup .auth-milestone-item {
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    font-size: 0.84rem;
+  }
+
+  .auth-unified-card--signup .auth-milestone-index {
+    font-size: 0.82rem;
+  }
+
+  .auth-unified-card--signup .auth-left-bullets {
+    min-height: 0;
+    gap: 6px;
+  }
+
+  .auth-unified-card--signup .auth-left-bullets li:nth-child(n + 3) {
+    display: none;
+  }
+
+  .auth-unified-card--signup .auth-left-footnote {
+    margin-top: 0;
+  }
 }
 
 .auth-close-row {
@@ -1304,7 +1430,7 @@ section[id] {
 
 /* Marketplace Section */
 .marketplace-section {
-  padding: 88px 0;
+  padding: 40px 0 72px;
 }
 
 .marketplace-header {
@@ -1353,26 +1479,28 @@ section[id] {
 
 /* Agent Card */
 .agent-card {
-  background-color: var(--colorNeutralBackground1);
-  border: 1px solid var(--colorNeutralStroke2);
-  border-radius: 12px;
-  padding: 20px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--colorNeutralBackground1) 94%, white 6%) 0%, var(--colorNeutralBackground1) 100%);
+  border: 1px solid color-mix(in srgb, var(--colorNeutralStroke2) 72%, var(--colorBrandStroke1) 28%);
+  border-radius: 22px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   height: 100%;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s, background 0.2s;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
 }
 
 .agent-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow16);
-  border-color: var(--colorNeutralStroke1);
+  transform: translateY(-6px);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.14);
+  border-color: color-mix(in srgb, var(--colorBrandStroke1) 48%, var(--colorNeutralStroke1) 52%);
 }
 
 .agent-card:focus-within {
   border-color: var(--colorBrandStroke1, var(--colorNeutralStroke1));
-  box-shadow: var(--shadow16);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.14);
 }
 
 .agent-avatar {
@@ -1382,38 +1510,63 @@ section[id] {
 }
 
 .agent-avatar-large {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  background-color: var(--colorNeutralBackground3);
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.44) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--colorBrandBackground2) 82%, white 18%) 0%, color-mix(in srgb, var(--colorBrandBackground) 74%, var(--colorNeutralBackground2) 26%) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 32px;
   line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.agent-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.agent-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.agent-name-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .agent-info {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   flex: 1 1 auto;
 }
 
-.agent-info h3 {
+.agent-info h3,
+.agent-name-row h3 {
   font-family: var(--font-heading);
-  font-weight: 600;
-  font-size: 20px;
+  font-weight: 700;
+  font-size: 21px;
   margin-bottom: 0;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
 
 .agent-meta {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 0;
-  font-size: 14px;
+  font-size: 13px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -1440,6 +1593,42 @@ section[id] {
   margin-bottom: 0;
 }
 
+.agent-specialty--lead {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--colorNeutralForeground1);
+}
+
+.agent-pill-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.agent-industry-pill,
+.agent-speed-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.agent-industry-pill {
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 82%, white 18%);
+  color: var(--colorNeutralForeground1);
+  border: 1px solid var(--colorNeutralStroke2);
+}
+
+.agent-speed-pill {
+  background: color-mix(in srgb, var(--colorBrandBackground2) 22%, transparent 78%);
+  color: var(--colorBrandForeground1);
+  border: 1px solid color-mix(in srgb, var(--colorBrandStroke1) 50%, transparent 50%);
+}
+
 .agent-industry {
   display: inline-flex;
   gap: 6px;
@@ -1450,13 +1639,54 @@ section[id] {
   color: var(--colorNeutralForeground3);
 }
 
+.agent-best-for {
+  margin: 0;
+  color: var(--colorNeutralForeground1);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.agent-best-for-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--colorBrandForeground1);
+}
+
 .agent-description {
   color: var(--colorNeutralForeground2);
-  margin-top: 2px;
+  margin-top: 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.55;
+}
+
+.agent-proof-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agent-proof-card {
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--colorBrandBackground2) 18%, var(--colorNeutralBackground2) 82%);
+  border: 1px solid color-mix(in srgb, var(--colorBrandStroke1) 28%, var(--colorNeutralStroke2) 72%);
+  color: var(--colorNeutralForeground1);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.agent-proof-card--secondary {
+  background: color-mix(in srgb, var(--colorNeutralBackground2) 88%, white 12%);
+  border-color: var(--colorNeutralStroke2);
+  color: var(--colorNeutralForeground2);
 }
 
 .agent-footer {
@@ -1464,14 +1694,20 @@ section[id] {
   justify-content: space-between;
   align-items: center;
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: 12px;
   gap: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--colorNeutralStroke2) 75%, transparent 25%);
 }
 
 .agent-price {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: var(--colorBrandForeground1);
+}
+
+.agent-footer .fui-Button {
+  min-height: 38px;
+  border-radius: 12px;
 }
 
 /* How It Works */

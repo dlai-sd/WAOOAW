@@ -69,6 +69,10 @@ class AttachYouTubeConnectionRequest(BaseModel):
     platform_key: str = Field(default="youtube", min_length=1)
 
 
+class ValidateYouTubeConnectionRequest(BaseModel):
+    pass
+
+
 @router.post("/connect/start", status_code=status.HTTP_201_CREATED)
 async def start_youtube_connect(
     body: StartYouTubeConnectRequest,
@@ -177,6 +181,30 @@ async def attach_youtube_connection(
                 "hired_instance_id": body.hired_instance_id,
                 "skill_id": body.skill_id,
                 "platform_key": body.platform_key,
+            },
+        )
+    except ServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    _raise_for_gateway_response(resp)
+    return resp.json if isinstance(resp.json, dict) else {"detail": resp.json}
+
+
+@router.post("/{credential_id}/validate")
+async def validate_youtube_connection(
+    credential_id: str,
+    body: ValidateYouTubeConnectionRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
+    try:
+        resp = await plant.request_json(
+            method="POST",
+            path=f"api/v1/customer-platform-connections/{credential_id}/validate",
+            headers=_forward_headers(request),
+            json_body={
+                "customer_id": _customer_id_from_user(current_user),
             },
         )
     except ServiceUnavailableError as exc:
