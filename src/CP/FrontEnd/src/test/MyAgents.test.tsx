@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockedNavigate = vi.fn()
 
@@ -125,6 +125,13 @@ vi.mock('../services/platformCredentials.service', () => ({
 
 vi.mock('../services/youtubeConnections.service', () => ({
   listYouTubeConnections: vi.fn().mockResolvedValue([]),
+  startYouTubeConnection: vi.fn(),
+  validateYouTubeConnection: vi.fn(),
+  attachYouTubeConnection: vi.fn(),
+}))
+
+vi.mock('../utils/browserNavigation', () => ({
+  redirectTo: vi.fn(),
 }))
 
 vi.mock('../services/platformConnections.service', async () => {
@@ -196,13 +203,18 @@ const renderWithProvider = (component: React.ReactElement) => {
 }
 
 describe('MyAgents Component', () => {
-  it('routes Open YouTube setup into step 3 of the hire wizard', async () => {
+  beforeEach(() => {
+    sessionStorage.clear()
     mockedNavigate.mockReset()
+  })
+
+  it('starts YouTube reconnect directly from My Agents when the channel needs attention', async () => {
 
     const summaryModule = await import('../services/myAgentsSummary.service')
     const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
     const connectionsModule = await import('../services/platformConnections.service')
     const youtubeModule = await import('../services/youtubeConnections.service')
+    const browserModule = await import('../utils/browserNavigation')
 
     vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
       instances: [
@@ -251,8 +263,8 @@ describe('MyAgents Component', () => {
       ]
     })
 
-    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValueOnce([])
-    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([
+    vi.mocked(connectionsModule.listPlatformConnections).mockResolvedValue([])
+    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValue([
       {
         id: 'cred-yt-0',
         customer_id: 'CUST-0',
@@ -265,6 +277,11 @@ describe('MyAgents Component', () => {
         updated_at: '2026-03-16T10:05:00Z',
       }
     ] as any)
+    vi.mocked(youtubeModule.startYouTubeConnection).mockResolvedValueOnce({
+      state: 'yt-state-0',
+      authorization_url: 'https://accounts.google.com/o/oauth2/v2/auth?state=yt-state-0',
+      expires_at: '2026-03-19T10:00:00Z',
+    })
 
     renderWithProvider(<MyAgents />)
 
@@ -280,15 +297,14 @@ describe('MyAgents Component', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
 
+    const reconnectButton = await screen.findByRole('button', { name: /connect with google/i })
+    fireEvent.click(reconnectButton)
+
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+      expect(youtubeModule.startYouTubeConnection).toHaveBeenCalled()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open YouTube setup' }))
-
-    expect(mockedNavigate).toHaveBeenCalledWith(
-      '/hire/setup/SUB-MKT-0?agentId=AGT-MKT-YT-000&agentTypeId=marketing.digital_marketing.v1&step=3&focus=youtube'
-    )
+    expect(browserModule.redirectTo).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=yt-state-0')
   })
 
   it('shows DMA agent selector at the top when all agents are DMA', async () => {
@@ -418,7 +434,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
-    const selector = screen.getByRole('combobox', { name: /Selected DMA Hire/i })
+    const selector = screen.getByRole('combobox')
     fireEvent.click(selector)
     
     const seoOption = await screen.findByText('SEO Pilot')
@@ -481,12 +497,12 @@ describe('MyAgents Component', () => {
         primary_language: 'English',
         timezone: 'Asia/Kolkata',
         offerings_services: ['SEO'],
-        platforms_enabled: [],
-        platform_bindings: {},
+        platforms_enabled: ['youtube'],
+        platform_bindings: { youtube: { skill_id: 'default' } },
       },
       readiness: {
         brief_complete: false,
-        youtube_selected: false,
+        youtube_selected: true,
         youtube_connection_ready: true,
         configured: false,
         can_finalize: false,
@@ -521,23 +537,16 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-induct')).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-
-    await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-platforms')).toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByTestId('platform-toggle-youtube'))
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
-
-    await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
 
-    expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledTimes(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
+    })
+
+    expect(hiredModule.upsertHiredAgentDraft).toHaveBeenCalledTimes(1)
 
     expect(activationModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenLastCalledWith('HIRED-1', {
       workspace: expect.objectContaining({
@@ -704,7 +713,7 @@ describe('MyAgents Component', () => {
       expect(screen.queryByText('Read-only access expired')).not.toBeInTheDocument()
     })
 
-    expect(screen.getByText('View and manage your hired agents')).toBeInTheDocument()
+    expect(screen.getByRole('combobox')).toHaveTextContent('Active Agent')
     expect(screen.getByRole('button', { name: 'Configure' })).not.toBeDisabled()
   })
 
@@ -859,8 +868,9 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('YouTube not connected')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+    expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
+    expect(screen.getByText('YouTube operating decision')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reconnect with Google' })).toBeInTheDocument()
     expect(screen.getByText('Blocked by approval')).toBeInTheDocument()
     expect(screen.getByText('Customer approval')).toBeInTheDocument()
     expect(screen.getByText('Approve exact deliverable')).toBeInTheDocument()
@@ -941,7 +951,7 @@ describe('MyAgents Component', () => {
         updated_at: '2026-03-10T10:05:00Z',
       }
     ])
-    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValueOnce([
+    vi.mocked(youtubeModule.listYouTubeConnections).mockResolvedValue([
       {
         id: 'cred-yt-2',
         customer_id: 'CUST-2',
@@ -974,7 +984,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
       expect(screen.getByText('Ready for upload')).toBeInTheDocument()
     })
-    expect(screen.queryByRole('button', { name: 'Open YouTube setup' })).not.toBeInTheDocument()
+    expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
   })
 
   it('shows reconnect-required state for stale YouTube credentials', async () => {
@@ -1077,7 +1087,7 @@ describe('MyAgents Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Dormant Channel reconnect required')).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reconnect with Google' })).toBeInTheDocument()
   })
 
   it('shows ready-to-attach state when a saved credential exists but is not attached to this hire', async () => {
@@ -1098,6 +1108,17 @@ describe('MyAgents Component', () => {
           cancel_at_period_end: false,
           hired_instance_id: 'HIRED-MKT-RTA',
           agent_type_id: 'marketing.digital_marketing.v1',
+        },
+        {
+          subscription_id: 'SUB-TRD-RTA',
+          agent_id: 'AGT-TRD-RTA',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-RTA',
+          agent_type_id: 'trading.share_trader.v1',
         },
       ],
     })
@@ -1142,7 +1163,7 @@ describe('MyAgents Component', () => {
     renderWithProvider(<MyAgents />)
 
     await waitFor(() => {
-      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
@@ -1157,6 +1178,162 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('YouTube channel status')).toBeInTheDocument()
       expect(screen.getByText('Ready Channel ready to attach')).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: 'Open YouTube setup' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Test connection' })).toBeInTheDocument()
+  })
+
+  it('tests and persists a saved YouTube credential from the My Agents operating rail', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+    const deliverablesModule = await import('../services/hiredAgentDeliverables.service')
+    const connectionsModule = await import('../services/platformConnections.service')
+    const youtubeModule = await import('../services/youtubeConnections.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-MKT-PERSIST',
+          agent_id: 'AGT-MKT-YT-PERSIST',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-MKT-PERSIST',
+          agent_type_id: 'marketing.digital_marketing.v1',
+        },
+        {
+          subscription_id: 'SUB-TRD-PERSIST',
+          agent_id: 'AGT-TRD-PERSIST',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-TRD-PERSIST',
+          agent_type_id: 'trading.share_trader.v1',
+        },
+      ],
+    })
+
+    vi.mocked(deliverablesModule.listHiredAgentDeliverables).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-MKT-PERSIST',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-MKT-PERSIST',
+          hired_instance_id: 'HIRED-MKT-PERSIST',
+          goal_instance_id: 'GOAL-MKT-PERSIST',
+          goal_template_id: 'marketing.theme_discovery.v1',
+          title: 'YouTube draft awaiting attach',
+          payload: { destination: { destination_type: 'youtube' } },
+          review_status: 'approved',
+          review_notes: null,
+          approval_id: 'APR-MKT-PERSIST',
+          execution_status: 'not_executed',
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+    })
+
+    vi.mocked(connectionsModule.listPlatformConnections)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 'CONN-PERSIST',
+          hired_instance_id: 'HIRED-MKT-PERSIST',
+          skill_id: 'default',
+          customer_platform_credential_id: 'cred-yt-persist',
+          platform_key: 'youtube',
+          status: 'connected',
+          connected_at: '2026-03-20T10:00:00Z',
+          last_verified_at: '2026-03-20T10:05:00Z',
+          created_at: '2026-03-20T10:00:00Z',
+          updated_at: '2026-03-20T10:05:00Z',
+        },
+      ] as any)
+    vi.mocked(youtubeModule.listYouTubeConnections)
+      .mockResolvedValue([
+        {
+          id: 'cred-yt-persist',
+          customer_id: 'CUST-PERSIST',
+          platform_key: 'youtube',
+          display_name: 'Persist Channel',
+          granted_scopes: ['youtube.upload'],
+          verification_status: 'verified',
+          connection_status: 'connected',
+          last_verified_at: '2026-03-20T10:05:00Z',
+          created_at: '2026-03-20T10:00:00Z',
+          updated_at: '2026-03-20T10:05:00Z',
+        },
+      ] as any)
+    vi.mocked(youtubeModule.validateYouTubeConnection).mockResolvedValueOnce({
+      id: 'cred-yt-persist',
+      customer_id: 'CUST-PERSIST',
+      platform_key: 'youtube',
+      display_name: 'Persist Channel',
+      verification_status: 'verified',
+      connection_status: 'connected',
+      token_expires_at: null,
+      last_verified_at: '2026-03-20T10:05:00Z',
+      channel_count: 1,
+      total_video_count: 42,
+      recent_short_count: 7,
+      recent_long_video_count: 35,
+      subscriber_count: 1200,
+      view_count: 54000,
+    })
+    vi.mocked(youtubeModule.attachYouTubeConnection).mockResolvedValueOnce({
+      id: 'CONN-PERSIST',
+      hired_instance_id: 'HIRED-MKT-PERSIST',
+      skill_id: 'default',
+      customer_platform_credential_id: 'cred-yt-persist',
+      platform_key: 'youtube',
+      status: 'connected',
+      connected_at: '2026-03-20T10:00:00Z',
+      last_verified_at: '2026-03-20T10:05:00Z',
+      created_at: '2026-03-20T10:00:00Z',
+      updated_at: '2026-03-20T10:05:00Z',
+    })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('My Agents (2)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Test connection' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    await waitFor(() => {
+      expect(youtubeModule.validateYouTubeConnection).toHaveBeenCalledWith('cred-yt-persist')
+    })
+
+    expect(screen.getByTestId('youtube-validation-metrics')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Persist connection for future use by Agent' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Persist connection for future use by Agent' }))
+
+    await waitFor(() => {
+      expect(youtubeModule.attachYouTubeConnection).toHaveBeenCalledWith('cred-yt-persist', {
+        hired_instance_id: 'HIRED-MKT-PERSIST',
+        skill_id: 'default',
+      })
+    })
+
+    expect(screen.getByText('YouTube connection saved for future agent use.')).toBeInTheDocument()
   })
 })

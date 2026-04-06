@@ -454,16 +454,6 @@ export function DigitalMarketingActivationWizard({
     return Boolean(attachedYouTubeConnection && (status === 'connected' || status === 'active'))
   }, [attachedYouTubeConnection])
 
-  // Auto-select + advance if only one instance and we are on step 0 (select panel)
-  useEffect(() => {
-    // With the new reduced step model, activeStepIndex 0 is now 'connect', not 'select'
-    // The 'select' step only exists when instances array is provided and no instance is selected
-    if (activeStepIndex === 0 && currentStep.id === 'select' && instances.length === 1) {
-      onSelectedInstanceChange?.(instances[0].subscription_id)
-      setActiveStepIndex(1)
-    }
-  }, [instances, activeStepIndex, currentStep.id, onSelectedInstanceChange])
-
   // OAuth callback — detect ?code&state on mount and finalize connection
   useEffect(() => {
     const result = readYouTubeOAuthResult()
@@ -801,15 +791,13 @@ export function DigitalMarketingActivationWizard({
   }
 
   async function handleContinue() {
-    if (currentStep.id !== 'select') {
-      const saved = await saveWorkspace()
-      if (!saved) return
-      if (currentStep.id === 'theme') {
-        const savedProfile = await saveProfile()
-        if (!savedProfile) return
-        const savedBrandVoice = await saveBrandVoice()
-        if (!savedBrandVoice) return
-      }
+    const saved = await saveWorkspace()
+    if (!saved) return
+    if (currentStep.id === 'theme') {
+      const savedProfile = await saveProfile()
+      if (!savedProfile) return
+      const savedBrandVoice = await saveBrandVoice()
+      if (!savedBrandVoice) return
     }
     setActiveStepIndex(i => Math.min(DMA_STEPS.length - 1, i + 1))
   }
@@ -1381,15 +1369,15 @@ export function DigitalMarketingActivationWizard({
     }
   }
 
-  if (!activeInstance && (currentStep.id !== 'select' || instances.length === 0)) {
+  if (!activeInstance) {
     return <FeedbackMessage intent="warning" title="Activation unavailable" message="Select a hired agent before opening the digital marketing activation workspace." />
   }
 
-  if (loading && currentStep.id !== 'select') {
+  if (loading) {
     return <LoadingIndicator message="Loading digital marketing activation..." size="medium" />
   }
 
-  if (error && currentStep.id !== 'select') {
+  if (error) {
     return <FeedbackMessage intent="error" title="Activation unavailable" message={error} action={{ label: 'Retry', onClick: () => void loadState() }} />
   }
 
@@ -1444,130 +1432,9 @@ export function DigitalMarketingActivationWizard({
             {/* SCROLLABLE BODY */}
             <div className="dma-wizard-canvas-body">
 
-              {/* STEP 0 — Select Agent */}
-              {currentStep.id === 'select' && (
-                <div data-testid="dma-step-panel-select" className="dma-wizard-canvas-body-inner">
-                  {instances.length === 0 ? (
-                    <div>No agents found.</div>
-                  ) : (
-                    <div className="dma-wizard-agent-select-grid">
-                      {instances.map((inst) => (
-                        <button
-                          key={inst.subscription_id}
-                          type="button"
-                          className={`dma-wizard-agent-card${inst.subscription_id === activeInstance?.subscription_id ? ' is-selected' : ''}`}
-                          onClick={() => {
-                            onSelectedInstanceChange?.(inst.subscription_id)
-                            setActiveStepIndex(1)
-                          }}
-                        >
-                          <div className="dma-wizard-agent-card-name">
-                            {inst.nickname || inst.agent_id}
-                          </div>
-                          <div className="dma-wizard-agent-card-meta">
-                            {inst.status}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* STEP 1 — Induct Agent */}
-              {currentStep.id === 'induct' && (
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-induct">
-                  <div style={{ display: 'grid', gap: '1.25rem' }}>
-                    <div>
-                      <div className="dma-wizard-section-label">Agent identity</div>
-                      <div className="dma-wizard-form-grid">
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Nickname</span>
-                          <Input
-                            aria-label="Nickname"
-                            value={nickname}
-                            onChange={(_, data) => setNickname(data.value)}
-                            disabled={readOnly}
-                            placeholder="e.g. Growth Copilot"
-                          />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Theme</span>
-                          <Input
-                            aria-label="Theme"
-                            value={theme}
-                            onChange={(_, data) => setTheme(data.value)}
-                            disabled={readOnly}
-                            placeholder="e.g. dark"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <Badge appearance="outline" color={readiness.configured ? 'success' : 'warning'}>
-                        {readiness.configured ? 'Identity configured ✓' : 'Nickname and theme required'}
-                      </Badge>
-                      {hiredInstanceId ? (
-                        <span style={{ opacity: 0.65, fontSize: '0.85rem' }}>
-                          Hire ID: {hiredInstanceId}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 2 — Choose Platforms */}
-              {currentStep.id === 'platforms' && (
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-platforms">
-                  <div style={{ display: 'grid', gap: '1.25rem' }}>
-                    <div>
-                      <div className="dma-wizard-section-label">Select the channels for this agent to manage</div>
-                        {SUPPORTED_PLATFORM_OPTIONS.length > 0 ? (
-                          <div className="dma-wizard-platform-grid">
-                            {SUPPORTED_PLATFORM_OPTIONS.map(({ key, label }) => {
-                              const isSelected = selectedPlatforms.includes(key)
-                              return (
-                                <button
-                                  key={key}
-                                  type="button"
-                                  className={`dma-wizard-platform-card${isSelected ? ' is-selected' : ''}`}
-                                  onClick={() => {
-                                    if (readOnly) return
-                                    setSelectedPlatforms(prev =>
-                                      isSelected ? prev.filter(p => p !== key) : [...prev, key]
-                                    )
-                                  }}
-                                  disabled={readOnly}
-                                  aria-pressed={isSelected}
-                                  data-testid={`platform-toggle-${key}`}
-                                >
-                                  <span style={{ fontWeight: 600 }}>{label}</span>
-                                  {isSelected ? <span style={{ color: '#00f2fe', marginLeft: 'auto' }}>✓</span> : null}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>No platforms available yet — YouTube is coming soon</div>
-                        )}
-                    </div>
-                    {selectedPlatforms.length > 0 ? (
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        {selectedPlatforms.map(p => (
-                          <Badge key={p} appearance="outline" color="informative">{p}</Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>Select at least one platform to continue.</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3 — Connect Platforms */}
+              {/* STEP 1 — Channel Ready */}
               {currentStep.id === 'connect' && (
-                <div data-testid="dma-step-panel-connect" className="dma-wizard-canvas-body-inner">
+                <div className="dma-wizard-step-content" data-testid="dma-step-panel-connect">
                   <div className="dma-wizard-platform-connect-list">
 
                     {/* YouTube */}
@@ -1673,7 +1540,7 @@ export function DigitalMarketingActivationWizard({
                 </div>
               )}
 
-              {/* STEP 4 — Build Master Theme */}
+              {/* STEP 2 — Build Master Theme */}
               {currentStep.id === 'theme' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-theme">
                   <div style={{ display: 'grid', gap: '1.75rem' }}>
