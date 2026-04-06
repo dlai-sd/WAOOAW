@@ -37,6 +37,7 @@ PROXY_LOG="/tmp/cloud-sql-proxy.log"
 INSTANCE_NAME="${WAOOAW_CLOUDSQL_INSTANCE_NAME:-plant-sql-${TARGET_ENV}}"
 INSTANCE="${PROJECT_ID}:${REGION}:${INSTANCE_NAME}"
 PROXY_PORT="${WAOOAW_CLOUDSQL_PROXY_PORT:-15432}"
+PROXY_ADDRESS="${WAOOAW_CLOUDSQL_PROXY_ADDRESS:-0.0.0.0}"
 DATABASE_URL_SECRET="${WAOOAW_DB_URL_SECRET:-${TARGET_ENV}-plant-database-url}"
 
 # ── 1. Auth ──────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ sleep 1
 
 "$PROXY_BIN" \
     --credentials-file="$KEY_FILE" \
+    --address="${PROXY_ADDRESS}" \
     "$INSTANCE" \
     --port="${PROXY_PORT}" \
     > "$PROXY_LOG" 2>&1 &
@@ -91,7 +93,7 @@ PROXY_PID=$!
 sleep 4
 
 if kill -0 "$PROXY_PID" 2>/dev/null && grep -q "ready for new connections" "$PROXY_LOG"; then
-    echo "✅ Cloud SQL Proxy listening on 127.0.0.1:${PROXY_PORT} (PID ${PROXY_PID})"
+    echo "✅ Cloud SQL Proxy listening on ${PROXY_ADDRESS}:${PROXY_PORT} (PID ${PROXY_PID})"
 else
     echo "❌ Cloud SQL Proxy failed to start — check $PROXY_LOG"
     cat "$PROXY_LOG" || true

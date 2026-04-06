@@ -104,14 +104,14 @@ function AppContent() {
           <Route path="/" element={
             isLoading ? (
               <>
-                <Header theme={theme} toggleTheme={toggleTheme} />
+                <Header theme={theme} toggleTheme={toggleTheme} variant="landing" />
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem 1rem' }}>
                   <Spinner size="large" />
                 </div>
               </>
             ) : !isAuthenticated ? (
               <>
-                <Header theme={theme} toggleTheme={toggleTheme} />
+                <Header theme={theme} toggleTheme={toggleTheme} variant="landing" />
                 <LandingPage />
               </>
             ) : (

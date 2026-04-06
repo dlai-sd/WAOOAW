@@ -73,7 +73,7 @@ function getEnvironmentConfig(): EnvironmentConfig {
       name: 'codespace',
       apiBaseUrl: `${currentUrl}/api`,
       frontendUrl: currentUrl,
-      googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+      googleClientId: (runtime.googleClientId || '').trim() || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
     }
   }
   
