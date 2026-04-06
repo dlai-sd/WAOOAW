@@ -181,10 +181,10 @@ EXECUTION ORDER:
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
 **Prerequisite evidence:**
-- Iteration 1 merge status: `PENDING HUMAN UPDATE BEFORE LAUNCH`
-- Iteration 1 PR: `TBD after Iteration 1 PR is opened`
-- Merge commit on `main`: `TBD after Iteration 1 merge`
-- Merged at: `TBD after Iteration 1 merge`
+- Iteration 1 merge status: `MERGED`
+- Iteration 1 PR: `#1020`
+- Merge commit on `main`: `29a18ad735f8f7d8aa368e467ac8f4b0fb5038eb`
+- Merged at: `2026-04-06T21:22:59+05:30`
 
 **Verify merge first:** use the prerequisite evidence block above as the source of truth. If it is still marked pending or missing a merged PR number and merge commit, do not launch Iteration 2.
 
@@ -200,7 +200,7 @@ Activate these personas NOW. Begin each epic with:
   "Acting as a [persona], I will [what] by [approach]."
 
 PLAN FILE: docs/CP/iterations/DMA-YT-VALUE-1-my-agents-dma-youtube-value.md
-YOUR SCOPE: Iteration 2 only — Epics E4, E5. Do not touch other iteration content.
+YOUR SCOPE: Iteration 2 only — Epic E4. Do not touch other iteration content.
 TIME BUDGET: 3.0h.
 
 ENVIRONMENT REQUIREMENT:
@@ -791,7 +791,7 @@ cd src/CP/FrontEnd && npx vitest run src/test/MyAgents.test.tsx
 **Lane:** B (new backend support required in Plant)
 **⏱ Estimated:** 3.0h | **Come back:** 2026-04-08 13:00 UTC
 **Prerequisite:** Iteration 1 PR merged to `main`
-**Epics:** E4, E5
+**Epics:** E4
 
 > **Backend-first rule:** All S1 backend stories must be committed to `main` before their paired frontend story starts.
 

@@ -240,6 +240,8 @@ async def test_validate_customer_platform_credential_maps_validation_result(mock
         recent_long_video_count=35,
         subscriber_count=1200,
         view_count=54000,
+        recent_uploads=[],
+        next_action_hint="connected_ready",
     )
 
     with patch(
