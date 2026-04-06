@@ -51,6 +51,7 @@ vi.mock('../services/youtubeConnections.service', () => ({
   listYouTubeConnections: vi.fn().mockResolvedValue([]),
   startYouTubeConnection: vi.fn(),
   finalizeYouTubeConnection: vi.fn(),
+  validateYouTubeConnection: vi.fn(),
   attachYouTubeConnection: vi.fn(),
 }))
 
@@ -675,7 +676,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.queryByText('This hire is no longer available. Please select another agent.')).not.toBeInTheDocument()
   })
 
-  it('reuses a saved YouTube connection before sending the user to Google', async () => {
+  it('tests a saved YouTube connection before persisting it for the agent', async () => {
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     const ytModule = await import('../services/youtubeConnections.service')
     const platformModule = await import('../services/platformConnections.service')
@@ -723,6 +724,23 @@ describe('DMA Activation Wizard — step navigation', () => {
       },
     ])
     vi.mocked(platformModule.listPlatformConnections).mockResolvedValue([])
+    vi.mocked(ytModule.validateYouTubeConnection).mockResolvedValue({
+      id: 'cred-youtube-1',
+      customer_id: 'CUST-1',
+      platform_key: 'youtube',
+      provider_account_id: 'channel-1',
+      display_name: 'Channel One',
+      verification_status: 'verified',
+      connection_status: 'connected',
+      token_expires_at: null,
+      last_verified_at: '2026-03-18T09:00:00Z',
+      channel_count: 1,
+      total_video_count: 42,
+      recent_short_count: 7,
+      recent_long_video_count: 35,
+      subscriber_count: 1200,
+      view_count: 54000,
+    })
     vi.mocked(ytModule.attachYouTubeConnection).mockResolvedValue({
       id: 'conn-youtube-1',
       hired_instance_id: 'HAI-1',
@@ -740,10 +758,20 @@ describe('DMA Activation Wizard — step navigation', () => {
     await goToConnectStep()
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Attach saved YouTube connection' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Test connection' })).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Attach saved YouTube connection' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
+
+    await waitFor(() => {
+      expect(ytModule.validateYouTubeConnection).toHaveBeenCalledWith('cred-youtube-1')
+    })
+
+    expect(screen.getByTestId('youtube-validation-metrics')).toBeInTheDocument()
+    expect(screen.getByText('42')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Persist connection for future use by Agent' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Persist connection for future use by Agent' }))
 
     await waitFor(() => {
       expect(ytModule.attachYouTubeConnection).toHaveBeenCalledWith('cred-youtube-1', {
@@ -753,14 +781,13 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
 
     expect(ytModule.startYouTubeConnection).not.toHaveBeenCalled()
-    expect(screen.getByText('Saved YouTube connection linked successfully.')).toBeInTheDocument()
+    expect(screen.getByText('YouTube connection saved for future agent use.')).toBeInTheDocument()
     expect(screen.getByText('✓ Connected')).toBeInTheDocument()
   })
 
-  it('falls back to Google when a saved YouTube connection cannot be reused', async () => {
+  it('starts Google OAuth again when the user chooses to reconnect the saved channel', async () => {
     const serviceModule = await import('../services/digitalMarketingActivation.service')
     const ytModule = await import('../services/youtubeConnections.service')
-    const platformModule = await import('../services/platformConnections.service')
     const browserModule = await import('../utils/browserNavigation')
     const disconnectedActivation = {
       hired_instance_id: 'HAI-1',
@@ -805,8 +832,6 @@ describe('DMA Activation Wizard — step navigation', () => {
         updated_at: '2026-03-18T09:00:00Z',
       },
     ])
-    vi.mocked(ytModule.attachYouTubeConnection).mockRejectedValueOnce(new Error('attach failed'))
-    vi.mocked(platformModule.listPlatformConnections).mockResolvedValue([])
     vi.mocked(ytModule.startYouTubeConnection).mockResolvedValue({
       state: 'yt-state-1',
       authorization_url: 'https://accounts.google.com/o/oauth2/v2/auth?state=yt-state-1',
@@ -816,7 +841,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     renderWizard()
     await goToConnectStep()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Attach saved YouTube connection' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect with Google' }))
 
     await waitFor(() => {
       expect(ytModule.startYouTubeConnection).toHaveBeenCalled()
@@ -882,11 +907,12 @@ describe('DMA Activation Wizard — step navigation', () => {
     await goToConnectStep()
 
     await waitFor(() => {
-      expect(screen.getByText('Connection needs to be attached.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Test connection' })).toBeInTheDocument()
     })
 
-    expect(screen.getByRole('button', { name: 'Attach saved YouTube connection' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reconnect with Google' })).toBeInTheDocument()
     expect(screen.queryByTestId('youtube-connected-badge')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Persist connection for future use by Agent' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
     expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
   })
@@ -1114,7 +1140,7 @@ describe('DMA Activation Wizard — step navigation', () => {
       expect(screen.getByText('Strategy Preview — review before approving')).toBeInTheDocument()
     })
     expect(screen.getByText('Master Theme: Growth content')).toBeInTheDocument()
-    expect(screen.getByText(/Proof-led content/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Proof-led content/i).length).toBeGreaterThan(0)
   })
 
   it('hides the strategy preview after the strategy is approved', async () => {

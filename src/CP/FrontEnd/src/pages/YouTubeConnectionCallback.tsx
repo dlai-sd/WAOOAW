@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/auth.service'
-import { attachYouTubeConnection, finalizeYouTubeConnection } from '../services/youtubeConnections.service'
+import { finalizeYouTubeConnection } from '../services/youtubeConnections.service'
 import {
   clearPendingYouTubeOAuthContext,
   getStoredYouTubeOAuthState,
@@ -59,14 +59,6 @@ export default function YouTubeConnectionCallback() {
           redirect_uri: context.redirectUri,
         })
 
-        if (context.hiredInstanceId && context.skillId) {
-          setStatus('Attaching your channel...')
-          await attachYouTubeConnection(connection.id, {
-            hired_instance_id: context.hiredInstanceId,
-            skill_id: context.skillId,
-          })
-        }
-
         if (cancelled) return
 
         storeYouTubeOAuthResult({
@@ -75,7 +67,7 @@ export default function YouTubeConnectionCallback() {
           subscriptionId: context.subscriptionId,
           hiredInstanceId: context.hiredInstanceId,
           connection,
-          message: `Connected ${connection.display_name || 'YouTube channel'}`,
+          message: `Connected ${connection.display_name || 'YouTube channel'}. Test the connection before saving it for the agent.`,
         })
         clearPendingYouTubeOAuthContext()
         navigate(context.returnTo, { replace: true })

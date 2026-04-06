@@ -6,12 +6,15 @@ from typing import Any
 from urllib.parse import urlencode
 import os
 import secrets
+import re
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from integrations.social.base import SocialPlatformError
+from integrations.social.youtube_client import YouTubeClient
 from models.customer_platform_credential import CustomerPlatformCredentialModel
 from models.oauth_connection_session import OAuthConnectionSessionModel
 from models.platform_connection import PlatformConnectionModel
@@ -33,6 +36,17 @@ class StartConnectResult:
 class FinalizedCredentialResult:
     credential: CustomerPlatformCredentialModel
     secret_ref: str
+
+
+@dataclass(frozen=True)
+class ValidatedCredentialResult:
+    credential: CustomerPlatformCredentialModel
+    channel_count: int
+    total_video_count: int
+    recent_short_count: int
+    recent_long_video_count: int
+    subscriber_count: int
+    view_count: int
 
 
 class YouTubeConnectionService:
@@ -63,6 +77,19 @@ class YouTubeConnectionService:
     def _ensure_oauth_configured(self) -> None:
         if not self._oauth_client_id() or not self._oauth_client_secret():
             raise YouTubeConnectionError("youtube_oauth_not_configured")
+
+    def _parse_iso8601_duration_seconds(self, raw_duration: str) -> int | None:
+        match = re.fullmatch(
+            r"P(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?",
+            raw_duration,
+        )
+        if not match:
+            return None
+
+        hours = int(match.group(1) or 0)
+        minutes = int(match.group(2) or 0)
+        seconds = int(match.group(3) or 0)
+        return hours * 3600 + minutes * 60 + seconds
 
     async def start_connect(self, *, customer_id: str, redirect_uri: str) -> StartConnectResult:
         self._ensure_oauth_configured()
@@ -249,6 +276,112 @@ class YouTubeConnectionService:
         await self._db.commit()
         await self._db.refresh(connection)
         return connection
+
+    async def validate_connection(
+        self,
+        *,
+        customer_id: str,
+        credential_id: str,
+    ) -> ValidatedCredentialResult:
+        credential = await self.get_credential(customer_id=customer_id, credential_id=credential_id)
+        if credential is None:
+            raise YouTubeConnectionError("customer_platform_credential_not_found")
+
+        client = YouTubeClient(customer_id=customer_id, credential_resolver=self._credential_resolver)
+
+        try:
+            access_token = await client._get_access_token(credential.secret_ref)
+            channel_payload = await client._make_api_call_with_retry(
+                endpoint="/channels",
+                method="GET",
+                access_token=access_token,
+                params={"part": "snippet,statistics,contentDetails", "mine": "true"},
+                credential_ref=credential.secret_ref,
+            )
+        except SocialPlatformError as exc:
+            raise YouTubeConnectionError(exc.message) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise YouTubeConnectionError(f"Failed to validate YouTube credentials: {exc}") from exc
+
+        items = channel_payload.get("items") or []
+        if not items:
+            raise YouTubeConnectionError("No YouTube channel found for credentials")
+
+        primary_channel = dict(items[0])
+        snippet = primary_channel.get("snippet") or {}
+        statistics = primary_channel.get("statistics") or {}
+        content_details = primary_channel.get("contentDetails") or {}
+        related_playlists = content_details.get("relatedPlaylists") or {}
+        uploads_playlist_id = str(related_playlists.get("uploads") or "").strip()
+
+        recent_short_count = 0
+        recent_long_video_count = 0
+        if uploads_playlist_id:
+            try:
+                playlist_payload = await client._make_api_call_with_retry(
+                    endpoint="/playlistItems",
+                    method="GET",
+                    access_token=access_token,
+                    params={
+                        "part": "contentDetails",
+                        "playlistId": uploads_playlist_id,
+                        "maxResults": "50",
+                    },
+                    credential_ref=credential.secret_ref,
+                )
+                video_ids = [
+                    str(item.get("contentDetails", {}).get("videoId") or "").strip()
+                    for item in (playlist_payload.get("items") or [])
+                ]
+                video_ids = [video_id for video_id in video_ids if video_id]
+                if video_ids:
+                    videos_payload = await client._make_api_call_with_retry(
+                        endpoint="/videos",
+                        method="GET",
+                        access_token=access_token,
+                        params={
+                            "part": "contentDetails",
+                            "id": ",".join(video_ids),
+                            "maxResults": "50",
+                        },
+                        credential_ref=credential.secret_ref,
+                    )
+                    for video in (videos_payload.get("items") or []):
+                        duration_raw = str(video.get("contentDetails", {}).get("duration") or "").strip()
+                        if not duration_raw:
+                            continue
+                        duration_seconds = self._parse_iso8601_duration_seconds(duration_raw)
+                        if duration_seconds is None:
+                            continue
+                        if duration_seconds <= 60:
+                            recent_short_count += 1
+                        else:
+                            recent_long_video_count += 1
+            except SocialPlatformError as exc:
+                raise YouTubeConnectionError(exc.message) from exc
+            except Exception:
+                # Non-critical enrichment failure: keep validation successful with core channel stats.
+                recent_short_count = 0
+                recent_long_video_count = 0
+
+        now = datetime.now(timezone.utc)
+        credential.display_name = str(snippet.get("title") or credential.display_name or "YouTube Channel")
+        credential.verification_status = "verified"
+        credential.connection_status = "connected"
+        credential.last_verified_at = now
+        credential.updated_at = now
+        await self._db.commit()
+        await self._db.refresh(credential)
+
+        return ValidatedCredentialResult(
+            credential=credential,
+            channel_count=len(items),
+            total_video_count=int(statistics.get("videoCount") or 0),
+            recent_short_count=recent_short_count,
+            recent_long_video_count=recent_long_video_count,
+            subscriber_count=int(statistics.get("subscriberCount") or 0),
+            view_count=int(statistics.get("viewCount") or 0),
+        )
 
     async def _get_pending_session(self, *, customer_id: str, state: str) -> OAuthConnectionSessionModel:
         result = await self._db.execute(

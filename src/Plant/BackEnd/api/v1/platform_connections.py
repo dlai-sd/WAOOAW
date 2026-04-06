@@ -101,6 +101,28 @@ class AttachCustomerCredentialRequest(BaseModel):
     platform_key: str = "youtube"
 
 
+class ValidateCustomerCredentialRequest(BaseModel):
+    customer_id: str
+
+
+class ValidateCustomerCredentialResponse(BaseModel):
+    id: str
+    customer_id: str
+    platform_key: str
+    provider_account_id: Optional[str] = None
+    display_name: Optional[str] = None
+    verification_status: str
+    connection_status: str
+    token_expires_at: Optional[datetime] = None
+    last_verified_at: Optional[datetime] = None
+    channel_count: int
+    total_video_count: int
+    recent_short_count: int
+    recent_long_video_count: int
+    subscriber_count: int
+    view_count: int
+
+
 def _optional_string(value: object) -> Optional[str]:
     if value is None:
         return None
@@ -148,6 +170,29 @@ def _to_customer_credential_response(
     )
 
 
+def _to_validated_customer_credential_response(
+    result,
+) -> ValidateCustomerCredentialResponse:
+    credential = result.credential
+    return ValidateCustomerCredentialResponse(
+        id=credential.id,
+        customer_id=credential.customer_id,
+        platform_key=credential.platform_key,
+        provider_account_id=credential.provider_account_id,
+        display_name=credential.display_name,
+        verification_status=credential.verification_status,
+        connection_status=credential.connection_status,
+        token_expires_at=credential.token_expires_at,
+        last_verified_at=credential.last_verified_at,
+        channel_count=result.channel_count,
+        total_video_count=result.total_video_count,
+        recent_short_count=result.recent_short_count,
+        recent_long_video_count=result.recent_long_video_count,
+        subscriber_count=result.subscriber_count,
+        view_count=result.view_count,
+    )
+
+
 def _raise_youtube_connection_error(exc: YouTubeConnectionError) -> None:
     detail = str(exc)
     if detail == "youtube_oauth_not_configured":
@@ -159,6 +204,11 @@ def _raise_youtube_connection_error(exc: YouTubeConnectionError) -> None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="YouTube credential vault is unavailable.",
+        ) from exc
+    if detail == "customer_platform_credential_not_found":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="YouTube credential not found.",
         ) from exc
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail) from exc
 
@@ -347,6 +397,26 @@ async def attach_customer_platform_credential(
     except YouTubeConnectionError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return _to_response(connection)
+
+
+@customer_router.post(
+    "/{credential_id}/validate",
+    response_model=ValidateCustomerCredentialResponse,
+)
+async def validate_customer_platform_credential(
+    credential_id: str,
+    body: ValidateCustomerCredentialRequest,
+    db: AsyncSession = Depends(get_db_session),
+) -> ValidateCustomerCredentialResponse:
+    service = YouTubeConnectionService(db=db)
+    try:
+        result = await service.validate_connection(
+            customer_id=body.customer_id,
+            credential_id=credential_id,
+        )
+    except YouTubeConnectionError as exc:
+        _raise_youtube_connection_error(exc)
+    return _to_validated_customer_credential_response(result)
 
 
 @router.delete(
