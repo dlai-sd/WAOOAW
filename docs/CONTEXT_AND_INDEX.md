@@ -872,6 +872,31 @@ debug/<description>           # Investigation branches
 6. Terraform apply (creates/updates Cloud Run services + LB)
 ```
 
+### Codespaces prebuilt-tag promotion flow
+
+Use this when validating locally in Codespaces first, then promoting the same exact images to demo.
+
+```bash
+bash .devcontainer/gcp-auth.sh
+bash scripts/codespace-stack.sh bootstrap-env
+bash scripts/codespace-stack.sh up all
+
+export IMAGE_TAG="$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)"
+bash scripts/codespace-build-push.sh --tag "${IMAGE_TAG}"
+
+# Then dispatch WAOOAW Promote Prebuilt Tag with environment=demo and image_tag=${IMAGE_TAG}
+```
+
+Canonical references:
+
+| Surface | Path |
+|---|---|
+| Local Docker stack control | `scripts/codespace-stack.sh` |
+| Demo-aligned env bootstrap | `scripts/codespace-demo-env.sh` |
+| Build + push immutable images from Codespaces | `scripts/codespace-build-push.sh` |
+| Promotion runbook | `docs/runbooks/codespaces-prebuilt-tag-promotion.md` |
+| Promotion workflow | `.github/workflows/waooaw-promote-prebuilt-tag.yml` |
+
 ### Component → Docker image mapping
 
 | Component | Dockerfile | Image name |
@@ -2204,6 +2229,9 @@ Use this shortlist when the task is broader than runtime routes.
 | `generate_test_report.py` | Test report generator |
 | `validate_github_script_blocks.py` | Script validation |
 | `deploy-gateway.sh` | Gateway deployment script |
+| `codespace-demo-env.sh` | Creates `.codespace/demo.env` from GCP secrets for Codespaces runtime validation |
+| `codespace-stack.sh` | Docker Compose wrapper for Codespaces local runtime (`bootstrap-env`, `up`, `restart`, `doctor`, `urls`) |
+| `codespace-build-push.sh` | Buildx wrapper that builds and pushes immutable CP/PP/Plant image tags to Artifact Registry |
 
 ### cloud/terraform/ — Infrastructure as Code
 
@@ -2327,6 +2355,21 @@ pytest tests/ -v
 1. Go to GitHub Actions → "WAOOAW Deploy" → Run workflow
 2. Select environment (demo/uat/prod)
 3. Select terraform_action (plan first, then apply)
+
+### Codespaces fast local-to-demo loop
+```bash
+bash .devcontainer/gcp-auth.sh
+bash scripts/codespace-stack.sh bootstrap-env
+bash scripts/codespace-stack.sh up all
+
+export IMAGE_TAG="$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)"
+bash scripts/codespace-build-push.sh --tag "${IMAGE_TAG}"
+```
+
+Then run the `WAOOAW Promote Prebuilt Tag` workflow with:
+- `environment=demo`
+- `terraform_action=plan` then `apply`
+- `image_tag=${IMAGE_TAG}`
 
 ### Check service health
 ```bash
