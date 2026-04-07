@@ -21,26 +21,6 @@ export default function YouTubeConnectionCallback() {
   useEffect(() => {
     let cancelled = false
 
-    const buildCompletionMessage = (connection: any) => {
-      const statusValue = String(connection?.connection_status || '').trim().toLowerCase()
-      const label = connection?.display_name || 'Google account'
-      const suggestedChannelName = connection?.suggested_channel_name || 'Empower'
-
-      if (statusValue === 'connected_no_channel') {
-        return `Connected ${label}. No YouTube channel exists on this account yet. Create a new channel named ${suggestedChannelName}, then test the connection again when you're ready.`
-      }
-
-      return `Connected ${connection.display_name || 'YouTube channel'}. Test the connection before saving it for the agent.`
-    }
-
-    const mapFinalizeError = (caughtError: any) => {
-      const rawMessage = String(caughtError?.message || '').trim()
-      if (rawMessage === 'youtube_channel_not_found') {
-        return 'Google account connected, but no YouTube channel exists on this account yet. Create a channel named Empower and then test the connection again.'
-      }
-      return rawMessage || 'The YouTube connection could not be completed. Please try again.'
-    }
-
     const finalizeCallback = async () => {
       const params = new URLSearchParams(window.location.search)
       const oauthError = params.get('error')
@@ -87,13 +67,13 @@ export default function YouTubeConnectionCallback() {
           subscriptionId: context.subscriptionId,
           hiredInstanceId: context.hiredInstanceId,
           connection,
-          message: buildCompletionMessage(connection),
+          message: `Connected ${connection.display_name || 'YouTube channel'}. Test the connection before saving it for the agent.`,
         })
         clearPendingYouTubeOAuthContext()
         navigate(context.returnTo, { replace: true })
       } catch (caughtError: any) {
         if (cancelled) return
-        setError(mapFinalizeError(caughtError))
+        setError(caughtError?.message || 'The YouTube connection could not be completed. Please try again.')
       }
     }
 

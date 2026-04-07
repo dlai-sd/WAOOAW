@@ -1125,7 +1125,7 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
 
     return youtubeCredentials.find((connection) => {
       const status = String(connection.connection_status || '').trim().toLowerCase()
-      return status === 'connected' || status === 'connected_no_channel' || status === 'reconnect_required' || status === 'needs_attention'
+      return status === 'connected' || status === 'reconnect_required' || status === 'needs_attention'
     }) || null
   }, [attachedYouTubeConnection?.customer_platform_credential_id, youtubeCredentials])
 
@@ -1177,17 +1177,6 @@ function GoalSettingPanel(props: { instance: MyAgentInstanceSummary; readOnly: b
           ? `${labelPrefix} last verified on ${lastVerified} and now needs attention before uploads can resume.`
           : `${labelPrefix} needs to be reconnected before uploads can resume.`,
         tone: 'danger' as const,
-        isReady: false,
-        connection: attached,
-      }
-    }
-
-    if (credentialStatus === 'connected_no_channel') {
-      return {
-        platformKey: 'youtube',
-        label: `${labelPrefix} channel missing`,
-        message: `${labelPrefix} is a saved Google account, but it does not have a YouTube channel yet. Create a channel named ${attachedCredential?.suggested_channel_name || 'Empower'} and then test the connection again.`,
-        tone: 'warning' as const,
         isReady: false,
         connection: attached,
       }

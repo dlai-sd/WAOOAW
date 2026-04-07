@@ -32,12 +32,6 @@ describe('YouTubeConnectionCallback', () => {
 
     vi.spyOn(authModule.authService, 'isAuthenticated').mockReturnValue(false)
     vi.spyOn(authModule.authService, 'silentRefresh').mockResolvedValue('restored-token')
-    vi.spyOn(authModule.authService, 'getCurrentUser').mockResolvedValue({
-      id: 'user-1',
-      email: 'test@example.com',
-      provider: 'google',
-      created_at: '2026-03-30T00:00:00Z',
-    } as any)
 
     vi.spyOn(globalThis, 'fetch' as any).mockImplementation(async (input: any) => {
       const url = String(input)
@@ -106,82 +100,5 @@ describe('YouTubeConnectionCallback', () => {
     expect(result?.source).toBe('hire-setup')
     expect(result?.connection.display_name).toBe('Clinic Channel')
     expect(result?.message).toContain('Connected Clinic Channel')
-  })
-
-  it('stores a no-channel completion message when the Google account is saved without a channel', async () => {
-    const authModule = await import('../services/auth.service')
-    const youtubeModule = await import('../services/youtubeConnections.service')
-
-    vi.spyOn(authModule.authService, 'isAuthenticated').mockReturnValue(true)
-    vi.spyOn(authModule.authService, 'getAccessToken').mockReturnValue('existing-token')
-    vi.spyOn(authModule.authService, 'silentRefresh').mockResolvedValue('existing-token')
-    vi.spyOn(authModule.authService, 'getCurrentUser').mockResolvedValue({
-      id: 'user-1',
-      email: 'test@example.com',
-      provider: 'google',
-      created_at: '2026-03-30T00:00:00Z',
-    } as any)
-
-    vi.spyOn(globalThis, 'fetch' as any).mockImplementation(async (input: any) => {
-      const url = String(input)
-      if (url.endsWith('/auth/me')) {
-        return new Response(JSON.stringify({
-          id: 'user-1',
-          email: 'test@example.com',
-          provider: 'google',
-          created_at: '2026-03-30T00:00:00Z',
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      }
-      return new Response(JSON.stringify({ detail: 'not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    })
-
-    vi.mocked(youtubeModule.finalizeYouTubeConnection).mockResolvedValue({
-      id: 'cred-yt-2',
-      customer_id: 'cust-1',
-      platform_key: 'youtube',
-      display_name: 'Owner',
-      granted_scopes: ['youtube.readonly'],
-      verification_status: 'google_account_verified',
-      connection_status: 'connected_no_channel',
-      suggested_channel_name: 'Empower',
-      create_channel_url: 'https://www.youtube.com/create_channel',
-      created_at: '2026-03-30T00:00:00Z',
-      updated_at: '2026-03-30T00:00:00Z',
-    })
-
-    beginYouTubeOAuthFlow({
-      state: 'oauth-state-2',
-      source: 'hire-setup',
-      returnTo: '/hire/setup/SUB-1?step=3&focus=youtube',
-      redirectUri: 'http://localhost/auth/youtube/callback',
-      subscriptionId: 'SUB-1',
-    })
-
-    window.history.replaceState({}, '', '/auth/youtube/callback?code=auth-code-2&state=oauth-state-2')
-
-    render(
-      <FluentProvider theme={waooawLightTheme}>
-        <MemoryRouter initialEntries={['/auth/youtube/callback?code=auth-code-2&state=oauth-state-2']}>
-          <AuthProvider>
-            <Routes>
-              <Route path="/auth/youtube/callback" element={<YouTubeConnectionCallback />} />
-              <Route path="/hire/setup/:subscriptionId" element={<div data-testid="resume-target">Resume target</div>} />
-            </Routes>
-          </AuthProvider>
-        </MemoryRouter>
-      </FluentProvider>
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('resume-target')).toBeInTheDocument()
-    })
-
-    const result = readYouTubeOAuthResult()
-    expect(result?.connection.connection_status).toBe('connected_no_channel')
-    expect(result?.message).toContain('No YouTube channel exists on this account yet')
-    expect(result?.message).toContain('Empower')
   })
 })
