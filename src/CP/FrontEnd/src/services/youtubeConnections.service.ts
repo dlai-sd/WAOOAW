@@ -49,6 +49,13 @@ export type AttachYouTubeConnectionResponse = {
   updated_at: string
 }
 
+export type RecentUploadPreview = {
+  video_id: string
+  title: string
+  published_at: string
+  duration_seconds: number
+}
+
 export type ValidateYouTubeConnectionResponse = {
   id: string
   customer_id: string
@@ -57,9 +64,6 @@ export type ValidateYouTubeConnectionResponse = {
   display_name?: string | null
   verification_status: string
   connection_status: string
-  next_action_hint?: string | null
-  suggested_channel_name?: string | null
-  create_channel_url?: string | null
   token_expires_at?: string | null
   last_verified_at?: string | null
   channel_count: number
@@ -68,6 +72,10 @@ export type ValidateYouTubeConnectionResponse = {
   recent_long_video_count: number
   subscriber_count: number
   view_count: number
+  recent_uploads: RecentUploadPreview[]
+  next_action_hint?: string | null
+  suggested_channel_name?: string | null
+  create_channel_url?: string | null
 }
 
 export async function startYouTubeConnection(redirectUri: string): Promise<StartYouTubeConnectionResponse> {

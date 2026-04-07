@@ -1281,6 +1281,7 @@ describe('MyAgents Component', () => {
       recent_long_video_count: 35,
       subscriber_count: 1200,
       view_count: 54000,
+      recent_uploads: [],
     })
     vi.mocked(youtubeModule.attachYouTubeConnection).mockResolvedValueOnce({
       id: 'CONN-PERSIST',

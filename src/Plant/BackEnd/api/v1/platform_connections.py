@@ -108,6 +108,13 @@ class ValidateCustomerCredentialRequest(BaseModel):
     customer_id: str
 
 
+class RecentUploadPreviewResponse(BaseModel):
+    video_id: str
+    title: str
+    published_at: str
+    duration_seconds: int
+
+
 class ValidateCustomerCredentialResponse(BaseModel):
     id: str
     customer_id: str
@@ -116,9 +123,6 @@ class ValidateCustomerCredentialResponse(BaseModel):
     display_name: Optional[str] = None
     verification_status: str
     connection_status: str
-    next_action_hint: Optional[str] = None
-    suggested_channel_name: Optional[str] = None
-    create_channel_url: Optional[str] = None
     token_expires_at: Optional[datetime] = None
     last_verified_at: Optional[datetime] = None
     channel_count: int
@@ -127,6 +131,10 @@ class ValidateCustomerCredentialResponse(BaseModel):
     recent_long_video_count: int
     subscriber_count: int
     view_count: int
+    recent_uploads: List[RecentUploadPreviewResponse]
+    next_action_hint: Optional[str] = None
+    suggested_channel_name: Optional[str] = None
+    create_channel_url: Optional[str] = None
 
 
 def _optional_string(value: object) -> Optional[str]:
@@ -191,7 +199,7 @@ def _to_validated_customer_credential_response(
         display_name=credential.display_name,
         verification_status=credential.verification_status,
         connection_status=credential.connection_status,
-        next_action_hint=_youtube_next_action_hint(credential.connection_status),
+        next_action_hint=result.next_action_hint,
         suggested_channel_name=_youtube_suggested_channel_name(credential.connection_status),
         create_channel_url=_youtube_create_channel_url(credential.connection_status),
         token_expires_at=credential.token_expires_at,
@@ -202,6 +210,15 @@ def _to_validated_customer_credential_response(
         recent_long_video_count=result.recent_long_video_count,
         subscriber_count=result.subscriber_count,
         view_count=result.view_count,
+        recent_uploads=[
+            RecentUploadPreviewResponse(
+                video_id=preview.video_id,
+                title=preview.title,
+                published_at=preview.published_at,
+                duration_seconds=preview.duration_seconds,
+            )
+            for preview in result.recent_uploads
+        ],
     )
 
 
