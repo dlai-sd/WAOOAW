@@ -387,16 +387,6 @@ export default function HireSetupWizard() {
     if (!isMarketingAgent) return
     let cancelled = false
 
-    const buildConnectionStatusMessage = (connection: any) => {
-      const status = String(connection?.connection_status || '').trim().toLowerCase()
-      if (status === 'connected_no_channel') {
-        return `${connection?.display_name || 'This Google account'} is saved, but no YouTube channel exists yet. Create a channel named ${connection?.suggested_channel_name || 'Empower'} before continuing.`
-      }
-      return connection
-        ? `${connection.display_name || 'This channel'} needs to be reconnected before continuing.`
-        : 'Reconnect YouTube before continuing.'
-    }
-
     const loadConnections = async () => {
       try {
         const rows = await listYouTubeConnections()
@@ -405,7 +395,11 @@ export default function HireSetupWizard() {
         const currentSelection = rows.find((row) => row.id === selectedYouTubeConnectionId)
         if (selectedYouTubeConnectionId && (!currentSelection || currentSelection.connection_status !== 'connected')) {
           setMarketingPlatforms((prev) => removeMarketingPlatformConfig(prev, 'youtube'))
-          setYouTubeConnectStatus(buildConnectionStatusMessage(currentSelection))
+          setYouTubeConnectStatus(
+            currentSelection
+              ? `${currentSelection.display_name || 'This channel'} needs to be reconnected before continuing.`
+              : 'Reconnect YouTube before continuing.'
+          )
         }
         if (!selectedYouTubeConnectionId || !currentSelection) {
           const connected = rows.find((row) => row.connection_status === 'connected')
@@ -430,17 +424,15 @@ export default function HireSetupWizard() {
 
     clearYouTubeOAuthResult()
     setSelectedYouTubeConnectionId(result.connection.id)
-    if (result.connection.connection_status === 'connected') {
-      setMarketingPlatform('youtube')
-      setMarketingPlatforms((prev) =>
-        upsertMarketingPlatformConfig(prev, {
-          platform: 'youtube',
-          customer_platform_credential_id: result.connection.id,
-          display_name: result.connection.display_name || 'YouTube Channel',
-          posting_identity: result.connection.display_name || undefined,
-        })
-      )
-    }
+    setMarketingPlatform('youtube')
+    setMarketingPlatforms((prev) =>
+      upsertMarketingPlatformConfig(prev, {
+        platform: 'youtube',
+        customer_platform_credential_id: result.connection.id,
+        display_name: result.connection.display_name || 'YouTube Channel',
+        posting_identity: result.connection.display_name || undefined,
+      })
+    )
     setYouTubeConnectStatus(result.message)
   }, [isMarketingAgent, subscriptionId])
 
