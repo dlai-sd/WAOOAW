@@ -9,6 +9,9 @@ export type YouTubeConnection = {
   granted_scopes: string[]
   verification_status: string
   connection_status: string
+  next_action_hint?: string | null
+  suggested_channel_name?: string | null
+  create_channel_url?: string | null
   token_expires_at?: string | null
   last_verified_at?: string | null
   created_at: string
@@ -71,6 +74,8 @@ export type ValidateYouTubeConnectionResponse = {
   view_count: number
   recent_uploads: RecentUploadPreview[]
   next_action_hint: string
+  suggested_channel_name?: string | null
+  create_channel_url?: string | null
 }
 
 export async function startYouTubeConnection(redirectUri: string): Promise<StartYouTubeConnectionResponse> {

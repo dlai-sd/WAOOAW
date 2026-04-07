@@ -56,8 +56,10 @@ export function DigitalMarketingChannelStatusCard(props: DigitalMarketingChannel
   const credential = props.credential
   const hasSavedCredential = Boolean(credential?.id)
   const isAttached = Boolean(summary.connection)
-  const shouldShowPersist = Boolean(props.canPersistConnection && hasSavedCredential && !isAttached)
+  const channelReady = String(props.validationResult?.connection_status || credential?.connection_status || '').trim().toLowerCase() === 'connected'
+  const shouldShowPersist = Boolean(props.canPersistConnection && hasSavedCredential && !isAttached && channelReady)
   const connectLabel = hasSavedCredential ? 'Reconnect with Google' : 'Connect YouTube'
+  const accountOnly = String(credential?.connection_status || '').trim().toLowerCase() === 'connected_no_channel'
 
   return (
     <Container {...containerProps}>
@@ -70,8 +72,8 @@ export function DigitalMarketingChannelStatusCard(props: DigitalMarketingChannel
       {credential ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground3)', marginBottom: '4px' }}>Channel</div>
-            <div style={{ fontWeight: 600 }}>{credential.display_name || 'Saved YouTube channel'}</div>
+            <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground3)', marginBottom: '4px' }}>{accountOnly ? 'Google account' : 'Channel'}</div>
+            <div style={{ fontWeight: 600 }}>{credential.display_name || (accountOnly ? 'Saved Google account' : 'Saved YouTube channel')}</div>
           </div>
           <div>
             <div style={{ fontSize: '12px', color: 'var(--colorNeutralForeground3)', marginBottom: '4px' }}>Credential state</div>
@@ -155,6 +157,20 @@ export function DigitalMarketingChannelStatusCard(props: DigitalMarketingChannel
 
       {props.actionMessage ? (
         <div style={{ fontSize: '13px', color: 'var(--colorNeutralForeground2)' }}>{props.actionMessage}</div>
+      ) : null}
+
+      {accountOnly ? (
+        <div style={{ fontSize: '13px', color: 'var(--colorNeutralForeground2)' }}>
+          No YouTube channel exists on this account yet. Create a channel named {credential?.suggested_channel_name || 'Empower'}, then test the connection again.
+          {credential?.create_channel_url ? (
+            <>
+              {' '}
+              <a href={credential.create_channel_url} target="_blank" rel="noreferrer">
+                Create YouTube channel
+              </a>
+            </>
+          ) : null}
+        </div>
       ) : null}
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
