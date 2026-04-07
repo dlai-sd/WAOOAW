@@ -1,4 +1,4 @@
-import { Badge, Button, Card, CardHeader, Spinner, Text, Input, Textarea } from '@fluentui/react-components'
+import { Badge, Button, Card, Spinner, Text, Input, Textarea } from '@fluentui/react-components'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
@@ -58,10 +58,10 @@ import {
 const DIGITAL_MARKETING_AGENT_TYPE_ID = 'marketing.digital_marketing.v1'
 
 const DMA_STEPS = [
-  { id: 'connect',   title: 'Channel Ready',        description: 'Connect or confirm the YouTube channel.' },
-  { id: 'theme',     title: 'Brief Chat',           description: 'Guide the customer to a usable YouTube direction.' },
-  { id: 'schedule',  title: 'Plan',                 description: 'Confirm posting rhythm only after the brief is coherent.' },
-  { id: 'activate',  title: 'Review & Activate',    description: 'Show exactly what is ready and what is blocked.' },
+  { id: 'connect',   title: 'Channel Ready',        description: 'Anchor this hire to the exact YouTube identity it should work through.' },
+  { id: 'theme',     title: 'Brief Chat',           description: 'Brief the DMA like a strategist and approve the direction it extracts.' },
+  { id: 'schedule',  title: 'Plan',                 description: 'Confirm the publishing rhythm once the strategy feels right.' },
+  { id: 'activate',  title: 'Review & Activate',    description: 'Review the brief, channel state, and activation blockers in one place.' },
 ] as const
 
 const PLATFORM_OPTIONS = [
@@ -286,6 +286,35 @@ function getYouTubeNextActionCopy(nextActionHint: string | null | undefined): st
     return 'Connected and ready — your DMA can access this channel'
   }
   return null
+}
+
+function buildDmaIntroduction(options: {
+  brandName: string
+  businessLabel: string
+  location: string
+  customerProfile: string
+  goal: string
+}): string {
+  const brandName = String(options.brandName || '').trim()
+  const businessLabel = String(options.businessLabel || '').trim() || brandName || 'your business'
+  const location = String(options.location || '').trim()
+  const customerProfile = String(options.customerProfile || '').trim()
+  const goal = String(options.goal || '').trim()
+
+  const businessDescriptor = brandName && businessLabel !== brandName
+    ? `${businessLabel} for ${brandName}`
+    : businessLabel
+  const locationDescriptor = location ? `, located in ${location}` : ''
+  const audienceDescriptor = customerProfile ? `, serving ${customerProfile}` : ''
+  const goalDescriptor = goal
+    ? ` My working objective is to turn that into content that supports ${goal}.`
+    : ' My working objective is to turn that into content your customers trust, engage with, and act on.'
+
+  return `Let me introduce myself quickly. I am your Digital Marketing Agent from WAOOAW. Based on what I know so far, I understand your business is ${businessDescriptor}${locationDescriptor}${audienceDescriptor}.${goalDescriptor} I will tighten the brief with you, connect the right channel, and only move to drafts after you approve the direction.`
+}
+
+function formatBusinessSnapshot(value: string, fallback: string): string {
+  return String(value || '').trim() || fallback
 }
 
 function parseListTextarea(value: string): string[] {
@@ -661,6 +690,135 @@ export function DigitalMarketingActivationWizard({
     if (parseListTextarea(offeringsText).length === 0) items.push('offerings and services')
     return items
   }, [brandName, location, offeringsText, primaryLanguage, timezone])
+  const offeringsList = useMemo(() => parseListTextarea(offeringsText), [offeringsText])
+  const businessLabel = useMemo(() => {
+    return formatBusinessSnapshot(
+      String(strategySummary.profession_name || strategySummary.service_focus || strategySummary.business_focus || brandName).trim(),
+      'Waiting for business type',
+    )
+  }, [brandName, strategySummary.business_focus, strategySummary.profession_name, strategySummary.service_focus])
+  const locationLabel = useMemo(() => {
+    return formatBusinessSnapshot(
+      String(strategySummary.location_focus || location).trim(),
+      'Waiting for service area',
+    )
+  }, [location, strategySummary.location_focus])
+  const audienceLabel = useMemo(() => {
+    return formatBusinessSnapshot(
+      String(strategySummary.customer_profile || strategySummary.audience).trim(),
+      'Waiting for target customers',
+    )
+  }, [strategySummary.audience, strategySummary.customer_profile])
+  const serviceFocusLabel = useMemo(() => {
+    return formatBusinessSnapshot(
+      String(strategySummary.service_focus || strategySummary.business_focus || offeringsList[0] || '').trim(),
+      'Waiting for core offer',
+    )
+  }, [offeringsList, strategySummary.business_focus, strategySummary.service_focus])
+  const differentiatorLabel = useMemo(() => {
+    return formatBusinessSnapshot(
+      String(strategySummary.signature_differentiator || strategySummary.positioning).trim(),
+      'Waiting for differentiation',
+    )
+  }, [strategySummary.positioning, strategySummary.signature_differentiator])
+  const goalLabel = useMemo(() => {
+    return formatBusinessSnapshot(
+      String(strategySummary.business_goal || businessContext).trim(),
+      'Waiting for the business goal',
+    )
+  }, [businessContext, strategySummary.business_goal])
+  const firstDirectionLabel = useMemo(() => {
+    return formatBusinessSnapshot(
+      String(strategySummary.first_content_direction || strategySummary.youtube_angle || masterTheme).trim(),
+      'Waiting for the first content direction',
+    )
+  }, [masterTheme, strategySummary.first_content_direction, strategySummary.youtube_angle])
+  const dmaIntroduction = useMemo(() => {
+    return buildDmaIntroduction({
+      brandName,
+      businessLabel,
+      location: String(strategySummary.location_focus || location || '').trim(),
+      customerProfile: String(strategySummary.customer_profile || strategySummary.audience || '').trim(),
+      goal: String(strategySummary.business_goal || businessContext || '').trim(),
+    })
+  }, [brandName, businessContext, businessLabel, location, strategySummary.audience, strategySummary.business_goal, strategySummary.customer_profile, strategySummary.location_focus])
+  const progressPercent = Math.max(10, Math.min(100, Math.round((completedMilestones / 5) * 100)))
+  const operatingChecklist = useMemo(() => ([
+    {
+      label: 'YouTube identity attached',
+      ok: !selectedPlatforms.includes('youtube') || isYouTubeAttached,
+    },
+    {
+      label: 'Business brief understood',
+      ok: readiness.brief_complete || missingProfileFields.length === 0,
+    },
+    {
+      label: 'Strategy approved',
+      ok: isThemeApproved,
+    },
+    {
+      label: 'Publishing plan confirmed',
+      ok: Boolean(scheduleStartDate.trim()),
+    },
+  ]), [isThemeApproved, isYouTubeAttached, missingProfileFields.length, readiness.brief_complete, scheduleStartDate, selectedPlatforms])
+  const stageCoachCopy = useMemo(() => {
+    if (currentStep.id === 'connect') {
+      return 'This step is only about identity. Once the correct YouTube channel is attached, the DMA can work through the right publishing surface.'
+    }
+    if (currentStep.id === 'theme') {
+      return 'Treat this like a strategist conversation, not a long form. Short, direct answers are enough because the DMA is extracting the brief live.'
+    }
+    if (currentStep.id === 'schedule') {
+      return 'Set cadence only after the direction is solid. A good schedule protects consistency; it should not compensate for a weak brief.'
+    }
+    return 'This final review is meant to remove surprises. If anything feels unclear here, go back and tighten the brief before activation.'
+  }, [currentStep.id])
+  const nextActionCopy = useMemo(() => {
+    if (currentStep.id === 'connect') {
+      return isYouTubeAttached
+        ? 'The channel identity is attached. Continue into the brief so I can shape the first content direction.'
+        : 'Connect and test the YouTube channel you want me to operate so I can work on the correct publishing identity.'
+    }
+    if (currentStep.id === 'theme') {
+      return isThemeApproved
+        ? 'The strategic direction is approved. Move to planning so we can lock the publishing rhythm.'
+        : 'Give me the sharpest possible answer to the next question. I will turn that into a tighter business brief and first content direction.'
+    }
+    if (currentStep.id === 'schedule') {
+      return scheduleStartDate.trim()
+        ? 'The schedule is set. Review activation readiness before turning this hire fully on.'
+        : 'Choose when the first publishing cycle should start and how often this hire should post.'
+    }
+    if (readiness.can_finalize) {
+      return 'Everything required for activation is in place. Review the brief on the right, then activate the DMA.'
+    }
+    if (readiness.missing_requirements?.length) {
+      return `Resolve these blockers before activation: ${readiness.missing_requirements.join(', ')}.`
+    }
+    return 'Review the brief and readiness checks, then activate when the business direction feels correct.'
+  }, [currentStep.id, isThemeApproved, isYouTubeAttached, readiness.can_finalize, readiness.missing_requirements, scheduleStartDate])
+  const stageStateLabel = useMemo(() => {
+    if (currentStep.id === 'connect') return isYouTubeAttached ? 'Channel attached' : 'Waiting for channel'
+    if (currentStep.id === 'theme') return isThemeApproved ? 'Strategy approved' : 'Conversation in progress'
+    if (currentStep.id === 'schedule') return scheduleStartDate.trim() ? 'Cadence set' : 'Cadence needed'
+    return readiness.can_finalize ? 'Ready to activate' : 'Review blockers'
+  }, [currentStep.id, isThemeApproved, isYouTubeAttached, readiness.can_finalize, scheduleStartDate])
+
+  useEffect(() => {
+    if (currentStep.id === 'connect') {
+      setActiveMilestone('prepare')
+      return
+    }
+    if (currentStep.id === 'theme') {
+      setActiveMilestone('theme')
+      return
+    }
+    if (currentStep.id === 'schedule') {
+      setActiveMilestone('schedule')
+      return
+    }
+    setActiveMilestone('induct')
+  }, [currentStep.id])
 
   const saveActivationWorkspaceWithRecovery = async (
     initialHiredInstanceId: string,
@@ -1411,11 +1569,31 @@ export function DigitalMarketingActivationWizard({
   return (
     <div className="dma-wizard-page">
       <div className="dma-wizard-shell">
-        {/* LEFT RAIL */}
-        <aside className="dma-wizard-rail">
-          <Card className="dma-wizard-rail-card">
-            <Text as="h2" size={500} weight="semibold">Activation steps</Text>
-            <div className="dma-wizard-step-list">
+        <section className="dma-wizard-main">
+          <Card className="dma-wizard-main-card">
+            <div className="dma-wizard-hero" data-testid="dma-conversation-hero">
+              <div className="dma-wizard-hero-copy">
+                <div className="dma-wizard-section-label">Digital Marketing Agent</div>
+                <Text as="h2" size={700} weight="semibold">Let&apos;s grow this business with content your customers trust</Text>
+                <Text as="p" size={400} data-testid="dma-introduction-copy">{dmaIntroduction}</Text>
+              </div>
+              <div className="dma-wizard-hero-stats">
+                <div className="dma-wizard-hero-stat-card">
+                  <span>Progress</span>
+                  <strong>{completedMilestones}/5 signals locked</strong>
+                  <div className="dma-wizard-progress-strip" aria-hidden="true">
+                    <div className="dma-wizard-progress-fill" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                </div>
+                <div className="dma-wizard-hero-stat-card">
+                  <span>Current state</span>
+                  <strong>{stageStateLabel}</strong>
+                  <div className="dma-wizard-hero-stat-meta">Milestone: {activeMilestone}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="dma-wizard-step-list dma-wizard-step-list--horizontal" data-testid="dma-journey-strip">
               {DMA_STEPS.map((step, index) => {
                 const isActive = index === activeStepIndex
                 const isDone = index < activeStepIndex
@@ -1437,27 +1615,32 @@ export function DigitalMarketingActivationWizard({
                 )
               })}
             </div>
-          </Card>
-        </aside>
 
-        {/* CANVAS */}
-        <section className="dma-wizard-canvas">
-          <Card className="dma-wizard-canvas-card">
-            {/* STICKY HEADER */}
-            <div className="dma-wizard-canvas-header">
-              <CardHeader
-                className="dma-wizard-canvas-header-card"
-                header={
-                  <div>
-                    <Text as="h2" size={600} weight="semibold">{currentStep.title}</Text>
-                    <Text as="p" size={300}>{currentStep.description}</Text>
-                  </div>
-                }
-              />
-            </div>
+            <div className="dma-wizard-main-body">
+              <div className="dma-wizard-stage-header">
+                <div className="dma-wizard-stage-copy">
+                  <div className="dma-wizard-section-label">Current focus</div>
+                  <Text as="h3" size={600} weight="semibold">{currentStep.title}</Text>
+                  <Text as="p" size={300}>{currentStep.description}</Text>
+                </div>
+                <div className="dma-wizard-stage-actions">
+                  <Badge appearance="outline" color={currentStep.id === 'activate' && readiness.can_finalize ? 'success' : 'informative'}>
+                    {stageStateLabel}
+                  </Badge>
+                  <Button appearance="subtle" size="small" onClick={() => setShowHelp((current) => !current)}>
+                    {showHelp ? 'Hide guidance' : 'Show guidance'}
+                  </Button>
+                </div>
+              </div>
 
-            {/* SCROLLABLE BODY */}
-            <div className="dma-wizard-canvas-body">
+              {showHelp ? (
+                <div className="dma-wizard-copy-card" data-testid="dma-coach-copy">
+                  <div className="dma-wizard-section-label">Why this stage matters</div>
+                  <div>{stageCoachCopy}</div>
+                </div>
+              ) : null}
+
+              <div className="dma-wizard-canvas-body">
 
               {/* STEP 1 — Channel Ready */}
               {currentStep.id === 'connect' && (
@@ -2062,8 +2245,7 @@ export function DigitalMarketingActivationWizard({
 
             </div>
 
-            {/* STICKY FOOTER — Back / Continue / Activate */}
-            <div className="dma-wizard-action-bar">
+              <div className="dma-wizard-action-bar">
               <div className="dma-wizard-action-bar-left">
                 <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
               </div>
@@ -2094,8 +2276,68 @@ export function DigitalMarketingActivationWizard({
                 )}
               </div>
             </div>
+            </div>
           </Card>
         </section>
+
+        <aside className="dma-wizard-brief-panel">
+          <Card className="dma-wizard-brief-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
+              <div>
+                <div className="dma-wizard-section-label">Live business brief</div>
+                <Text as="h3" size={500} weight="semibold">What the DMA understands so far</Text>
+              </div>
+              <Badge appearance="outline" color={readiness.can_finalize ? 'success' : 'warning'}>
+                {readiness.can_finalize ? 'Activation ready' : 'Still shaping'}
+              </Badge>
+            </div>
+
+            <div className="dma-wizard-brief-summary" data-testid="dma-live-brief">
+              <div className="dma-wizard-brief-summary-card"><span>Business</span><strong>{businessLabel}</strong></div>
+              <div className="dma-wizard-brief-summary-card"><span>Location</span><strong>{locationLabel}</strong></div>
+              <div className="dma-wizard-brief-summary-card"><span>Target customers</span><strong>{audienceLabel}</strong></div>
+              <div className="dma-wizard-brief-summary-card"><span>Core offer</span><strong>{serviceFocusLabel}</strong></div>
+              <div className="dma-wizard-brief-summary-card"><span>Differentiator</span><strong>{differentiatorLabel}</strong></div>
+              <div className="dma-wizard-brief-summary-card"><span>First content direction</span><strong>{firstDirectionLabel}</strong></div>
+            </div>
+          </Card>
+
+          <Card className="dma-wizard-brief-card">
+            <div className="dma-wizard-section-label">Business objective</div>
+            <Text as="p" size={300}>{goalLabel}</Text>
+            {(strategySummary.content_pillars || []).length > 0 ? (
+              <div className="dma-wizard-pill-list">
+                {(strategySummary.content_pillars || []).map((pillar, index) => (
+                  <Badge key={`${pillar}-${index}`} appearance="filled" color="informative">{pillar}</Badge>
+                ))}
+              </div>
+            ) : null}
+          </Card>
+
+          <Card className="dma-wizard-brief-card">
+            <div className="dma-wizard-section-label">Operating status</div>
+            <div className="dma-wizard-status-list">
+              {operatingChecklist.map((item) => (
+                <div key={item.label} className={`dma-wizard-status-item${item.ok ? ' is-done' : ''}`}>
+                  <span>{item.label}</span>
+                  <Badge appearance="outline" color={item.ok ? 'success' : 'warning'}>
+                    {item.ok ? 'Ready' : 'Pending'}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="dma-wizard-brief-card">
+            <div className="dma-wizard-section-label">Next action</div>
+            <Text as="p" size={300} data-testid="dma-next-action-copy">{nextActionCopy}</Text>
+            {missingProfileFields.length > 0 ? (
+              <div className="dma-wizard-copy-card dma-wizard-copy-card--compact">
+                Missing brief details: {missingProfileFields.join(', ')}.
+              </div>
+            ) : null}
+          </Card>
+        </aside>
       </div>
     </div>
   )
@@ -2132,7 +2374,16 @@ export function StrategyPreviewPanel({
 
   if (!hasPreview) {
     if (strictPreviewMode) return null
-    if (!summary) return null
+    if (!summary) {
+      return (
+        <Card style={{ padding: '1rem', marginBottom: '1rem', background: 'var(--colorNeutralBackground3)' }}>
+          <div style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.7, marginBottom: '0.5rem' }}>
+            Strategy Preview
+          </div>
+          <div>No strategy generated yet.</div>
+        </Card>
+      )
+    }
 
     return (
       <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #333', borderRadius: '0.75rem', background: '#1a1a1a' }}>

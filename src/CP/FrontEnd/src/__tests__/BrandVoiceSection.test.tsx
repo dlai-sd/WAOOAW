@@ -25,6 +25,22 @@ vi.mock('../services/brandVoice.service', () => ({
   updateBrandVoice: updateBrandVoiceMock,
 }))
 
+vi.mock('../services/profile.service', () => ({
+  getProfile: vi.fn(async () => ({
+    id: 'user-1',
+    email: 'test@example.com',
+    business_name: 'WAOOAW',
+    location: 'Mumbai',
+    timezone: 'Asia/Kolkata',
+    primary_language: 'English',
+  })),
+  updateProfile: vi.fn(async (payload) => ({
+    id: 'user-1',
+    email: 'test@example.com',
+    ...payload,
+  })),
+}))
+
 vi.mock('../services/hiredAgents.service', () => ({
   getHiredAgentBySubscription: vi.fn(async () => ({
     hired_instance_id: 'hire_1',
@@ -177,7 +193,7 @@ describe('Brand voice section', () => {
       />
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /Build Master Theme/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /Brief Chat/i }))
 
     await waitFor(() => {
       expect(screen.getByText('Brand Voice')).toBeInTheDocument()
