@@ -132,7 +132,7 @@ class ValidateCustomerCredentialResponse(BaseModel):
     subscriber_count: int
     view_count: int
     recent_uploads: List[RecentUploadPreviewResponse]
-    next_action_hint: Optional[str] = None
+    next_action_hint: str
     suggested_channel_name: Optional[str] = None
     create_channel_url: Optional[str] = None
 

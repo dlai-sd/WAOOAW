@@ -73,7 +73,7 @@ export type ValidateYouTubeConnectionResponse = {
   subscriber_count: number
   view_count: number
   recent_uploads: RecentUploadPreview[]
-  next_action_hint?: string | null
+  next_action_hint: string
   suggested_channel_name?: string | null
   create_channel_url?: string | null
 }
