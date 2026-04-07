@@ -88,6 +88,9 @@ class CustomerPlatformCredentialResponse(BaseModel):
     granted_scopes: list[str]
     verification_status: str
     connection_status: str
+    next_action_hint: Optional[str] = None
+    suggested_channel_name: Optional[str] = None
+    create_channel_url: Optional[str] = None
     token_expires_at: Optional[datetime] = None
     last_verified_at: Optional[datetime] = None
     created_at: datetime
@@ -113,6 +116,9 @@ class ValidateCustomerCredentialResponse(BaseModel):
     display_name: Optional[str] = None
     verification_status: str
     connection_status: str
+    next_action_hint: Optional[str] = None
+    suggested_channel_name: Optional[str] = None
+    create_channel_url: Optional[str] = None
     token_expires_at: Optional[datetime] = None
     last_verified_at: Optional[datetime] = None
     channel_count: int
@@ -163,6 +169,9 @@ def _to_customer_credential_response(
         granted_scopes=list(credential.granted_scopes or []),
         verification_status=credential.verification_status,
         connection_status=credential.connection_status,
+        next_action_hint=_youtube_next_action_hint(credential.connection_status),
+        suggested_channel_name=_youtube_suggested_channel_name(credential.connection_status),
+        create_channel_url=_youtube_create_channel_url(credential.connection_status),
         token_expires_at=credential.token_expires_at,
         last_verified_at=credential.last_verified_at,
         created_at=credential.created_at,
@@ -182,6 +191,9 @@ def _to_validated_customer_credential_response(
         display_name=credential.display_name,
         verification_status=credential.verification_status,
         connection_status=credential.connection_status,
+        next_action_hint=_youtube_next_action_hint(credential.connection_status),
+        suggested_channel_name=_youtube_suggested_channel_name(credential.connection_status),
+        create_channel_url=_youtube_create_channel_url(credential.connection_status),
         token_expires_at=credential.token_expires_at,
         last_verified_at=credential.last_verified_at,
         channel_count=result.channel_count,
@@ -191,6 +203,29 @@ def _to_validated_customer_credential_response(
         subscriber_count=result.subscriber_count,
         view_count=result.view_count,
     )
+
+
+def _youtube_next_action_hint(connection_status: str | None) -> Optional[str]:
+    normalized = str(connection_status or "").strip().lower()
+    if normalized == "connected_no_channel":
+        return "create_channel_empower"
+    if normalized == "connected":
+        return "connected_ready"
+    return None
+
+
+def _youtube_suggested_channel_name(connection_status: str | None) -> Optional[str]:
+    normalized = str(connection_status or "").strip().lower()
+    if normalized == "connected_no_channel":
+        return YouTubeConnectionService.suggested_channel_name
+    return None
+
+
+def _youtube_create_channel_url(connection_status: str | None) -> Optional[str]:
+    normalized = str(connection_status or "").strip().lower()
+    if normalized == "connected_no_channel":
+        return "https://www.youtube.com/create_channel"
+    return None
 
 
 def _raise_youtube_connection_error(exc: YouTubeConnectionError) -> None:

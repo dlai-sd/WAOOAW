@@ -52,8 +52,13 @@ class ValidatedCredentialResult:
 class YouTubeConnectionService:
     auth_base_url = "https://accounts.google.com/o/oauth2/v2/auth"
     token_url = "https://oauth2.googleapis.com/token"
+    userinfo_url = "https://openidconnect.googleapis.com/v1/userinfo"
     channels_url = "https://www.googleapis.com/youtube/v3/channels"
+    suggested_channel_name = "Empower"
     scopes = [
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/youtube.upload",
         "https://www.googleapis.com/auth/youtube.force-ssl",
@@ -146,15 +151,30 @@ class YouTubeConnectionService:
         if not access_token or not refresh_token:
             raise YouTubeConnectionError("missing_google_tokens")
 
-        channel = await self._fetch_channel(access_token=access_token)
-        provider_account_id = str(channel.get("id") or "").strip()
-        if not provider_account_id:
-            raise YouTubeConnectionError("missing_youtube_channel")
-
-        channel_snippet = channel.get("snippet") or {}
+        account_profile = await self._fetch_google_account_profile(access_token=access_token)
+        channels = await self._fetch_channels(access_token=access_token)
         expires_in = int(token_payload.get("expires_in") or 3600)
         token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
         granted_scopes = sorted(set(str(token_payload.get("scope") or "").split()))
+
+        if channels:
+            primary_channel = dict(channels[0])
+            channel_snippet = primary_channel.get("snippet") or {}
+            provider_account_id = str(primary_channel.get("id") or "").strip()
+            if not provider_account_id:
+                raise YouTubeConnectionError("missing_youtube_channel")
+            display_name = str(channel_snippet.get("title") or "YouTube Channel")
+            posting_identity = display_name
+            verification_status = "verified"
+            connection_status = "connected"
+        else:
+            provider_account_id, display_name = self._derive_google_account_identity(
+                customer_id=customer_id,
+                account_profile=account_profile,
+            )
+            posting_identity = display_name
+            verification_status = "google_account_verified"
+            connection_status = "connected_no_channel"
 
         existing_credential = await self._find_credential_by_provider_account(
             customer_id=customer_id,
@@ -170,13 +190,17 @@ class YouTubeConnectionService:
             stored_secret = await self._credential_resolver.upsert(
                 customer_id=customer_id,
                 platform="youtube",
-                posting_identity=str(channel_snippet.get("title") or "YouTube Channel"),
+                posting_identity=posting_identity,
                 access_token=access_token,
                 refresh_token=refresh_token,
                 credential_ref=existing_ref,
                 metadata={
                     "provider_account_id": provider_account_id,
                     "token_expires_at": token_expires_at.isoformat(),
+                    "has_youtube_channel": "true" if channels else "false",
+                    "suggested_channel_name": self.suggested_channel_name,
+                    "google_account_email": str(account_profile.get("email") or "").strip(),
+                    "google_account_name": str(account_profile.get("name") or "").strip(),
                 },
             )
         except CredentialResolutionError as exc:
@@ -185,10 +209,13 @@ class YouTubeConnectionService:
         credential = await self._upsert_customer_credential(
             customer_id=customer_id,
             provider_account_id=provider_account_id,
-            display_name=str(channel_snippet.get("title") or "YouTube Channel"),
+            display_name=display_name,
             granted_scopes=granted_scopes,
             secret_ref=stored_secret.credential_ref,
             token_expires_at=token_expires_at,
+            verification_status=verification_status,
+            connection_status=connection_status,
+            last_verified_at=datetime.now(timezone.utc),
         )
 
         now = datetime.now(timezone.utc)
@@ -305,7 +332,23 @@ class YouTubeConnectionService:
 
         items = channel_payload.get("items") or []
         if not items:
-            raise YouTubeConnectionError("No YouTube channel found for credentials")
+            now = datetime.now(timezone.utc)
+            credential.verification_status = "google_account_verified"
+            credential.connection_status = "connected_no_channel"
+            credential.last_verified_at = now
+            credential.updated_at = now
+            await self._db.commit()
+            await self._db.refresh(credential)
+
+            return ValidatedCredentialResult(
+                credential=credential,
+                channel_count=0,
+                total_video_count=0,
+                recent_short_count=0,
+                recent_long_video_count=0,
+                subscriber_count=0,
+                view_count=0,
+            )
 
         primary_channel = dict(items[0])
         snippet = primary_channel.get("snippet") or {}
@@ -365,6 +408,7 @@ class YouTubeConnectionService:
                 recent_long_video_count = 0
 
         now = datetime.now(timezone.utc)
+        credential.provider_account_id = str(primary_channel.get("id") or credential.provider_account_id or "").strip() or credential.provider_account_id
         credential.display_name = str(snippet.get("title") or credential.display_name or "YouTube Channel")
         credential.verification_status = "verified"
         credential.connection_status = "connected"
@@ -413,7 +457,18 @@ class YouTubeConnectionService:
             raise YouTubeConnectionError("google_token_exchange_failed")
         return response.json()
 
-    async def _fetch_channel(self, *, access_token: str) -> dict[str, Any]:
+    async def _fetch_google_account_profile(self, *, access_token: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(
+                self.userinfo_url,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+        if response.status_code != 200:
+            return {}
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {}
+
+    async def _fetch_channels(self, *, access_token: str) -> list[dict[str, Any]]:
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(
                 self.channels_url,
@@ -424,9 +479,15 @@ class YouTubeConnectionService:
             raise YouTubeConnectionError("youtube_channel_lookup_failed")
         payload = response.json()
         items = payload.get("items") or []
-        if not items:
-            raise YouTubeConnectionError("youtube_channel_not_found")
-        return dict(items[0])
+        return [dict(item) for item in items if isinstance(item, dict)]
+
+    def _derive_google_account_identity(self, *, customer_id: str, account_profile: dict[str, Any]) -> tuple[str, str]:
+        google_sub = str(account_profile.get("sub") or "").strip()
+        google_email = str(account_profile.get("email") or "").strip()
+        google_name = str(account_profile.get("name") or "").strip()
+        provider_account_id = f"google-account:{google_sub or google_email or customer_id}"
+        display_name = google_name or google_email or "Google Account"
+        return provider_account_id, display_name
 
     async def _upsert_customer_credential(
         self,
@@ -437,6 +498,9 @@ class YouTubeConnectionService:
         granted_scopes: list[str],
         secret_ref: str,
         token_expires_at: datetime,
+        verification_status: str,
+        connection_status: str,
+        last_verified_at: datetime | None,
     ) -> CustomerPlatformCredentialModel:
         result = await self._db.execute(
             select(CustomerPlatformCredentialModel)
@@ -453,11 +517,11 @@ class YouTubeConnectionService:
                 provider_account_id=provider_account_id,
                 display_name=display_name,
                 granted_scopes=granted_scopes,
-                verification_status="verified",
-                connection_status="connected",
+                verification_status=verification_status,
+                connection_status=connection_status,
                 secret_ref=secret_ref,
                 token_expires_at=token_expires_at,
-                last_verified_at=now,
+                last_verified_at=last_verified_at,
                 created_at=now,
                 updated_at=now,
             )
@@ -465,11 +529,11 @@ class YouTubeConnectionService:
         else:
             credential.display_name = display_name
             credential.granted_scopes = granted_scopes
-            credential.verification_status = "verified"
-            credential.connection_status = "connected"
+            credential.verification_status = verification_status
+            credential.connection_status = connection_status
             credential.secret_ref = secret_ref
             credential.token_expires_at = token_expires_at
-            credential.last_verified_at = now
+            credential.last_verified_at = last_verified_at
             credential.updated_at = now
         await self._db.flush()
         return credential

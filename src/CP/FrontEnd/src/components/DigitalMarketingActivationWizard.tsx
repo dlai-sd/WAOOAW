@@ -375,11 +375,30 @@ export function DigitalMarketingActivationWizard({
     return String(binding?.skill_id || 'default').trim() || 'default'
   }, [activation?.workspace?.platform_bindings])
 
+  function getYouTubeConnectionStatus(value: { connection_status?: string | null } | null | undefined): string {
+    return String(value?.connection_status || '').trim().toLowerCase()
+  }
+
+  function hasVerifiedYouTubeChannel(value: { connection_status?: string | null } | null | undefined): boolean {
+    return getYouTubeConnectionStatus(value) === 'connected'
+  }
+
+  function isReusableYouTubeCredential(connection: YouTubeConnection): boolean {
+    const status = getYouTubeConnectionStatus(connection)
+    return status === 'connected' || status === 'connected_no_channel'
+  }
+
+  function youtubeAccountHint(connection: Pick<YouTubeConnection, 'connection_status' | 'suggested_channel_name' | 'display_name'> | null | undefined): string | null {
+    if (getYouTubeConnectionStatus(connection) !== 'connected_no_channel') return null
+    const suggestedChannelName = connection?.suggested_channel_name || 'Empower'
+    return `${connection?.display_name || 'This Google account'} is saved, but no YouTube channel exists yet. Create a new channel named ${suggestedChannelName}, then run Test connection again.`
+  }
+
   function pickReusableYouTubeConnection(connections: YouTubeConnection[]): YouTubeConnection | null {
     const now = Date.now()
     for (const connection of connections) {
       if (String(connection.platform_key || '').toLowerCase() !== 'youtube') continue
-      if (String(connection.connection_status || '').toLowerCase() !== 'connected') continue
+      if (!isReusableYouTubeCredential(connection)) continue
       const tokenExpiry = connection.token_expires_at ? Date.parse(connection.token_expires_at) : Number.NaN
       if (Number.isFinite(tokenExpiry) && tokenExpiry <= now) continue
       return connection
@@ -855,7 +874,13 @@ export function DigitalMarketingActivationWizard({
         }
       })
       setYoutubeConnected(true)
-      setOauthMessage(`Connection test succeeded for ${result.display_name || 'your YouTube channel'}.`)
+      if (hasVerifiedYouTubeChannel(result)) {
+        setOauthMessage(`Connection test succeeded for ${result.display_name || 'your YouTube channel'}.`)
+      } else {
+        setOauthMessage(
+          `Google account saved, but no YouTube channel exists yet. Create a channel named ${result.suggested_channel_name || 'Empower'} and test again.`
+        )
+      }
     } catch (caughtError: any) {
       setYoutubeValidationResult(null)
       setYoutubeValidationError(caughtError?.message || 'The YouTube connection test failed. Please try again.')
@@ -871,6 +896,12 @@ export function DigitalMarketingActivationWizard({
     }
     if (!youtubeValidationResult || youtubeValidationResult.id !== savedYouTubeConnection.id) {
       setOauthError('Run a successful connection test before saving it for the agent.')
+      return
+    }
+    if (!hasVerifiedYouTubeChannel(youtubeValidationResult)) {
+      setOauthError(
+        `This Google account is already saved, but no YouTube channel exists yet. Create a channel named ${youtubeValidationResult.suggested_channel_name || 'Empower'} and test again before attaching it to the agent.`
+      )
       return
     }
     if (!hiredInstanceId) {
@@ -1449,17 +1480,36 @@ export function DigitalMarketingActivationWizard({
                             data-testid="youtube-linked-channel-name"
                             style={{ fontSize: '0.85rem', color: '#10b981', marginTop: '0.2rem', display: 'block' }}
                           >
-                            Channel: {savedYouTubeConnection.display_name}
+                            {getYouTubeConnectionStatus(savedYouTubeConnection) === 'connected_no_channel' ? 'Google account' : 'Channel'}: {savedYouTubeConnection.display_name}
+                          </span>
+                        ) : null}
+                        {youtubeAccountHint(savedYouTubeConnection) ? (
+                          <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
+                            {youtubeAccountHint(savedYouTubeConnection)}{' '}
+                            {savedYouTubeConnection?.create_channel_url ? (
+                              <a href={savedYouTubeConnection.create_channel_url} target="_blank" rel="noreferrer">
+                                Create YouTube channel
+                              </a>
+                            ) : null}
                           </span>
                         ) : null}
                         {savedYouTubeConnection && savedYouTubeConnection.verification_status !== 'verified' ? (
                           <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
-                            Verification pending. Run Test connection to verify this channel.
+                            {getYouTubeConnectionStatus(savedYouTubeConnection) === 'connected_no_channel'
+                              ? `Google account verified. Create a channel named ${savedYouTubeConnection.suggested_channel_name || 'Empower'} and then run Test connection.`
+                              : 'Verification pending. Run Test connection to verify this channel.'}
                           </span>
                         ) : null}
                         {youtubeValidationResult && !isYouTubeAttached ? (
                           <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
-                            Connection tested successfully. Save it for the agent when ready.
+                            {hasVerifiedYouTubeChannel(youtubeValidationResult)
+                              ? 'Connection tested successfully. Save it for the agent when ready.'
+                              : `Google account saved. Create a channel named ${youtubeValidationResult.suggested_channel_name || 'Empower'} and test again before saving it for the agent.`}{' '}
+                            {!hasVerifiedYouTubeChannel(youtubeValidationResult) && youtubeValidationResult.create_channel_url ? (
+                              <a href={youtubeValidationResult.create_channel_url} target="_blank" rel="noreferrer">
+                                Create YouTube channel
+                              </a>
+                            ) : null}
                           </span>
                         ) : null}
                       </div>
@@ -1485,7 +1535,7 @@ export function DigitalMarketingActivationWizard({
                         >
                           {youtubeValidationLoading ? 'Testing…' : 'Test connection'}
                         </Button>
-                        {!isYouTubeAttached && youtubeValidationResult && youtubeValidationResult.id === savedYouTubeConnection?.id ? (
+                        {!isYouTubeAttached && youtubeValidationResult && youtubeValidationResult.id === savedYouTubeConnection?.id && hasVerifiedYouTubeChannel(youtubeValidationResult) ? (
                           <Button
                             appearance="outline"
                             disabled={youtubePersistLoading || readOnly}
