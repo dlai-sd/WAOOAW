@@ -188,7 +188,7 @@ async function renderThemeStep() {
     />
   )
 
-  fireEvent.click(await screen.findByRole('button', { name: /Build Master Theme/i }))
+  fireEvent.click(await screen.findByRole('button', { name: /Brief Chat/i }))
 
   await waitFor(() => {
     expect(screen.getByLabelText('Brand name')).toBeInTheDocument()

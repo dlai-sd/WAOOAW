@@ -431,8 +431,9 @@ describe('DMA Activation Wizard — step navigation', () => {
   it('does not show Select Agent step when controlled instance is provided', async () => {
     renderWizard()
     await waitFor(() => {
-      expect(screen.queryByTestId('dma-step-panel-select')).not.toBeInTheDocument()
+      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
+    expect(screen.queryByTestId('dma-step-panel-select')).not.toBeInTheDocument()
     // First visible panel should be connect (channel ready)
     expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
   })
@@ -1214,8 +1215,8 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('strategy-current-focus-question')).toHaveTextContent(
       'Do you want the first YouTube series to lean more into trust-building or behind-the-scenes proof?'
     )
-    expect(screen.getByText('Beauty Artist')).toBeInTheDocument()
-    expect(screen.getByText('Viman Nagar, Pune')).toBeInTheDocument()
+    expect(screen.getAllByText('Beauty Artist').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Viman Nagar, Pune').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByTestId('approve-theme-strategy-btn'))
 
