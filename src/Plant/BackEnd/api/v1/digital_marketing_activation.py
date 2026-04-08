@@ -188,6 +188,32 @@ def _normalize_string_list(raw_items: Any) -> list[str]:
     return [str(item or "").strip() for item in raw_items if str(item or "").strip()]
 
 
+def _complete_or_fallback_text(value: Any, fallback: str, *, max_length: int = 320) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+
+    compact = " ".join(text.split())[:max_length].strip()
+    if not compact:
+        return fallback
+
+    if compact[-1:] in {".", "!", "?"}:
+        return compact
+
+    sentence_end = max(compact.rfind("."), compact.rfind("!"), compact.rfind("?"))
+    if sentence_end >= 24:
+        return compact[: sentence_end + 1].strip()
+
+    if compact.endswith((" can we", " shall we", " should we", " let us", " let's")):
+        return fallback
+
+    last_word = compact.split(" ")[-1]
+    if len(last_word) <= 2:
+        return fallback
+
+    return compact
+
+
 def _base_workshop_summary(workspace: dict[str, Any]) -> dict[str, Any]:
     return {
         "profession_name": "",
@@ -420,12 +446,17 @@ def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
     try:
         payload = json.loads(cleaned)
     except json.JSONDecodeError:
-        return cleaned.splitlines()[0][:120] or "Digital marketing activation plan", []
+        candidate = cleaned.splitlines()[0] if cleaned.splitlines() else cleaned
+        return _complete_or_fallback_text(candidate, "Digital marketing activation plan", max_length=180), []
 
     if not isinstance(payload, dict):
         return "Digital marketing activation plan", []
 
-    master_theme = str(payload.get("master_theme") or payload.get("theme") or "Digital marketing activation plan").strip()
+    master_theme = _complete_or_fallback_text(
+        payload.get("master_theme") or payload.get("theme"),
+        "Digital marketing activation plan",
+        max_length=180,
+    )
     return master_theme or "Digital marketing activation plan", _normalize_derived_themes(payload.get("derived_themes"))
 
 
@@ -459,10 +490,13 @@ def _parse_theme_workshop_response(
         workshop = _normalize_strategy_workshop(existing_workshop, workspace)
         if pending_input:
             workshop["messages"] = [*workshop["messages"], {"role": "user", "content": pending_input}]
-        assistant_message = master_theme or fallback_message
+        assistant_message = _complete_or_fallback_text(master_theme, fallback_message)
         workshop["assistant_message"] = assistant_message
         workshop["status"] = "approval_ready" if derived_themes else "discovery"
-        workshop["checkpoint_summary"] = master_theme or "The core strategy is taking shape, but it still needs one stronger decision."
+        workshop["checkpoint_summary"] = _complete_or_fallback_text(
+            master_theme,
+            "The core strategy is taking shape, but it still needs one stronger decision.",
+        )
         workshop["current_focus_question"] = ""
         workshop["next_step_options"] = ["Approve this direction", "Sharpen the audience", "Suggest a different first angle"]
         workshop["time_saving_note"] = "I have collapsed your earlier answers into one working direction so we do not keep restating the same inputs."
@@ -472,9 +506,16 @@ def _parse_theme_workshop_response(
     if not isinstance(payload, dict):
         return _parse_theme_workshop_response("", workspace=workspace, existing_workshop=existing_workshop, pending_input=pending_input)
 
-    master_theme = str(payload.get("master_theme") or payload.get("theme") or existing_workshop.get("master_theme") or "Digital marketing activation plan").strip()
+    master_theme = _complete_or_fallback_text(
+        payload.get("master_theme") or payload.get("theme") or existing_workshop.get("master_theme"),
+        "Digital marketing activation plan",
+        max_length=180,
+    )
     derived_themes = _normalize_derived_themes(payload.get("derived_themes"))
-    assistant_message = str(payload.get("assistant_message") or "").strip() or (master_theme if derived_themes else fallback_message)
+    assistant_message = _complete_or_fallback_text(
+        payload.get("assistant_message") or (master_theme if derived_themes else fallback_message),
+        fallback_message,
+    )
     workshop = _normalize_strategy_workshop(payload.get("strategy_workshop") or payload, workspace)
 
     if pending_input:
@@ -484,8 +525,15 @@ def _parse_theme_workshop_response(
 
     workshop["assistant_message"] = assistant_message
     workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": assistant_message}]
-    workshop["checkpoint_summary"] = str(payload.get("checkpoint_summary") or workshop.get("checkpoint_summary") or "").strip()
-    workshop["current_focus_question"] = str(payload.get("current_focus_question") or workshop.get("current_focus_question") or "").strip()
+    workshop["checkpoint_summary"] = _complete_or_fallback_text(
+        payload.get("checkpoint_summary") or workshop.get("checkpoint_summary"),
+        "The core strategy is taking shape, but it still needs one stronger decision.",
+    )
+    workshop["current_focus_question"] = _complete_or_fallback_text(
+        payload.get("current_focus_question") or workshop.get("current_focus_question"),
+        "",
+        max_length=220,
+    )
     workshop["time_saving_note"] = str(payload.get("time_saving_note") or workshop.get("time_saving_note") or "").strip()
     if payload.get("next_step_options"):
         workshop["next_step_options"] = _normalize_string_list(payload.get("next_step_options"))
