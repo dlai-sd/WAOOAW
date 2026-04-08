@@ -154,7 +154,7 @@ async function renderWizard() {
   )
 
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: /Choose Platforms/i })).toBeInTheDocument()
+    expect(screen.getByText(/Channel access/i)).toBeInTheDocument()
   })
 }
 
@@ -163,9 +163,8 @@ describe('Wizard platforms', () => {
     vi.clearAllMocks()
   })
 
-  it('shows only the supported YouTube platform card', async () => {
+  it('shows only YouTube inside the channel access section', async () => {
     await renderWizard()
-    fireEvent.click(screen.getByRole('button', { name: /Choose Platforms/i }))
 
     await waitFor(() => {
       expect(screen.getByText('YouTube')).toBeInTheDocument()
@@ -176,7 +175,6 @@ describe('Wizard platforms', () => {
 
   it('does not show unavailable badges in the connect step', async () => {
     await renderWizard()
-    fireEvent.click(screen.getByRole('button', { name: /Connect Platforms/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Connect your YouTube channel/i)).toBeInTheDocument()

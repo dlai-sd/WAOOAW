@@ -193,7 +193,8 @@ describe('Brand voice section', () => {
       />
     )
 
-    fireEvent.click(await screen.findByRole('button', { name: /Brief Chat/i }))
+    fireEvent.click(await screen.findByText('Optional business context fields'))
+    fireEvent.click(await screen.findByText('Brand Voice'))
 
     await waitFor(() => {
       expect(screen.getByText('Brand Voice')).toBeInTheDocument()
@@ -219,13 +220,13 @@ describe('Brand voice section', () => {
     expect(screen.getByLabelText('Voice description')).toHaveValue('')
   })
 
-  it('saves parsed brand voice arrays on continue', async () => {
+  it('saves parsed brand voice arrays on save progress', async () => {
     await renderThemeStep()
 
     fireEvent.change(screen.getByLabelText('Voice description'), { target: { value: 'Helpful and direct' } })
     fireEvent.change(screen.getByLabelText('Tone keywords'), { target: { value: 'helpful, direct' } })
     fireEvent.change(screen.getByLabelText('Example phrases'), { target: { value: 'Line one\nLine two' } })
-    fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Save progress/i }))
 
     await waitFor(() => {
       expect(updateBrandVoiceMock).toHaveBeenCalledWith(

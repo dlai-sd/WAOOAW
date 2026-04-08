@@ -188,8 +188,6 @@ async function renderThemeStep() {
     />
   )
 
-  fireEvent.click(await screen.findByRole('button', { name: /Brief Chat/i }))
-
   await waitFor(() => {
     expect(screen.getByLabelText('Brand name')).toBeInTheDocument()
   })
@@ -244,11 +242,11 @@ describe('Wizard profile prefill', () => {
     })
   })
 
-  it('syncs profile fields on continue', async () => {
+  it('syncs profile fields on save progress', async () => {
     await renderThemeStep()
 
     fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Bengaluru' } })
-    fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Save progress/i }))
 
     await waitFor(() => {
       expect(updateProfileMock).toHaveBeenCalledWith(

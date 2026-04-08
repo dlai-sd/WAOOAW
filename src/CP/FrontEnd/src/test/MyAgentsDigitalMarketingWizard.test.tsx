@@ -170,7 +170,6 @@ async function goToConnectStep() {
 
 async function goToThemeStep() {
   await goToConnectStep()
-  fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
   await waitFor(() => {
     expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
   })
@@ -408,16 +407,16 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
   })
 
-  it('renders wizard shell with 4 outcome-led step buttons', async () => {
+  it('renders a chat-first shell with summary and all working sections visible', async () => {
     renderWizard()
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
-    const stepTitles = ['Channel Ready', 'Brief Chat', 'Plan', 'Review & Activate']
-    for (const title of stepTitles) {
-      expect(screen.getAllByText(title).length).toBeGreaterThan(0)
-    }
-    expect(screen.getByText('Now')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Chat with your DMA' })).toBeInTheDocument()
+    expect(screen.getByTestId('dma-conversation-summary')).toBeInTheDocument()
+    expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
+    expect(screen.getByTestId('dma-step-panel-schedule')).toBeInTheDocument()
+    expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
   })
 
   it('starts on the connect panel when a DMA hire is already selected', async () => {
@@ -438,38 +437,23 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
   })
 
-  it('first visible stage is productive customer outcome not internal mechanics', async () => {
+  it('opens directly in the DMA conversation instead of internal setup mechanics', async () => {
     renderWizard()
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
-    // Should show "Channel Ready" not "Select Agent" or "Induct Agent"
-    expect(screen.getByRole('button', { name: /Channel Ready/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Chat with your DMA' })).toBeInTheDocument()
+    expect(screen.getByTestId('strategy-assistant-message')).toBeInTheDocument()
   })
 
-  it('Continue and Back navigation works across reduced stage model', async () => {
+  it('keeps connect, theme, schedule, and activation sections available in one flow', async () => {
     renderWizard()
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
-    
-    // Navigate to next stage
-    const themeBtn = screen.getByText('Brief Chat').closest('button')
-    expect(themeBtn).not.toBeNull()
-    fireEvent.click(themeBtn!)
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
-    })
-    
-    // Navigate back
-    const connectBtn = screen.getByText('Channel Ready').closest('button')
-    expect(connectBtn).not.toBeNull()
-    fireEvent.click(connectBtn!)
-    
-    await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
-    })
+    expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
+    expect(screen.getByTestId('dma-step-panel-schedule')).toBeInTheDocument()
+    expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
   })
 
   it('shows activation unavailable when no DMA hire is selected', async () => {
@@ -494,12 +478,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
-    const reviewActivateBtn = screen.getByText('Review & Activate').closest('button')
-    expect(reviewActivateBtn).not.toBeNull()
-    fireEvent.click(reviewActivateBtn!)
-    await waitFor(() => {
-      expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
-    })
+    expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Activate Agent' })).toBeInTheDocument()
   })
 
@@ -538,15 +517,15 @@ describe('DMA Activation Wizard — step navigation', () => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save progress' }))
 
     await waitFor(() => {
-      expect(screen.getByText('This hire is no longer available. Please select another agent.')).toBeInTheDocument()
+      expect(onStaleReference).toHaveBeenCalledWith({ subscriptionId: 'SUB-1', hiredInstanceId: 'HAI-1' })
     })
 
     expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
-    expect(screen.queryByTestId('dma-step-panel-theme')).not.toBeInTheDocument()
-    expect(onStaleReference).toHaveBeenCalledWith({ subscriptionId: 'SUB-1', hiredInstanceId: 'HAI-1' })
+    expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
+    expect(serviceModule.upsertDigitalMarketingActivationWorkspace).toHaveBeenCalled()
   })
 
   it('re-resolves the hire by subscription and retries the save before showing a stale error', async () => {
@@ -635,7 +614,7 @@ describe('DMA Activation Wizard — step navigation', () => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save progress' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
@@ -895,7 +874,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.queryByTestId('youtube-connected-badge')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Persist connection for future use by Agent' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
-    expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
+    expect(screen.getByText('Strategy workspace')).toBeInTheDocument()
   })
 
   it('shows theme-step guidance on connect instead of any draft CTA', async () => {
@@ -970,7 +949,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
 
     expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
-    expect(screen.getByTestId('generate-youtube-draft-next-step-hint')).toBeInTheDocument()
+    expect(screen.getByText('Strategy workspace')).toBeInTheDocument()
   })
 
   it('prefills brand name from the customer profile when the activation workspace is empty', async () => {
@@ -1375,15 +1354,15 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
   })
 
-  it('shows workshop panel as the primary DMA brief interface', async () => {
+  it('shows the chat-first workshop panel as the primary DMA brief interface', async () => {
     renderWizard()
     await goToThemeStep()
 
     await waitFor(() => {
-      expect(screen.getByText('Brief your DMA hire')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Chat with your DMA' })).toBeInTheDocument()
     })
-    expect(screen.getByText('The assistant will ask only what it needs to build your first YouTube theme')).toBeInTheDocument()
-    expect(screen.getByTestId('strategy-workshop-thread')).toBeInTheDocument()
+    expect(screen.getByText('Reply to your DMA')).toBeInTheDocument()
+    expect(screen.getByTestId('dma-chat-thread')).toBeInTheDocument()
   })
 
   it('shows suggested next answers as clickable options', async () => {
@@ -1435,7 +1414,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     await goToThemeStep()
 
     await waitFor(() => {
-      expect(screen.getByText('Brief your DMA hire')).toBeInTheDocument()
+      expect(screen.getByText('Optional business context fields')).toBeInTheDocument()
     })
 
     // Dense fields should be in a collapsed section
