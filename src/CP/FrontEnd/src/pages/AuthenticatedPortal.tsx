@@ -35,6 +35,8 @@ import {
 import { isDigitalMarketingAgent } from '../services/agentSkills.service'
 import { getPlatformConnectionSummary, listPlatformConnections, type PlatformConnection } from '../services/platformConnections.service'
 
+const PORTAL_CURRENT_PAGE_STORAGE_KEY = 'cp_authenticated_portal_current_page'
+
 interface AuthenticatedPortalProps {
   theme: 'light' | 'dark'
   toggleTheme: () => void
@@ -186,7 +188,33 @@ export default function AuthenticatedPortal({
     derivedJourneyContext,
   } = portalEntryState
 
-  const [currentPage, setCurrentPage] = useState<Page>(derivedInitialPage)
+  const explicitInitialPage = portalEntry?.page ?? initialPage
+
+  const getPersistedPortalPage = (): Page | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      const saved = String(window.sessionStorage.getItem(PORTAL_CURRENT_PAGE_STORAGE_KEY) || '').trim()
+      if (!saved) return null
+      const allowedPages: Page[] = [
+        'command-centre',
+        'my-agents',
+        'goals',
+        'deliverables',
+        'inbox',
+        'billing',
+        'profile-settings',
+        'discover',
+        'agent-detail',
+        'hire-setup',
+        'hire-receipt',
+      ]
+      return allowedPages.includes(saved as Page) ? (saved as Page) : null
+    } catch {
+      return null
+    }
+  }
+
+  const [currentPage, setCurrentPage] = useState<Page>(() => explicitInitialPage || getPersistedPortalPage() || derivedInitialPage)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(derivedInitialAgentId)
@@ -200,8 +228,18 @@ export default function AuthenticatedPortal({
   const [inboxError, setInboxError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!explicitInitialPage) return
     setCurrentPage(derivedInitialPage)
-  }, [derivedInitialPage])
+  }, [derivedInitialPage, explicitInitialPage])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.sessionStorage.setItem(PORTAL_CURRENT_PAGE_STORAGE_KEY, currentPage)
+    } catch {
+      // ignore storage errors
+    }
+  }, [currentPage])
 
   useEffect(() => {
     setSelectedAgentId(derivedInitialAgentId)
