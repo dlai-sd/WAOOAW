@@ -55,6 +55,7 @@ class ActivationWorkspaceResponse(BaseModel):
 
 class ThemePlanGenerateRequest(BaseModel):
     customer_id: str | None = None
+    workspace: dict[str, Any] = Field(default_factory=dict)
     campaign_setup: dict[str, Any] = Field(default_factory=dict)
 
 

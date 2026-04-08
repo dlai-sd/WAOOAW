@@ -166,3 +166,24 @@ def test_generate_theme_plan_proxy_surfaces_upstream_failure_without_secret_leak
     assert response.json()["detail"] == "UPSTREAM_ERROR"
     assert "sk-" not in response.text
     app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+def test_generate_theme_plan_proxy_surfaces_safe_upstream_message(client, auth_headers, monkeypatch):
+    monkeypatch.setenv("PLANT_GATEWAY_URL", "http://plant-test:8000")
+    payload = {"detail": "Digital marketing theme generation failed upstream"}
+    from api.digital_marketing_activation import get_plant_gateway_client
+    from main import app
+
+    fake = _FakePlantClient(response_status=500, response_json=payload)
+    app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+    response = client.post(
+        "/api/cp/digital-marketing-activation/HAI-1/generate-theme-plan",
+        headers=auth_headers,
+        json={},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Digital marketing theme generation failed upstream"
+    app.dependency_overrides.clear()
