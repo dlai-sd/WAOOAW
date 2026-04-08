@@ -867,11 +867,35 @@ export function DigitalMarketingActivationWizard({
     }
   }
 
-  const saveWorkspace = async (): Promise<boolean> => {
+  const buildActivationWorkspacePayload = (): UpsertDigitalMarketingActivationInput => {
+    const offeringsServices = parseListTextarea(offeringsText)
+    const platformBindings = buildMarketingPlatformBindings(
+      selectedPlatforms,
+      activation?.workspace.platform_bindings,
+      'default'
+    )
+
+    return {
+      workspace: {
+        brand_name: brandName.trim(),
+        location: location.trim(),
+        primary_language: primaryLanguage.trim(),
+        timezone: timezone.trim(),
+        business_context: businessContext.trim(),
+        offerings_services: offeringsServices,
+        platforms_enabled: selectedPlatforms,
+        platform_bindings: platformBindings,
+      },
+    }
+  }
+
+  const persistWorkspaceSnapshot = async ({ updateIndicators = true }: { updateIndicators?: boolean } = {}): Promise<boolean> => {
     if (readOnly) return true
 
-    setSaveStatus('saving')
-    setSaveError(null)
+    if (updateIndicators) {
+      setSaveStatus('saving')
+      setSaveError(null)
+    }
 
     try {
       if (!activeInstance?.subscription_id || !activeInstance?.agent_id) {
@@ -887,29 +911,9 @@ export function DigitalMarketingActivationWizard({
         config: draft?.config || {},
       })
 
-      const offeringsServices = parseListTextarea(offeringsText)
-      const platformBindings = buildMarketingPlatformBindings(
-        selectedPlatforms,
-        activation?.workspace.platform_bindings,
-        'default'
-      )
-
-      const activationPayload: UpsertDigitalMarketingActivationInput = {
-        workspace: {
-          brand_name: brandName.trim(),
-          location: location.trim(),
-          primary_language: primaryLanguage.trim(),
-          timezone: timezone.trim(),
-          business_context: businessContext.trim(),
-          offerings_services: offeringsServices,
-          platforms_enabled: selectedPlatforms,
-          platform_bindings: platformBindings,
-        },
-      }
-
       const { activation: savedActivation, draft: recoveredDraft } = await saveActivationWorkspaceWithRecovery(
         savedDraft.hired_instance_id,
-        activationPayload,
+        buildActivationWorkspacePayload(),
       )
 
       const refreshedDraft = await getHiredAgentBySubscription(activeInstance.subscription_id).catch(() => ({
@@ -920,7 +924,9 @@ export function DigitalMarketingActivationWizard({
 
       setDraft(refreshedDraft)
       setActivation(savedActivation)
-      setSaveStatus('saved')
+      if (updateIndicators) {
+        setSaveStatus('saved')
+      }
       onSaved?.({
         ...refreshedDraft,
         hired_instance_id: savedActivation.hired_instance_id,
@@ -935,20 +941,25 @@ export function DigitalMarketingActivationWizard({
       })
       return true
     } catch (e: any) {
+      const message = isNotFoundError(e)
+        ? 'This hire is no longer available. Please select another agent.'
+        : e?.message || 'Failed to save activation workspace'
+
+      setSaveError(message)
+      setSaveStatus('error')
+
       if (isNotFoundError(e)) {
-        const message = 'This hire is no longer available. Please select another agent.'
-        setSaveError(message)
-        setSaveStatus('error')
         await onStaleReference?.({
           subscriptionId: activeInstance?.subscription_id || '',
           hiredInstanceId,
         })
-        return false
       }
-      setSaveError(e?.message || 'Failed to save activation workspace')
-      setSaveStatus('error')
       return false
     }
+  }
+
+  const saveWorkspace = async (): Promise<boolean> => {
+    return persistWorkspaceSnapshot({ updateIndicators: true })
   }
 
   const saveBrandVoice = async (): Promise<boolean> => {
@@ -1141,10 +1152,9 @@ export function DigitalMarketingActivationWizard({
     setThemePlanLoading(true)
     setThemePlanError(null)
     try {
-      const saved = await saveWorkspace()
-      if (!saved) return
       const pendingInput = String(overrideReply ?? strategyReply).trim()
       const response = await generateDigitalMarketingThemePlan(hiredInstanceId, {
+        ...buildActivationWorkspacePayload(),
         campaign_setup: {
           schedule: normalizedSchedule,
           strategy_workshop: {
@@ -1159,6 +1169,7 @@ export function DigitalMarketingActivationWizard({
       })
       applyThemePlanResponse(response)
       setActiveMilestone('theme')
+      void persistWorkspaceSnapshot({ updateIndicators: false })
     } catch (e: any) {
       setThemePlanError(e?.message || 'Failed to generate theme plan.')
     } finally {
@@ -2135,6 +2146,9 @@ export function DigitalMarketingActivationWizard({
                           ) : null}
                         </div>
                       </div>
+                      {themePlanError ? (
+                        <FeedbackMessage intent="error" title="DMA reply failed" message={themePlanError} />
+                      ) : null}
                     </div>
 
                     <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
