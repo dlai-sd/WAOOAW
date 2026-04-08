@@ -3869,7 +3869,11 @@ section[id] {
 .dma-chat-thread {
   display: grid;
   gap: 14px;
-  margin-bottom: 18px;
+}
+
+.dma-chat-message-stack {
+  display: grid;
+  gap: 12px;
 }
 
 .dma-chat-history-card,
@@ -3903,6 +3907,57 @@ section[id] {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--colorNeutralForeground3);
+}
+
+.dma-chat-quick-replies {
+  display: grid;
+  gap: 8px;
+}
+
+.dma-chat-composer {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--colorBrandStroke1) 35%, var(--colorNeutralStroke2));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--colorNeutralBackground1) 94%, var(--colorBrandBackground2)) 0%, var(--colorNeutralBackground2) 100%);
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+
+.dma-chat-composer-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.dma-chat-composer-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.dma-chat-composer-field {
+  display: grid;
+  gap: 6px;
+}
+
+.dma-chat-composer-hint,
+.dma-chat-composer-empty-state {
+  color: var(--colorNeutralForeground3);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.dma-chat-composer-actions {
+  display: grid;
+  gap: 10px;
+  align-content: end;
+  max-width: 220px;
 }
 
 .dma-wizard-hero {
@@ -4253,9 +4308,23 @@ section[id] {
   .dma-wizard-action-bar,
   .dma-wizard-action-bar-left,
   .dma-wizard-action-bar-right,
-  .dma-wizard-status-item {
+  .dma-wizard-status-item,
+  .dma-chat-composer-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .dma-chat-composer-body {
+    grid-template-columns: 1fr;
+  }
+
+  .dma-chat-composer-actions {
+    max-width: none;
+    width: 100%;
+  }
+
+  .dma-wizard-theme-workshop-message {
+    max-width: 100%;
   }
 }
 
@@ -4394,16 +4463,23 @@ section[id] {
   border-radius: 14px;
   border: 1px solid var(--colorNeutralStroke2);
   background: color-mix(in srgb, var(--colorNeutralBackground3) 78%, transparent);
+  max-width: min(100%, 48rem);
 }
 
 .dma-wizard-theme-workshop-message--assistant {
   border-color: color-mix(in srgb, var(--colorBrandStroke1) 55%, var(--colorNeutralStroke2));
   background: color-mix(in srgb, var(--colorBrandBackground2) 16%, var(--colorNeutralBackground2));
+  justify-self: start;
 }
 
 .dma-wizard-theme-workshop-message--user {
   border-color: var(--colorNeutralStroke2);
   background: color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent);
+  justify-self: end;
+}
+
+.dma-wizard-theme-workshop-message--pending {
+  opacity: 0.9;
 }
 
 .dma-wizard-theme-workshop-message-role {

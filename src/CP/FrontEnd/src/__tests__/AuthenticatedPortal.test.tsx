@@ -181,6 +181,7 @@ async function renderPortal(
 describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
   beforeEach(() => {
     navigateMock.mockReset()
+    window.sessionStorage.clear()
   })
 
   it('renders Command Centre as the default page', async () => {
@@ -217,6 +218,20 @@ describe('AuthenticatedPortal — navigation structure (CP-NAV-1)', () => {
     await renderPortal()
     fireEvent.click(screen.getByText('My Agents'))
     expect(screen.getByTestId('page-my-agents')).toBeTruthy()
+  })
+
+  it('restores the previously open portal page after a remount when no explicit portal entry overrides it', async () => {
+    const view = await renderPortal()
+
+    fireEvent.click(screen.getByText('My Agents'))
+    expect(screen.getByTestId('page-my-agents')).toBeTruthy()
+
+    view.unmount()
+
+    await renderPortal()
+
+    expect(screen.getByTestId('page-my-agents')).toBeTruthy()
+    expect(screen.queryByTestId('page-command-centre')).toBeNull()
   })
 
   it('switches to Deliverables page when sidebar item clicked', async () => {
