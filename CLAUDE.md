@@ -103,6 +103,8 @@ docker-compose -f docker-compose.test.yml run cp-test pytest -x -v
 
 Persistence rule: when a story changes schema or persisted behavior, validate the migration and a smoke query against Cloud SQL demo through the Auth Proxy before treating Docker regression as complete. Docker Postgres is for isolated regression only, not the persistence source of truth.
 
+Codespaces review-build rule: use the repo's existing assets only — `.devcontainer/gcp-auth.sh`, `.codespace/demo.env`, `docker-compose.local.yml`, `docker-compose.codespace.yml`, and `scripts/codespace-stack.sh`. Before any fresh Codespaces build, clear stale WAOOAW-local images with `bash scripts/codespace-stack.sh clean` and `docker image prune -f`, then rebuild/start with `bash .devcontainer/gcp-auth.sh` followed by `bash scripts/codespace-stack.sh up cp` (or the required scope). Always publish the review URL from `bash scripts/codespace-stack.sh urls`.
+
 ---
 
 ## Git
@@ -170,3 +172,4 @@ Platform standards (Section 5.6) are in `docs/CONTEXT_AND_INDEX.md`.
 | PR targeting non-main branch | Work never ships | `--base main` always |
 | External call without CB | Cascading failure | `@circuit_breaker` |
 | New `core/` package in Gateway but no `COPY core/` in Dockerfile | `ModuleNotFoundError` on Cloud Run startup | Add `COPY core/ ./core/` beside other `COPY` lines in Dockerfile |
+| Starting a new Codespaces build on stale local images | Review stack runs old layers or mismatched services | `bash scripts/codespace-stack.sh clean` then `docker image prune -f` before rebuild |
