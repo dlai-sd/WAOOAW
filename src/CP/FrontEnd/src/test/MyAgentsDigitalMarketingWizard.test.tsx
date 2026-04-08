@@ -1366,6 +1366,7 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByText('Message your DMA')).toBeInTheDocument()
     expect(screen.getByTestId('dma-chat-thread')).toBeInTheDocument()
     expect(screen.getByTestId('start-theme-workshop-btn')).toBeEnabled()
+    expect(screen.getByTestId('start-theme-workshop-btn')).toHaveAttribute('type', 'button')
   })
 
   it('shows suggested next answers as clickable options', async () => {
