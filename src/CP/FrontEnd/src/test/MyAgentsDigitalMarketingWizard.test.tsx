@@ -445,6 +445,16 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('strategy-assistant-message')).toBeInTheDocument()
   })
 
+  it('uses a scrollable chat viewport and visual bubble styling without inline role labels', async () => {
+    const { container } = renderWizard()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-chat-scroll-region')).toBeInTheDocument()
+    })
+
+    expect(container.querySelector('.dma-wizard-theme-workshop-message-role')).toBeNull()
+  })
+
   it('keeps connect, theme, schedule, and activation sections available in one flow', async () => {
     renderWizard()
     await waitFor(() => {

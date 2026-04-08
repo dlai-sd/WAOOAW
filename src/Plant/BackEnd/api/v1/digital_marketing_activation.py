@@ -323,12 +323,12 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
                 "profession_label": profession_label,
                 "profession_flavor": _profession_flavor(profession_label),
                 "free_model_rules": [
-                    "Keep the strategist response under 90 words.",
-                    "Do not repeat the user's last answer in full.",
-                    "Give one insight, one recommendation, and one next question only if still needed.",
-                    "Provide 2-3 short next-step options that save the customer's time.",
-                    "Sound like a premium strategist in live chat, not a setup wizard, checklist, or intake form.",
-                    "Lead the conversation with confidence and warmth so the customer feels guided, not processed.",
+                    "Keep every strategist reply to 1-2 short sentences and under 60 words unless an approval-ready summary is required.",
+                    "Respond to the latest turn and the existing thread. Do not restart the conversation, re-greet, or fall back to the same opener each turn.",
+                    "Do not repeat the user's last answer or restate facts that are already locked unless something materially changed.",
+                    "Give one insight, one recommendation, and at most one next question only if it is still needed.",
+                    "Provide 2-3 very short next-step options that save the customer's time.",
+                    "Sound like a premium strategist in live chat: consultative, targeted, commercially sharp, and calm.",
                     "Move to approval_ready as soon as the strategy is coherent enough.",
                 ],
             },
@@ -352,7 +352,7 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
             },
             "pending_customer_input": pending_input,
             "response_contract": {
-                "assistant_message": "One compact, high-conviction strategist reply in plain English. It should feel like premium live chat: warm, commercially sharp, and easy to respond to.",
+                "assistant_message": "One thread-aware strategist reply in plain English. Keep it to 1-2 short sentences, make it consultative and specific, and only ask one focused question if the thread still needs it.",
                 "checkpoint_summary": "One short paragraph summarizing what is now locked.",
                 "current_focus_question": "At most one high-value question. Empty string if not needed.",
                 "next_step_options": ["Two or three short suggested next moves."],
@@ -438,7 +438,7 @@ def _parse_theme_workshop_response(
     pending_input: str,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     cleaned = str(raw_text or "").strip()
-    fallback_message = "I can take this forward quickly. Tell me the one business result this content must drive first, and I will turn that into a sharper direction."
+    fallback_message = "I can sharpen this quickly. What single business result should this content drive first?"
 
     if not cleaned:
         workshop = _normalize_strategy_workshop(existing_workshop, workspace)

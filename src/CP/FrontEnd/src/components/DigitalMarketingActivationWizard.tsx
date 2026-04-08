@@ -418,6 +418,7 @@ export function DigitalMarketingActivationWizard({
   const [postActionStatus, setPostActionStatus] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
   const [postPublishReceipts, setPostPublishReceipts] = useState<Record<string, string>>({})
   const [queueDateTime, setQueueDateTime] = useState<Record<string, string>>({})
+  const chatScrollRef = useRef<HTMLDivElement | null>(null)
   const profileRef = useRef<ProfileData | null>(null)
 
   const hiredInstanceId = useMemo(
@@ -750,7 +751,7 @@ export function DigitalMarketingActivationWizard({
     && !String(strategyWorkshop.checkpoint_summary || '').trim()
   const openingAssistantMessage = useMemo(() => {
     if (isFirstConversation) {
-      return `Thanks for hiring me. We will do this like a sharp strategy conversation, not a setup form. Start by telling me what your business does, who you most want to reach, and what result you want this content to create first.`
+      return `Tell me what your business does, who you most want to reach, and the first result you want this content to drive. I will tighten the brief with you here and keep this moving without turning it into setup busywork.`
     }
     if (strategyWorkshop.assistant_message) return strategyWorkshop.assistant_message
     return `I have picked the conversation back up and I am ready to tighten the brief, unblock the next decision, and move this toward approved publishing.`
@@ -778,6 +779,13 @@ export function DigitalMarketingActivationWizard({
 
     return messages
   }, [conversationHistory, openingAssistantMessage, strategyWorkshop.assistant_message])
+
+  useEffect(() => {
+    const chatScrollElement = chatScrollRef.current
+    if (!chatScrollElement) return
+    chatScrollElement.scrollTop = chatScrollElement.scrollHeight
+  }, [chatMessages.length, themePlanLoading])
+
   const canSendStrategyReply = Boolean(strategyReply.trim()) && !readOnly && !themePlanLoading
   const operatingChecklist = useMemo(() => ([
     {
@@ -2046,63 +2054,63 @@ export function DigitalMarketingActivationWizard({
               <div className="dma-wizard-canvas-body">
                 <div className="dma-wizard-step-content" data-testid="dma-chat-primary-panel">
                   <div className="dma-chat-thread" data-testid="dma-chat-thread">
-                    <div className="dma-chat-message-stack" data-testid="dma-chat-message-stack">
-                      {chatMessages.map((message, index) => (
-                        <div
-                          key={`${message.role}-${index}-${message.content.slice(0, 24)}`}
-                          className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
-                          data-testid={message.role === 'assistant' && index === chatMessages.length - 1 ? 'strategy-assistant-message' : undefined}
-                        >
-                          <div className="dma-wizard-theme-workshop-message-role">{message.role === 'assistant' ? 'DMA' : 'You'}</div>
-                          <div>{message.content}</div>
-                        </div>
-                      ))}
+                    <div className="dma-chat-scroll-region" ref={chatScrollRef} data-testid="dma-chat-scroll-region">
+                      <div className="dma-chat-message-stack" data-testid="dma-chat-message-stack">
+                        {chatMessages.map((message, index) => (
+                          <div
+                            key={`${message.role}-${index}-${message.content.slice(0, 24)}`}
+                            className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
+                            data-testid={message.role === 'assistant' && index === chatMessages.length - 1 ? 'strategy-assistant-message' : undefined}
+                          >
+                            <div>{message.content}</div>
+                          </div>
+                        ))}
 
-                      {themePlanLoading ? (
-                        <div
-                          className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant dma-wizard-theme-workshop-message--pending"
-                          data-testid="strategy-thinking-indicator"
-                        >
-                          <div className="dma-wizard-theme-workshop-message-role">DMA</div>
-                          <div>Thinking through the brief and tightening the next decision...</div>
+                        {themePlanLoading ? (
+                          <div
+                            className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant dma-wizard-theme-workshop-message--pending"
+                            data-testid="strategy-thinking-indicator"
+                          >
+                            <div>Thinking through the brief and tightening the next decision...</div>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {strategyWorkshop.checkpoint_summary ? (
+                        <div className="dma-chat-insight-card" data-testid="strategy-checkpoint-summary">
+                          <div className="dma-chat-insight-label">What I have already understood</div>
+                          <div>{strategyWorkshop.checkpoint_summary}</div>
+                        </div>
+                      ) : null}
+
+                      {strategyWorkshop.current_focus_question ? (
+                        <div className="dma-chat-focus-card" data-testid="strategy-current-focus-question">
+                          <div className="dma-chat-insight-label">Best next answer</div>
+                          <div>{strategyWorkshop.current_focus_question}</div>
+                        </div>
+                      ) : null}
+
+                      {(strategyWorkshop.next_step_options || []).length > 0 ? (
+                        <div className="dma-chat-quick-replies">
+                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick replies</div>
+                          <div className="dma-wizard-theme-option-list">
+                            {(strategyWorkshop.next_step_options || []).map((option, index) => (
+                              <Button
+                                key={`${option}-${index}`}
+                                type="button"
+                                appearance="secondary"
+                                size="small"
+                                onClick={() => handleStrategyOption(option)}
+                                disabled={readOnly || themePlanLoading}
+                                data-testid={`strategy-option-${index}`}
+                              >
+                                {option}
+                              </Button>
+                            ))}
+                          </div>
                         </div>
                       ) : null}
                     </div>
-
-                    {strategyWorkshop.checkpoint_summary ? (
-                      <div className="dma-chat-insight-card" data-testid="strategy-checkpoint-summary">
-                        <div className="dma-chat-insight-label">What I have already understood</div>
-                        <div>{strategyWorkshop.checkpoint_summary}</div>
-                      </div>
-                    ) : null}
-
-                    {strategyWorkshop.current_focus_question ? (
-                      <div className="dma-chat-focus-card" data-testid="strategy-current-focus-question">
-                        <div className="dma-chat-insight-label">Best next answer</div>
-                        <div>{strategyWorkshop.current_focus_question}</div>
-                      </div>
-                    ) : null}
-
-                    {(strategyWorkshop.next_step_options || []).length > 0 ? (
-                      <div className="dma-chat-quick-replies">
-                        <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick replies</div>
-                        <div className="dma-wizard-theme-option-list">
-                          {(strategyWorkshop.next_step_options || []).map((option, index) => (
-                            <Button
-                              key={`${option}-${index}`}
-                              type="button"
-                              appearance="secondary"
-                              size="small"
-                              onClick={() => handleStrategyOption(option)}
-                              disabled={readOnly || themePlanLoading}
-                              data-testid={`strategy-option-${index}`}
-                            >
-                              {option}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
 
                     <div className="dma-chat-composer" data-testid="dma-chat-composer">
                       <div className="dma-chat-composer-header">
@@ -2162,7 +2170,7 @@ export function DigitalMarketingActivationWizard({
 
         <aside className="dma-wizard-brief-panel">
           <Card className="dma-wizard-brief-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
+            <div className="dma-wizard-brief-card-header">
               <div>
                 <div className="dma-wizard-section-label">Live business brief</div>
                 <Text as="h3" size={500} weight="semibold">What the DMA understands so far</Text>
@@ -2199,7 +2207,7 @@ export function DigitalMarketingActivationWizard({
             <div className="dma-wizard-status-list">
               {operatingChecklist.map((item) => (
                 <div key={item.label} className={`dma-wizard-status-item${item.ok ? ' is-done' : ''}`}>
-                  <span>{item.label}</span>
+                  <span className="dma-wizard-status-item-label">{item.label}</span>
                   <Badge appearance="outline" color={item.ok ? 'success' : 'warning'}>
                     {item.ok ? 'Ready' : 'Pending'}
                   </Badge>
