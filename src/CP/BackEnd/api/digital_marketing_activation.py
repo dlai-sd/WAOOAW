@@ -60,6 +60,7 @@ class ActivationWorkspaceUpsertRequest(BaseModel):
 
 
 class ThemePlanGenerateRequest(BaseModel):
+    workspace: dict[str, Any] = Field(default_factory=dict)
     campaign_setup: dict[str, Any] = Field(default_factory=dict)
 
 

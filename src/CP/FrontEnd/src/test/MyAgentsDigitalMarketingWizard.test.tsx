@@ -1420,6 +1420,53 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
   })
 
+  it('still sends the DMA chat request when workspace persistence fails', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+    const hiredAgentsModule = await import('../services/hiredAgents.service')
+
+    vi.mocked(serviceModule.upsertDigitalMarketingActivationWorkspace).mockRejectedValueOnce(new Error('Workspace save failed'))
+    vi.mocked(hiredAgentsModule.upsertHiredAgentDraft).mockResolvedValueOnce({
+      subscription_id: 'SUB-1',
+      hired_instance_id: 'HAI-1',
+      agent_id: 'AGT-MKT-DMA-001',
+      agent_type_id: 'marketing.digital_marketing.v1',
+      nickname: 'Growth Copilot',
+      theme: 'dark',
+      config: {},
+      configured: true,
+      goals_completed: false,
+    })
+
+    renderWizard()
+    await goToThemeStep()
+
+    fireEvent.change(screen.getByLabelText('Strategy workshop reply'), {
+      target: { value: 'We need the first series to target premium founders in Pune.' },
+    })
+    fireEvent.click(screen.getByTestId('start-theme-workshop-btn'))
+
+    await waitFor(() => {
+      expect(serviceModule.generateDigitalMarketingThemePlan).toHaveBeenCalledWith(
+        'HAI-1',
+        expect.objectContaining({
+          workspace: expect.objectContaining({
+            brand_name: 'WAOOAW',
+            location: 'Pune',
+          }),
+          campaign_setup: expect.objectContaining({
+            strategy_workshop: expect.objectContaining({
+              pending_input: 'We need the first series to target premium founders in Pune.',
+            }),
+          }),
+        })
+      )
+    })
+
+    expect(screen.getByTestId('strategy-assistant-message')).toHaveTextContent(
+      'Your content should make complex buying decisions feel commercially obvious.'
+    )
+  })
+
   it('sends the chat reply with Enter', async () => {
     const serviceModule = await import('../services/digitalMarketingActivation.service')
 
