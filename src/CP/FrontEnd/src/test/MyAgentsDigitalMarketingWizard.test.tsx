@@ -1219,6 +1219,9 @@ describe('DMA Activation Wizard — step navigation', () => {
     renderWizard()
     await goToThemeStep()
 
+    fireEvent.change(screen.getByLabelText('Strategy workshop reply'), {
+      target: { value: 'Help me frame the strongest first 3 content angles.' },
+    })
     fireEvent.click(screen.getByTestId('start-theme-workshop-btn'))
 
     await waitFor(() => {
@@ -1365,7 +1368,9 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
     expect(screen.getByText('Message your DMA')).toBeInTheDocument()
     expect(screen.getByTestId('dma-chat-thread')).toBeInTheDocument()
-    expect(screen.getByTestId('start-theme-workshop-btn')).toBeEnabled()
+    expect(screen.getByTestId('dma-chat-composer')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Start with DMA' })).not.toBeInTheDocument()
   })
 
   it('shows suggested next answers as clickable options', async () => {
@@ -1376,6 +1381,9 @@ describe('DMA Activation Wizard — step navigation', () => {
       expect(screen.getByTestId('strategy-assistant-message')).toBeInTheDocument()
     })
 
+    fireEvent.change(screen.getByLabelText('Strategy workshop reply'), {
+      target: { value: 'Sharpen the current direction for me.' },
+    })
     fireEvent.click(screen.getByTestId('start-theme-workshop-btn'))
 
     await waitFor(() => {
@@ -1405,6 +1413,32 @@ describe('DMA Activation Wizard — step navigation', () => {
           campaign_setup: expect.objectContaining({
             strategy_workshop: expect.objectContaining({
               pending_input: 'My target audience is enterprise sales leaders',
+            }),
+          }),
+        })
+      )
+    })
+  })
+
+  it('sends the chat reply with Enter', async () => {
+    const serviceModule = await import('../services/digitalMarketingActivation.service')
+
+    renderWizard()
+    await goToThemeStep()
+
+    const replyBox = screen.getByLabelText('Strategy workshop reply')
+    fireEvent.change(replyBox, {
+      target: { value: 'We help premium clinics attract higher-intent local demand.' },
+    })
+    fireEvent.keyDown(replyBox, { key: 'Enter', code: 'Enter' })
+
+    await waitFor(() => {
+      expect(serviceModule.generateDigitalMarketingThemePlan).toHaveBeenCalledWith(
+        'HAI-1',
+        expect.objectContaining({
+          campaign_setup: expect.objectContaining({
+            strategy_workshop: expect.objectContaining({
+              pending_input: 'We help premium clinics attract higher-intent local demand.',
             }),
           }),
         })

@@ -755,6 +755,30 @@ export function DigitalMarketingActivationWizard({
     if (strategyWorkshop.assistant_message) return strategyWorkshop.assistant_message
     return `I have picked the conversation back up and I am ready to tighten the brief, unblock the next decision, and move this toward approved publishing.`
   }, [isFirstConversation, strategyWorkshop.assistant_message])
+  const chatMessages = useMemo(() => {
+    const messages = conversationHistory
+      .map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: String(message.content || '').trim(),
+      }))
+      .filter((message) => message.content)
+
+    if (messages.length === 0) {
+      return [{ role: 'assistant' as const, content: openingAssistantMessage }]
+    }
+
+    const latestAssistantMessage = String(strategyWorkshop.assistant_message || '').trim()
+    const lastMessage = messages[messages.length - 1]
+    if (
+      latestAssistantMessage
+      && (lastMessage?.role !== 'assistant' || lastMessage.content !== latestAssistantMessage)
+    ) {
+      messages.push({ role: 'assistant', content: latestAssistantMessage })
+    }
+
+    return messages
+  }, [conversationHistory, openingAssistantMessage, strategyWorkshop.assistant_message])
+  const canSendStrategyReply = Boolean(strategyReply.trim()) && !readOnly && !themePlanLoading
   const operatingChecklist = useMemo(() => ([
     {
       label: 'YouTube identity attached',
@@ -1880,6 +1904,11 @@ export function DigitalMarketingActivationWizard({
     void generateThemePlan(normalizedOption)
   }
 
+  const handleStrategySubmit = () => {
+    if (!canSendStrategyReply) return
+    void generateThemePlan()
+  }
+
   const approveThemeStrategy = async () => {
     if (!hiredInstanceId || !masterTheme.trim()) return
     setThemePlanSaving(true)
@@ -2006,27 +2035,28 @@ export function DigitalMarketingActivationWizard({
               <div className="dma-wizard-canvas-body">
                 <div className="dma-wizard-step-content" data-testid="dma-chat-primary-panel">
                   <div className="dma-chat-thread" data-testid="dma-chat-thread">
-                    <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
-                      <div className="dma-wizard-theme-workshop-message-role">DMA</div>
-                      <div>{isFirstConversation ? openingAssistantMessage : openingAssistantMessage || dmaIntroduction}</div>
-                    </div>
-
-                    {!isFirstConversation ? (
-                      <div className="dma-chat-history-card">
-                        <div className="dma-chat-history-title">Recent conversation</div>
-                        <div className="dma-chat-history-list">
-                          {conversationHistory.map((message, index) => (
-                            <div
-                              key={`${message.role}-${index}-${message.content.slice(0, 12)}`}
-                              className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
-                            >
-                              <div className="dma-wizard-theme-workshop-message-role">{message.role === 'assistant' ? 'DMA' : 'You'}</div>
-                              <div>{message.content}</div>
-                            </div>
-                          ))}
+                    <div className="dma-chat-message-stack" data-testid="dma-chat-message-stack">
+                      {chatMessages.map((message, index) => (
+                        <div
+                          key={`${message.role}-${index}-${message.content.slice(0, 24)}`}
+                          className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
+                          data-testid={message.role === 'assistant' && index === chatMessages.length - 1 ? 'strategy-assistant-message' : undefined}
+                        >
+                          <div className="dma-wizard-theme-workshop-message-role">{message.role === 'assistant' ? 'DMA' : 'You'}</div>
+                          <div>{message.content}</div>
                         </div>
-                      </div>
-                    ) : null}
+                      ))}
+
+                      {themePlanLoading ? (
+                        <div
+                          className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant dma-wizard-theme-workshop-message--pending"
+                          data-testid="strategy-thinking-indicator"
+                        >
+                          <div className="dma-wizard-theme-workshop-message-role">DMA</div>
+                          <div>Thinking through the brief and tightening the next decision...</div>
+                        </div>
+                      ) : null}
+                    </div>
 
                     {strategyWorkshop.checkpoint_summary ? (
                       <div className="dma-chat-insight-card" data-testid="strategy-checkpoint-summary">
@@ -2042,26 +2072,14 @@ export function DigitalMarketingActivationWizard({
                       </div>
                     ) : null}
 
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <span style={{ fontWeight: 600 }}>Message your DMA</span>
-                      <Textarea
-                        aria-label="Strategy workshop reply"
-                        value={strategyReply}
-                        onChange={(_, data) => setStrategyReply(data.value)}
-                        disabled={readOnly}
-                        resize="vertical"
-                        rows={4}
-                        placeholder="Tell me about your business, audience, offer, growth goal, or ask me to sharpen the current direction."
-                      />
-                    </label>
-
                     {(strategyWorkshop.next_step_options || []).length > 0 ? (
-                      <div>
+                      <div className="dma-chat-quick-replies">
                         <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick replies</div>
                         <div className="dma-wizard-theme-option-list">
                           {(strategyWorkshop.next_step_options || []).map((option, index) => (
                             <Button
                               key={`${option}-${index}`}
+                              type="button"
                               appearance="secondary"
                               size="small"
                               onClick={() => handleStrategyOption(option)}
@@ -2075,25 +2093,48 @@ export function DigitalMarketingActivationWizard({
                       </div>
                     ) : null}
 
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Button
-                        appearance="primary"
-                        onClick={() => void generateThemePlan()}
-                        disabled={readOnly || themePlanLoading}
-                        data-testid="start-theme-workshop-btn"
-                      >
-                        {themePlanLoading
-                          ? 'DMA is thinking…'
-                          : latestCustomerNote || strategyWorkshop.assistant_message
-                            ? 'Send to DMA'
-                            : 'Start with DMA'}
-                      </Button>
-                      {themePlanLoading ? <Spinner size="tiny" /> : null}
-                      {!brandName.trim() ? (
-                        <span style={{ opacity: 0.72, fontSize: '0.85rem' }}>
-                          You can start here without setup. I will pull the brief from chat and you can fill the rail later if needed.
-                        </span>
-                      ) : null}
+                    <div className="dma-chat-composer" data-testid="dma-chat-composer">
+                      <div className="dma-chat-composer-header">
+                        <div style={{ fontWeight: 600 }}>Keep feeding the brief</div>
+                        <div className="dma-chat-composer-hint">Press Enter to send. Use Shift+Enter for a new line.</div>
+                      </div>
+                      <div className="dma-chat-composer-body">
+                        <label className="dma-chat-composer-field">
+                          <span style={{ fontWeight: 600 }}>Message your DMA</span>
+                          <Textarea
+                            aria-label="Strategy workshop reply"
+                            value={strategyReply}
+                            onChange={(_, data) => setStrategyReply(data.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault()
+                                handleStrategySubmit()
+                              }
+                            }}
+                            disabled={readOnly || themePlanLoading}
+                            resize="vertical"
+                            rows={4}
+                            placeholder="Tell me more about your business, customers, offer, objections, proof, and the exact result you want this content to create."
+                          />
+                        </label>
+
+                        <div className="dma-chat-composer-actions">
+                          <Button
+                            type="button"
+                            appearance="primary"
+                            onClick={handleStrategySubmit}
+                            disabled={!canSendStrategyReply}
+                            data-testid="start-theme-workshop-btn"
+                          >
+                            Send
+                          </Button>
+                          {!strategyReply.trim() ? (
+                            <span className="dma-chat-composer-empty-state">
+                              Share more context and I will keep sharpening the brief without forcing you through setup fields.
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
 
                     <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
