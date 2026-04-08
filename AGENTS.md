@@ -86,6 +86,16 @@ docs/                All platform docs (start with CONTEXT_AND_INDEX.md)
 
 ---
 
+## Codespaces build and review path
+
+- Use the existing Codespaces assets only: `.devcontainer/gcp-auth.sh`, `.codespace/demo.env`, `docker-compose.local.yml`, `docker-compose.codespace.yml`, and `scripts/codespace-stack.sh`.
+- Do not invent ad-hoc Docker or URL publishing commands when a Codespaces review build is needed.
+- Before any fresh Codespaces build, remove stale WAOOAW-local images first: run `bash scripts/codespace-stack.sh clean` and then `docker image prune -f`.
+- After cleanup, restore the real stack with `bash .devcontainer/gcp-auth.sh` and `bash scripts/codespace-stack.sh up cp` (or the needed scope).
+- Publish review URLs from `bash scripts/codespace-stack.sh urls` so the shared URL matches the actual running stack.
+
+---
+
 ## GCP access — Cloud Run logs & debugging
 
 This Codespace is authenticated as `waooaw-codespace-reader@waooaw-oauth.iam.gserviceaccount.com`
