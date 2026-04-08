@@ -55,6 +55,7 @@ class ActivationWorkspaceResponse(BaseModel):
 
 class ThemePlanGenerateRequest(BaseModel):
     customer_id: str | None = None
+    workspace: dict[str, Any] = Field(default_factory=dict)
     campaign_setup: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -812,7 +813,8 @@ async def generate_theme_plan(
         hired_agents_simple._assert_customer_owns_record(record, body.customer_id)
     _ensure_supported_record(record)
 
-    workspace = _workspace_from_config(record.config)
+    persisted_workspace = _workspace_from_config(record.config)
+    workspace = {**persisted_workspace, **dict(body.workspace or {})}
     existing_campaign_setup = dict(workspace.get("campaign_setup") or {})
     campaign_setup = {
         **existing_campaign_setup,
