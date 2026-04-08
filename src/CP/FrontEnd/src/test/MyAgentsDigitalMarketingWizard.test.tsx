@@ -413,7 +413,6 @@ describe('DMA Activation Wizard — step navigation', () => {
       expect(screen.getByTestId('dma-step-panel-connect')).toBeInTheDocument()
     })
     expect(screen.getByRole('heading', { name: 'Chat with your DMA' })).toBeInTheDocument()
-    expect(screen.getByTestId('dma-conversation-summary')).toBeInTheDocument()
     expect(screen.getByTestId('dma-step-panel-theme')).toBeInTheDocument()
     expect(screen.getByTestId('dma-step-panel-schedule')).toBeInTheDocument()
     expect(screen.getByTestId('dma-step-panel-activate')).toBeInTheDocument()
@@ -729,9 +728,9 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     expect(screen.getByTestId('youtube-validation-metrics')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Persist connection for future use by Agent' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save for DMA' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Persist connection for future use by Agent' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save for DMA' }))
 
     await waitFor(() => {
       expect(ytModule.attachYouTubeConnection).toHaveBeenCalledWith('cred-youtube-1', {
@@ -742,7 +741,7 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     expect(ytModule.startYouTubeConnection).not.toHaveBeenCalled()
     expect(screen.getByText('YouTube connection saved for future agent use.')).toBeInTheDocument()
-    expect(screen.getByText('✓ Connected')).toBeInTheDocument()
+    expect(screen.getAllByText('Connected').length).toBeGreaterThan(0)
   })
 
   it('starts Google OAuth again when the user chooses to reconnect the saved channel', async () => {
@@ -871,10 +870,9 @@ describe('DMA Activation Wizard — step navigation', () => {
     })
 
     expect(screen.getByRole('button', { name: 'Reconnect with Google' })).toBeInTheDocument()
-    expect(screen.queryByTestId('youtube-connected-badge')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Persist connection for future use by Agent' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save for DMA' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
-    expect(screen.getByText('Strategy workspace')).toBeInTheDocument()
+    expect(screen.getByText('Strategy controls')).toBeInTheDocument()
   })
 
   it('shows theme-step guidance on connect instead of any draft CTA', async () => {
@@ -945,11 +943,11 @@ describe('DMA Activation Wizard — step navigation', () => {
     await goToConnectStep()
 
     await waitFor(() => {
-      expect(screen.getByTestId('youtube-connected-badge')).toBeInTheDocument()
+      expect(screen.getByText('Connected')).toBeInTheDocument()
     })
 
     expect(screen.queryByTestId('generate-youtube-draft-btn')).not.toBeInTheDocument()
-    expect(screen.getByText('Strategy workspace')).toBeInTheDocument()
+    expect(screen.getByText('Strategy controls')).toBeInTheDocument()
   })
 
   it('prefills brand name from the customer profile when the activation workspace is empty', async () => {
@@ -1036,6 +1034,8 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     renderWizard()
     await goToThemeStep()
+
+    fireEvent.click(screen.getByText('Business details'))
 
     await waitFor(() => {
       expect(screen.getByLabelText('Brand name')).toHaveValue('ExistingBrand')
@@ -1325,6 +1325,8 @@ describe('DMA Activation Wizard — step navigation', () => {
     renderWizard()
     await goToThemeStep()
 
+    fireEvent.click(screen.getByText('Strategy controls'))
+
     await waitFor(() => {
       expect(screen.getByTestId('generate-youtube-draft-btn')).toBeInTheDocument()
     })
@@ -1361,8 +1363,9 @@ describe('DMA Activation Wizard — step navigation', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Chat with your DMA' })).toBeInTheDocument()
     })
-    expect(screen.getByText('Reply to your DMA')).toBeInTheDocument()
+    expect(screen.getByText('Message your DMA')).toBeInTheDocument()
     expect(screen.getByTestId('dma-chat-thread')).toBeInTheDocument()
+    expect(screen.getByTestId('start-theme-workshop-btn')).toBeEnabled()
   })
 
   it('shows suggested next answers as clickable options', async () => {
@@ -1414,11 +1417,10 @@ describe('DMA Activation Wizard — step navigation', () => {
     await goToThemeStep()
 
     await waitFor(() => {
-      expect(screen.getByText('Optional business context fields')).toBeInTheDocument()
+      expect(screen.getByText('Business details')).toBeInTheDocument()
     })
 
-    // Dense fields should be in a collapsed section
-    expect(screen.queryByText('Direct input fields')).not.toBeVisible()
+    expect(screen.getByText('Use this only when you want to pin details directly instead of saying them in chat.')).toBeInTheDocument()
   })
 
   it('reveals advanced fields when section is expanded', async () => {
@@ -1426,16 +1428,14 @@ describe('DMA Activation Wizard — step navigation', () => {
     await goToThemeStep()
 
     await waitFor(() => {
-      expect(screen.getByText('Optional business context fields')).toBeInTheDocument()
+      expect(screen.getByText('Business details')).toBeInTheDocument()
     })
 
-    // Expand the details section
-    const summary = screen.getByText('Optional business context fields')
+    const summary = screen.getByText('Business details')
     fireEvent.click(summary)
 
-    // Now fields should be accessible
     await waitFor(() => {
-      expect(screen.getByText('Direct input fields')).toBeVisible()
+      expect(screen.getByLabelText('Business context')).toBeInTheDocument()
     })
   })
 
@@ -1487,6 +1487,8 @@ describe('DMA Activation Wizard — step navigation', () => {
 
     renderWizard()
     await goToConnectStep()
+
+    fireEvent.click(screen.getByText('YouTube connection'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Test connection' }))
 

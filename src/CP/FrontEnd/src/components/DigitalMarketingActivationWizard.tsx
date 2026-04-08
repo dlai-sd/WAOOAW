@@ -391,7 +391,6 @@ export function DigitalMarketingActivationWizard({
   const [strategyWorkshop, setStrategyWorkshop] = useState<DigitalMarketingStrategyWorkshop>(buildEmptyStrategyWorkshop())
   const [strategySummary, setStrategySummary] = useState<DigitalMarketingStrategyWorkshopSummary>(buildEmptyStrategyWorkshop().summary || {})
   const [strategyReply, setStrategyReply] = useState('')
-  const [strategyDetailsEditable, setStrategyDetailsEditable] = useState(false)
   const [themePlanLoading, setThemePlanLoading] = useState(false)
   const [themePlanSaving, setThemePlanSaving] = useState(false)
   const [themePlanError, setThemePlanError] = useState<string | null>(null)
@@ -749,44 +748,13 @@ export function DigitalMarketingActivationWizard({
   const isFirstConversation = conversationHistory.length === 0
     && !String(strategyWorkshop.assistant_message || '').trim()
     && !String(strategyWorkshop.checkpoint_summary || '').trim()
-  const conversationAchievements = useMemo(() => {
-    const items: string[] = []
-    if (strategyWorkshop.checkpoint_summary) items.push(strategyWorkshop.checkpoint_summary)
-    if (isYouTubeAttached) items.push(`YouTube is attached${savedYouTubeConnection?.display_name ? ` as ${savedYouTubeConnection.display_name}` : ''}.`)
-    if (isThemeApproved && masterTheme.trim()) items.push(`Approved strategic direction: ${masterTheme.trim()}.`)
-    if (scheduleStartDate.trim()) items.push(`Publishing cadence is set from ${scheduleStartDate.trim()} at ${postsPerWeek || '3'} posts per week.`)
-    return items.slice(0, 3)
-  }, [isThemeApproved, isYouTubeAttached, masterTheme, postsPerWeek, savedYouTubeConnection?.display_name, scheduleStartDate, strategyWorkshop.checkpoint_summary])
-  const conversationPendingItems = useMemo(() => {
-    const items: string[] = []
-    if (!brandName.trim()) items.push('Lock the business name so I can personalize the narrative.')
-    if (!location.trim()) items.push('Add the location or service area so I can localize the content.')
-    if (!isYouTubeAttached) items.push('Attach the YouTube channel I should publish through.')
-    if (!isThemeApproved) items.push('Approve the strategic direction once it feels commercially right.')
-    if (!scheduleStartDate.trim()) items.push('Set the publishing cadence so I can move from strategy to execution.')
-    return items.slice(0, 4)
-  }, [brandName, isThemeApproved, isYouTubeAttached, location, scheduleStartDate])
-  const conversationSuggestions = useMemo(() => {
-    const options = (strategyWorkshop.next_step_options || []).slice(0, 3)
-    if (options.length > 0) return options
-    if (!brandName.trim()) return ['Tell me what your business does in one line.']
-    if (!isYouTubeAttached) return ['Connect the YouTube channel you want me to grow.']
-    if (!isThemeApproved) return ['Tell me the main customer outcome this content must drive.']
-    if (!scheduleStartDate.trim()) return ['Choose when the first publishing cycle should start.']
-    return ['Ask me for the next draft direction.', 'Review the approved content lane.', 'Activate this DMA when you are satisfied.']
-  }, [brandName, isThemeApproved, isYouTubeAttached, scheduleStartDate, strategyWorkshop.next_step_options])
   const openingAssistantMessage = useMemo(() => {
     if (isFirstConversation) {
-      return `✨ I’m excited to be your Digital Marketing Agent on this hire. In this space I’ll help you shape the business brief, connect the right YouTube identity, turn that into an approved content direction, and move you toward real publishing without forcing you through a long setup form.`
+      return `Thanks for hiring me. We will do this like a sharp strategy conversation, not a setup form. Start by telling me what your business does, who you most want to reach, and what result you want this content to create first.`
     }
     if (strategyWorkshop.assistant_message) return strategyWorkshop.assistant_message
-    return `✨ Great to continue this with you. I’ve reviewed our recent conversation and I’m ready to tighten the brief, unblock anything still pending, and move the work toward approved publishing.`
+    return `I have picked the conversation back up and I am ready to tighten the brief, unblock the next decision, and move this toward approved publishing.`
   }, [isFirstConversation, strategyWorkshop.assistant_message])
-  const conversationSummaryTitle = isFirstConversation ? '✨ New conversation' : '✨ Last 10 conversations at a glance'
-  const conversationSummarySubtitle = isFirstConversation
-    ? 'I will lead the conversation and keep the journey simple, focused, and useful.'
-    : 'Here is a positive progress recap, what is still pending, and the strongest next moves.'
-  const progressPercent = Math.max(10, Math.min(100, Math.round((completedMilestones / 5) * 100)))
   const operatingChecklist = useMemo(() => ([
     {
       label: 'YouTube identity attached',
@@ -805,18 +773,6 @@ export function DigitalMarketingActivationWizard({
       ok: Boolean(scheduleStartDate.trim()),
     },
   ]), [isThemeApproved, isYouTubeAttached, missingProfileFields.length, readiness.brief_complete, scheduleStartDate, selectedPlatforms])
-  const stageCoachCopy = useMemo(() => {
-    if (currentStep.id === 'connect') {
-      return 'This step is only about identity. Once the correct YouTube channel is attached, the DMA can work through the right publishing surface.'
-    }
-    if (currentStep.id === 'theme') {
-      return 'Treat this like a strategist conversation, not a long form. Short, direct answers are enough because the DMA is extracting the brief live.'
-    }
-    if (currentStep.id === 'schedule') {
-      return 'Set cadence only after the direction is solid. A good schedule protects consistency; it should not compensate for a weak brief.'
-    }
-    return 'This final review is meant to remove surprises. If anything feels unclear here, go back and tighten the brief before activation.'
-  }, [currentStep.id])
   const nextActionCopy = useMemo(() => {
     if (currentStep.id === 'connect') {
       return isYouTubeAttached
@@ -1154,7 +1110,6 @@ export function DigitalMarketingActivationWizard({
     setStrategyWorkshop(nextWorkshop)
     setStrategySummary(nextWorkshop.summary || {})
     setStrategyReply('')
-    setStrategyDetailsEditable(false)
   }
 
   const generateThemePlan = async (overrideReply?: string) => {
@@ -1457,6 +1412,425 @@ export function DigitalMarketingActivationWizard({
     )
   }
 
+  const renderYouTubeControlRail = () => (
+    <details open={!isYouTubeAttached} data-testid="dma-step-panel-connect">
+      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>YouTube connection</summary>
+      <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.9rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 600 }}>Publishing identity</div>
+            <div style={{ opacity: 0.75, fontSize: '0.9rem' }}>
+              Connect the YouTube channel this DMA should grow and publish through.
+            </div>
+          </div>
+          <Badge appearance="outline" color={isYouTubeAttached ? 'success' : 'warning'}>
+            {isYouTubeAttached ? 'Connected' : 'Needs connection'}
+          </Badge>
+        </div>
+
+        {savedYouTubeConnection?.display_name ? (
+          <div style={{ fontSize: '0.9rem' }}>
+            Channel: <strong>{savedYouTubeConnection.display_name}</strong>
+          </div>
+        ) : null}
+
+        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <Button
+            appearance="primary"
+            disabled={oauthLoading || readOnly}
+            onClick={() => void handleConnectYouTube()}
+          >
+            {oauthLoading
+              ? 'Connecting…'
+              : savedYouTubeConnection
+                ? 'Reconnect with Google'
+                : 'Connect with Google'}
+          </Button>
+          <Button
+            appearance="secondary"
+            disabled={!savedYouTubeConnection || youtubeValidationLoading || readOnly}
+            onClick={() => void handleTestYouTubeConnection()}
+          >
+            {youtubeValidationLoading ? 'Testing…' : 'Test connection'}
+          </Button>
+          {!isYouTubeAttached && youtubeValidationResult && youtubeValidationResult.id === savedYouTubeConnection?.id ? (
+            <Button
+              appearance="outline"
+              disabled={youtubePersistLoading || readOnly}
+              onClick={() => void handlePersistYouTubeConnection()}
+            >
+              {youtubePersistLoading ? 'Saving…' : 'Save for DMA'}
+            </Button>
+          ) : null}
+        </div>
+
+        {youtubeValidationResult ? (
+          <div
+            data-testid="youtube-validation-metrics"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(8rem, 1fr))',
+              gap: '0.75rem',
+              padding: '0.9rem 1rem',
+              border: '1px solid color-mix(in srgb, var(--colorBrandStroke1) 45%, var(--colorNeutralStroke2))',
+              borderRadius: '0.9rem',
+              background: 'color-mix(in srgb, var(--colorBrandBackground2) 12%, var(--colorNeutralBackground3))',
+            }}
+          >
+            <div><strong>Channels</strong><div>{youtubeValidationResult.channel_count}</div></div>
+            <div><strong>Videos</strong><div>{youtubeValidationResult.total_video_count}</div></div>
+            <div><strong>Shorts</strong><div>{youtubeValidationResult.recent_short_count}</div></div>
+            <div><strong>Long videos</strong><div>{youtubeValidationResult.recent_long_video_count}</div></div>
+            <div><strong>Subscribers</strong><div>{youtubeValidationResult.subscriber_count}</div></div>
+            <div><strong>Views</strong><div>{youtubeValidationResult.view_count}</div></div>
+          </div>
+        ) : null}
+
+        {youtubeValidationResult?.recent_uploads?.length ? (
+          <div
+            data-testid="youtube-recent-uploads"
+            style={{
+              display: 'grid',
+              gap: '0.6rem',
+              padding: '0.9rem 1rem',
+              border: '1px solid var(--colorNeutralStroke2)',
+              borderRadius: '0.9rem',
+              background: 'color-mix(in srgb, var(--colorNeutralBackground3) 74%, transparent)',
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>Recent uploads (proof)</div>
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              {youtubeValidationResult.recent_uploads.map((upload) => (
+                <div
+                  key={upload.video_id}
+                  style={{
+                    padding: '0.75rem 0.85rem',
+                    borderRadius: '0.75rem',
+                    background: 'color-mix(in srgb, var(--colorBrandBackground2) 12%, var(--colorNeutralBackground3))',
+                    border: '1px solid color-mix(in srgb, var(--colorBrandStroke1) 38%, var(--colorNeutralStroke2))',
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{upload.title}</div>
+                  <div style={{ fontSize: '0.85rem', opacity: 0.78 }}>
+                    {formatPublishedDateLabel(upload.published_at)} · {formatDurationLabel(upload.duration_seconds)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {getYouTubeNextActionCopy(youtubeValidationResult?.next_action_hint) ? (
+          <div
+            data-testid="youtube-next-action-hint"
+            style={{
+              padding: '0.9rem 1rem',
+              borderRadius: '0.9rem',
+              border: '1px solid color-mix(in srgb, var(--colorPaletteDarkOrangeBorder2) 70%, transparent)',
+              background: 'color-mix(in srgb, var(--colorPaletteDarkOrangeBackground2) 55%, transparent)',
+              color: 'var(--colorPaletteDarkOrangeForeground1)',
+              fontSize: '0.95rem',
+            }}
+          >
+            {getYouTubeNextActionCopy(youtubeValidationResult?.next_action_hint)}
+          </div>
+        ) : null}
+
+        {oauthMessage && <div className="dma-wizard-oauth-success">{oauthMessage}</div>}
+        {youtubeValidationError && <div className="dma-wizard-oauth-error">{youtubeValidationError}</div>}
+        {oauthError && <div className="dma-wizard-oauth-error">{oauthError}</div>}
+      </div>
+    </details>
+  )
+
+  const renderBusinessContextRail = () => (
+    <details open={!brandName.trim() || !location.trim()} data-testid="dma-step-panel-business">
+      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Business details</summary>
+      <div style={{ display: 'grid', gap: '0.9rem', marginTop: '0.9rem' }}>
+        <div style={{ opacity: 0.75, fontSize: '0.9rem' }}>
+          Use this only when you want to pin details directly instead of saying them in chat.
+        </div>
+        <div className="dma-wizard-form-grid">
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Brand name</span>
+            <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Location</span>
+            <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Primary language</span>
+            <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Timezone</span>
+            <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} placeholder="e.g. Asia/Kolkata" />
+          </label>
+        </div>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <span>Offerings and services</span>
+          <Textarea
+            aria-label="Offerings and services"
+            value={offeringsText}
+            onChange={(_, data) => setOfferingsText(data.value)}
+            disabled={readOnly}
+            resize="vertical"
+            rows={3}
+            placeholder="Comma-separated list of what you sell or offer"
+          />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          <span>Business context</span>
+          <Textarea
+            aria-label="Business context"
+            value={businessContext}
+            onChange={(_, data) => setBusinessContext(data.value)}
+            disabled={readOnly}
+            resize="vertical"
+            rows={3}
+            placeholder="Describe your business, target audience, key differentiators"
+          />
+        </label>
+        <details>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Brand voice</summary>
+          <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.8rem' }}>
+            {brandVoiceLoading ? <Spinner size="tiny" /> : null}
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <span>Voice description</span>
+              <Textarea
+                aria-label="Voice description"
+                value={voiceDescription}
+                onChange={(_, data) => setVoiceDescription(data.value)}
+                disabled={readOnly}
+                resize="vertical"
+                rows={3}
+                placeholder="Describe how your brand should sound."
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <span>Tone keywords</span>
+              <Input
+                aria-label="Tone keywords"
+                value={toneKeywords}
+                onChange={(_, data) => setToneKeywords(data.value)}
+                disabled={readOnly}
+                placeholder="e.g. warm, credible, direct"
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <span>Example phrases</span>
+              <Textarea
+                aria-label="Example phrases"
+                value={examplePhrases}
+                onChange={(_, data) => setExamplePhrases(data.value)}
+                disabled={readOnly}
+                resize="vertical"
+                rows={4}
+                placeholder="One phrase per line"
+              />
+            </label>
+          </div>
+        </details>
+      </div>
+    </details>
+  )
+
+  const renderStrategyControlRail = () => (
+    <details open={!isThemeApproved} data-testid="dma-step-panel-theme">
+      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Strategy controls</summary>
+      <div style={{ display: 'grid', gap: '1rem', marginTop: '0.9rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontWeight: 600 }}>Direction and approvals</div>
+            <div style={{ opacity: 0.75, fontSize: '0.9rem' }}>
+              I will keep turning the conversation into a sharper brief and an approval-ready content direction.
+            </div>
+          </div>
+          <Badge
+            appearance="outline"
+            color={isThemeApproved ? 'success' : strategyWorkshop.status === 'approval_ready' ? 'informative' : 'warning'}
+            data-testid="strategy-workshop-status"
+          >
+            {isThemeApproved ? 'Approved' : strategyWorkshop.status === 'approval_ready' ? 'Ready for approval' : 'Discovery in progress'}
+          </Badge>
+        </div>
+
+        <StrategyPreviewPanel
+          isThemeApproved={isThemeApproved}
+          masterTheme={masterTheme}
+          derivedThemes={derivedThemes}
+          strategySummary={strategySummary}
+          fallbackSummary={strategyWorkshop.checkpoint_summary || strategyWorkshop.assistant_message || ''}
+          messages={strategyPreviewMessages}
+        />
+
+        <DigitalMarketingThemePlanCard
+          masterTheme={masterTheme}
+          derivedThemes={derivedThemes}
+          editable
+          saving={themePlanSaving}
+          loading={themePlanLoading}
+          error={themePlanError}
+          onMasterThemeChange={setMasterTheme}
+          onDerivedThemeChange={updateDerivedTheme}
+          onAddDerivedTheme={addDerivedTheme}
+          onSave={() => void saveThemePlan()}
+        />
+
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button
+            appearance="primary"
+            disabled={readOnly || themePlanSaving || !masterTheme.trim()}
+            onClick={() => void approveThemeStrategy()}
+            data-testid="approve-theme-strategy-btn"
+          >
+            {isThemeApproved ? 'Strategy approved' : 'Approve strategy'}
+          </Button>
+          {isThemeApproved ? (
+            <span style={{ color: 'var(--colorPaletteGreenForeground1)', fontSize: '0.85rem' }}>Draft generation is now unlocked.</span>
+          ) : (
+            <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>Approve when the positioning and content lanes feel commercially right.</span>
+          )}
+        </div>
+
+        {renderDraftGenerationPanel()}
+      </div>
+    </details>
+  )
+
+  const renderScheduleControlRail = () => (
+    <details open={isThemeApproved && !scheduleStartDate.trim()} data-testid="dma-step-panel-schedule">
+      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Publishing cadence</summary>
+      <div style={{ display: 'grid', gap: '1rem', marginTop: '0.9rem' }}>
+        <div className="dma-wizard-form-grid">
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Start date</span>
+            <Input
+              type="date"
+              aria-label="Start date"
+              value={scheduleStartDate}
+              onChange={(_, data) => setScheduleStartDate(data.value)}
+              disabled={readOnly}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <span>Posts per week</span>
+            <Input
+              type="number"
+              aria-label="Posts per week"
+              value={postsPerWeek}
+              onChange={(_, data) => setPostsPerWeek(data.value)}
+              disabled={readOnly}
+              min="1"
+              max="21"
+            />
+          </label>
+        </div>
+        <div>
+          <div className="dma-wizard-section-label">Preferred days</div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+              const selectedDays = parseListTextarea(preferredDaysText)
+              const isSelected = selectedDays.includes(day)
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  style={{
+                    padding: '0.4rem 0.9rem',
+                    borderRadius: '999px',
+                    border: `1px solid ${isSelected ? 'color-mix(in srgb, var(--colorBrandStroke1) 70%, transparent)' : 'var(--colorNeutralStroke2)'}`,
+                    background: isSelected
+                      ? 'color-mix(in srgb, var(--colorBrandBackground2) 18%, var(--colorNeutralBackground3))'
+                      : 'color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent)',
+                    color: 'inherit',
+                    cursor: readOnly ? 'default' : 'pointer',
+                    fontWeight: isSelected ? 700 : 400,
+                  }}
+                  onClick={() => {
+                    if (readOnly) return
+                    const current = parseListTextarea(preferredDaysText)
+                    const next = isSelected ? current.filter(d => d !== day) : [...current, day]
+                    setPreferredDaysText(next.join(', '))
+                  }}
+                  aria-pressed={isSelected}
+                >
+                  {day}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+        {scheduleStartDate ? (
+          <Badge appearance="outline" color="success">
+            Schedule set: {postsPerWeek || '3'}x/week from {scheduleStartDate}
+          </Badge>
+        ) : (
+          <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>Set the first publishing date to lock the cadence.</div>
+        )}
+      </div>
+    </details>
+  )
+
+  const renderActivationControlRail = () => (
+    <details open={!readiness.can_finalize} data-testid="dma-step-panel-activate">
+      <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Activation controls</summary>
+      <div style={{ display: 'grid', gap: '1rem', marginTop: '0.9rem' }}>
+        <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '14px', overflow: 'hidden' }}>
+          {[
+            { label: 'Agent identity configured', ok: readiness.configured },
+            { label: 'Business brief complete', ok: readiness.brief_complete },
+            { label: 'Platform connections ready', ok: !readiness.youtube_selected || readiness.youtube_connection_ready },
+            { label: 'Campaign theme generated', ok: Boolean(masterTheme) },
+          ].map(({ label, ok }) => (
+            <div key={label} className="dma-wizard-review-row" style={{ padding: '0.85rem 1rem' }}>
+              <span>{label}</span>
+              <Badge appearance="outline" color={ok ? 'success' : 'warning'}>
+                {ok ? 'Ready' : 'Incomplete'}
+              </Badge>
+            </div>
+          ))}
+        </div>
+
+        {readiness.missing_requirements?.length > 0 ? (
+          <FeedbackMessage
+            intent="warning"
+            title="Complete these before activating"
+            message={readiness.missing_requirements.join(' · ')}
+          />
+        ) : null}
+
+        {finishStatus === 'success' || activation?.workspace.activation_complete ? (
+          <FeedbackMessage intent="success" title="Setup complete" message="This hire now has channels, theme plan, and schedule confirmed." />
+        ) : null}
+
+        {finishError ? <FeedbackMessage intent="error" title="Activation failed" message={finishError} /> : null}
+
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <Button
+            appearance="primary"
+            onClick={() => void finishActivation()}
+            disabled={readOnly || finishStatus === 'saving' || !readiness.can_finalize}
+          >
+            {finishStatus === 'saving' ? 'Activating…' : 'Activate Agent'}
+          </Button>
+          <Button
+            appearance="secondary"
+            onClick={() => {
+              void saveWorkspace()
+              void saveProfile()
+              void saveBrandVoice()
+            }}
+            disabled={readOnly || saveStatus === 'saving'}
+          >
+            {saveStatus === 'saving' ? 'Saving…' : 'Save progress'}
+          </Button>
+        </div>
+      </div>
+    </details>
+  )
+
   const strategyPreviewMessages = (strategyWorkshop.messages || []).slice(-5)
 
   const saveThemePlan = async () => {
@@ -1626,44 +2000,11 @@ export function DigitalMarketingActivationWizard({
                   <Badge appearance="outline" color={readiness.can_finalize ? 'success' : 'warning'}>{completedMilestones}/5 signals locked</Badge>
                 </div>
               </div>
-
-              <div className="dma-chat-summary-card" data-testid="dma-conversation-summary">
-                <div className="dma-chat-summary-copy">
-                  <div className="dma-chat-summary-title">{conversationSummaryTitle}</div>
-                  <div className="dma-chat-summary-subtitle">{conversationSummarySubtitle}</div>
-                </div>
-                <div className="dma-chat-summary-grid">
-                  <div className="dma-chat-summary-column">
-                    <div className="dma-chat-summary-label">✓ Achievements</div>
-                    <ul>
-                      {(conversationAchievements.length > 0 ? conversationAchievements : ['I am ready to start shaping the business brief with you.']).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="dma-chat-summary-column">
-                    <div className="dma-chat-summary-label">↗ Pending, in a good way</div>
-                    <ul>
-                      {(conversationPendingItems.length > 0 ? conversationPendingItems : ['The core setup is in place. We can move toward activation when you are ready.']).map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="dma-chat-summary-column">
-                    <div className="dma-chat-summary-label">✦ Suggested next steps</div>
-                    <ul>
-                      {conversationSuggestions.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div className="dma-wizard-main-body">
               <div className="dma-wizard-canvas-body">
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-connect">
+                <div className="dma-wizard-step-content" data-testid="dma-chat-primary-panel">
                   <div className="dma-chat-thread" data-testid="dma-chat-thread">
                     <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
                       <div className="dma-wizard-theme-workshop-message-role">DMA</div>
@@ -1672,7 +2013,7 @@ export function DigitalMarketingActivationWizard({
 
                     {!isFirstConversation ? (
                       <div className="dma-chat-history-card">
-                        <div className="dma-chat-history-title">Recent conversation thread</div>
+                        <div className="dma-chat-history-title">Recent conversation</div>
                         <div className="dma-chat-history-list">
                           {conversationHistory.map((message, index) => (
                             <div
@@ -1696,27 +2037,27 @@ export function DigitalMarketingActivationWizard({
 
                     {strategyWorkshop.current_focus_question ? (
                       <div className="dma-chat-focus-card" data-testid="strategy-current-focus-question">
-                        <div className="dma-chat-insight-label">Right now I need</div>
+                        <div className="dma-chat-insight-label">Best next answer</div>
                         <div>{strategyWorkshop.current_focus_question}</div>
                       </div>
                     ) : null}
 
                     <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <span style={{ fontWeight: 600 }}>Reply to your DMA</span>
+                      <span style={{ fontWeight: 600 }}>Message your DMA</span>
                       <Textarea
                         aria-label="Strategy workshop reply"
                         value={strategyReply}
                         onChange={(_, data) => setStrategyReply(data.value)}
                         disabled={readOnly}
                         resize="vertical"
-                        rows={3}
-                        placeholder="Tell me what kind of business growth you want, who you serve, what makes you different, or what I should improve next."
+                        rows={4}
+                        placeholder="Tell me about your business, audience, offer, growth goal, or ask me to sharpen the current direction."
                       />
                     </label>
 
                     {(strategyWorkshop.next_step_options || []).length > 0 ? (
                       <div>
-                        <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick answers</div>
+                        <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick replies</div>
                         <div className="dma-wizard-theme-option-list">
                           {(strategyWorkshop.next_step_options || []).map((option, index) => (
                             <Button
@@ -1738,537 +2079,24 @@ export function DigitalMarketingActivationWizard({
                       <Button
                         appearance="primary"
                         onClick={() => void generateThemePlan()}
-                        disabled={readOnly || themePlanLoading || !brandName.trim()}
+                        disabled={readOnly || themePlanLoading}
                         data-testid="start-theme-workshop-btn"
                       >
                         {themePlanLoading
                           ? 'DMA is thinking…'
                           : latestCustomerNote || strategyWorkshop.assistant_message
-                            ? 'Send reply'
-                            : 'Start conversation'}
+                            ? 'Send to DMA'
+                            : 'Start with DMA'}
                       </Button>
                       {themePlanLoading ? <Spinner size="tiny" /> : null}
-                      {!brandName.trim() ? <span style={{ opacity: 0.72, fontSize: '0.85rem' }}>Add the business name below if I don&apos;t know it yet.</span> : null}
+                      {!brandName.trim() ? (
+                        <span style={{ opacity: 0.72, fontSize: '0.85rem' }}>
+                          You can start here without setup. I will pull the brief from chat and you can fill the rail later if needed.
+                        </span>
+                      ) : null}
                     </div>
 
                     <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
-                  </div>
-
-                  <div className="dma-wizard-platform-connect-list">
-                    <div className="dma-chat-section-title">Channel access</div>
-                    <div className="dma-wizard-platform-connect-row">
-                      <div className="dma-wizard-platform-connect-info">
-                        <span className="dma-wizard-platform-connect-name">YouTube</span>
-                        <span className="dma-wizard-platform-connect-desc">
-                          Connect your YouTube channel to allow the agent to manage uploads and publishing.
-                        </span>
-                        {savedYouTubeConnection?.display_name ? (
-                          <span
-                            data-testid="youtube-linked-channel-name"
-                            style={{ fontSize: '0.85rem', color: 'var(--colorPaletteGreenForeground1)', marginTop: '0.2rem', display: 'block' }}
-                          >
-                            Channel: {savedYouTubeConnection.display_name}
-                          </span>
-                        ) : null}
-                        {savedYouTubeConnection && savedYouTubeConnection.verification_status !== 'verified' ? (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--colorPaletteDarkOrangeForeground1)', display: 'block' }}>
-                            Verification pending. Run Test connection to verify this channel.
-                          </span>
-                        ) : null}
-                        {youtubeValidationResult && !isYouTubeAttached ? (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--colorPaletteDarkOrangeForeground1)', display: 'block' }}>
-                            Connection tested successfully. Save it for the agent when ready.
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="dma-wizard-platform-connect-action" style={{ display: 'grid', gap: '0.6rem', justifyItems: 'end' }}>
-                        {isYouTubeAttached ? (
-                          <span className="dma-wizard-connected-badge" data-testid="youtube-connected-badge">✓ Connected</span>
-                        ) : null}
-                        <Button
-                          appearance="primary"
-                          disabled={oauthLoading || readOnly}
-                          onClick={() => void handleConnectYouTube()}
-                        >
-                          {oauthLoading
-                            ? 'Connecting…'
-                            : savedYouTubeConnection
-                              ? 'Reconnect with Google'
-                              : 'Connect with Google'}
-                        </Button>
-                        <Button
-                          appearance="secondary"
-                          disabled={!savedYouTubeConnection || youtubeValidationLoading || readOnly}
-                          onClick={() => void handleTestYouTubeConnection()}
-                        >
-                          {youtubeValidationLoading ? 'Testing…' : 'Test connection'}
-                        </Button>
-                        {!isYouTubeAttached && youtubeValidationResult && youtubeValidationResult.id === savedYouTubeConnection?.id ? (
-                          <Button
-                            appearance="outline"
-                            disabled={youtubePersistLoading || readOnly}
-                            onClick={() => void handlePersistYouTubeConnection()}
-                          >
-                            {youtubePersistLoading ? 'Saving…' : 'Persist connection for future use by Agent'}
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {youtubeValidationResult ? (
-                      <div
-                        data-testid="youtube-validation-metrics"
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(8rem, 1fr))',
-                          gap: '0.75rem',
-                          padding: '0.9rem 1rem',
-                          border: '1px solid color-mix(in srgb, var(--colorBrandStroke1) 45%, var(--colorNeutralStroke2))',
-                          borderRadius: '0.9rem',
-                          background: 'color-mix(in srgb, var(--colorBrandBackground2) 12%, var(--colorNeutralBackground3))',
-                        }}
-                      >
-                        <div><strong>Channels</strong><div>{youtubeValidationResult.channel_count}</div></div>
-                        <div><strong>Videos</strong><div>{youtubeValidationResult.total_video_count}</div></div>
-                        <div><strong>Shorts</strong><div>{youtubeValidationResult.recent_short_count}</div></div>
-                        <div><strong>Long videos</strong><div>{youtubeValidationResult.recent_long_video_count}</div></div>
-                        <div><strong>Subscribers</strong><div>{youtubeValidationResult.subscriber_count}</div></div>
-                        <div><strong>Views</strong><div>{youtubeValidationResult.view_count}</div></div>
-                      </div>
-                    ) : null}
-
-                    {youtubeValidationResult?.recent_uploads?.length ? (
-                      <div
-                        data-testid="youtube-recent-uploads"
-                        style={{
-                          display: 'grid',
-                          gap: '0.6rem',
-                          padding: '0.9rem 1rem',
-                          border: '1px solid var(--colorNeutralStroke2)',
-                          borderRadius: '0.9rem',
-                          background: 'color-mix(in srgb, var(--colorNeutralBackground3) 74%, transparent)',
-                        }}
-                      >
-                        <div style={{ fontWeight: 700 }}>Recent uploads (proof)</div>
-                        <div style={{ display: 'grid', gap: '0.5rem' }}>
-                          {youtubeValidationResult.recent_uploads.map((upload) => (
-                            <div
-                              key={upload.video_id}
-                              style={{
-                                padding: '0.75rem 0.85rem',
-                                borderRadius: '0.75rem',
-                                background: 'color-mix(in srgb, var(--colorBrandBackground2) 12%, var(--colorNeutralBackground3))',
-                                border: '1px solid color-mix(in srgb, var(--colorBrandStroke1) 38%, var(--colorNeutralStroke2))',
-                              }}
-                            >
-                              <div style={{ fontWeight: 600 }}>{upload.title}</div>
-                              <div style={{ fontSize: '0.85rem', opacity: 0.78 }}>
-                                {formatPublishedDateLabel(upload.published_at)} · {formatDurationLabel(upload.duration_seconds)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {getYouTubeNextActionCopy(youtubeValidationResult?.next_action_hint) ? (
-                      <div
-                        data-testid="youtube-next-action-hint"
-                        style={{
-                          padding: '0.9rem 1rem',
-                          borderRadius: '0.9rem',
-                          border: '1px solid color-mix(in srgb, var(--colorPaletteDarkOrangeBorder2) 70%, transparent)',
-                          background: 'color-mix(in srgb, var(--colorPaletteDarkOrangeBackground2) 55%, transparent)',
-                          color: 'var(--colorPaletteDarkOrangeForeground1)',
-                          fontSize: '0.95rem',
-                        }}
-                      >
-                        {getYouTubeNextActionCopy(youtubeValidationResult?.next_action_hint)}
-                      </div>
-                    ) : null}
-
-                    {oauthMessage && (
-                      <div className="dma-wizard-oauth-success">{oauthMessage}</div>
-                    )}
-
-                    {youtubeValidationError && (
-                      <div className="dma-wizard-oauth-error">{youtubeValidationError}</div>
-                    )}
-
-                    {oauthError && (
-                      <div className="dma-wizard-oauth-error">{oauthError}</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-theme">
-                  <div style={{ display: 'grid', gap: '1.75rem' }}>
-                    <div className="dma-wizard-theme-workshop-card">
-                      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div>
-                          <div className="dma-wizard-section-label">Strategy workspace</div>
-                          <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>I will keep turning the conversation into a sharper marketing brief and first content direction.</div>
-                        </div>
-                        <Badge
-                          appearance="outline"
-                          color={isThemeApproved ? 'success' : strategyWorkshop.status === 'approval_ready' ? 'informative' : 'warning'}
-                          data-testid="strategy-workshop-status"
-                        >
-                          {isThemeApproved ? 'Approved' : strategyWorkshop.status === 'approval_ready' ? 'Ready for approval' : 'Discovery in progress'}
-                        </Badge>
-                      </div>
-
-                      <div>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                          <div className="dma-wizard-section-label">Extracted business brief</div>
-                          <Button
-                            appearance="subtle"
-                            size="small"
-                            onClick={() => setStrategyDetailsEditable((current) => !current)}
-                            disabled={readOnly}
-                            data-testid="toggle-strategy-details-edit"
-                          >
-                            {strategyDetailsEditable ? 'Hide edit fields' : 'Edit extracted details'}
-                          </Button>
-                        </div>
-
-                        <div className="dma-wizard-theme-summary-grid" data-testid="strategy-summary-grid">
-                          <div className="dma-wizard-theme-summary-card"><span>Profession</span><strong>{strategySummary.profession_name || 'Waiting for strategist to infer'}</strong></div>
-                          <div className="dma-wizard-theme-summary-card"><span>Location focus</span><strong>{strategySummary.location_focus || location || 'Waiting for locality focus'}</strong></div>
-                          <div className="dma-wizard-theme-summary-card"><span>Customer profile</span><strong>{strategySummary.customer_profile || strategySummary.audience || 'Waiting for audience clarity'}</strong></div>
-                          <div className="dma-wizard-theme-summary-card"><span>Service focus</span><strong>{strategySummary.service_focus || strategySummary.business_focus || 'Waiting for service focus'}</strong></div>
-                          <div className="dma-wizard-theme-summary-card"><span>Differentiator</span><strong>{strategySummary.signature_differentiator || strategySummary.positioning || 'Waiting for differentiation'}</strong></div>
-                          <div className="dma-wizard-theme-summary-card"><span>First content direction</span><strong>{strategySummary.first_content_direction || strategySummary.youtube_angle || 'Waiting for first content direction'}</strong></div>
-                        </div>
-
-                        {strategyDetailsEditable ? (
-                          <div className="dma-wizard-form-grid" style={{ marginTop: '0.85rem' }}>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Profession</span>
-                              <Input aria-label="Profession" value={String(strategySummary.profession_name || '')} onChange={(_, data) => updateStrategySummaryField('profession_name', data.value)} disabled={readOnly} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Location focus</span>
-                              <Input aria-label="Location focus" value={String(strategySummary.location_focus || '')} onChange={(_, data) => updateStrategySummaryField('location_focus', data.value)} disabled={readOnly} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Customer profile</span>
-                              <Textarea aria-label="Customer profile" value={String(strategySummary.customer_profile || '')} onChange={(_, data) => updateStrategySummaryField('customer_profile', data.value)} disabled={readOnly} resize="vertical" rows={3} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Service focus</span>
-                              <Textarea aria-label="Service focus" value={String(strategySummary.service_focus || '')} onChange={(_, data) => updateStrategySummaryField('service_focus', data.value)} disabled={readOnly} resize="vertical" rows={3} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Differentiator</span>
-                              <Textarea aria-label="Differentiator" value={String(strategySummary.signature_differentiator || '')} onChange={(_, data) => updateStrategySummaryField('signature_differentiator', data.value)} disabled={readOnly} resize="vertical" rows={3} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Business goal</span>
-                              <Textarea aria-label="Business goal" value={String(strategySummary.business_goal || '')} onChange={(_, data) => updateStrategySummaryField('business_goal', data.value)} disabled={readOnly} resize="vertical" rows={3} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>First content direction</span>
-                              <Textarea aria-label="First content direction" value={String(strategySummary.first_content_direction || '')} onChange={(_, data) => updateStrategySummaryField('first_content_direction', data.value)} disabled={readOnly} resize="vertical" rows={3} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Tone</span>
-                              <Input aria-label="Tone" value={String(strategySummary.tone || '')} onChange={(_, data) => updateStrategySummaryField('tone', data.value)} disabled={readOnly} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Content pillars</span>
-                              <Textarea aria-label="Content pillars" value={formatListForTextarea(strategySummary.content_pillars)} onChange={(_, data) => updateStrategySummaryField('content_pillars', parseListTextarea(data.value))} disabled={readOnly} resize="vertical" rows={3} />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Call to action</span>
-                              <Textarea aria-label="Call to action" value={String(strategySummary.cta || '')} onChange={(_, data) => updateStrategySummaryField('cta', data.value)} disabled={readOnly} resize="vertical" rows={3} />
-                            </label>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <DigitalMarketingThemePlanCard
-                        masterTheme={masterTheme}
-                        derivedThemes={derivedThemes}
-                        editable
-                        saving={themePlanSaving}
-                        loading={themePlanLoading}
-                        error={themePlanError}
-                        onMasterThemeChange={setMasterTheme}
-                        onDerivedThemeChange={updateDerivedTheme}
-                        onAddDerivedTheme={addDerivedTheme}
-                        onSave={() => void saveThemePlan()}
-                      />
-
-                      <StrategyPreviewPanel
-                        isThemeApproved={isThemeApproved}
-                        masterTheme={masterTheme}
-                        derivedThemes={derivedThemes}
-                        strategySummary={strategySummary}
-                        fallbackSummary={strategyWorkshop.checkpoint_summary || strategyWorkshop.assistant_message || ''}
-                        messages={strategyPreviewMessages}
-                      />
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Button
-                          appearance="primary"
-                          disabled={readOnly || themePlanSaving || !masterTheme.trim()}
-                          onClick={() => void approveThemeStrategy()}
-                          data-testid="approve-theme-strategy-btn"
-                        >
-                          {isThemeApproved ? 'Strategy approved' : 'Approve strategy'}
-                        </Button>
-                        {isThemeApproved ? (
-                          <span style={{ color: 'var(--colorPaletteGreenForeground1)', fontSize: '0.85rem' }}>Draft generation is now unlocked.</span>
-                        ) : (
-                          <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>Approve only when the positioning and content lanes feel final.</span>
-                        )}
-                      </div>
-
-                      {renderDraftGenerationPanel()}
-                    </div>
-
-                    <details style={{ marginTop: '1rem' }}>
-                      <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.75rem', background: 'var(--colorNeutralBackground3)', borderRadius: '8px' }}>
-                        Optional business context fields
-                      </summary>
-                      <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '8px' }}>
-                        <div className="dma-wizard-section-label" style={{ marginBottom: '0.75rem' }}>Direct input fields</div>
-                        <div style={{ opacity: 0.75, fontSize: '0.85rem', marginBottom: '1rem' }}>
-                          The assistant will ask for most of this progressively. Use these only if you already know the exact inputs.
-                        </div>
-                        <div className="dma-wizard-form-grid" style={{ marginBottom: '0.85rem' }}>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Brand name</span>
-                            <Input aria-label="Brand name" value={brandName} onChange={(_, data) => setBrandName(data.value)} disabled={readOnly} />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Location</span>
-                            <Input aria-label="Location" value={location} onChange={(_, data) => setLocation(data.value)} disabled={readOnly} />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Primary language</span>
-                            <Input aria-label="Primary language" value={primaryLanguage} onChange={(_, data) => setPrimaryLanguage(data.value)} disabled={readOnly} />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            <span>Timezone</span>
-                            <Input aria-label="Timezone" value={timezone} onChange={(_, data) => setTimezone(data.value)} disabled={readOnly} placeholder="e.g. Asia/Kolkata" />
-                          </label>
-                        </div>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.85rem' }}>
-                          <span>Offerings and services</span>
-                          <Textarea
-                            aria-label="Offerings and services"
-                            value={offeringsText}
-                            onChange={(_, data) => setOfferingsText(data.value)}
-                            disabled={readOnly}
-                            resize="vertical"
-                            rows={3}
-                            placeholder="Comma-separated list of what you sell or offer"
-                          />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Business context</span>
-                          <Textarea
-                            aria-label="Business context"
-                            value={businessContext}
-                            onChange={(_, data) => setBusinessContext(data.value)}
-                            disabled={readOnly}
-                            resize="vertical"
-                            rows={3}
-                            placeholder="Describe your business, target audience, key differentiators"
-                          />
-                        </label>
-                        <details style={{ marginTop: '1rem' }}>
-                          <summary style={{ cursor: 'pointer', fontWeight: 600, marginBottom: '0.75rem' }}>Brand Voice</summary>
-                          <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.75rem' }}>
-                            {brandVoiceLoading ? <Spinner size="tiny" /> : null}
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Voice description</span>
-                              <Textarea
-                                aria-label="Voice description"
-                                value={voiceDescription}
-                                onChange={(_, data) => setVoiceDescription(data.value)}
-                                disabled={readOnly}
-                                resize="vertical"
-                                rows={3}
-                                placeholder="Describe how your brand should sound."
-                              />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Tone keywords</span>
-                              <Input
-                                aria-label="Tone keywords"
-                                value={toneKeywords}
-                                onChange={(_, data) => setToneKeywords(data.value)}
-                                disabled={readOnly}
-                                placeholder="e.g. warm, credible, direct"
-                              />
-                            </label>
-                            <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                              <span>Example phrases</span>
-                              <Textarea
-                                aria-label="Example phrases"
-                                value={examplePhrases}
-                                onChange={(_, data) => setExamplePhrases(data.value)}
-                                disabled={readOnly}
-                                resize="vertical"
-                                rows={4}
-                                placeholder="One phrase per line"
-                              />
-                            </label>
-                          </div>
-                        </details>
-                      </div>
-                    </details>
-                  </div>
-                </div>
-
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-schedule">
-                  <div style={{ display: 'grid', gap: '1.25rem' }}>
-                    <div className="dma-chat-section-title">Publishing plan</div>
-                    <div>
-                      <div className="dma-wizard-section-label">Posting schedule</div>
-                      <div className="dma-wizard-form-grid">
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Start date</span>
-                          <Input
-                            type="date"
-                            aria-label="Start date"
-                            value={scheduleStartDate}
-                            onChange={(_, data) => setScheduleStartDate(data.value)}
-                            disabled={readOnly}
-                          />
-                        </label>
-                        <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                          <span>Posts per week</span>
-                          <Input
-                            type="number"
-                            aria-label="Posts per week"
-                            value={postsPerWeek}
-                            onChange={(_, data) => setPostsPerWeek(data.value)}
-                            disabled={readOnly}
-                            min="1"
-                            max="21"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="dma-wizard-section-label">Preferred days</div>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
-                          const selectedDays = parseListTextarea(preferredDaysText)
-                          const isSelected = selectedDays.includes(day)
-                          return (
-                            <button
-                              key={day}
-                              type="button"
-                              style={{
-                                padding: '0.4rem 0.9rem',
-                                borderRadius: '999px',
-                                border: `1px solid ${isSelected ? 'color-mix(in srgb, var(--colorBrandStroke1) 70%, transparent)' : 'var(--colorNeutralStroke2)'}`,
-                                background: isSelected
-                                  ? 'color-mix(in srgb, var(--colorBrandBackground2) 18%, var(--colorNeutralBackground3))'
-                                  : 'color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent)',
-                                color: 'inherit',
-                                cursor: readOnly ? 'default' : 'pointer',
-                                fontWeight: isSelected ? 700 : 400,
-                              }}
-                              onClick={() => {
-                                if (readOnly) return
-                                const current = parseListTextarea(preferredDaysText)
-                                const next = isSelected ? current.filter(d => d !== day) : [...current, day]
-                                setPreferredDaysText(next.join(', '))
-                              }}
-                              aria-pressed={isSelected}
-                            >
-                              {day}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    {scheduleStartDate ? (
-                      <Badge appearance="outline" color="success">
-                        Schedule set: {postsPerWeek || '3'}×/week from {scheduleStartDate}
-                      </Badge>
-                    ) : (
-                      <div style={{ opacity: 0.6, fontSize: '0.9rem' }}>Set a start date to confirm the schedule.</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="dma-wizard-step-content" data-testid="dma-step-panel-activate">
-                  <div style={{ display: 'grid', gap: '1.5rem' }}>
-                    <div className="dma-chat-section-title">Activation</div>
-                    <div>
-                      <div className="dma-wizard-section-label">Activation readiness</div>
-                      <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '14px', overflow: 'hidden' }}>
-                        {[
-                          { label: 'Agent identity configured',   ok: readiness.configured },
-                          { label: 'Business brief complete',      ok: readiness.brief_complete },
-                          { label: 'Platform connections ready',   ok: !readiness.youtube_selected || readiness.youtube_connection_ready },
-                          { label: 'Campaign theme generated',     ok: Boolean(masterTheme) },
-                        ].map(({ label, ok }) => (
-                          <div key={label} className="dma-wizard-review-row" style={{ padding: '0.85rem 1rem' }}>
-                            <span>{label}</span>
-                            <Badge appearance="outline" color={ok ? 'success' : 'warning'}>
-                              {ok ? '✓ Ready' : 'Incomplete'}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {readiness.missing_requirements?.length > 0 ? (
-                      <FeedbackMessage
-                        intent="warning"
-                        title="Complete these before activating"
-                        message={readiness.missing_requirements.join(' · ')}
-                      />
-                    ) : null}
-
-                    {readiness.can_finalize ? (
-                      <div style={{ display: 'grid', gap: '0.6rem' }}>
-                        <div style={{ color: 'var(--colorPaletteGreenForeground1)', fontWeight: 600 }}>
-                          ✓ Agent is ready to activate
-                        </div>
-                        {readOnly ? (
-                          <Badge appearance="outline" color="informative">This hire has ended — activation workspace is read-only.</Badge>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div style={{ opacity: 0.7, fontSize: '0.9rem' }}>
-                        Complete the missing items above, then return to this step to activate.
-                      </div>
-                    )}
-
-                    {saveError ? <FeedbackMessage intent="error" title="Save failed" message={saveError} /> : null}
-                    {finishError ? <FeedbackMessage intent="error" title="Activation failed" message={finishError} /> : null}
-                    {finishStatus === 'success' || activation?.workspace.activation_complete ? (
-                      <FeedbackMessage intent="success" title="Setup complete" message="This hire now has channels, theme plan, and schedule confirmed." />
-                    ) : null}
-
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Button
-                        appearance="primary"
-                        onClick={() => void finishActivation()}
-                        disabled={readOnly || finishStatus === 'saving' || !readiness.can_finalize}
-                      >
-                        {finishStatus === 'saving' ? 'Activating…' : 'Activate Agent'}
-                      </Button>
-                      <Button
-                        appearance="secondary"
-                        onClick={() => {
-                          void saveWorkspace()
-                          void saveProfile()
-                          void saveBrandVoice()
-                        }}
-                        disabled={readOnly || saveStatus === 'saving'}
-                      >
-                        {saveStatus === 'saving' ? 'Saving…' : 'Save progress'}
-                      </Button>
-                    </div>
                   </div>
                 </div>
  
@@ -2333,6 +2161,17 @@ export function DigitalMarketingActivationWizard({
                 Missing brief details: {missingProfileFields.join(', ')}.
               </div>
             ) : null}
+          </Card>
+
+          <Card className="dma-wizard-brief-card">
+            <div className="dma-wizard-section-label">Setup controls</div>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {renderBusinessContextRail()}
+              {renderYouTubeControlRail()}
+              {renderStrategyControlRail()}
+              {renderScheduleControlRail()}
+              {renderActivationControlRail()}
+            </div>
           </Card>
         </aside>
       </div>
