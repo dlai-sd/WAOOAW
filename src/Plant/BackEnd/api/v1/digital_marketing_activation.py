@@ -414,6 +414,20 @@ def _normalize_derived_themes(raw_derived: Any) -> list[dict[str, Any]]:
     return normalized
 
 
+def _sanitize_theme_value(value: Any, fallback: str = "Digital marketing activation plan") -> str:
+    candidate = str(value or "").strip()
+    if len(candidate) < 3:
+        return fallback
+
+    if candidate in {"{", "}", "[", "]", "{}", "[]"}:
+        return fallback
+
+    if candidate.startswith("{") or candidate.startswith("["):
+        return fallback
+
+    return candidate[:160]
+
+
 def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
     cleaned = str(raw_text or "").strip()
     if not cleaned:
@@ -421,12 +435,12 @@ def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
     try:
         payload = json.loads(cleaned)
     except json.JSONDecodeError:
-        return cleaned.splitlines()[0][:120] or "Digital marketing activation plan", []
+        return _sanitize_theme_value(cleaned.splitlines()[0][:120]), []
 
     if not isinstance(payload, dict):
         return "Digital marketing activation plan", []
 
-    master_theme = str(payload.get("master_theme") or payload.get("theme") or "Digital marketing activation plan").strip()
+    master_theme = _sanitize_theme_value(payload.get("master_theme") or payload.get("theme"))
     return master_theme or "Digital marketing activation plan", _normalize_derived_themes(payload.get("derived_themes"))
 
 
@@ -460,10 +474,10 @@ def _parse_theme_workshop_response(
         workshop = _normalize_strategy_workshop(existing_workshop, workspace)
         if pending_input:
             workshop["messages"] = [*workshop["messages"], {"role": "user", "content": pending_input}]
-        assistant_message = master_theme or fallback_message
+        assistant_message = _sanitize_theme_value(master_theme, fallback_message)
         workshop["assistant_message"] = assistant_message
         workshop["status"] = "approval_ready" if derived_themes else "discovery"
-        workshop["checkpoint_summary"] = master_theme or "The core strategy is taking shape, but it still needs one stronger decision."
+        workshop["checkpoint_summary"] = _sanitize_theme_value(master_theme, "The core strategy is taking shape, but it still needs one stronger decision.")
         workshop["current_focus_question"] = ""
         workshop["next_step_options"] = ["Approve this direction", "Sharpen the audience", "Suggest a different first angle"]
         workshop["time_saving_note"] = "I have collapsed your earlier answers into one working direction so we do not keep restating the same inputs."
@@ -473,9 +487,12 @@ def _parse_theme_workshop_response(
     if not isinstance(payload, dict):
         return _parse_theme_workshop_response("", workspace=workspace, existing_workshop=existing_workshop, pending_input=pending_input)
 
-    master_theme = str(payload.get("master_theme") or payload.get("theme") or existing_workshop.get("master_theme") or "Digital marketing activation plan").strip()
+    master_theme = _sanitize_theme_value(
+        payload.get("master_theme") or payload.get("theme") or existing_workshop.get("master_theme")
+    )
     derived_themes = _normalize_derived_themes(payload.get("derived_themes"))
     assistant_message = str(payload.get("assistant_message") or "").strip() or (master_theme if derived_themes else fallback_message)
+    assistant_message = _sanitize_theme_value(assistant_message, fallback_message)
     workshop = _normalize_strategy_workshop(payload.get("strategy_workshop") or payload, workspace)
 
     if pending_input:
@@ -588,6 +605,8 @@ async def _persist_theme_plan_to_campaign(
         },
         "schedule": dict(campaign_setup.get("schedule") or {}),
     }
+    safe_master_theme = _sanitize_theme_value(master_theme)
+    activation_payload["theme_plan"]["master_theme"] = safe_master_theme
     brief = campaigns_module.build_campaign_brief_from_activation_payload(activation_payload)
     cost_estimate = estimate_cost(brief, model_used="grok-3-latest")
 
@@ -879,9 +898,11 @@ async def generate_theme_plan(
     if db is not None:
         await db.commit()
 
+    safe_master_theme = _sanitize_theme_value(master_theme)
+
     return ThemePlanResponse(
         campaign_id=campaign_id,
-        master_theme=master_theme,
+        master_theme=safe_master_theme,
         derived_themes=derived_themes,
         workspace=persisted_workspace,
     )

@@ -144,6 +144,31 @@ def test_generate_theme_plan_reuses_existing_draft_campaign(test_client, monkeyp
 
 
 @pytest.mark.unit
+def test_generate_theme_plan_falls_back_when_model_returns_json_fragment(test_client, monkeypatch):
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    hired_instance_id = _create_marketing_hire(test_client, customer_id="cust-dma-json-fragment")
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(dma_module, "grok_complete", lambda *args, **kwargs: "{")
+
+    response = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={"campaign_setup": {"schedule": {"start_date": "2026-03-22", "posts_per_week": 2}}},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["master_theme"] == "Digital marketing activation plan"
+    assert body["workspace"]["campaign_setup"]["master_theme"] == "Digital marketing activation plan"
+
+
+@pytest.mark.unit
 def test_theme_workshop_prompt_requires_thread_aware_brief_consultative_replies():
     import api.v1.digital_marketing_activation as dma_module
 

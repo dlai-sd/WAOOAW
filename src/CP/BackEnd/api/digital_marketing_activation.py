@@ -48,9 +48,31 @@ def _unwrap_gateway_error_detail(detail: Any) -> Any:
     return detail
 
 
+def _sanitize_upstream_failure_detail(detail: Any) -> str:
+    unwrapped = _unwrap_gateway_error_detail(detail)
+    if isinstance(unwrapped, dict):
+        candidate = str(
+            unwrapped.get("detail")
+            or unwrapped.get("message")
+            or unwrapped.get("error")
+            or ""
+        ).strip()
+    else:
+        candidate = str(unwrapped or "").strip()
+
+    lowered = candidate.lower()
+    if not candidate:
+        return "Digital marketing activation upstream failure"
+    if any(token in lowered for token in ["traceback", "xai_api_key", "api key", "sk-", "bearer ", "password", "secret"]):
+        return "UPSTREAM_ERROR"
+    if lowered in {"internal server error", "upstream_error"}:
+        return "Digital marketing activation upstream failure"
+    return candidate[:240]
+
+
 def _raise_for_gateway_response(resp: Any) -> None:
     if resp.status_code >= 500:
-        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+        raise HTTPException(status_code=503, detail=_sanitize_upstream_failure_detail(resp.json))
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail=_unwrap_gateway_error_detail(resp.json))
 
