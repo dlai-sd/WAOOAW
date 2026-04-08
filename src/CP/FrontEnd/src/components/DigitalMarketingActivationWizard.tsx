@@ -367,7 +367,7 @@ export function DigitalMarketingActivationWizard({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [showHelp, setShowHelp] = useState(false)
   const [activeMilestone, setActiveMilestone] = useState<'induct' | 'prepare' | 'theme' | 'schedule'>('induct')
-  const [activeStepIndex, setActiveStepIndex] = useState(0)
+  const [activeStepIndex, setActiveStepIndex] = useState(1)
   const currentStep = DMA_STEPS[activeStepIndex]
 
   const [draft, setDraft] = useState<HiredAgentInstance | null>(null)
@@ -647,7 +647,7 @@ export function DigitalMarketingActivationWizard({
   }, [activeInstance?.subscription_id])
 
   useEffect(() => {
-    if (currentStep.id !== 'theme') return
+    if (!activeInstance?.subscription_id) return
     let cancelled = false
     setBrandVoiceLoading(true)
     getBrandVoice()
@@ -667,7 +667,7 @@ export function DigitalMarketingActivationWizard({
         if (!cancelled) setBrandVoiceLoading(false)
       })
     return () => { cancelled = true }
-  }, [currentStep.id])
+  }, [activeInstance?.subscription_id])
 
   const readiness = activation?.readiness || {
     brief_complete: false,
@@ -742,6 +742,50 @@ export function DigitalMarketingActivationWizard({
       goal: String(strategySummary.business_goal || businessContext || '').trim(),
     })
   }, [brandName, businessContext, businessLabel, location, strategySummary.audience, strategySummary.business_goal, strategySummary.customer_profile, strategySummary.location_focus])
+  const conversationHistory = useMemo(
+    () => (strategyWorkshop.messages || []).slice(-10),
+    [strategyWorkshop.messages],
+  )
+  const isFirstConversation = conversationHistory.length === 0
+    && !String(strategyWorkshop.assistant_message || '').trim()
+    && !String(strategyWorkshop.checkpoint_summary || '').trim()
+  const conversationAchievements = useMemo(() => {
+    const items: string[] = []
+    if (strategyWorkshop.checkpoint_summary) items.push(strategyWorkshop.checkpoint_summary)
+    if (isYouTubeAttached) items.push(`YouTube is attached${savedYouTubeConnection?.display_name ? ` as ${savedYouTubeConnection.display_name}` : ''}.`)
+    if (isThemeApproved && masterTheme.trim()) items.push(`Approved strategic direction: ${masterTheme.trim()}.`)
+    if (scheduleStartDate.trim()) items.push(`Publishing cadence is set from ${scheduleStartDate.trim()} at ${postsPerWeek || '3'} posts per week.`)
+    return items.slice(0, 3)
+  }, [isThemeApproved, isYouTubeAttached, masterTheme, postsPerWeek, savedYouTubeConnection?.display_name, scheduleStartDate, strategyWorkshop.checkpoint_summary])
+  const conversationPendingItems = useMemo(() => {
+    const items: string[] = []
+    if (!brandName.trim()) items.push('Lock the business name so I can personalize the narrative.')
+    if (!location.trim()) items.push('Add the location or service area so I can localize the content.')
+    if (!isYouTubeAttached) items.push('Attach the YouTube channel I should publish through.')
+    if (!isThemeApproved) items.push('Approve the strategic direction once it feels commercially right.')
+    if (!scheduleStartDate.trim()) items.push('Set the publishing cadence so I can move from strategy to execution.')
+    return items.slice(0, 4)
+  }, [brandName, isThemeApproved, isYouTubeAttached, location, scheduleStartDate])
+  const conversationSuggestions = useMemo(() => {
+    const options = (strategyWorkshop.next_step_options || []).slice(0, 3)
+    if (options.length > 0) return options
+    if (!brandName.trim()) return ['Tell me what your business does in one line.']
+    if (!isYouTubeAttached) return ['Connect the YouTube channel you want me to grow.']
+    if (!isThemeApproved) return ['Tell me the main customer outcome this content must drive.']
+    if (!scheduleStartDate.trim()) return ['Choose when the first publishing cycle should start.']
+    return ['Ask me for the next draft direction.', 'Review the approved content lane.', 'Activate this DMA when you are satisfied.']
+  }, [brandName, isThemeApproved, isYouTubeAttached, scheduleStartDate, strategyWorkshop.next_step_options])
+  const openingAssistantMessage = useMemo(() => {
+    if (isFirstConversation) {
+      return `✨ I’m excited to be your Digital Marketing Agent on this hire. In this space I’ll help you shape the business brief, connect the right YouTube identity, turn that into an approved content direction, and move you toward real publishing without forcing you through a long setup form.`
+    }
+    if (strategyWorkshop.assistant_message) return strategyWorkshop.assistant_message
+    return `✨ Great to continue this with you. I’ve reviewed our recent conversation and I’m ready to tighten the brief, unblock anything still pending, and move the work toward approved publishing.`
+  }, [isFirstConversation, strategyWorkshop.assistant_message])
+  const conversationSummaryTitle = isFirstConversation ? '✨ New conversation' : '✨ Last 10 conversations at a glance'
+  const conversationSummarySubtitle = isFirstConversation
+    ? 'I will lead the conversation and keep the journey simple, focused, and useful.'
+    : 'Here is a positive progress recap, what is still pending, and the strongest next moves.'
   const progressPercent = Math.max(10, Math.min(100, Math.round((completedMilestones / 5) * 100)))
   const operatingChecklist = useMemo(() => ([
     {
@@ -1321,7 +1365,7 @@ export function DigitalMarketingActivationWizard({
                 <div
                   key={post.post_id}
                   data-testid={`draft-post-card-${post.post_id}`}
-                  style={{ padding: '0.85rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}
+                  style={{ padding: '0.85rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', background: 'color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent)' }}
                 >
                   <div style={{ fontSize: '0.85rem', opacity: 0.65, marginBottom: '0.4rem' }}>YouTube draft</div>
                   <div style={{ marginBottom: '0.75rem', lineHeight: 1.5 }}>{post.text}</div>
@@ -1338,7 +1382,7 @@ export function DigitalMarketingActivationWizard({
                   {receiptUrl ? (
                     <div style={{ marginTop: '0.5rem', fontSize: '0.82rem' }}>
                       <span style={{ opacity: 0.6 }}>Published: </span>
-                      <a href={receiptUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#00f2fe' }} data-testid={`publish-receipt-${post.post_id}`}>
+                      <a href={receiptUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--colorBrandForegroundLink)' }} data-testid={`publish-receipt-${post.post_id}`}>
                         {receiptUrl}
                       </a>
                     </div>
@@ -1571,83 +1615,147 @@ export function DigitalMarketingActivationWizard({
       <div className="dma-wizard-shell">
         <section className="dma-wizard-main">
           <Card className="dma-wizard-main-card">
-            <div className="dma-wizard-hero" data-testid="dma-conversation-hero">
-              <div className="dma-wizard-hero-copy">
-                <div className="dma-wizard-section-label">Digital Marketing Agent</div>
-                <Text as="h2" size={700} weight="semibold">Let&apos;s grow this business with content your customers trust</Text>
-                <Text as="p" size={400} data-testid="dma-introduction-copy">{dmaIntroduction}</Text>
+            <div className="dma-chat-shell" data-testid="dma-conversation-hero">
+              <div className="dma-chat-header">
+                <div>
+                  <div className="dma-wizard-section-label">Digital Marketing Agent</div>
+                  <Text as="h2" size={600} weight="semibold">Chat with your DMA</Text>
+                </div>
+                <div className="dma-chat-header-badges">
+                  <Badge appearance="outline" color={isThemeApproved ? 'success' : 'informative'}>{stageStateLabel}</Badge>
+                  <Badge appearance="outline" color={readiness.can_finalize ? 'success' : 'warning'}>{completedMilestones}/5 signals locked</Badge>
+                </div>
               </div>
-              <div className="dma-wizard-hero-stats">
-                <div className="dma-wizard-hero-stat-card">
-                  <span>Progress</span>
-                  <strong>{completedMilestones}/5 signals locked</strong>
-                  <div className="dma-wizard-progress-strip" aria-hidden="true">
-                    <div className="dma-wizard-progress-fill" style={{ width: `${progressPercent}%` }} />
+
+              <div className="dma-chat-summary-card" data-testid="dma-conversation-summary">
+                <div className="dma-chat-summary-copy">
+                  <div className="dma-chat-summary-title">{conversationSummaryTitle}</div>
+                  <div className="dma-chat-summary-subtitle">{conversationSummarySubtitle}</div>
+                </div>
+                <div className="dma-chat-summary-grid">
+                  <div className="dma-chat-summary-column">
+                    <div className="dma-chat-summary-label">✓ Achievements</div>
+                    <ul>
+                      {(conversationAchievements.length > 0 ? conversationAchievements : ['I am ready to start shaping the business brief with you.']).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="dma-chat-summary-column">
+                    <div className="dma-chat-summary-label">↗ Pending, in a good way</div>
+                    <ul>
+                      {(conversationPendingItems.length > 0 ? conversationPendingItems : ['The core setup is in place. We can move toward activation when you are ready.']).map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="dma-chat-summary-column">
+                    <div className="dma-chat-summary-label">✦ Suggested next steps</div>
+                    <ul>
+                      {conversationSuggestions.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
-                <div className="dma-wizard-hero-stat-card">
-                  <span>Current state</span>
-                  <strong>{stageStateLabel}</strong>
-                  <div className="dma-wizard-hero-stat-meta">Milestone: {activeMilestone}</div>
-                </div>
               </div>
-            </div>
-
-            <div className="dma-wizard-step-list dma-wizard-step-list--horizontal" data-testid="dma-journey-strip">
-              {DMA_STEPS.map((step, index) => {
-                const isActive = index === activeStepIndex
-                const isDone = index < activeStepIndex
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    className={`dma-wizard-step-button${isActive ? ' is-active' : ''}${isDone ? ' is-done' : ''}`}
-                    onClick={() => setActiveStepIndex(index)}
-                  >
-                    <span className="dma-wizard-step-index">0{index + 1}</span>
-                    <span className="dma-wizard-step-copy">
-                      <span className="dma-wizard-step-title">{step.title}</span>
-                      <span className="dma-wizard-step-description">{step.description}</span>
-                    </span>
-                    {isDone ? <span className="dma-wizard-step-state dma-wizard-step-state--done">Done</span> : null}
-                    {isActive ? <span className="dma-wizard-step-state dma-wizard-step-state--active">Now</span> : null}
-                  </button>
-                )
-              })}
             </div>
 
             <div className="dma-wizard-main-body">
-              <div className="dma-wizard-stage-header">
-                <div className="dma-wizard-stage-copy">
-                  <div className="dma-wizard-section-label">Current focus</div>
-                  <Text as="h3" size={600} weight="semibold">{currentStep.title}</Text>
-                  <Text as="p" size={300}>{currentStep.description}</Text>
-                </div>
-                <div className="dma-wizard-stage-actions">
-                  <Badge appearance="outline" color={currentStep.id === 'activate' && readiness.can_finalize ? 'success' : 'informative'}>
-                    {stageStateLabel}
-                  </Badge>
-                  <Button appearance="subtle" size="small" onClick={() => setShowHelp((current) => !current)}>
-                    {showHelp ? 'Hide guidance' : 'Show guidance'}
-                  </Button>
-                </div>
-              </div>
-
-              {showHelp ? (
-                <div className="dma-wizard-copy-card" data-testid="dma-coach-copy">
-                  <div className="dma-wizard-section-label">Why this stage matters</div>
-                  <div>{stageCoachCopy}</div>
-                </div>
-              ) : null}
-
               <div className="dma-wizard-canvas-body">
-
-              {/* STEP 1 — Channel Ready */}
-              {currentStep.id === 'connect' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-connect">
-                  <div className="dma-wizard-platform-connect-list">
+                  <div className="dma-chat-thread" data-testid="dma-chat-thread">
+                    <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
+                      <div className="dma-wizard-theme-workshop-message-role">DMA</div>
+                      <div>{isFirstConversation ? openingAssistantMessage : openingAssistantMessage || dmaIntroduction}</div>
+                    </div>
 
-                    {/* YouTube */}
+                    {!isFirstConversation ? (
+                      <div className="dma-chat-history-card">
+                        <div className="dma-chat-history-title">Recent conversation thread</div>
+                        <div className="dma-chat-history-list">
+                          {conversationHistory.map((message, index) => (
+                            <div
+                              key={`${message.role}-${index}-${message.content.slice(0, 12)}`}
+                              className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
+                            >
+                              <div className="dma-wizard-theme-workshop-message-role">{message.role === 'assistant' ? 'DMA' : 'You'}</div>
+                              <div>{message.content}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {strategyWorkshop.checkpoint_summary ? (
+                      <div className="dma-chat-insight-card" data-testid="strategy-checkpoint-summary">
+                        <div className="dma-chat-insight-label">What I have already understood</div>
+                        <div>{strategyWorkshop.checkpoint_summary}</div>
+                      </div>
+                    ) : null}
+
+                    {strategyWorkshop.current_focus_question ? (
+                      <div className="dma-chat-focus-card" data-testid="strategy-current-focus-question">
+                        <div className="dma-chat-insight-label">Right now I need</div>
+                        <div>{strategyWorkshop.current_focus_question}</div>
+                      </div>
+                    ) : null}
+
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <span style={{ fontWeight: 600 }}>Reply to your DMA</span>
+                      <Textarea
+                        aria-label="Strategy workshop reply"
+                        value={strategyReply}
+                        onChange={(_, data) => setStrategyReply(data.value)}
+                        disabled={readOnly}
+                        resize="vertical"
+                        rows={3}
+                        placeholder="Tell me what kind of business growth you want, who you serve, what makes you different, or what I should improve next."
+                      />
+                    </label>
+
+                    {(strategyWorkshop.next_step_options || []).length > 0 ? (
+                      <div>
+                        <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick answers</div>
+                        <div className="dma-wizard-theme-option-list">
+                          {(strategyWorkshop.next_step_options || []).map((option, index) => (
+                            <Button
+                              key={`${option}-${index}`}
+                              appearance="secondary"
+                              size="small"
+                              onClick={() => handleStrategyOption(option)}
+                              disabled={readOnly || themePlanLoading}
+                              data-testid={`strategy-option-${index}`}
+                            >
+                              {option}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Button
+                        appearance="primary"
+                        onClick={() => void generateThemePlan()}
+                        disabled={readOnly || themePlanLoading || !brandName.trim()}
+                        data-testid="start-theme-workshop-btn"
+                      >
+                        {themePlanLoading
+                          ? 'DMA is thinking…'
+                          : latestCustomerNote || strategyWorkshop.assistant_message
+                            ? 'Send reply'
+                            : 'Start conversation'}
+                      </Button>
+                      {themePlanLoading ? <Spinner size="tiny" /> : null}
+                      {!brandName.trim() ? <span style={{ opacity: 0.72, fontSize: '0.85rem' }}>Add the business name below if I don&apos;t know it yet.</span> : null}
+                    </div>
+
+                    <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
+                  </div>
+
+                  <div className="dma-wizard-platform-connect-list">
+                    <div className="dma-chat-section-title">Channel access</div>
                     <div className="dma-wizard-platform-connect-row">
                       <div className="dma-wizard-platform-connect-info">
                         <span className="dma-wizard-platform-connect-name">YouTube</span>
@@ -1657,18 +1765,18 @@ export function DigitalMarketingActivationWizard({
                         {savedYouTubeConnection?.display_name ? (
                           <span
                             data-testid="youtube-linked-channel-name"
-                            style={{ fontSize: '0.85rem', color: '#10b981', marginTop: '0.2rem', display: 'block' }}
+                            style={{ fontSize: '0.85rem', color: 'var(--colorPaletteGreenForeground1)', marginTop: '0.2rem', display: 'block' }}
                           >
                             Channel: {savedYouTubeConnection.display_name}
                           </span>
                         ) : null}
                         {savedYouTubeConnection && savedYouTubeConnection.verification_status !== 'verified' ? (
-                          <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--colorPaletteDarkOrangeForeground1)', display: 'block' }}>
                             Verification pending. Run Test connection to verify this channel.
                           </span>
                         ) : null}
                         {youtubeValidationResult && !isYouTubeAttached ? (
-                          <span style={{ fontSize: '0.8rem', color: '#f59e0b', display: 'block' }}>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--colorPaletteDarkOrangeForeground1)', display: 'block' }}>
                             Connection tested successfully. Save it for the agent when ready.
                           </span>
                         ) : null}
@@ -1715,9 +1823,9 @@ export function DigitalMarketingActivationWizard({
                           gridTemplateColumns: 'repeat(auto-fit, minmax(8rem, 1fr))',
                           gap: '0.75rem',
                           padding: '0.9rem 1rem',
-                          border: '1px solid rgba(0, 242, 254, 0.18)',
+                          border: '1px solid color-mix(in srgb, var(--colorBrandStroke1) 45%, var(--colorNeutralStroke2))',
                           borderRadius: '0.9rem',
-                          background: 'rgba(0, 242, 254, 0.05)',
+                          background: 'color-mix(in srgb, var(--colorBrandBackground2) 12%, var(--colorNeutralBackground3))',
                         }}
                       >
                         <div><strong>Channels</strong><div>{youtubeValidationResult.channel_count}</div></div>
@@ -1736,9 +1844,9 @@ export function DigitalMarketingActivationWizard({
                           display: 'grid',
                           gap: '0.6rem',
                           padding: '0.9rem 1rem',
-                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          border: '1px solid var(--colorNeutralStroke2)',
                           borderRadius: '0.9rem',
-                          background: 'rgba(255, 255, 255, 0.02)',
+                          background: 'color-mix(in srgb, var(--colorNeutralBackground3) 74%, transparent)',
                         }}
                       >
                         <div style={{ fontWeight: 700 }}>Recent uploads (proof)</div>
@@ -1749,8 +1857,8 @@ export function DigitalMarketingActivationWizard({
                               style={{
                                 padding: '0.75rem 0.85rem',
                                 borderRadius: '0.75rem',
-                                background: 'rgba(0, 242, 254, 0.05)',
-                                border: '1px solid rgba(0, 242, 254, 0.12)',
+                                background: 'color-mix(in srgb, var(--colorBrandBackground2) 12%, var(--colorNeutralBackground3))',
+                                border: '1px solid color-mix(in srgb, var(--colorBrandStroke1) 38%, var(--colorNeutralStroke2))',
                               }}
                             >
                               <div style={{ fontWeight: 600 }}>{upload.title}</div>
@@ -1769,9 +1877,9 @@ export function DigitalMarketingActivationWizard({
                         style={{
                           padding: '0.9rem 1rem',
                           borderRadius: '0.9rem',
-                          border: '1px solid rgba(245, 158, 11, 0.28)',
-                          background: 'rgba(245, 158, 11, 0.08)',
-                          color: '#fcd34d',
+                          border: '1px solid color-mix(in srgb, var(--colorPaletteDarkOrangeBorder2) 70%, transparent)',
+                          background: 'color-mix(in srgb, var(--colorPaletteDarkOrangeBackground2) 55%, transparent)',
+                          color: 'var(--colorPaletteDarkOrangeForeground1)',
                           fontSize: '0.95rem',
                         }}
                       >
@@ -1790,27 +1898,16 @@ export function DigitalMarketingActivationWizard({
                     {oauthError && (
                       <div className="dma-wizard-oauth-error">{oauthError}</div>
                     )}
-
-                    {selectedPlatforms.includes('youtube') ? (
-                      <div className="dma-wizard-connect-next-step" data-testid="generate-youtube-draft-next-step-hint">
-                        Build Master Theme is next. The AI strategist will workshop your positioning, ask follow-up questions, and only unlock draft generation after you approve the final theme.
-                      </div>
-                    ) : null}
                   </div>
                 </div>
-              )}
 
-              {/* STEP 2 — Build Master Theme */}
-              {currentStep.id === 'theme' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-theme">
                   <div style={{ display: 'grid', gap: '1.75rem' }}>
-
-                    {/* PRIMARY: AI Strategy Workshop - Consultative chat-like interface */}
                     <div className="dma-wizard-theme-workshop-card">
                       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div>
-                          <div className="dma-wizard-section-label">Brief your DMA hire</div>
-                          <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>The assistant will ask only what it needs to build your first YouTube theme</div>
+                          <div className="dma-wizard-section-label">Strategy workspace</div>
+                          <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>I will keep turning the conversation into a sharper marketing brief and first content direction.</div>
                         </div>
                         <Badge
                           appearance="outline"
@@ -1819,88 +1916,6 @@ export function DigitalMarketingActivationWizard({
                         >
                           {isThemeApproved ? 'Approved' : strategyWorkshop.status === 'approval_ready' ? 'Ready for approval' : 'Discovery in progress'}
                         </Badge>
-                      </div>
-
-                      <div className="dma-wizard-theme-workshop-thread" data-testid="strategy-workshop-thread">
-                        <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
-                          <div className="dma-wizard-theme-workshop-message-role">Marketing Strategist</div>
-                          <div>
-                            {strategyWorkshop.assistant_message || 'Start the workshop and the strategist will quickly lock the strongest direction, not run a long intake interview.'}
-                          </div>
-                        </div>
-
-                        {strategyWorkshop.checkpoint_summary ? (
-                          <div className="dma-wizard-theme-workshop-insights">
-                            <div className="dma-wizard-theme-insight-card" data-testid="strategy-checkpoint-summary">
-                              <div className="dma-wizard-theme-insight-label">What we've locked</div>
-                              <div>{strategyWorkshop.checkpoint_summary}</div>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {latestCustomerNote ? (
-                          <div className="dma-wizard-theme-latest-note">
-                            <div className="dma-wizard-theme-workshop-message-role">Latest customer note</div>
-                            <div>{latestCustomerNote}</div>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {strategyWorkshop.current_focus_question ? (
-                        <div>
-                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Next question</div>
-                          <div className="dma-wizard-theme-follow-up-question" data-testid="strategy-current-focus-question">{strategyWorkshop.current_focus_question}</div>
-                        </div>
-                      ) : null}
-
-                      {(strategyWorkshop.next_step_options || []).length > 0 ? (
-                        <div>
-                          <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick answers</div>
-                          <div className="dma-wizard-theme-option-list">
-                            {(strategyWorkshop.next_step_options || []).map((option, index) => (
-                              <Button
-                                key={`${option}-${index}`}
-                                appearance="secondary"
-                                size="small"
-                                onClick={() => handleStrategyOption(option)}
-                                disabled={readOnly || themePlanLoading}
-                                data-testid={`strategy-option-${index}`}
-                              >
-                                {option}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        <span style={{ fontWeight: 600 }}>Your answer or instruction</span>
-                        <Textarea
-                          aria-label="Strategy workshop reply"
-                          value={strategyReply}
-                          onChange={(_, data) => setStrategyReply(data.value)}
-                          disabled={readOnly}
-                          resize="vertical"
-                          rows={3}
-                          placeholder="Tell the strategist about your ideal customer, business goals, positioning, or anything the strategy must respect."
-                        />
-                      </label>
-
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <Button
-                          appearance="primary"
-                          onClick={() => void generateThemePlan()}
-                          disabled={readOnly || themePlanLoading || !brandName.trim()}
-                          data-testid="start-theme-workshop-btn"
-                        >
-                          {themePlanLoading
-                            ? 'Strategist is thinking…'
-                            : latestCustomerNote || strategyWorkshop.assistant_message
-                              ? 'Send to strategist'
-                              : 'Start AI workshop'}
-                        </Button>
-                        {themePlanLoading ? <Spinner size="tiny" /> : null}
-                        {!brandName.trim() ? <span style={{ opacity: 0.6, fontSize: '0.85rem' }}>Enter brand name first</span> : null}
                       </div>
 
                       <div>
@@ -2003,7 +2018,7 @@ export function DigitalMarketingActivationWizard({
                           {isThemeApproved ? 'Strategy approved' : 'Approve strategy'}
                         </Button>
                         {isThemeApproved ? (
-                          <span style={{ color: '#10b981', fontSize: '0.85rem' }}>Draft generation is now unlocked.</span>
+                          <span style={{ color: 'var(--colorPaletteGreenForeground1)', fontSize: '0.85rem' }}>Draft generation is now unlocked.</span>
                         ) : (
                           <span style={{ opacity: 0.7, fontSize: '0.85rem' }}>Approve only when the positioning and content lanes feel final.</span>
                         )}
@@ -2012,7 +2027,6 @@ export function DigitalMarketingActivationWizard({
                       {renderDraftGenerationPanel()}
                     </div>
 
-                    {/* SECONDARY: Optional structured business fields (collapsed by default) */}
                     <details style={{ marginTop: '1rem' }}>
                       <summary style={{ cursor: 'pointer', fontWeight: 600, padding: '0.75rem', background: 'var(--colorNeutralBackground3)', borderRadius: '8px' }}>
                         Optional business context fields
@@ -2108,12 +2122,10 @@ export function DigitalMarketingActivationWizard({
                     </details>
                   </div>
                 </div>
-              )}
 
-              {/* STEP 5 — Confirm Schedule */}
-              {currentStep.id === 'schedule' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-schedule">
                   <div style={{ display: 'grid', gap: '1.25rem' }}>
+                    <div className="dma-chat-section-title">Publishing plan</div>
                     <div>
                       <div className="dma-wizard-section-label">Posting schedule</div>
                       <div className="dma-wizard-form-grid">
@@ -2154,8 +2166,10 @@ export function DigitalMarketingActivationWizard({
                               style={{
                                 padding: '0.4rem 0.9rem',
                                 borderRadius: '999px',
-                                border: `1px solid ${isSelected ? 'rgba(0,242,254,0.5)' : 'var(--colorNeutralStroke2)'}`,
-                                background: isSelected ? 'rgba(0,242,254,0.1)' : 'rgba(255,255,255,0.03)',
+                                border: `1px solid ${isSelected ? 'color-mix(in srgb, var(--colorBrandStroke1) 70%, transparent)' : 'var(--colorNeutralStroke2)'}`,
+                                background: isSelected
+                                  ? 'color-mix(in srgb, var(--colorBrandBackground2) 18%, var(--colorNeutralBackground3))'
+                                  : 'color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent)',
                                 color: 'inherit',
                                 cursor: readOnly ? 'default' : 'pointer',
                                 fontWeight: isSelected ? 700 : 400,
@@ -2183,13 +2197,10 @@ export function DigitalMarketingActivationWizard({
                     )}
                   </div>
                 </div>
-              )}
 
-              {/* STEP 6 — Review & Activate */}
-              {currentStep.id === 'activate' && (
                 <div className="dma-wizard-step-content" data-testid="dma-step-panel-activate">
                   <div style={{ display: 'grid', gap: '1.5rem' }}>
-                    {/* Readiness checklist */}
+                    <div className="dma-chat-section-title">Activation</div>
                     <div>
                       <div className="dma-wizard-section-label">Activation readiness</div>
                       <div style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '14px', overflow: 'hidden' }}>
@@ -2209,7 +2220,6 @@ export function DigitalMarketingActivationWizard({
                       </div>
                     </div>
 
-                    {/* Missing requirements */}
                     {readiness.missing_requirements?.length > 0 ? (
                       <FeedbackMessage
                         intent="warning"
@@ -2218,10 +2228,9 @@ export function DigitalMarketingActivationWizard({
                       />
                     ) : null}
 
-                    {/* Activation status */}
                     {readiness.can_finalize ? (
                       <div style={{ display: 'grid', gap: '0.6rem' }}>
-                        <div style={{ color: '#10b981', fontWeight: 600 }}>
+                        <div style={{ color: 'var(--colorPaletteGreenForeground1)', fontWeight: 600 }}>
                           ✓ Agent is ready to activate
                         </div>
                         {readOnly ? (
@@ -2239,42 +2248,30 @@ export function DigitalMarketingActivationWizard({
                     {finishStatus === 'success' || activation?.workspace.activation_complete ? (
                       <FeedbackMessage intent="success" title="Setup complete" message="This hire now has channels, theme plan, and schedule confirmed." />
                     ) : null}
+
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Button
+                        appearance="primary"
+                        onClick={() => void finishActivation()}
+                        disabled={readOnly || finishStatus === 'saving' || !readiness.can_finalize}
+                      >
+                        {finishStatus === 'saving' ? 'Activating…' : 'Activate Agent'}
+                      </Button>
+                      <Button
+                        appearance="secondary"
+                        onClick={() => {
+                          void saveWorkspace()
+                          void saveProfile()
+                          void saveBrandVoice()
+                        }}
+                        disabled={readOnly || saveStatus === 'saving'}
+                      >
+                        {saveStatus === 'saving' ? 'Saving…' : 'Save progress'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              )}
-
-            </div>
-
-              <div className="dma-wizard-action-bar">
-              <div className="dma-wizard-action-bar-left">
-                <SaveIndicator status={saveStatus} errorMessage={saveError || undefined} />
-              </div>
-              <div className="dma-wizard-action-bar-right">
-                <Button
-                  appearance="subtle"
-                  onClick={() => setActiveStepIndex(i => Math.max(0, i - 1))}
-                  disabled={activeStepIndex === 0}
-                >
-                  Back
-                </Button>
-                {activeStepIndex < DMA_STEPS.length - 1 ? (
-                  <Button
-                    appearance="primary"
-                    onClick={() => void handleContinue()}
-                    disabled={saveStatus === 'saving'}
-                  >
-                    {saveStatus === 'saving' ? 'Saving…' : 'Continue'}
-                  </Button>
-                ) : (
-                  <Button
-                    appearance="primary"
-                    onClick={() => void finishActivation()}
-                    disabled={readOnly || finishStatus === 'saving' || !readiness.can_finalize}
-                  >
-                    {finishStatus === 'saving' ? 'Activating…' : 'Activate Agent'}
-                  </Button>
-                )}
-              </div>
+ 
             </div>
             </div>
           </Card>
@@ -2386,13 +2383,13 @@ export function StrategyPreviewPanel({
     }
 
     return (
-      <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid #333', borderRadius: '0.75rem', background: '#1a1a1a' }}>
-        <h4 style={{ margin: '0 0 0.5rem', color: '#00f2fe' }}>Review your content strategy before approving</h4>
-        <blockquote style={{ borderLeft: '3px solid #667eea', paddingLeft: '1rem', margin: '0.5rem 0', color: '#ccc' }}>
+      <div style={{ marginBottom: '1rem', padding: '1rem', border: '1px solid var(--colorNeutralStroke2)', borderRadius: '0.75rem', background: 'var(--colorNeutralBackground3)' }}>
+        <h4 style={{ margin: '0 0 0.5rem', color: 'var(--colorBrandForeground1)' }}>Review your content strategy before approving</h4>
+        <blockquote style={{ borderLeft: '3px solid var(--colorBrandStroke1)', paddingLeft: '1rem', margin: '0.5rem 0', color: 'var(--colorNeutralForeground2)' }}>
           {summary}
         </blockquote>
         {thread.map((msg, index) => (
-          <div key={`${msg.role}-${index}`} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? '#00f2fe' : '#ccc' }}>
+          <div key={`${msg.role}-${index}`} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? 'var(--colorBrandForeground1)' : 'var(--colorNeutralForeground2)' }}>
             <strong>{msg.role === 'assistant' ? 'Agent' : 'You'}:</strong> {msg.content}
           </div>
         ))}
@@ -2433,7 +2430,7 @@ export function StrategyPreviewPanel({
         <div style={{ marginBottom: thread.length ? '0.75rem' : 0 }}>{summary}</div>
       ) : null}
       {thread.map((msg, index) => (
-        <div key={`${msg.role}-${index}`} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? '#00f2fe' : '#ccc' }}>
+        <div key={`${msg.role}-${index}`} style={{ margin: '0.25rem 0', color: msg.role === 'assistant' ? 'var(--colorBrandForeground1)' : 'var(--colorNeutralForeground2)' }}>
           <strong>{msg.role === 'assistant' ? 'Agent' : 'You'}:</strong> {msg.content}
         </div>
       ))}

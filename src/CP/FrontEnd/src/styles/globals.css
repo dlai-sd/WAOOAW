@@ -3764,10 +3764,12 @@ section[id] {
   min-height: var(--dma-wizard-pane-height);
   padding: 22px;
   border-radius: 28px;
+  border: 1px solid var(--colorNeutralStroke2);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
   background:
-    radial-gradient(circle at top left, rgba(0, 242, 254, 0.12), transparent 28%),
-    radial-gradient(circle at top right, rgba(102, 126, 234, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(24, 24, 27, 0.98) 0%, rgba(18, 18, 22, 0.98) 100%);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--colorBrandBackground) 16%, transparent), transparent 30%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--colorPaletteLightTealBackground2) 14%, transparent), transparent 34%),
+    linear-gradient(180deg, var(--colorNeutralBackground1) 0%, var(--colorNeutralBackground2) 100%);
 }
 
 .dma-wizard-brief-panel {
@@ -3784,6 +3786,123 @@ section[id] {
   border-radius: 22px;
   display: grid;
   gap: 14px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: linear-gradient(180deg, var(--colorNeutralBackground1) 0%, var(--colorNeutralBackground2) 100%);
+}
+
+.dma-chat-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.dma-chat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dma-chat-header-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dma-chat-summary-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--colorBrandStroke1) 50%, var(--colorNeutralStroke2));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--colorBrandBackground) 8%, var(--colorNeutralBackground1)) 0%, var(--colorNeutralBackground2) 100%);
+}
+
+.dma-chat-summary-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.dma-chat-summary-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--colorNeutralForeground1);
+}
+
+.dma-chat-summary-subtitle {
+  color: var(--colorNeutralForeground2);
+  line-height: 1.6;
+}
+
+.dma-chat-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dma-chat-summary-column {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 55%, transparent);
+}
+
+.dma-chat-summary-column ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  color: var(--colorNeutralForeground2);
+}
+
+.dma-chat-summary-label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--colorNeutralForeground3);
+}
+
+.dma-chat-thread {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.dma-chat-history-card,
+.dma-chat-insight-card,
+.dma-chat-focus-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 72%, transparent);
+}
+
+.dma-chat-history-title,
+.dma-chat-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--colorNeutralForeground3);
+}
+
+.dma-chat-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.dma-chat-insight-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--colorNeutralForeground3);
 }
 
 .dma-wizard-hero {
@@ -3899,6 +4018,11 @@ section[id] {
   padding: 6px 4px 8px 0;
 }
 
+.dma-wizard-step-content {
+  display: grid;
+  gap: 18px;
+}
+
 .dma-wizard-action-bar {
   display: flex;
   align-items: center;
@@ -4006,14 +4130,14 @@ section[id] {
   padding: 14px;
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 14px;
-  background: rgba(255,255,255,0.03);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 72%, transparent);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .dma-wizard-platform-card.is-selected {
   border-color: rgba(0,242,254,0.6);
-  background: rgba(0,242,254,0.08);
+  background: color-mix(in srgb, var(--colorBrandBackground2) 14%, transparent);
 }
 
 .dma-wizard-section-label {
@@ -4027,8 +4151,8 @@ section[id] {
 .dma-wizard-copy-card {
   padding: 0.95rem 1rem;
   border-radius: 16px;
-  border: 1px solid rgba(0,242,254,0.18);
-  background: rgba(0,242,254,0.05);
+  border: 1px solid color-mix(in srgb, var(--colorBrandStroke1) 45%, var(--colorNeutralStroke2));
+  background: color-mix(in srgb, var(--colorBrandBackground2) 12%, var(--colorNeutralBackground3));
   color: var(--colorNeutralForeground2);
   line-height: 1.6;
 }
@@ -4050,8 +4174,8 @@ section[id] {
   gap: 0.35rem;
   padding: 0.9rem 0.95rem;
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 75%, transparent);
 }
 
 .dma-wizard-brief-summary-card span {
@@ -4084,13 +4208,13 @@ section[id] {
   gap: 12px;
   padding: 0.85rem 0.95rem;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 75%, transparent);
 }
 
 .dma-wizard-status-item.is-done {
   border-color: rgba(16,185,129,0.24);
-  background: rgba(16,185,129,0.06);
+  background: color-mix(in srgb, var(--colorPaletteGreenBackground2) 34%, transparent);
 }
 
 .dma-wizard-review-row {
@@ -4154,7 +4278,7 @@ section[id] {
   padding: 16px;
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 74%, transparent);
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -4162,14 +4286,14 @@ section[id] {
 }
 
 .dma-wizard-agent-card:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--colorNeutralBackground4) 82%, transparent);
   border-color: rgba(0, 242, 254, 0.35);
   transform: translateY(-2px);
 }
 
 .dma-wizard-agent-card.is-selected {
   border-color: rgba(0, 242, 254, 0.6);
-  background: rgba(0, 242, 254, 0.08);
+  background: color-mix(in srgb, var(--colorBrandBackground2) 14%, transparent);
   box-shadow: 0 0 0 1px rgba(0, 242, 254, 0.25);
 }
 
@@ -4199,7 +4323,7 @@ section[id] {
   padding: 14px 16px;
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent);
 }
 
 .dma-wizard-platform-connect-row--disabled {
@@ -4227,24 +4351,13 @@ section[id] {
   flex-shrink: 0;
 }
 
-.dma-wizard-connect-next-step {
-  margin-top: 1rem;
-  padding: 0.95rem 1rem;
-  border: 1px solid rgba(0,242,254,0.24);
-  border-radius: 12px;
-  background: rgba(0,242,254,0.05);
-  color: var(--colorNeutralForeground2);
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-
 .dma-wizard-theme-workshop-card {
   display: grid;
   gap: 1rem;
   padding: 1rem;
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(0,242,254,0.06), rgba(255,255,255,0.02));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--colorBrandBackground2) 10%, var(--colorNeutralBackground1)) 0%, var(--colorNeutralBackground2) 100%);
 }
 
 .dma-wizard-theme-workshop-thread {
@@ -4263,8 +4376,8 @@ section[id] {
   gap: 0.35rem;
   padding: 0.85rem 0.95rem;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent);
 }
 
 .dma-wizard-theme-insight-label {
@@ -4280,17 +4393,17 @@ section[id] {
   padding: 0.9rem 1rem;
   border-radius: 14px;
   border: 1px solid var(--colorNeutralStroke2);
-  background: rgba(255,255,255,0.04);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 78%, transparent);
 }
 
 .dma-wizard-theme-workshop-message--assistant {
-  border-color: rgba(0,242,254,0.28);
-  background: rgba(0,242,254,0.08);
+  border-color: color-mix(in srgb, var(--colorBrandStroke1) 55%, var(--colorNeutralStroke2));
+  background: color-mix(in srgb, var(--colorBrandBackground2) 16%, var(--colorNeutralBackground2));
 }
 
 .dma-wizard-theme-workshop-message--user {
-  border-color: rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.03);
+  border-color: var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent);
 }
 
 .dma-wizard-theme-workshop-message-role {
@@ -4303,8 +4416,8 @@ section[id] {
 .dma-wizard-theme-follow-up-question {
   padding: 0.7rem 0.9rem;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent);
   font-size: 0.9rem;
 }
 
@@ -4313,8 +4426,8 @@ section[id] {
   gap: 0.35rem;
   padding: 0.75rem 0.9rem;
   border-radius: 12px;
-  border: 1px dashed rgba(255,255,255,0.14);
-  background: rgba(255,255,255,0.02);
+  border: 1px dashed color-mix(in srgb, var(--colorNeutralStroke2) 85%, transparent);
+  background: color-mix(in srgb, var(--colorNeutralBackground2) 85%, transparent);
 }
 
 .dma-wizard-theme-option-list {
@@ -4335,8 +4448,8 @@ section[id] {
   gap: 0.35rem;
   padding: 0.85rem 0.95rem;
   border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--colorNeutralStroke2);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent);
 }
 
 .dma-wizard-theme-summary-card span {
@@ -4355,7 +4468,7 @@ section[id] {
   padding: 1rem;
   border: 1px solid var(--colorNeutralStroke2);
   border-radius: 14px;
-  background: rgba(255,255,255,0.03);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent);
 }
 
 .dma-wizard-connected-badge {
@@ -4375,7 +4488,7 @@ section[id] {
   align-items: center;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--colorNeutralBackground3) 78%, transparent);
   color: var(--colorNeutralForeground3);
   font-size: 0.78rem;
 }
@@ -4383,16 +4496,18 @@ section[id] {
 .dma-wizard-oauth-error {
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(239, 68, 68, 0.12);
-  color: #f87171;
+  border: 1px solid color-mix(in srgb, var(--colorPaletteRedBorder2) 70%, transparent);
+  background: color-mix(in srgb, var(--colorPaletteRedBackground1) 80%, transparent);
+  color: var(--colorPaletteRedForeground1);
   font-size: 0.85rem;
 }
 
 .dma-wizard-oauth-success {
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #34d399;
+  border: 1px solid color-mix(in srgb, var(--colorPaletteGreenBorder2) 70%, transparent);
+  background: color-mix(in srgb, var(--colorPaletteGreenBackground2) 70%, transparent);
+  color: var(--colorPaletteGreenForeground1);
   font-size: 0.85rem;
 }
 
