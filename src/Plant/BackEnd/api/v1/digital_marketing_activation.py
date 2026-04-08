@@ -189,6 +189,32 @@ def _normalize_string_list(raw_items: Any) -> list[str]:
     return [str(item or "").strip() for item in raw_items if str(item or "").strip()]
 
 
+def _complete_or_fallback_text(value: Any, fallback: str, *, max_length: int = 320) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+
+    compact = " ".join(text.split())[:max_length].strip()
+    if not compact:
+        return fallback
+
+    if compact[-1:] in {".", "!", "?"}:
+        return compact
+
+    sentence_end = max(compact.rfind("."), compact.rfind("!"), compact.rfind("?"))
+    if sentence_end >= 24:
+        return compact[: sentence_end + 1].strip()
+
+    if compact.endswith((" can we", " shall we", " should we", " let us", " let's")):
+        return fallback
+
+    last_word = compact.split(" ")[-1]
+    if len(last_word) <= 2:
+        return fallback
+
+    return compact
+
+
 def _base_workshop_summary(workspace: dict[str, Any]) -> dict[str, Any]:
     return {
         "profession_name": "",
@@ -323,12 +349,14 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
                 "profession_label": profession_label,
                 "profession_flavor": _profession_flavor(profession_label),
                 "free_model_rules": [
-                    "Keep every strategist reply to 1-2 short sentences and under 60 words unless an approval-ready summary is required.",
-                    "Respond to the latest turn and the existing thread. Do not restart the conversation, re-greet, or fall back to the same opener each turn.",
-                    "Do not repeat the user's last answer or restate facts that are already locked unless something materially changed.",
-                    "Give one insight, one recommendation, and at most one next question only if it is still needed.",
-                    "Provide 2-3 very short next-step options that save the customer's time.",
-                    "Sound like a premium strategist in live chat: consultative, targeted, commercially sharp, and calm.",
+                    "Keep the strategist response under 90 words and usually within 1-2 short sentences.",
+                    "Do not repeat the user's last answer in full.",
+                    "Do not restart the conversation or ask the customer to repeat context already present in the thread.",
+                    "Give one insight, one recommendation, and one next question only if still needed.",
+                    "Provide 2-3 short next-step options that save the customer's time.",
+                    "Sound like a premium strategist in live chat, not a setup wizard, checklist, or intake form.",
+                    "Keep the tone consultative, targeted, commercially sharp, and calm.",
+                    "Lead the conversation with confidence and warmth so the customer feels guided, not processed.",
                     "Move to approval_ready as soon as the strategy is coherent enough.",
                 ],
             },
@@ -352,7 +380,7 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
             },
             "pending_customer_input": pending_input,
             "response_contract": {
-                "assistant_message": "One thread-aware strategist reply in plain English. Keep it to 1-2 short sentences, make it consultative and specific, and only ask one focused question if the thread still needs it.",
+                "assistant_message": "One compact, high-conviction, thread-aware strategist reply in plain English. It should feel like premium live chat: warm, commercially sharp, and easy to respond to.",
                 "checkpoint_summary": "One short paragraph summarizing what is now locked.",
                 "current_focus_question": "At most one high-value question. Empty string if not needed.",
                 "next_step_options": ["Two or three short suggested next moves."],
@@ -414,20 +442,6 @@ def _normalize_derived_themes(raw_derived: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def _sanitize_theme_value(value: Any, fallback: str = "Digital marketing activation plan") -> str:
-    candidate = str(value or "").strip()
-    if len(candidate) < 3:
-        return fallback
-
-    if candidate in {"{", "}", "[", "]", "{}", "[]"}:
-        return fallback
-
-    if candidate.startswith("{") or candidate.startswith("["):
-        return fallback
-
-    return candidate[:160]
-
-
 def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
     cleaned = str(raw_text or "").strip()
     if not cleaned:
@@ -435,12 +449,17 @@ def _parse_theme_plan(raw_text: str) -> tuple[str, list[dict[str, Any]]]:
     try:
         payload = json.loads(cleaned)
     except json.JSONDecodeError:
-        return _sanitize_theme_value(cleaned.splitlines()[0][:120]), []
+        candidate = cleaned.splitlines()[0] if cleaned.splitlines() else cleaned
+        return _complete_or_fallback_text(candidate, "Digital marketing activation plan", max_length=180), []
 
     if not isinstance(payload, dict):
         return "Digital marketing activation plan", []
 
-    master_theme = _sanitize_theme_value(payload.get("master_theme") or payload.get("theme"))
+    master_theme = _complete_or_fallback_text(
+        payload.get("master_theme") or payload.get("theme"),
+        "Digital marketing activation plan",
+        max_length=180,
+    )
     return master_theme or "Digital marketing activation plan", _normalize_derived_themes(payload.get("derived_themes"))
 
 
@@ -452,7 +471,7 @@ def _parse_theme_workshop_response(
     pending_input: str,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     cleaned = str(raw_text or "").strip()
-    fallback_message = "I can sharpen this quickly. What single business result should this content drive first?"
+    fallback_message = "I can take this forward quickly. Tell me the one business result this content must drive first, and I will turn that into a sharper direction."
 
     if not cleaned:
         workshop = _normalize_strategy_workshop(existing_workshop, workspace)
@@ -474,10 +493,13 @@ def _parse_theme_workshop_response(
         workshop = _normalize_strategy_workshop(existing_workshop, workspace)
         if pending_input:
             workshop["messages"] = [*workshop["messages"], {"role": "user", "content": pending_input}]
-        assistant_message = _sanitize_theme_value(master_theme, fallback_message)
+        assistant_message = _complete_or_fallback_text(master_theme, fallback_message)
         workshop["assistant_message"] = assistant_message
         workshop["status"] = "approval_ready" if derived_themes else "discovery"
-        workshop["checkpoint_summary"] = _sanitize_theme_value(master_theme, "The core strategy is taking shape, but it still needs one stronger decision.")
+        workshop["checkpoint_summary"] = _complete_or_fallback_text(
+            master_theme,
+            "The core strategy is taking shape, but it still needs one stronger decision.",
+        )
         workshop["current_focus_question"] = ""
         workshop["next_step_options"] = ["Approve this direction", "Sharpen the audience", "Suggest a different first angle"]
         workshop["time_saving_note"] = "I have collapsed your earlier answers into one working direction so we do not keep restating the same inputs."
@@ -487,12 +509,16 @@ def _parse_theme_workshop_response(
     if not isinstance(payload, dict):
         return _parse_theme_workshop_response("", workspace=workspace, existing_workshop=existing_workshop, pending_input=pending_input)
 
-    master_theme = _sanitize_theme_value(
-        payload.get("master_theme") or payload.get("theme") or existing_workshop.get("master_theme")
+    master_theme = _complete_or_fallback_text(
+        payload.get("master_theme") or payload.get("theme") or existing_workshop.get("master_theme"),
+        "Digital marketing activation plan",
+        max_length=180,
     )
     derived_themes = _normalize_derived_themes(payload.get("derived_themes"))
-    assistant_message = str(payload.get("assistant_message") or "").strip() or (master_theme if derived_themes else fallback_message)
-    assistant_message = _sanitize_theme_value(assistant_message, fallback_message)
+    assistant_message = _complete_or_fallback_text(
+        payload.get("assistant_message") or (master_theme if derived_themes else fallback_message),
+        fallback_message,
+    )
     workshop = _normalize_strategy_workshop(payload.get("strategy_workshop") or payload, workspace)
 
     if pending_input:
@@ -502,8 +528,15 @@ def _parse_theme_workshop_response(
 
     workshop["assistant_message"] = assistant_message
     workshop["messages"] = [*workshop["messages"], {"role": "assistant", "content": assistant_message}]
-    workshop["checkpoint_summary"] = str(payload.get("checkpoint_summary") or workshop.get("checkpoint_summary") or "").strip()
-    workshop["current_focus_question"] = str(payload.get("current_focus_question") or workshop.get("current_focus_question") or "").strip()
+    workshop["checkpoint_summary"] = _complete_or_fallback_text(
+        payload.get("checkpoint_summary") or workshop.get("checkpoint_summary"),
+        "The core strategy is taking shape, but it still needs one stronger decision.",
+    )
+    workshop["current_focus_question"] = _complete_or_fallback_text(
+        payload.get("current_focus_question") or workshop.get("current_focus_question"),
+        "",
+        max_length=220,
+    )
     workshop["time_saving_note"] = str(payload.get("time_saving_note") or workshop.get("time_saving_note") or "").strip()
     if payload.get("next_step_options"):
         workshop["next_step_options"] = _normalize_string_list(payload.get("next_step_options"))
@@ -605,8 +638,6 @@ async def _persist_theme_plan_to_campaign(
         },
         "schedule": dict(campaign_setup.get("schedule") or {}),
     }
-    safe_master_theme = _sanitize_theme_value(master_theme)
-    activation_payload["theme_plan"]["master_theme"] = safe_master_theme
     brief = campaigns_module.build_campaign_brief_from_activation_payload(activation_payload)
     cost_estimate = estimate_cost(brief, model_used="grok-3-latest")
 
@@ -832,8 +863,7 @@ async def generate_theme_plan(
         hired_agents_simple._assert_customer_owns_record(record, body.customer_id)
     _ensure_supported_record(record)
 
-    persisted_workspace = _workspace_from_config(record.config)
-    workspace = {**persisted_workspace, **dict(body.workspace or {})}
+    workspace = _workspace_from_config(record.config)
     existing_campaign_setup = dict(workspace.get("campaign_setup") or {})
     campaign_setup = {
         **existing_campaign_setup,
@@ -898,11 +928,9 @@ async def generate_theme_plan(
     if db is not None:
         await db.commit()
 
-    safe_master_theme = _sanitize_theme_value(master_theme)
-
     return ThemePlanResponse(
         campaign_id=campaign_id,
-        master_theme=safe_master_theme,
+        master_theme=master_theme,
         derived_themes=derived_themes,
         workspace=persisted_workspace,
     )

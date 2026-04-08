@@ -23,7 +23,7 @@ def get_plant_gateway_client() -> PlantGatewayClient:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")
     if not base_url:
         raise HTTPException(status_code=503, detail="PLANT_GATEWAY_URL not configured")
-    return PlantGatewayClient(base_url=base_url)
+    return PlantGatewayClient(base_url=base_url, timeout_seconds=25.0)
 
 
 def _forward_headers(request: Request) -> Dict[str, str]:
