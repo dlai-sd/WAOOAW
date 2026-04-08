@@ -210,6 +210,13 @@ When implementing a user journey end-to-end, the definition of "done" is:
 ## Common commands reference
 
 ```bash
+# Codespaces review build — supported path only
+bash .devcontainer/gcp-auth.sh
+bash scripts/codespace-stack.sh clean
+docker image prune -f
+bash scripts/codespace-stack.sh up cp
+bash scripts/codespace-stack.sh urls
+
 # Start all services locally
 docker-compose -f docker-compose.local.yml up -d
 
@@ -242,6 +249,14 @@ gcloud run revisions list --service=<SERVICE> --region=asia-south1 --project=wao
 # When Terraform apply exits with "container failed to start and listen on PORT", the above
 # commands give the exact Python traceback — use them before reading any other file.
 ```
+
+## Codespaces review-build rules
+
+- Use the repo's existing assets only: `.devcontainer/gcp-auth.sh`, `.codespace/demo.env`, `docker-compose.local.yml`, `docker-compose.codespace.yml`, and `scripts/codespace-stack.sh`.
+- Before any fresh Codespaces build, remove stale WAOOAW-local images with `bash scripts/codespace-stack.sh clean` and `docker image prune -f`.
+- Rebuild or restart through `scripts/codespace-stack.sh`, not ad-hoc Docker commands, unless you are diagnosing the wrapper itself.
+- Publish the review URL from `bash scripts/codespace-stack.sh urls` so the shared URL matches the live stack.
+- If the stack fails after cleanup and restart, run `bash scripts/codespace-stack.sh doctor` before debugging application code.
 
 ---
 
