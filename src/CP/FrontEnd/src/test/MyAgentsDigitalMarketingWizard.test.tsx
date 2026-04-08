@@ -445,6 +445,16 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('strategy-assistant-message')).toBeInTheDocument()
   })
 
+  it('uses a scrollable chat viewport and visual bubble styling without inline role labels', async () => {
+    const { container } = renderWizard()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('dma-chat-scroll-region')).toBeInTheDocument()
+    })
+
+    expect(container.querySelector('.dma-wizard-theme-workshop-message-role')).toBeNull()
+  })
+
   it('keeps connect, theme, schedule, and activation sections available in one flow', async () => {
     renderWizard()
     await waitFor(() => {
@@ -1363,8 +1373,19 @@ describe('DMA Activation Wizard — step navigation', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Chat with your DMA' })).toBeInTheDocument()
     })
-    expect(screen.getByText('Message your DMA')).toBeInTheDocument()
+    expect(screen.queryByText('Keep feeding the brief')).not.toBeInTheDocument()
+    expect(screen.queryByText('Message your DMA')).not.toBeInTheDocument()
     expect(screen.getByTestId('dma-chat-thread')).toBeInTheDocument()
+    expect(screen.getByTestId('dma-chat-composer')).toBeInTheDocument()
+    expect(screen.getByLabelText('Strategy workshop reply')).toHaveAttribute(
+      'placeholder',
+      'Describe your business, audience, offer, or ask for the sharpest next move.'
+    )
+    expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Start with DMA' })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Strategy workshop reply'), {
+      target: { value: 'Sharpen the current direction for me.' },
+    })
     expect(screen.getByTestId('start-theme-workshop-btn')).toBeEnabled()
     expect(screen.getByTestId('start-theme-workshop-btn')).toHaveAttribute('type', 'button')
   })

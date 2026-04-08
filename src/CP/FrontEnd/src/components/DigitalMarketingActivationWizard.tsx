@@ -418,6 +418,8 @@ export function DigitalMarketingActivationWizard({
   const [postActionStatus, setPostActionStatus] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
   const [postPublishReceipts, setPostPublishReceipts] = useState<Record<string, string>>({})
   const [queueDateTime, setQueueDateTime] = useState<Record<string, string>>({})
+  const chatScrollRef = useRef<HTMLDivElement | null>(null)
+  const [activeBriefSection, setActiveBriefSection] = useState<'brief' | 'objective' | 'status' | 'next' | 'controls'>('brief')
   const profileRef = useRef<ProfileData | null>(null)
 
   const hiredInstanceId = useMemo(
@@ -755,6 +757,37 @@ export function DigitalMarketingActivationWizard({
     if (strategyWorkshop.assistant_message) return strategyWorkshop.assistant_message
     return `I have picked the conversation back up and I am ready to tighten the brief, unblock the next decision, and move this toward approved publishing.`
   }, [isFirstConversation, strategyWorkshop.assistant_message])
+  const chatMessages = useMemo(() => {
+    const messages = conversationHistory
+      .map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: String(message.content || '').trim(),
+      }))
+      .filter((message) => message.content)
+
+    if (messages.length === 0) {
+      return [{ role: 'assistant' as const, content: openingAssistantMessage }]
+    }
+
+    const latestAssistantMessage = String(strategyWorkshop.assistant_message || '').trim()
+    const lastMessage = messages[messages.length - 1]
+    if (
+      latestAssistantMessage
+      && (lastMessage?.role !== 'assistant' || lastMessage.content !== latestAssistantMessage)
+    ) {
+      messages.push({ role: 'assistant', content: latestAssistantMessage })
+    }
+
+    return messages
+  }, [conversationHistory, openingAssistantMessage, strategyWorkshop.assistant_message])
+
+  useEffect(() => {
+    const chatScrollElement = chatScrollRef.current
+    if (!chatScrollElement) return
+    chatScrollElement.scrollTop = chatScrollElement.scrollHeight
+  }, [chatMessages.length, themePlanLoading])
+
+  const canSendStrategyReply = Boolean(strategyReply.trim()) && !readOnly && !themePlanLoading
   const operatingChecklist = useMemo(() => ([
     {
       label: 'YouTube identity attached',
@@ -803,6 +836,19 @@ export function DigitalMarketingActivationWizard({
     if (currentStep.id === 'schedule') return scheduleStartDate.trim() ? 'Cadence set' : 'Cadence needed'
     return readiness.can_finalize ? 'Ready to activate' : 'Review blockers'
   }, [currentStep.id, isThemeApproved, isYouTubeAttached, readiness.can_finalize, scheduleStartDate])
+  const composerPlaceholder = useMemo(() => {
+    const focusQuestion = String(strategyWorkshop.current_focus_question || '').trim()
+    if (focusQuestion) return focusQuestion
+    return 'Describe your business, audience, offer, or ask for the sharpest next move.'
+  }, [strategyWorkshop.current_focus_question])
+  const controlsPreview = useMemo(() => {
+    if (missingProfileFields.length > 0) return `Still needed: ${missingProfileFields.join(', ')}`
+    return 'Business details, channel setup, strategy, and activation controls'
+  }, [missingProfileFields])
+  const statusPreview = useMemo(() => {
+    const readyCount = operatingChecklist.filter((item) => item.ok).length
+    return `${readyCount}/${operatingChecklist.length} ready`
+  }, [operatingChecklist])
 
   useEffect(() => {
     if (currentStep.id === 'connect') {
@@ -1880,6 +1926,11 @@ export function DigitalMarketingActivationWizard({
     void generateThemePlan(normalizedOption)
   }
 
+  const handleStrategySubmit = () => {
+    if (!canSendStrategyReply) return
+    void generateThemePlan()
+  }
+
   const approveThemeStrategy = async () => {
     if (!hiredInstanceId || !masterTheme.trim()) return
     setThemePlanSaving(true)
@@ -2006,103 +2057,81 @@ export function DigitalMarketingActivationWizard({
               <div className="dma-wizard-canvas-body">
                 <div className="dma-wizard-step-content" data-testid="dma-chat-primary-panel">
                   <div className="dma-chat-thread" data-testid="dma-chat-thread">
-                    <div className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant" data-testid="strategy-assistant-message">
-                      <div className="dma-wizard-theme-workshop-message-role">DMA</div>
-                      <div>{isFirstConversation ? openingAssistantMessage : openingAssistantMessage || dmaIntroduction}</div>
+                    <div className="dma-chat-scroll-region" ref={chatScrollRef} data-testid="dma-chat-scroll-region">
+                      <div className="dma-chat-message-stack" data-testid="dma-chat-message-stack">
+                        {chatMessages.map((message, index) => (
+                          <div
+                            key={`${message.role}-${index}-${message.content.slice(0, 24)}`}
+                            className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
+                            data-testid={message.role === 'assistant' && index === chatMessages.length - 1 ? 'strategy-assistant-message' : undefined}
+                          >
+                            <div>{message.content}</div>
+                          </div>
+                        ))}
+
+                        {themePlanLoading ? (
+                          <div
+                            className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant dma-wizard-theme-workshop-message--pending"
+                            data-testid="strategy-thinking-indicator"
+                          >
+                            <div>Thinking through the brief and tightening the next decision...</div>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
 
-                    {!isFirstConversation ? (
-                      <div className="dma-chat-history-card">
-                        <div className="dma-chat-history-title">Recent conversation</div>
-                        <div className="dma-chat-history-list">
-                          {conversationHistory.map((message, index) => (
-                            <div
-                              key={`${message.role}-${index}-${message.content.slice(0, 12)}`}
-                              className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
-                            >
-                              <div className="dma-wizard-theme-workshop-message-role">{message.role === 'assistant' ? 'DMA' : 'You'}</div>
-                              <div>{message.content}</div>
-                            </div>
-                          ))}
+                    <div className="dma-chat-composer" data-testid="dma-chat-composer">
+                      {(strategyWorkshop.next_step_options || []).length > 0 ? (
+                        <div className="dma-chat-quick-replies">
+                          <div className="dma-wizard-theme-option-list">
+                            {(strategyWorkshop.next_step_options || []).map((option, index) => (
+                              <Button
+                                key={`${option}-${index}`}
+                                type="button"
+                                appearance="subtle"
+                                size="small"
+                                onClick={() => handleStrategyOption(option)}
+                                disabled={readOnly || themePlanLoading}
+                                data-testid={`strategy-option-${index}`}
+                              >
+                                {option}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="dma-chat-composer-body">
+                        <Textarea
+                          aria-label="Strategy workshop reply"
+                          className="dma-chat-composer-input"
+                          value={strategyReply}
+                          onChange={(_, data) => setStrategyReply(data.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                              event.preventDefault()
+                              handleStrategySubmit()
+                            }
+                          }}
+                          disabled={readOnly || themePlanLoading}
+                          resize="vertical"
+                          rows={3}
+                          placeholder={composerPlaceholder}
+                        />
+
+                        <div className="dma-chat-composer-actions">
+                          <Button
+                            type="button"
+                            appearance="primary"
+                            onClick={handleStrategySubmit}
+                            disabled={!canSendStrategyReply}
+                            data-testid="start-theme-workshop-btn"
+                          >
+                            Send
+                          </Button>
                         </div>
                       </div>
-                    ) : null}
-
-                    {strategyWorkshop.checkpoint_summary ? (
-                      <div className="dma-chat-insight-card" data-testid="strategy-checkpoint-summary">
-                        <div className="dma-chat-insight-label">What I have already understood</div>
-                        <div>{strategyWorkshop.checkpoint_summary}</div>
-                      </div>
-                    ) : null}
-
-                    {strategyWorkshop.current_focus_question ? (
-                      <div className="dma-chat-focus-card" data-testid="strategy-current-focus-question">
-                        <div className="dma-chat-insight-label">Best next answer</div>
-                        <div>{strategyWorkshop.current_focus_question}</div>
-                      </div>
-                    ) : null}
-
-                    <label style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <span style={{ fontWeight: 600 }}>Message your DMA</span>
-                      <Textarea
-                        aria-label="Strategy workshop reply"
-                        value={strategyReply}
-                        onChange={(_, data) => setStrategyReply(data.value)}
-                        disabled={readOnly}
-                        resize="vertical"
-                        rows={4}
-                        placeholder="Tell me about your business, audience, offer, growth goal, or ask me to sharpen the current direction."
-                      />
-                    </label>
-
-                    {(strategyWorkshop.next_step_options || []).length > 0 ? (
-                      <div>
-                        <div style={{ fontWeight: 600, marginBottom: '0.45rem' }}>Quick replies</div>
-                        <div className="dma-wizard-theme-option-list">
-                          {(strategyWorkshop.next_step_options || []).map((option, index) => (
-                            <Button
-                              key={`${option}-${index}`}
-                              type="button"
-                              appearance="secondary"
-                              size="small"
-                              onClick={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                handleStrategyOption(option)
-                              }}
-                              disabled={readOnly || themePlanLoading}
-                              data-testid={`strategy-option-${index}`}
-                            >
-                              {option}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Button
-                        type="button"
-                        appearance="primary"
-                        onClick={(event) => {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          void generateThemePlan()
-                        }}
-                        disabled={readOnly || themePlanLoading}
-                        data-testid="start-theme-workshop-btn"
-                      >
-                        {themePlanLoading
-                          ? 'DMA is thinking…'
-                          : latestCustomerNote || strategyWorkshop.assistant_message
-                            ? 'Send to DMA'
-                            : 'Start with DMA'}
-                      </Button>
-                      {themePlanLoading ? <Spinner size="tiny" /> : null}
-                      {!brandName.trim() ? (
-                        <span style={{ opacity: 0.72, fontSize: '0.85rem' }}>
-                          You can start here without setup. I will pull the brief from chat and you can fill the rail later if needed.
-                        </span>
+                      {themePlanError ? (
+                        <FeedbackMessage intent="error" title="DMA reply failed" message={themePlanError} />
                       ) : null}
                     </div>
 
@@ -2116,8 +2145,8 @@ export function DigitalMarketingActivationWizard({
         </section>
 
         <aside className="dma-wizard-brief-panel">
-          <Card className="dma-wizard-brief-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
+          <Card className="dma-wizard-brief-card dma-wizard-brief-card--accordion">
+            <div className="dma-wizard-brief-card-header">
               <div>
                 <div className="dma-wizard-section-label">Live business brief</div>
                 <Text as="h3" size={500} weight="semibold">What the DMA understands so far</Text>
@@ -2127,60 +2156,115 @@ export function DigitalMarketingActivationWizard({
               </Badge>
             </div>
 
-            <div className="dma-wizard-brief-summary" data-testid="dma-live-brief">
-              <div className="dma-wizard-brief-summary-card"><span>Business</span><strong>{businessLabel}</strong></div>
-              <div className="dma-wizard-brief-summary-card"><span>Location</span><strong>{locationLabel}</strong></div>
-              <div className="dma-wizard-brief-summary-card"><span>Target customers</span><strong>{audienceLabel}</strong></div>
-              <div className="dma-wizard-brief-summary-card"><span>Core offer</span><strong>{serviceFocusLabel}</strong></div>
-              <div className="dma-wizard-brief-summary-card"><span>Differentiator</span><strong>{differentiatorLabel}</strong></div>
-              <div className="dma-wizard-brief-summary-card"><span>First content direction</span><strong>{firstDirectionLabel}</strong></div>
-            </div>
-          </Card>
-
-          <Card className="dma-wizard-brief-card">
-            <div className="dma-wizard-section-label">Business objective</div>
-            <Text as="p" size={300}>{goalLabel}</Text>
-            {(strategySummary.content_pillars || []).length > 0 ? (
-              <div className="dma-wizard-pill-list">
-                {(strategySummary.content_pillars || []).map((pillar, index) => (
-                  <Badge key={`${pillar}-${index}`} appearance="filled" color="informative">{pillar}</Badge>
-                ))}
-              </div>
-            ) : null}
-          </Card>
-
-          <Card className="dma-wizard-brief-card">
-            <div className="dma-wizard-section-label">Operating status</div>
-            <div className="dma-wizard-status-list">
-              {operatingChecklist.map((item) => (
-                <div key={item.label} className={`dma-wizard-status-item${item.ok ? ' is-done' : ''}`}>
-                  <span>{item.label}</span>
-                  <Badge appearance="outline" color={item.ok ? 'success' : 'warning'}>
-                    {item.ok ? 'Ready' : 'Pending'}
-                  </Badge>
+            <div className="dma-brief-accordion">
+              <section className={`dma-brief-accordion-item${activeBriefSection === 'brief' ? ' is-open' : ''}`}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('brief')} aria-expanded={activeBriefSection === 'brief'}>
+                  <div className="dma-brief-accordion-heading">
+                    <span className="dma-wizard-section-label">Live business brief</span>
+                    <span className="dma-brief-accordion-title">What the DMA understands so far</span>
+                  </div>
+                  <span className="dma-brief-accordion-preview">{businessLabel}</span>
+                </button>
+                <div className={`dma-brief-accordion-panel${activeBriefSection === 'brief' ? '' : ' is-hidden'}`}>
+                  <div className="dma-wizard-brief-summary" data-testid="dma-live-brief">
+                    <div className="dma-wizard-brief-summary-card"><span>Business</span><strong>{businessLabel}</strong></div>
+                    <div className="dma-wizard-brief-summary-card"><span>Location</span><strong>{locationLabel}</strong></div>
+                    <div className="dma-wizard-brief-summary-card"><span>Target customers</span><strong>{audienceLabel}</strong></div>
+                    <div className="dma-wizard-brief-summary-card"><span>Core offer</span><strong>{serviceFocusLabel}</strong></div>
+                    <div className="dma-wizard-brief-summary-card"><span>Differentiator</span><strong>{differentiatorLabel}</strong></div>
+                    <div className="dma-wizard-brief-summary-card"><span>First content direction</span><strong>{firstDirectionLabel}</strong></div>
+                  </div>
+                  {strategyWorkshop.checkpoint_summary ? (
+                    <div className="dma-wizard-copy-card dma-wizard-copy-card--compact" data-testid="strategy-checkpoint-summary">
+                      {strategyWorkshop.checkpoint_summary}
+                    </div>
+                  ) : null}
                 </div>
-              ))}
-            </div>
-          </Card>
+              </section>
 
-          <Card className="dma-wizard-brief-card">
-            <div className="dma-wizard-section-label">Next action</div>
-            <Text as="p" size={300} data-testid="dma-next-action-copy">{nextActionCopy}</Text>
-            {missingProfileFields.length > 0 ? (
-              <div className="dma-wizard-copy-card dma-wizard-copy-card--compact">
-                Missing brief details: {missingProfileFields.join(', ')}.
-              </div>
-            ) : null}
-          </Card>
+              <section className={`dma-brief-accordion-item${activeBriefSection === 'objective' ? ' is-open' : ''}`}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('objective')} aria-expanded={activeBriefSection === 'objective'}>
+                  <div className="dma-brief-accordion-heading">
+                    <span className="dma-wizard-section-label">Business objective</span>
+                    <span className="dma-brief-accordion-title">What success should look like</span>
+                  </div>
+                  <span className="dma-brief-accordion-preview">{goalLabel}</span>
+                </button>
+                <div className={`dma-brief-accordion-panel${activeBriefSection === 'objective' ? '' : ' is-hidden'}`}>
+                  <Text as="p" size={300}>{goalLabel}</Text>
+                  {(strategySummary.content_pillars || []).length > 0 ? (
+                    <div className="dma-wizard-pill-list">
+                      {(strategySummary.content_pillars || []).map((pillar, index) => (
+                        <Badge key={`${pillar}-${index}`} appearance="filled" color="informative">{pillar}</Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
 
-          <Card className="dma-wizard-brief-card">
-            <div className="dma-wizard-section-label">Setup controls</div>
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {renderBusinessContextRail()}
-              {renderYouTubeControlRail()}
-              {renderStrategyControlRail()}
-              {renderScheduleControlRail()}
-              {renderActivationControlRail()}
+              <section className={`dma-brief-accordion-item${activeBriefSection === 'status' ? ' is-open' : ''}`}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('status')} aria-expanded={activeBriefSection === 'status'}>
+                  <div className="dma-brief-accordion-heading">
+                    <span className="dma-wizard-section-label">Operating status</span>
+                    <span className="dma-brief-accordion-title">Readiness signals</span>
+                  </div>
+                  <span className="dma-brief-accordion-preview">{statusPreview}</span>
+                </button>
+                <div className={`dma-brief-accordion-panel${activeBriefSection === 'status' ? '' : ' is-hidden'}`}>
+                  <div className="dma-wizard-status-list">
+                    {operatingChecklist.map((item) => (
+                      <div key={item.label} className={`dma-wizard-status-item${item.ok ? ' is-done' : ''}`}>
+                        <span className="dma-wizard-status-item-label">{item.label}</span>
+                        <Badge appearance="outline" color={item.ok ? 'success' : 'warning'}>
+                          {item.ok ? 'Ready' : 'Pending'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className={`dma-brief-accordion-item${activeBriefSection === 'next' ? ' is-open' : ''}`}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('next')} aria-expanded={activeBriefSection === 'next'}>
+                  <div className="dma-brief-accordion-heading">
+                    <span className="dma-wizard-section-label">Next action</span>
+                    <span className="dma-brief-accordion-title">What to answer or do next</span>
+                  </div>
+                  <span className="dma-brief-accordion-preview">{currentStep.title}</span>
+                </button>
+                <div className={`dma-brief-accordion-panel${activeBriefSection === 'next' ? '' : ' is-hidden'}`}>
+                  <Text as="p" size={300} data-testid="dma-next-action-copy">{nextActionCopy}</Text>
+                  {strategyWorkshop.current_focus_question ? (
+                    <div className="dma-wizard-copy-card dma-wizard-copy-card--compact" data-testid="strategy-current-focus-question">
+                      {strategyWorkshop.current_focus_question}
+                    </div>
+                  ) : null}
+                  {missingProfileFields.length > 0 ? (
+                    <div className="dma-wizard-copy-card dma-wizard-copy-card--compact">
+                      Missing brief details: {missingProfileFields.join(', ')}.
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className={`dma-brief-accordion-item${activeBriefSection === 'controls' ? ' is-open' : ''}`}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('controls')} aria-expanded={activeBriefSection === 'controls'}>
+                  <div className="dma-brief-accordion-heading">
+                    <span className="dma-wizard-section-label">Setup controls</span>
+                    <span className="dma-brief-accordion-title">Pin details and unlock activation</span>
+                  </div>
+                  <span className="dma-brief-accordion-preview">{controlsPreview}</span>
+                </button>
+                <div className={`dma-brief-accordion-panel dma-brief-accordion-panel--scrollable${activeBriefSection === 'controls' ? '' : ' is-hidden'}`}>
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    {renderBusinessContextRail()}
+                    {renderYouTubeControlRail()}
+                    {renderStrategyControlRail()}
+                    {renderScheduleControlRail()}
+                    {renderActivationControlRail()}
+                  </div>
+                </div>
+              </section>
             </div>
           </Card>
         </aside>

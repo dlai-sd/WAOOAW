@@ -169,6 +169,37 @@ def test_generate_theme_plan_falls_back_when_model_returns_json_fragment(test_cl
 
 
 @pytest.mark.unit
+def test_theme_workshop_prompt_requires_thread_aware_brief_consultative_replies():
+    import api.v1.digital_marketing_activation as dma_module
+
+    prompt = json.loads(
+        dma_module._theme_workshop_prompt(
+            {
+                "brand_name": "Acme Health",
+                "location": "Pune",
+                "offerings_services": ["Dental care"],
+                "platforms_enabled": ["youtube"],
+            },
+            {
+                "strategy_workshop": {
+                    "messages": [
+                        {"role": "assistant", "content": "What result matters most from this channel?"},
+                        {"role": "user", "content": "More qualified consultation leads from local families."},
+                    ]
+                }
+            },
+        )
+    )
+
+    rules = prompt["operating_mode"]["free_model_rules"]
+
+    assert any("1-2 short sentences" in rule for rule in rules)
+    assert any("Do not restart the conversation" in rule for rule in rules)
+    assert any("consultative, targeted, commercially sharp, and calm" in rule for rule in rules)
+    assert "thread-aware strategist reply" in prompt["response_contract"]["assistant_message"]
+
+
+@pytest.mark.unit
 def test_generate_theme_plan_trims_incomplete_assistant_message(test_client, monkeypatch):
     monkeypatch.setenv("PAYMENTS_MODE", "coupon")
     monkeypatch.setenv("PERSISTENCE_MODE", "memory")

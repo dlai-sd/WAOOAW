@@ -1027,6 +1027,45 @@ Static IP (waooaw-lb-ip)
 - **pgpass**: `/root/.pgpass` — enables passwordless `psql` (written by `gcp-auth.sh` from `${WAOOAW_CLOUDSQL_ENV}-plant-database-url` unless overridden)
 - **DB env file**: `/root/.env.db` — exports host/port/user/db only; passwordless `psql` works because `gcp-auth.sh` also writes `/root/.pgpass`
 
+#### Codespaces build assets — mandatory path for review builds
+
+For Codespaces build, restart, and review URL publishing, use the repo's existing assets together. Do not invent ad-hoc `docker build`, `docker run`, hand-written compose stacks, or guessed `app.github.dev` URLs.
+
+| Asset | Purpose |
+|------|---------|
+| `.devcontainer/gcp-auth.sh` | Activates the service account, starts Cloud SQL Auth Proxy on `15432`, writes `/root/.pgpass`, writes `/root/.env.db` |
+| `.codespace/demo.env` | Docker-consumable env file for the Codespaces demo stack |
+| `docker-compose.local.yml` | Base WAOOAW local service definitions |
+| `docker-compose.codespace.yml` | Codespaces overlay: Cloud SQL proxy path, forwarded ports, host-gateway wiring |
+| `scripts/codespace-stack.sh` | Supported wrapper for `build`, `up`, `restart`, `down`, `status`, `doctor`, and `urls` |
+
+**Required pre-build cleanup rule:** before any new Codespaces build, remove stale WAOOAW-local images so Compose does not silently reuse old layers or superseded service images.
+
+**First-attempt Codespaces build path:**
+```bash
+# 1. Restore GCP auth + Cloud SQL proxy
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
+
+# 2. Remove stale WAOOAW-local containers/images from prior runs
+bash /workspaces/WAOOAW/scripts/codespace-stack.sh clean
+docker image prune -f
+
+# 3. Rebuild and start using the repo's existing Codespaces assets
+bash /workspaces/WAOOAW/scripts/codespace-stack.sh up cp
+
+# 4. Publish the real review URLs from the repo wrapper
+bash /workspaces/WAOOAW/scripts/codespace-stack.sh urls
+```
+
+**Execution rule:** if a Codespaces review build behaves differently from the repo guidance, first prove these four facts before debugging application code:
+
+1. `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh` succeeded.
+2. `.codespace/demo.env` exists and is the env source for Compose.
+3. The stack was started through `scripts/codespace-stack.sh`, not manual Docker commands.
+4. The review URL being shared came from `scripts/codespace-stack.sh urls` and matches `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/`.
+
+**Maintenance rule:** if a new Codespaces build is required, repeat the cleanup before the rebuild. If the stack still misbehaves after cleanup, run `bash /workspaces/WAOOAW/scripts/codespace-stack.sh doctor` before changing application code.
+
 **First-attempt path:**
 ```bash
 # 0. Preconditions — verify these before spending time debugging
@@ -1105,6 +1144,8 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembi
 ### How to connect to Plant Cloud SQL from Codespace
 
 Agent rule: schema changes, persisted-behavior stories, and DB smoke validation should use the intended Cloud SQL environment through the Auth Proxy. Demo remains the default and the normal proving ground before UAT/prod; the Docker Postgres containers are only for isolated regression tests and must not be treated as the persistence source of truth.
+
+Agent rule for Codespaces review builds: the supported build/publish path is `.devcontainer/gcp-auth.sh` + `.codespace/demo.env` + `docker-compose.local.yml` + `docker-compose.codespace.yml` orchestrated through `scripts/codespace-stack.sh`. Before any fresh build, clear stale WAOOAW-local Docker images with `bash /workspaces/WAOOAW/scripts/codespace-stack.sh clean` and `docker image prune -f` so the review environment does not drift onto reused local layers.
 
 Cloud SQL `plant-sql-<env>` must be reached through the Cloud SQL Auth Proxy for IAM-based authentication — do not connect directly on port 5432.
 The normal Codespaces path is the public-IP-backed proxy listener on `127.0.0.1:15432`; if the selected instance drifts to private-IP-only, first re-enable public IP with `gcloud sql instances patch plant-sql-${WAOOAW_CLOUDSQL_ENV:-demo} --assign-ip --project=waooaw-oauth --quiet`, then rerun `bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh`.

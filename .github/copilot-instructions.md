@@ -34,6 +34,9 @@ WAOOAW is an AI agent marketplace platform where specialized AI agents earn busi
 - ✅ **VERIFY** ports are publicly accessible before sharing URLs
 - ✅ **TEST** the URL works before telling user it's ready
 - ✅ Use format: `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/`
+- ✅ **USE** the existing Codespaces assets for build/publish: `.devcontainer/gcp-auth.sh`, `.codespace/demo.env`, `docker-compose.local.yml`, `docker-compose.codespace.yml`, and `scripts/codespace-stack.sh`
+- ✅ **DELETE** stale WAOOAW-local Docker images before any fresh Codespaces build: `bash scripts/codespace-stack.sh clean` then `docker image prune -f`
+- ✅ **PUBLISH** review URLs from `bash scripts/codespace-stack.sh urls`, not from guessed or hand-assembled URLs
 
 **3. Port Configuration**
 - Frontend: 3000, 8080
@@ -337,6 +340,13 @@ def test_filter_agents_by_industry(industry, expected_count):
 - **Merge to develop**: Deploy to staging (auto)
 - **Tag v*.*.* **: Deploy to production (manual approval)
 - **Daily**: Security scans, dependency updates
+
+### Codespaces Build Workflow
+- Before a fresh Codespaces build, run `bash .devcontainer/gcp-auth.sh`.
+- Then remove stale WAOOAW-local images with `bash scripts/codespace-stack.sh clean` and `docker image prune -f`.
+- Rebuild/start only through `bash scripts/codespace-stack.sh up <scope>` or `restart <scope>`.
+- If the stack still behaves unexpectedly, run `bash scripts/codespace-stack.sh doctor` before changing app code.
+- Share only the URL emitted by `bash scripts/codespace-stack.sh urls`.
 
 ### Branch Protection
 - **main**: Requires PR review, status checks, up-to-date branch
