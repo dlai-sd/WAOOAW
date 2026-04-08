@@ -2062,9 +2062,14 @@ export function DigitalMarketingActivationWizard({
                           {(strategyWorkshop.next_step_options || []).map((option, index) => (
                             <Button
                               key={`${option}-${index}`}
+                              type="button"
                               appearance="secondary"
                               size="small"
-                              onClick={() => handleStrategyOption(option)}
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                handleStrategyOption(option)
+                              }}
                               disabled={readOnly || themePlanLoading}
                               data-testid={`strategy-option-${index}`}
                             >
@@ -2077,8 +2082,13 @@ export function DigitalMarketingActivationWizard({
 
                     <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <Button
+                        type="button"
                         appearance="primary"
-                        onClick={() => void generateThemePlan()}
+                        onClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          void generateThemePlan()
+                        }}
                         disabled={readOnly || themePlanLoading}
                         data-testid="start-theme-workshop-btn"
                       >
