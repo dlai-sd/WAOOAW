@@ -193,11 +193,11 @@ describe('Brand voice section', () => {
       />
     )
 
-    fireEvent.click(await screen.findByText('Optional business context fields'))
-    fireEvent.click(await screen.findByText('Brand Voice'))
+    fireEvent.click(await screen.findByText('Business details'))
+    fireEvent.click(await screen.findByText('Brand voice'))
 
     await waitFor(() => {
-      expect(screen.getByText('Brand Voice')).toBeInTheDocument()
+      expect(screen.getByText('Brand voice')).toBeInTheDocument()
     })
   }
 
@@ -215,7 +215,7 @@ describe('Brand voice section', () => {
     await renderThemeStep()
 
     await waitFor(() => {
-      expect(screen.getByText('Brand Voice')).toBeInTheDocument()
+      expect(screen.getByText('Brand voice')).toBeInTheDocument()
     })
     expect(screen.getByLabelText('Voice description')).toHaveValue('')
   })

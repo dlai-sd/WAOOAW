@@ -154,7 +154,7 @@ async function renderWizard() {
   )
 
   await waitFor(() => {
-    expect(screen.getByText(/Channel access/i)).toBeInTheDocument()
+    expect(screen.getByText(/YouTube connection/i)).toBeInTheDocument()
   })
 }
 
@@ -163,11 +163,13 @@ describe('Wizard platforms', () => {
     vi.clearAllMocks()
   })
 
-  it('shows only YouTube inside the channel access section', async () => {
+  it('shows only YouTube inside the YouTube connection section', async () => {
     await renderWizard()
 
+    fireEvent.click(screen.getByText('YouTube connection'))
+
     await waitFor(() => {
-      expect(screen.getByText('YouTube')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Connect with Google/i })).toBeInTheDocument()
     })
     expect(screen.queryByText('Instagram')).not.toBeInTheDocument()
     expect(screen.queryByText('Unavailable')).not.toBeInTheDocument()
@@ -176,8 +178,10 @@ describe('Wizard platforms', () => {
   it('does not show unavailable badges in the connect step', async () => {
     await renderWizard()
 
+    fireEvent.click(screen.getByText('YouTube connection'))
+
     await waitFor(() => {
-      expect(screen.getByText(/Connect your YouTube channel/i)).toBeInTheDocument()
+      expect(screen.getByText(/Connect the YouTube channel this DMA should grow and publish through/i)).toBeInTheDocument()
     })
     expect(screen.queryByText('Instagram')).not.toBeInTheDocument()
     expect(screen.queryByText('Unavailable')).not.toBeInTheDocument()

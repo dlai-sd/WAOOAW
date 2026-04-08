@@ -326,6 +326,8 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
                     "Do not repeat the user's last answer in full.",
                     "Give one insight, one recommendation, and one next question only if still needed.",
                     "Provide 2-3 short next-step options that save the customer's time.",
+                    "Sound like a premium strategist in live chat, not a setup wizard, checklist, or intake form.",
+                    "Lead the conversation with confidence and warmth so the customer feels guided, not processed.",
                     "Move to approval_ready as soon as the strategy is coherent enough.",
                 ],
             },
@@ -349,7 +351,7 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
             },
             "pending_customer_input": pending_input,
             "response_contract": {
-                "assistant_message": "One compact consultative response in plain English: insight, recommendation, and gentle direction.",
+                "assistant_message": "One compact, high-conviction strategist reply in plain English. It should feel like premium live chat: warm, commercially sharp, and easy to respond to.",
                 "checkpoint_summary": "One short paragraph summarizing what is now locked.",
                 "current_focus_question": "At most one high-value question. Empty string if not needed.",
                 "next_step_options": ["Two or three short suggested next moves."],
@@ -435,7 +437,7 @@ def _parse_theme_workshop_response(
     pending_input: str,
 ) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     cleaned = str(raw_text or "").strip()
-    fallback_message = "I can shape a stronger theme quickly once I know the single business result your content should drive first."
+    fallback_message = "I can take this forward quickly. Tell me the one business result this content must drive first, and I will turn that into a sharper direction."
 
     if not cleaned:
         workshop = _normalize_strategy_workshop(existing_workshop, workspace)
@@ -824,10 +826,11 @@ async def generate_theme_plan(
         proposal = grok_complete(
             client,
             system=(
-                "You are a premium digital brand strategist running a live strategy workshop for a business owner. "
-                "Speak like a senior consultant with deep domain expertise, be direct and commercially sharp, and never sound generic. "
-                "Ask probing questions until the strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, "
-                "and a structured summary. Always return JSON matching the requested response contract."
+                "You are the Digital Marketing Agent the customer has already hired, and you are running a live strategy conversation. "
+                "Sound like a world-class strategist inside a premium chat product: warm, confident, commercially sharp, and easy to reply to. "
+                "Do not sound like a wizard, onboarding checklist, status dashboard, or form. Lead the customer through the fewest possible questions, "
+                "extract signal quickly, and make each reply feel useful enough that the customer wants to keep going. Ask probing questions only until the "
+                "strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. Always return JSON matching the requested response contract."
             ),
             user=_theme_workshop_prompt(workspace, campaign_setup),
             model="grok-3-latest",
