@@ -1201,6 +1201,8 @@ describe('DMA Activation Wizard — step navigation', () => {
     expect(screen.getByTestId('strategy-checkpoint-summary')).toHaveTextContent(
       'We have locked the audience, the premium-natural positioning, and the first content direction.'
     )
+    fireEvent.click(screen.getByRole('button', { name: /what to answer or do next/i }))
+
     expect(screen.getByTestId('strategy-current-focus-question')).toHaveTextContent(
       'Do you want the first YouTube series to lean more into trust-building or behind-the-scenes proof?'
     )
@@ -1376,9 +1378,14 @@ describe('DMA Activation Wizard — step navigation', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Chat with your DMA' })).toBeInTheDocument()
     })
-    expect(screen.getByText('Message your DMA')).toBeInTheDocument()
+    expect(screen.queryByText('Keep feeding the brief')).not.toBeInTheDocument()
+    expect(screen.queryByText('Message your DMA')).not.toBeInTheDocument()
     expect(screen.getByTestId('dma-chat-thread')).toBeInTheDocument()
     expect(screen.getByTestId('dma-chat-composer')).toBeInTheDocument()
+    expect(screen.getByLabelText('Strategy workshop reply')).toHaveAttribute(
+      'placeholder',
+      'Describe your business, audience, offer, or ask for the sharpest next move.'
+    )
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Start with DMA' })).not.toBeInTheDocument()
   })
