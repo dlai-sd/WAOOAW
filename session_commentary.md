@@ -1,6 +1,29 @@
 
 ---
 
+## [2026-04-10 UTC] DMA-MEDIA-1 — agent media generation upgrade plan
+
+**Branch**: `docs/dma-media-1-agent-artifacts`
+**Plan file**: `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md`
+**Status**: Skeleton in progress
+
+### Goal
+Create a durable, agent-executable upgrade plan that turns DMA media generation into a first-class capability for tables, images, audio, video, and video+audio while preserving CP thin-proxy rules, Plant ownership, approval gates, and Docker-first validation.
+
+### Checkpoint list
+- [x] Read planning template and platform context
+- [x] Create clean docs branch from `main` in a separate worktree
+- [x] Create plan skeleton with vision intake, guardrails, iteration scaffold, and execution rules
+- [ ] Commit and push skeleton checkpoint
+- [ ] Write iteration story cards and dependency map
+- [ ] Commit and push completed plan
+- [ ] Open PR to `main`
+
+### Next save point
+After the skeleton commit is pushed.
+
+---
+
 ## [2026-04-02 UTC] INFRA-CODESPACE-1 — Fast local iteration in GitHub Codespaces
 
 **Branch**: `docs/cp-codespace-fast-loop-plan`
