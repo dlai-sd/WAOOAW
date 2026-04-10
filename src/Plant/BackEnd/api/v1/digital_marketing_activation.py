@@ -169,45 +169,91 @@ async def _build_auto_draft(
 ) -> dict[str, Any]:
     """Build and persist a draft batch inline from the chat handler. Returns the serialisable batch dict."""
     playbook = _dma_playbook()
-    brand_name = str(workspace.get("brand_name") or record.nickname or "").strip()
+    # Use the customer's brand name from the workspace brief — never fall back to the
+    # agent's own hire nickname (that causes the agent's personal name to appear in posts).
+    brand_name = str(workspace.get("brand_name") or "").strip()
     location = str(workspace.get("location") or "").strip()
     language = str(workspace.get("primary_language") or "en").strip()
 
-    subject = master_theme or brand_name or "the approved content plan"
-    requested_artifacts = [
-        ArtifactRequest(
-            artifact_type=art,
-            prompt=f"Create a {art.value.replace('_', ' ')} asset for: {subject}",
-            metadata={"source": "dma_chat_intent", "channel": "youtube"},
-        )
-        for art in artifact_types
-    ]
-
-    result = execute_marketing_multichannel_v1(
-        playbook,
-        SkillExecutionInput(
-            theme=master_theme or brand_name,
-            brand_name=brand_name,
-            offer=None,
-            location=location or None,
-            audience=None,
-            tone=None,
-            language=language,
-            channels=[ChannelName.YOUTUBE],
-            requested_artifacts=requested_artifacts,
-        ),
-    )
-
     batch_id = str(uuid4())
-    posts = [
-        DraftPostRecord(
-            post_id=str(uuid4()),
-            channel=v.channel,
-            text=v.text,
-            hashtags=v.hashtags,
+    posts: List[DraftPostRecord] = []
+
+    # ── TABLE artifact: build a GFM markdown table from campaign themes ──────
+    if ArtifactType.TABLE in artifact_types:
+        campaign_setup: dict[str, Any] = workspace.get("campaign_setup") or {}
+        derived_themes: List[dict[str, Any]] = campaign_setup.get("derived_themes") or []
+        master_theme_val = campaign_setup.get("master_theme") or master_theme or brand_name or "Content Plan"
+
+        if derived_themes:
+            header = f"**Master Theme:** {master_theme_val}\n\n"
+            table_lines = [
+                "| # | Theme | Description | Frequency |",
+                "|---|-------|-------------|-----------|",
+            ]
+            for i, theme in enumerate(derived_themes, 1):
+                title = str(theme.get("title") or "").replace("|", "\\|")
+                desc = str(theme.get("description") or "").replace("|", "\\|")
+                freq = str(theme.get("frequency") or "").replace("|", "\\|")
+                table_lines.append(f"| {i} | {title} | {desc} | {freq} |")
+            table_text = header + "\n".join(table_lines)
+        else:
+            table_text = (
+                f"**Master Theme:** {master_theme_val}\n\n"
+                "| # | Theme | Description | Frequency |\n"
+                "|---|-------|-------------|----------|\n"
+                f"| 1 | {master_theme_val} | Content plan for {brand_name or 'your brand'} | weekly |\n"
+            )
+
+        posts.append(
+            DraftPostRecord(
+                post_id=str(uuid4()),
+                channel="youtube",
+                text=table_text,
+                artifact_type="table",
+                hashtags=[],
+            )
         )
-        for v in result.output.variants
-    ]
+
+    # ── Non-table artifacts: run the deterministic channel adapters ───────────
+    non_table_types = [a for a in artifact_types if a != ArtifactType.TABLE]
+    if non_table_types or not posts:
+        subject = master_theme or brand_name or "the approved content plan"
+        requested_artifacts = [
+            ArtifactRequest(
+                artifact_type=art,
+                prompt=f"Create a {art.value.replace('_', ' ')} asset for: {subject}",
+                metadata={"source": "dma_chat_intent", "channel": "youtube"},
+            )
+            for art in (non_table_types or [ArtifactType.TABLE])
+        ]
+
+        channel_brand = brand_name or "Brand"
+        result = execute_marketing_multichannel_v1(
+            playbook,
+            SkillExecutionInput(
+                theme=master_theme or channel_brand,
+                brand_name=channel_brand,
+                offer=None,
+                location=location or None,
+                audience=None,
+                tone=None,
+                language=language,
+                channels=[ChannelName.YOUTUBE],
+                requested_artifacts=requested_artifacts,
+            ),
+        )
+
+        for v in result.output.variants:
+            art_type: str = non_table_types[0].value if non_table_types else "text"
+            posts.append(
+                DraftPostRecord(
+                    post_id=str(uuid4()),
+                    channel=v.channel,
+                    text=v.text,
+                    artifact_type=art_type,
+                    hashtags=v.hashtags,
+                )
+            )
 
     batch = DraftBatchRecord(
         batch_id=batch_id,
@@ -215,7 +261,7 @@ async def _build_auto_draft(
         hired_instance_id=record.hired_instance_id,
         campaign_id=campaign_id,
         customer_id=str(record.customer_id or "") if record.customer_id else None,
-        theme=result.output.canonical.theme,
+        theme=master_theme or brand_name,
         brand_name=brand_name,
         brief_summary=None,
         created_at=datetime.utcnow(),
