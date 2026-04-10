@@ -71,6 +71,8 @@ class MarketingDraftPostModel(Base):
     artifact_preview_uri = Column(Text, nullable=True)
     artifact_mime_type = Column(String(255), nullable=True)
     artifact_metadata = Column(JSONB, nullable=False, default=dict)
+    artifact_generation_status = Column(String(32), nullable=False, default="not_requested", index=True)
+    artifact_job_id = Column(String(255), nullable=True, index=True)
     generated_artifacts = Column(JSONB, nullable=False, default=list)
     review_status = Column(String(32), nullable=False, default="pending_review", index=True)
     approval_id = Column(String(255), nullable=True, index=True)

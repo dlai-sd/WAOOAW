@@ -152,6 +152,8 @@ class _InMemoryDraftBatchStore:
         artifact_preview_uri: str | None | object = _UNSET,
         artifact_mime_type: str | None | object = _UNSET,
         artifact_metadata: dict | object = _UNSET,
+        artifact_generation_status: str | object = _UNSET,
+        artifact_job_id: str | None | object = _UNSET,
         generated_artifacts: list | object = _UNSET,
         review_status: str | object = _UNSET,
         approval_id: str | None | object = _UNSET,
@@ -180,6 +182,10 @@ class _InMemoryDraftBatchStore:
                     post.artifact_mime_type = artifact_mime_type
                 if artifact_metadata is not _UNSET:
                     post.artifact_metadata = artifact_metadata
+                if artifact_generation_status is not _UNSET:
+                    post.artifact_generation_status = artifact_generation_status
+                if artifact_job_id is not _UNSET:
+                    post.artifact_job_id = artifact_job_id
                 if generated_artifacts is not _UNSET:
                     post.generated_artifacts = generated_artifacts
                 if review_status is not _UNSET:

@@ -45,6 +45,14 @@ def upgrade() -> None:
     )
     op.add_column(
         "marketing_draft_posts",
+        sa.Column("artifact_generation_status", sa.String(length=32), nullable=False, server_default="not_requested"),
+    )
+    op.add_column(
+        "marketing_draft_posts",
+        sa.Column("artifact_job_id", sa.String(length=255), nullable=True),
+    )
+    op.add_column(
+        "marketing_draft_posts",
         sa.Column(
             "generated_artifacts",
             postgresql.JSONB(astext_type=sa.Text()),
@@ -53,11 +61,17 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_marketing_draft_posts_artifact_type", "marketing_draft_posts", ["artifact_type"])
+    op.create_index("ix_marketing_draft_posts_artifact_generation_status", "marketing_draft_posts", ["artifact_generation_status"])
+    op.create_index("ix_marketing_draft_posts_artifact_job_id", "marketing_draft_posts", ["artifact_job_id"])
 
 
 def downgrade() -> None:
     op.drop_index("ix_marketing_draft_posts_artifact_type", table_name="marketing_draft_posts")
+    op.drop_index("ix_marketing_draft_posts_artifact_job_id", table_name="marketing_draft_posts")
+    op.drop_index("ix_marketing_draft_posts_artifact_generation_status", table_name="marketing_draft_posts")
     op.drop_column("marketing_draft_posts", "generated_artifacts")
+    op.drop_column("marketing_draft_posts", "artifact_job_id")
+    op.drop_column("marketing_draft_posts", "artifact_generation_status")
     op.drop_column("marketing_draft_posts", "artifact_metadata")
     op.drop_column("marketing_draft_posts", "artifact_mime_type")
     op.drop_column("marketing_draft_posts", "artifact_preview_uri")

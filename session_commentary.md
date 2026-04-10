@@ -5,7 +5,7 @@
 
 **Branch**: `feat/dma-media-generation-agent`
 **Plan file**: `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md`
-**Status**: In progress
+**Status**: Implementation complete — PR pending
 
 ### Goal
 Implement the merged DMA media-generation upgrade plan end to end so DMA returns typed media artifacts instead of text-only promises, while preserving Plant business-logic ownership, CP thin-proxy rules, approval safety, and Docker-only final validation.
@@ -20,13 +20,17 @@ Implement the merged DMA media-generation upgrade plan end to end so DMA returns
 - [x] Validate E1-S1 in Docker via `plant-backend-test --no-cov tests/unit/test_skill_playbook_pipeline.py -q`
 - [x] Complete E1-S2 draft artifact persistence changes
 - [x] Validate E1-S2 in Docker via `plant-backend-test --no-cov tests/unit/test_marketing_draft_batch_api.py -q`
-- [ ] Complete E2-S1 provider-agnostic media artifact store changes
-- [ ] Keep the plan tracking table and this note updated after each checkpoint commit
-- [ ] Run final Docker-only validation
+- [x] Complete E2-S1 provider-agnostic media artifact store changes
+- [x] Complete E3-S1 queued media generation state in the draft path
+- [x] Complete E4-S1 and E4-S2 artifact request handling plus channel routing
+- [x] Complete E5-S1 review-ready artifact status and publish-readiness responses
+- [x] Complete E6-S1 CP proxy and TypeScript contract passthrough
+- [x] Complete E7-S1 artifact request controls and preview rendering in the DMA UI
+- [x] Run Docker-only validation for Plant backend, CP backend, and CP frontend paths
 - [ ] Open implementation PR to `main`
 
 ### Next save point
-After E1-S2 is committed and pushed, then E2-S1 is underway.
+After the implementation PR is created and linked here.
 
 ---
 

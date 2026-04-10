@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import Depends, Request
@@ -20,18 +20,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_mold.enforcement import default_hook_bus
 from agent_mold.hooks import HookEvent, HookStage
+from agent_mold.skills.artifact_routing import route_artifact_requests
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import load_playbook
-from agent_mold.skills.playbook import ChannelName, GeneratedArtifactReference, SkillExecutionInput
+from agent_mold.skills.playbook import ArtifactRequest, ArtifactType, ChannelName, GeneratedArtifactReference, SkillExecutionInput
 from core.database import get_db_session, get_read_db_session
 from core.exceptions import PolicyEnforcementError
-from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord
+from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord, materialize_batch_record
+from services.media_artifact_store import get_media_artifact_store
 from services.policy_denial_audit import (
     PolicyDenialAuditRecord,
     PolicyDenialAuditStore,
     get_policy_denial_audit_store,
 )
 from services.marketing_credential_resolver import resolve_youtube_secret_ref
+from worker.tasks.media_generation_tasks import enqueue_media_generation_job
 
 router = waooaw_router(prefix="/marketing", tags=["marketing"])
 
@@ -65,6 +68,7 @@ class CreateDraftBatchRequest(BaseModel):
     public_release_requested: bool = False
 
     channels: Optional[List[ChannelName]] = None
+    requested_artifacts: Optional[List[ArtifactRequest]] = None
 
 class CreateDraftBatchResponse(DraftBatchRecord):
     pass
@@ -87,7 +91,7 @@ async def list_draft_batches(
         batches = [b for b in batches if b.status == status]
 
     batches = batches[-max(1, int(limit)) :]
-    return batches
+    return [materialize_batch_record(batch) for batch in batches]
 
 @router.get("/draft-batches/{batch_id}", response_model=DraftBatchRecord)
 async def get_draft_batch(
@@ -97,7 +101,7 @@ async def get_draft_batch(
     store = DatabaseDraftBatchStore(db)
     batch = await store.get_batch(batch_id)
     if batch is not None:
-        return batch
+        return materialize_batch_record(batch)
     raise PolicyEnforcementError(
         "Unknown draft batch",
         reason="unknown_batch_id",
@@ -107,15 +111,18 @@ async def get_draft_batch(
 @router.post("/draft-batches", response_model=CreateDraftBatchResponse)
 async def create_draft_batch(
     body: CreateDraftBatchRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db_session),
 ) -> CreateDraftBatchResponse:
     store = DatabaseDraftBatchStore(db)
     playbook = _marketing_multichannel_playbook()
+    media_store = get_media_artifact_store()
     youtube_secret_ref = await resolve_youtube_secret_ref(
         db,
         hired_instance_id=body.hired_instance_id,
         supplied_ref=body.youtube_credential_ref,
     )
+    correlation_id = request.headers.get("x-correlation-id") or str(uuid4())
 
     result = execute_marketing_multichannel_v1(
         playbook,
@@ -128,35 +135,50 @@ async def create_draft_batch(
             tone=body.tone,
             language=body.language,
             channels=body.channels,
+            requested_artifacts=body.requested_artifacts,
         ),
     )
 
     batch_id = str(uuid4())
-    posts = [
-        (
-        lambda primary_artifact, generated_artifacts: DraftPostRecord(
-            post_id=str(uuid4()),
-            channel=v.channel,
-            text=v.text,
-            hashtags=v.hashtags,
-            artifact_type=(primary_artifact.artifact_type.value if primary_artifact is not None else "text"),
-            artifact_uri=(primary_artifact.uri if primary_artifact is not None else None),
-            artifact_preview_uri=(primary_artifact.preview_uri if primary_artifact is not None else None),
-            artifact_mime_type=(primary_artifact.mime_type if primary_artifact is not None else None),
-            artifact_metadata=(primary_artifact.metadata if primary_artifact is not None else {}),
-            generated_artifacts=generated_artifacts,
-            credential_ref=youtube_secret_ref if v.channel == ChannelName.YOUTUBE else None,
-            visibility=body.youtube_visibility if v.channel == ChannelName.YOUTUBE else "private",
-            public_release_requested=body.public_release_requested if v.channel == ChannelName.YOUTUBE else False,
+    posts: List[DraftPostRecord] = []
+    for variant in result.output.variants:
+        post_id = str(uuid4())
+        prepared = await _prepare_post_artifacts(
+            batch_id=batch_id,
+            post_id=post_id,
+            channel=variant.channel,
+            theme=body.theme,
+            brand_name=body.brand_name,
+            text=variant.text,
+            requested_artifacts=list(result.output.canonical.requested_artifacts or []),
+            pre_generated_artifacts=[
+                GeneratedArtifactReference.model_validate(artifact)
+                for artifact in (variant.generated_artifacts or [])
+            ],
+            media_store=media_store,
+            correlation_id=correlation_id,
         )
-        )(
-            next(iter(v.generated_artifacts), None),
-            [GeneratedArtifactReference.model_validate(artifact) for artifact in (v.generated_artifacts or [])],
+        posts.append(
+            DraftPostRecord(
+                post_id=post_id,
+                channel=variant.channel,
+                text=variant.text,
+                hashtags=variant.hashtags,
+                artifact_type=prepared["artifact_type"],
+                artifact_uri=prepared["artifact_uri"],
+                artifact_preview_uri=prepared["artifact_preview_uri"],
+                artifact_mime_type=prepared["artifact_mime_type"],
+                artifact_metadata=prepared["artifact_metadata"],
+                artifact_generation_status=prepared["artifact_generation_status"],
+                artifact_job_id=prepared["artifact_job_id"],
+                generated_artifacts=prepared["generated_artifacts"],
+                credential_ref=youtube_secret_ref if variant.channel == ChannelName.YOUTUBE else None,
+                visibility=body.youtube_visibility if variant.channel == ChannelName.YOUTUBE else "private",
+                public_release_requested=body.public_release_requested if variant.channel == ChannelName.YOUTUBE else False,
+            )
         )
-        for v in result.output.variants
-    ]
 
-    batch = DraftBatchRecord(
+    batch = materialize_batch_record(DraftBatchRecord(
         batch_id=batch_id,
         agent_id=body.agent_id,
         hired_instance_id=body.hired_instance_id,
@@ -167,11 +189,148 @@ async def create_draft_batch(
         brief_summary=body.brief_summary,
         created_at=datetime.utcnow(),
         posts=posts,
-    )
+    ))
 
     await store.save_batch(batch)
     await db.commit()
     return CreateDraftBatchResponse(**batch.model_dump())
+
+
+def _table_preview(theme: str, brand_name: str, channel: ChannelName, prompt: str) -> Dict[str, Any]:
+    rows = [
+        {
+            "content_pillar": "Hook",
+            "customer_angle": brand_name,
+            "channel_use": channel.value,
+            "prompt_hint": prompt,
+        },
+        {
+            "content_pillar": "Proof",
+            "customer_angle": theme,
+            "channel_use": "CTA",
+            "prompt_hint": "Show measurable value before publish",
+        },
+        {
+            "content_pillar": "Offer",
+            "customer_angle": f"{brand_name} next step",
+            "channel_use": "Review",
+            "prompt_hint": "Customer approves before publish",
+        },
+    ]
+    return {
+        "columns": ["content_pillar", "customer_angle", "channel_use", "prompt_hint"],
+        "rows": rows,
+    }
+
+
+def _table_preview_csv(preview: Dict[str, Any]) -> bytes:
+    columns = list(preview.get("columns") or [])
+    rows = list(preview.get("rows") or [])
+    lines = [",".join(columns)]
+    for row in rows:
+        values = [str(row.get(column, "")).replace(",", " ") for column in columns]
+        lines.append(",".join(values))
+    return "\n".join(lines).encode("utf-8")
+
+
+async def _prepare_post_artifacts(
+    *,
+    batch_id: str,
+    post_id: str,
+    channel: ChannelName,
+    theme: str,
+    brand_name: str,
+    text: str,
+    requested_artifacts: List[ArtifactRequest],
+    pre_generated_artifacts: List[GeneratedArtifactReference],
+    media_store,
+    correlation_id: str,
+) -> Dict[str, Any]:
+    generated_artifacts = list(pre_generated_artifacts)
+    artifact_metadata: Dict[str, Any] = {}
+    artifact_type = "text"
+    artifact_uri = None
+    artifact_preview_uri = None
+    artifact_mime_type = None
+    artifact_generation_status = "not_requested"
+    artifact_job_id = None
+
+    if generated_artifacts:
+        primary_generated_artifact = generated_artifacts[0]
+        artifact_type = primary_generated_artifact.artifact_type.value
+        artifact_uri = primary_generated_artifact.uri
+        artifact_preview_uri = primary_generated_artifact.preview_uri
+        artifact_mime_type = primary_generated_artifact.mime_type
+        artifact_metadata.update(primary_generated_artifact.metadata)
+
+    accepted_requests, rejected_requests = route_artifact_requests(channel, requested_artifacts)
+    if rejected_requests:
+        artifact_metadata["routing_errors"] = [
+            {"artifact_type": item.artifact_type.value, "reason": item.reason}
+            for item in rejected_requests
+        ]
+
+    table_requests = [req for req in accepted_requests if req.artifact_type == ArtifactType.TABLE]
+    queued_requests = [req for req in accepted_requests if req.artifact_type != ArtifactType.TABLE]
+
+    if table_requests:
+        table_request = table_requests[0]
+        preview = _table_preview(theme, brand_name, channel, table_request.prompt)
+        stored = await media_store.store_artifact(
+            batch_id=batch_id,
+            post_id=post_id,
+            artifact_type=ArtifactType.TABLE,
+            filename=f"{channel.value}-table.csv",
+            content=_table_preview_csv(preview),
+            mime_type="text/csv",
+            metadata={
+                "generation_status": "ready",
+                "table_preview": preview,
+                "source_text": text,
+            },
+        )
+        table_artifact = stored.as_generated_reference()
+        generated_artifacts.append(table_artifact)
+        artifact_type = ArtifactType.TABLE.value
+        artifact_uri = table_artifact.uri
+        artifact_preview_uri = table_artifact.preview_uri
+        artifact_mime_type = table_artifact.mime_type
+        artifact_metadata.update(table_artifact.metadata)
+        artifact_generation_status = "ready"
+
+    if queued_requests:
+        first_binary_request = queued_requests[0]
+        artifact_type = first_binary_request.artifact_type.value
+        artifact_generation_status = "queued"
+        artifact_metadata["queued_artifact_types"] = [request.artifact_type.value for request in queued_requests]
+        artifact_metadata["generation_status"] = "queued"
+        artifact_job_id, dispatch_mode = enqueue_media_generation_job(
+            payload={
+                "correlation_id": correlation_id,
+                "batch_id": batch_id,
+                "post_id": post_id,
+                "channel": channel.value,
+                "theme": theme,
+                "brand_name": brand_name,
+                "text": text,
+                "requested_artifacts": [request.model_dump(mode="json") for request in queued_requests],
+            }
+        )
+        artifact_metadata["dispatch_mode"] = dispatch_mode
+
+    if accepted_requests or rejected_requests:
+        artifact_metadata["requested_artifacts"] = [request.model_dump(mode="json") for request in requested_artifacts]
+
+    return {
+        "artifact_type": artifact_type,
+        "artifact_uri": artifact_uri,
+        "artifact_preview_uri": artifact_preview_uri,
+        "artifact_mime_type": artifact_mime_type,
+        "artifact_metadata": artifact_metadata,
+        "artifact_generation_status": artifact_generation_status,
+        "artifact_job_id": artifact_job_id,
+        "generated_artifacts": generated_artifacts,
+    }
 
 class ExecuteDraftPostRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
@@ -426,14 +585,29 @@ async def execute_draft_post(
         and post.review_status == "approved"
         and effective_credential_ref
     ):
+        if post.artifact_generation_status in {"queued", "running"}:
+            raise PolicyEnforcementError(
+                "Artifact generation is still in progress",
+                reason="artifact_not_ready",
+                details={"post_id": post_id, "artifact_generation_status": post.artifact_generation_status},
+            )
         try:
             from integrations.social.youtube_client import YouTubeClient
 
             client = YouTubeClient(customer_id=batch.customer_id)
-            result = await client.post_text(
-                credential_ref=effective_credential_ref,
-                text=post.text,
-            )
+            if post.artifact_type in {"video", "video_audio"} and post.artifact_uri:
+                result = await client.post_short(
+                    credential_ref=effective_credential_ref,
+                    video_url=post.artifact_uri,
+                    title=batch.theme,
+                    description=post.text,
+                )
+            else:
+                result = await client.post_text(
+                    credential_ref=effective_credential_ref,
+                    text=post.text,
+                    image_url=post.artifact_uri if post.artifact_type == "image" else None,
+                )
             provider_post_id = result.post_id
             provider_post_url = result.post_url
 

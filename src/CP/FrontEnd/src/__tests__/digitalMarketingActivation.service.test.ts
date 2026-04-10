@@ -108,13 +108,14 @@ describe('marketingReview.service — draft create and execute', () => {
       youtube_credential_ref: 'projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest',
       youtube_visibility: 'private',
       public_release_requested: false,
+      requested_artifacts: [{ artifact_type: 'table', prompt: 'Create a weekly content table' }],
     })
 
     expect(spy).toHaveBeenCalledWith(
       '/cp/marketing/draft-batches',
       expect.objectContaining({
         method: 'POST',
-        body: expect.stringContaining('youtube_credential_ref'),
+        body: expect.stringContaining('requested_artifacts'),
       })
     )
     expect(result.batch_id).toBe('b-new')

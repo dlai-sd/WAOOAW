@@ -98,6 +98,12 @@ class TestSettings:
         assert hasattr(settings, 'enable_sql_logging')
         assert hasattr(settings, 'enable_route_registration_logging')
         assert hasattr(settings, 'enable_startup_diagnostics')
+
+    def test_media_artifact_store_defaults(self):
+        settings = Settings()
+        assert settings.media_artifact_store_backend == "local"
+        assert settings.media_artifact_local_root
+        assert settings.media_artifact_max_bytes > 0
     
     def test_gcp_project_id(self, monkeypatch):
         """Test GCP project ID can be set via environment variables."""

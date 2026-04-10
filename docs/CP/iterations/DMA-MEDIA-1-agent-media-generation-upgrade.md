@@ -32,9 +32,9 @@ If a story does not improve DMA value delivery, DMA enablement, or runtime safet
 |---|---|
 | Execution branch | `feat/dma-media-generation-agent` |
 | Execution started | `2026-04-10 UTC` |
-| Current phase | `Iteration 1 implementation` |
-| Current story | `E2-S1 — Introduce a provider-agnostic media artifact store service` |
-| Last durable checkpoint | `E1-S2 draft artifact persistence validated in Docker and ready to push` |
+| Current phase | `Implementation complete — ready for PR` |
+| Current story | `E7-S2 — Docker-only validation and PR handoff` |
+| Last durable checkpoint | `Plant + CP backend + CP frontend Docker validation passing` |
 | Final validation rule | `Docker only; no virtualenv` |
 
 ### Execution notes
@@ -331,14 +331,14 @@ Do this before starting the next epic. If interrupted, completed work is already
 |---|---|---|---|---|---|
 | E1-S1 | 1 | DMA speaks a typed artifact language | Extend the Plant artifact contract beyond text-only outputs | 🟢 Done | — |
 | E1-S2 | 1 | DMA speaks a typed artifact language | Persist draft artifact metadata with a first-class schema | 🟢 Done | — |
-| E2-S1 | 1 | DMA stores and names media safely | Introduce a provider-agnostic media artifact store service | 🟡 In Progress | — |
-| E3-S1 | 1 | DMA generation jobs run asynchronously | Add async media job state to the draft-batch generation path | 🔴 Not Started | — |
-| E4-S1 | 2 | DMA routes typed artifacts through provider-safe backend paths | Teach content generation to honor artifact requests | 🔴 Not Started | — |
-| E4-S2 | 2 | DMA routes typed artifacts through provider-safe backend paths | Route generated artifacts into channel-compatible variants | 🔴 Not Started | — |
-| E5-S1 | 2 | DMA returns review-ready artifact payloads and typed publish receipts | Expose artifact status, previews, and publish-ready media receipts through Plant APIs | 🔴 Not Started | — |
-| E6-S1 | 3 | CP stays a thin proxy while exposing the richer contract | Extend CP proxy and frontend service types for typed artifacts | 🔴 Not Started | — |
-| E7-S1 | 3 | DMA customers can request, preview, and approve richer artifacts | Add artifact request controls and preview renderers to the DMA UI | 🔴 Not Started | — |
-| E7-S2 | 3 | DMA customers can request, preview, and approve richer artifacts | Lock the upgrade with Docker-only backend and frontend validation | 🔴 Not Started | — |
+| E2-S1 | 1 | DMA stores and names media safely | Introduce a provider-agnostic media artifact store service | 🟢 Done | — |
+| E3-S1 | 1 | DMA generation jobs run asynchronously | Add async media job state to the draft-batch generation path | 🟢 Done | — |
+| E4-S1 | 2 | DMA routes typed artifacts through provider-safe backend paths | Teach content generation to honor artifact requests | 🟢 Done | — |
+| E4-S2 | 2 | DMA routes typed artifacts through provider-safe backend paths | Route generated artifacts into channel-compatible variants | 🟢 Done | — |
+| E5-S1 | 2 | DMA returns review-ready artifact payloads and typed publish receipts | Expose artifact status, previews, and publish-ready media receipts through Plant APIs | 🟢 Done | — |
+| E6-S1 | 3 | CP stays a thin proxy while exposing the richer contract | Extend CP proxy and frontend service types for typed artifacts | 🟢 Done | — |
+| E7-S1 | 3 | DMA customers can request, preview, and approve richer artifacts | Add artifact request controls and preview renderers to the DMA UI | 🟢 Done | — |
+| E7-S2 | 3 | DMA customers can request, preview, and approve richer artifacts | Lock the upgrade with Docker-only backend and frontend validation | 🟢 Done | — |
 
 ---
 

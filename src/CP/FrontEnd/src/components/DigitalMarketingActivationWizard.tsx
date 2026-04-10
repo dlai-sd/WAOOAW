@@ -2,6 +2,7 @@ import { Badge, Button, Card, Spinner, Text, Input, Textarea } from '@fluentui/r
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
+import { DigitalMarketingArtifactPreviewCard } from './DigitalMarketingArtifactPreviewCard'
 import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
@@ -26,6 +27,8 @@ import {
   approveDraftPost,
   rejectDraftPost,
   scheduleDraftPost,
+  type DraftArtifactRequest,
+  type DraftArtifactType,
   type DraftBatch,
   type DraftPost,
 } from '../services/marketingReview.service'
@@ -74,6 +77,14 @@ const PLATFORM_OPTIONS = [
 ]
 
 const SUPPORTED_PLATFORM_OPTIONS = PLATFORM_OPTIONS.filter((platform) => platform.key === 'youtube')
+
+const ARTIFACT_OPTIONS: Array<{ type: Exclude<DraftArtifactType, 'text'>; label: string; description: string }> = [
+  { type: 'table', label: 'Table', description: 'Structured plan, checklist, or comparison table.' },
+  { type: 'image', label: 'Image', description: 'Static visual concept for the draft.' },
+  { type: 'audio', label: 'Audio', description: 'Voice-first or narration asset request.' },
+  { type: 'video', label: 'Video', description: 'Short-form video asset request.' },
+  { type: 'video_audio', label: 'Video + audio', description: 'Narrated video asset request.' },
+]
 
 
 function isNotFoundError(error: unknown): error is { status: number } {
@@ -415,6 +426,7 @@ export function DigitalMarketingActivationWizard({
   const [draftPosts, setDraftPosts] = useState<DraftPost[]>([])
   const [draftGenerating, setDraftGenerating] = useState(false)
   const [draftGenerateError, setDraftGenerateError] = useState<string | null>(null)
+  const [selectedArtifactTypes, setSelectedArtifactTypes] = useState<Array<Exclude<DraftArtifactType, 'text'>>>(['table'])
   const [postActionStatus, setPostActionStatus] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
   const [postPublishReceipts, setPostPublishReceipts] = useState<Record<string, string>>({})
   const [queueDateTime, setQueueDateTime] = useState<Record<string, string>>({})
@@ -1205,6 +1217,15 @@ export function DigitalMarketingActivationWizard({
     return ytSelected && ytReady && briefReady && isThemeApproved && !draftGenerating
   }, [selectedPlatforms, isYouTubeAttached, brandName, isThemeApproved, draftGenerating])
 
+  const requestedArtifacts: DraftArtifactRequest[] = useMemo(() => {
+    const subject = masterTheme.trim() || brandName.trim() || 'the approved DMA brief'
+    return selectedArtifactTypes.map((artifactType) => ({
+      artifact_type: artifactType,
+      prompt: `Create a ${artifactType.replace('_', ' ')} asset for ${subject}`,
+      metadata: { source: 'cp_dma_wizard', channel: 'youtube' },
+    }))
+  }, [brandName, masterTheme, selectedArtifactTypes])
+
   const handleGenerateYouTubeDraft = async () => {
     if (!canGenerateYouTubeDraft || !hiredInstanceId) return
     setDraftGenerating(true)
@@ -1227,6 +1248,7 @@ export function DigitalMarketingActivationWizard({
         youtube_visibility: 'private',
         public_release_requested: false,
         channels: ['youtube'],
+        requested_artifacts: requestedArtifacts,
       })
       setGeneratedBatch(batch)
       setDraftPosts(batch.posts.filter((p) => p.channel === 'youtube'))
@@ -1237,6 +1259,14 @@ export function DigitalMarketingActivationWizard({
     } finally {
       setDraftGenerating(false)
     }
+  }
+
+  const toggleArtifactType = (artifactType: Exclude<DraftArtifactType, 'text'>) => {
+    setSelectedArtifactTypes((current) => (
+      current.includes(artifactType)
+        ? current.filter((value) => value !== artifactType)
+        : [...current, artifactType]
+    ))
   }
 
   const handleApprovePost = async (postId: string) => {
@@ -1335,16 +1365,40 @@ export function DigitalMarketingActivationWizard({
             Approve the master theme strategy below before generating a YouTube draft.
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <Button
-              appearance="primary"
-              onClick={() => void handleGenerateYouTubeDraft()}
-              disabled={!canGenerateYouTubeDraft || readOnly}
-              data-testid="generate-youtube-draft-btn"
-            >
-              {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
-            </Button>
-            {draftGenerating ? <Spinner size="tiny" /> : null}
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gap: '0.4rem' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Requested artifacts</div>
+              <div style={{ display: 'grid', gap: '0.45rem' }}>
+                {ARTIFACT_OPTIONS.map((option) => (
+                  <label
+                    key={option.type}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem', fontSize: '0.88rem' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedArtifactTypes.includes(option.type)}
+                      onChange={() => toggleArtifactType(option.type)}
+                      disabled={draftGenerating || readOnly}
+                    />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <span style={{ display: 'block', opacity: 0.72 }}>{option.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <Button
+                appearance="primary"
+                onClick={() => void handleGenerateYouTubeDraft()}
+                disabled={!canGenerateYouTubeDraft || readOnly}
+                data-testid="generate-youtube-draft-btn"
+              >
+                {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
+              </Button>
+              {draftGenerating ? <Spinner size="tiny" /> : null}
+            </div>
           </div>
         )}
         {draftGenerateError ? (
@@ -1370,10 +1424,16 @@ export function DigitalMarketingActivationWizard({
                 >
                   <div style={{ fontSize: '0.85rem', opacity: 0.65, marginBottom: '0.4rem' }}>YouTube draft</div>
                   <div style={{ marginBottom: '0.75rem', lineHeight: 1.5 }}>{post.text}</div>
+                  <DigitalMarketingArtifactPreviewCard post={post} />
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
                     <Badge appearance="outline" color={isApproved ? 'success' : isRejected ? 'danger' : 'warning'}>
                       {post.review_status}
                     </Badge>
+                    {post.artifact_generation_status && post.artifact_generation_status !== 'not_requested' ? (
+                      <Badge appearance="outline" color={post.artifact_generation_status === 'ready' ? 'success' : post.artifact_generation_status === 'failed' ? 'danger' : 'informative'}>
+                        Asset: {post.artifact_generation_status}
+                      </Badge>
+                    ) : null}
                     {isPosted ? (
                       <Badge appearance="outline" color="success">Published</Badge>
                     ) : isScheduled ? (

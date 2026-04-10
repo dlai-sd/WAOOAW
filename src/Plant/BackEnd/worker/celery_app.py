@@ -55,6 +55,7 @@ celery_app.conf.task_routes = {
     "execute_pump":      {"queue": "pump"},
     "execute_processor": {"queue": "processor"},
     "execute_publisher": {"queue": "publisher"},
+    "generate_media_artifact": {"queue": "media"},
 }
 
 # E4-S1 / E4-S2 (Iteration 7): Celery Beat scheduled tasks
