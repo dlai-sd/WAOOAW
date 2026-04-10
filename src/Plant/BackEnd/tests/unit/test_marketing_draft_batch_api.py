@@ -1,3 +1,8 @@
+import pytest
+
+from agent_mold.skills.playbook import ChannelName, GeneratedArtifactReference
+
+
 def test_create_draft_batch_persists_posts_and_returns_ids(test_client, in_memory_marketing_draft_store):
     payload = {
         "agent_id": "AGT-MKT-HEALTH-001",
@@ -245,3 +250,69 @@ def test_create_draft_batch_resolves_attached_youtube_secret_ref(
     assert create.status_code == 200
     yt_post = create.json()["posts"][0]
     assert yt_post["credential_ref"] == "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
+
+
+def test_create_draft_batch_round_trips_artifact_metadata(test_client, in_memory_marketing_draft_store, monkeypatch):
+    from agent_mold.skills.playbook import CanonicalMessage, ChannelVariant, MarketingMultiChannelOutput, SkillExecutionResult
+    import api.v1.marketing_drafts as marketing_drafts_module
+
+    artifact = GeneratedArtifactReference(
+        artifact_type="video",
+        uri="gs://waooaw-test/drafts/video-001.mp4",
+        preview_uri="https://cdn.waooaw.test/video-001-preview.jpg",
+        mime_type="video/mp4",
+        metadata={"duration_seconds": 45, "generation_status": "ready"},
+    )
+
+    def _fake_execute(_playbook, inp):
+        canonical = CanonicalMessage(
+            theme=inp.theme,
+            core_message="Video draft ready for review",
+            call_to_action="Approve the video draft",
+            generated_artifacts=[artifact],
+        )
+        variant = ChannelVariant(
+            channel=ChannelName.YOUTUBE,
+            text="Video draft ready for review",
+            hashtags=["WAOOAW"],
+            generated_artifacts=[artifact],
+        )
+        return SkillExecutionResult(
+            playbook_id="MARKETING.MULTICHANNEL.POST.V1",
+            output=MarketingMultiChannelOutput(
+                canonical=canonical,
+                variants=[variant],
+                generated_artifacts=[artifact],
+            ),
+            debug={"executor": "fake"},
+        )
+
+    monkeypatch.setattr(marketing_drafts_module, "execute_marketing_multichannel_v1", _fake_execute)
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-001",
+            "hired_instance_id": "HIRED-ART-001",
+            "campaign_id": "CAM-ART-001",
+            "customer_id": "CUST-ART-001",
+            "theme": "YouTube content sprint",
+            "brand_name": "WAOOAW",
+            "channels": ["youtube"],
+        },
+    )
+
+    assert create.status_code == 200
+    post = create.json()["posts"][0]
+    assert post["artifact_type"] == "video"
+    assert post["artifact_uri"] == "gs://waooaw-test/drafts/video-001.mp4"
+    assert post["artifact_preview_uri"] == "https://cdn.waooaw.test/video-001-preview.jpg"
+    assert post["artifact_mime_type"] == "video/mp4"
+    assert post["artifact_metadata"]["generation_status"] == "ready"
+    assert len(post["generated_artifacts"]) == 1
+    assert post["generated_artifacts"][0]["artifact_type"] == "video"
+
+    batch = next(iter(in_memory_marketing_draft_store._batches.values()))
+    stored_post = batch.posts[0]
+    assert stored_post.artifact_type == "video"
+    assert stored_post.generated_artifacts[0].artifact_type.value == "video"

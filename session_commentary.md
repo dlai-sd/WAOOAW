@@ -18,13 +18,15 @@ Implement the merged DMA media-generation upgrade plan end to end so DMA returns
 - [x] Seed live execution status into the plan file before code edits
 - [x] Complete E1-S1 artifact contract changes
 - [x] Validate E1-S1 in Docker via `plant-backend-test --no-cov tests/unit/test_skill_playbook_pipeline.py -q`
-- [ ] Complete E1-S2 draft artifact persistence changes
+- [x] Complete E1-S2 draft artifact persistence changes
+- [x] Validate E1-S2 in Docker via `plant-backend-test --no-cov tests/unit/test_marketing_draft_batch_api.py -q`
+- [ ] Complete E2-S1 provider-agnostic media artifact store changes
 - [ ] Keep the plan tracking table and this note updated after each checkpoint commit
 - [ ] Run final Docker-only validation
 - [ ] Open implementation PR to `main`
 
 ### Next save point
-After E1-S1 is committed and pushed, then E1-S2 is underway.
+After E1-S2 is committed and pushed, then E2-S1 is underway.
 
 ---
 

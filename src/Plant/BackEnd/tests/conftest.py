@@ -147,6 +147,12 @@ class _InMemoryDraftBatchStore:
         self,
         post_id: str,
         *,
+        artifact_type: str | object = _UNSET,
+        artifact_uri: str | None | object = _UNSET,
+        artifact_preview_uri: str | None | object = _UNSET,
+        artifact_mime_type: str | None | object = _UNSET,
+        artifact_metadata: dict | object = _UNSET,
+        generated_artifacts: list | object = _UNSET,
         review_status: str | object = _UNSET,
         approval_id: str | None | object = _UNSET,
         credential_ref: str | None | object = _UNSET,
@@ -164,6 +170,18 @@ class _InMemoryDraftBatchStore:
                 if post.post_id != post_id:
                     continue
 
+                if artifact_type is not _UNSET:
+                    post.artifact_type = artifact_type
+                if artifact_uri is not _UNSET:
+                    post.artifact_uri = artifact_uri
+                if artifact_preview_uri is not _UNSET:
+                    post.artifact_preview_uri = artifact_preview_uri
+                if artifact_mime_type is not _UNSET:
+                    post.artifact_mime_type = artifact_mime_type
+                if artifact_metadata is not _UNSET:
+                    post.artifact_metadata = artifact_metadata
+                if generated_artifacts is not _UNSET:
+                    post.generated_artifacts = generated_artifacts
                 if review_status is not _UNSET:
                     post.review_status = review_status
                 if approval_id is not _UNSET:

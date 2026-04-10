@@ -22,7 +22,7 @@ from agent_mold.enforcement import default_hook_bus
 from agent_mold.hooks import HookEvent, HookStage
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import load_playbook
-from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
+from agent_mold.skills.playbook import ChannelName, GeneratedArtifactReference, SkillExecutionInput
 from core.database import get_db_session, get_read_db_session
 from core.exceptions import PolicyEnforcementError
 from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord
@@ -133,14 +133,25 @@ async def create_draft_batch(
 
     batch_id = str(uuid4())
     posts = [
-        DraftPostRecord(
+        (
+        lambda primary_artifact, generated_artifacts: DraftPostRecord(
             post_id=str(uuid4()),
             channel=v.channel,
             text=v.text,
             hashtags=v.hashtags,
+            artifact_type=(primary_artifact.artifact_type.value if primary_artifact is not None else "text"),
+            artifact_uri=(primary_artifact.uri if primary_artifact is not None else None),
+            artifact_preview_uri=(primary_artifact.preview_uri if primary_artifact is not None else None),
+            artifact_mime_type=(primary_artifact.mime_type if primary_artifact is not None else None),
+            artifact_metadata=(primary_artifact.metadata if primary_artifact is not None else {}),
+            generated_artifacts=generated_artifacts,
             credential_ref=youtube_secret_ref if v.channel == ChannelName.YOUTUBE else None,
             visibility=body.youtube_visibility if v.channel == ChannelName.YOUTUBE else "private",
             public_release_requested=body.public_release_requested if v.channel == ChannelName.YOUTUBE else False,
+        )
+        )(
+            next(iter(v.generated_artifacts), None),
+            [GeneratedArtifactReference.model_validate(artifact) for artifact in (v.generated_artifacts or [])],
         )
         for v in result.output.variants
     ]
