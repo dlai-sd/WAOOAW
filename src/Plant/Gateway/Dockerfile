@@ -35,12 +35,6 @@ ENV PATH=/home/gateway/.local/bin:$PATH
 # Ensure application root is importable for test runners that don't add cwd.
 ENV PYTHONPATH=/app
 
-# Environment variables (override at runtime)
-ENV PLANT_BACKEND_URL=http://plant-backend:8001
-ENV REDIS_URL=redis://redis:6379
-ENV OPA_URL=http://opa:8181
-ENV ENVIRONMENT=production
-
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/health')"
