@@ -358,6 +358,42 @@ class ApproveDraftPostResponse(BaseModel):
     review_status: str
     approval_id: str
 
+class ArtifactStatusResponse(BaseModel):
+    post_id: str
+    artifact_type: str
+    artifact_generation_status: str
+    artifact_uri: Optional[str] = None
+    artifact_preview_uri: Optional[str] = None
+    artifact_mime_type: Optional[str] = None
+    artifact_job_id: Optional[str] = None
+
+
+@router.get("/draft-posts/{post_id}/artifact-status", response_model=ArtifactStatusResponse)
+async def get_draft_post_artifact_status(
+    post_id: str,
+    db: AsyncSession = Depends(get_read_db_session),
+) -> ArtifactStatusResponse:
+    """Poll the generation status of a media artifact for a draft post."""
+    store = DatabaseDraftBatchStore(db)
+    found = await store.find_post(post_id)
+    if found is None:
+        raise PolicyEnforcementError(
+            "Unknown draft post",
+            reason="unknown_post_id",
+            details={"post_id": post_id},
+        )
+    _, post = found
+    return ArtifactStatusResponse(
+        post_id=post_id,
+        artifact_type=post.artifact_type or "text",
+        artifact_generation_status=post.artifact_generation_status or "not_requested",
+        artifact_uri=post.artifact_uri,
+        artifact_preview_uri=post.artifact_preview_uri,
+        artifact_mime_type=post.artifact_mime_type,
+        artifact_job_id=post.artifact_job_id,
+    )
+
+
 @router.post("/draft-posts/{post_id}/approve", response_model=ApproveDraftPostResponse)
 async def approve_draft_post(
     post_id: str,
