@@ -1,5 +1,7 @@
 import { Badge, Button, Card, Spinner, Text, Input, Textarea } from '@fluentui/react-components'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
 import { DigitalMarketingArtifactPreviewCard } from './DigitalMarketingArtifactPreviewCard'
@@ -1586,15 +1588,29 @@ export function DigitalMarketingActivationWizard({
               {/* Expanded body */}
               {isExpanded ? (
                 <div style={{ padding: '0 0.75rem 0.75rem', display: 'grid', gap: '0.55rem' }}>
-                  <div style={{ lineHeight: 1.55, fontSize: '0.9rem' }}>{post.text}</div>
+                  {post.artifact_type === 'table' ? (
+                    <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div style={{ lineHeight: 1.55, fontSize: '0.9rem' }}>{post.text}</div>
+                  )}
 
-                  {/* Artifact: image inline, script as download link, table summary */}
+                  {/* Artifact: image inline, table as rendered markdown, script as download */}
                   {effectiveUri && effectiveMime?.startsWith('image/') ? (
                     <img
                       src={effectiveUri}
                       alt={`${post.artifact_type} asset`}
                       style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '6px', objectFit: 'cover' }}
                     />
+                  ) : effectiveUri && effectiveMime === 'text/csv' ? (
+                    <a
+                      href={effectiveUri}
+                      download
+                      style={{ fontSize: '0.78rem', color: 'var(--colorBrandForegroundLink)' }}
+                    >
+                      ↓ Download content table (.csv)
+                    </a>
                   ) : effectiveUri && (effectiveMime === 'text/markdown' || effectiveMime?.startsWith('text/')) ? (
                     <a
                       href={effectiveUri}
@@ -1602,14 +1618,6 @@ export function DigitalMarketingActivationWizard({
                       style={{ fontSize: '0.82rem', color: 'var(--colorBrandForegroundLink)' }}
                     >
                       ↓ Download {post.artifact_type} script (.md)
-                    </a>
-                  ) : effectiveUri && effectiveMime === 'text/csv' ? (
-                    <a
-                      href={effectiveUri}
-                      download
-                      style={{ fontSize: '0.82rem', color: 'var(--colorBrandForegroundLink)' }}
-                    >
-                      ↓ Download content table (.csv)
                     </a>
                   ) : effectiveGenStatus === 'queued' || effectiveGenStatus === 'running' ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: 0.7, fontSize: '0.82rem' }}>
@@ -2640,7 +2648,8 @@ export function DigitalMarketingActivationWizard({
                               className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
                               data-testid={message.role === 'assistant' && index === chatMessages.length - 1 ? 'strategy-assistant-message' : undefined}
                             >
-                              <div>{displayContent}</div>
+                              <div className="dma-chat-role-label">{message.role === 'assistant' ? 'DMA' : 'You'}</div>
+                              <ReactMarkdown className="dma-chat-markdown" remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
                               {inlinePostIds.length > 0 ? renderInlineDraftCards(inlinePostIds) : null}
                             </div>
                           )
