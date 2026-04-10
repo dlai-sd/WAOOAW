@@ -33,8 +33,8 @@ If a story does not improve DMA value delivery, DMA enablement, or runtime safet
 | Execution branch | `feat/dma-media-generation-agent` |
 | Execution started | `2026-04-10 UTC` |
 | Current phase | `Iteration 1 implementation` |
-| Current story | `E1-S1 — Extend the Plant artifact contract beyond text-only outputs` |
-| Last durable checkpoint | `Plan and commentary status seeded before code edits` |
+| Current story | `E1-S2 — Persist draft artifact metadata with a first-class schema` |
+| Last durable checkpoint | `E1-S1 contract changes validated in Docker and pushed` |
 | Final validation rule | `Docker only; no virtualenv` |
 
 ### Execution notes
@@ -329,8 +329,8 @@ Do this before starting the next epic. If interrupted, completed work is already
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | DMA speaks a typed artifact language | Extend the Plant artifact contract beyond text-only outputs | 🟡 In Progress | — |
-| E1-S2 | 1 | DMA speaks a typed artifact language | Persist draft artifact metadata with a first-class schema | 🔴 Not Started | — |
+| E1-S1 | 1 | DMA speaks a typed artifact language | Extend the Plant artifact contract beyond text-only outputs | 🟢 Done | — |
+| E1-S2 | 1 | DMA speaks a typed artifact language | Persist draft artifact metadata with a first-class schema | 🟡 In Progress | — |
 | E2-S1 | 1 | DMA stores and names media safely | Introduce a provider-agnostic media artifact store service | 🔴 Not Started | — |
 | E3-S1 | 1 | DMA generation jobs run asynchronously | Add async media job state to the draft-batch generation path | 🔴 Not Started | — |
 | E4-S1 | 2 | DMA routes typed artifacts through provider-safe backend paths | Teach content generation to honor artifact requests | 🔴 Not Started | — |

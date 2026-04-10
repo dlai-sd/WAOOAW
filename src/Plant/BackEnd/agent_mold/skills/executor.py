@@ -48,6 +48,7 @@ def execute_marketing_multichannel_v1(playbook: SkillPlaybook, inp: SkillExecuti
         call_to_action="Tell us what you want next and we’ll tailor it.",
         key_points=[p for p in [inp.audience, inp.tone, inp.language] if p],
         hashtags=["WAOOAW", brand.replace(" ", ""), "SmallBusiness"],
+        requested_artifacts=list(inp.requested_artifacts or []),
     )
 
     adapter_map = {
@@ -71,6 +72,13 @@ def execute_marketing_multichannel_v1(playbook: SkillPlaybook, inp: SkillExecuti
 
     return SkillExecutionResult(
         playbook_id=playbook.metadata.playbook_id,
-        output=MarketingMultiChannelOutput(canonical=canonical, variants=variants),
-        debug={"executor": "deterministic_chunk_c"},
+        output=MarketingMultiChannelOutput(
+            canonical=canonical,
+            variants=variants,
+            generated_artifacts=[],
+        ),
+        debug={
+            "executor": "deterministic_chunk_c",
+            "requested_artifact_types": [artifact.artifact_type.value for artifact in (inp.requested_artifacts or [])],
+        },
     )

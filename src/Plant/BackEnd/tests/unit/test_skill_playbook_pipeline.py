@@ -1,10 +1,13 @@
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.loader import PlaybookLoadError, load_playbook, load_playbook_with_certification
 from agent_mold.skills.adapters import adapt_facebook, adapt_instagram, adapt_linkedin, adapt_whatsapp, adapt_youtube
-from agent_mold.skills.playbook import ChannelName, SkillExecutionInput
+from agent_mold.skills.playbook import ArtifactRequest, ArtifactType, ChannelName, SkillExecutionInput
+from pydantic import ValidationError
 
 
 def test_load_marketing_playbook_and_execute_variants():
@@ -65,6 +68,47 @@ def test_executor_respects_explicit_channel_list_order_and_dedupes():
     )
 
     assert [v.channel for v in result.output.variants] == [ChannelName.WHATSAPP, ChannelName.LINKEDIN]
+
+
+def test_executor_preserves_typed_artifact_requests_without_breaking_text_variants():
+    backend_root = Path(__file__).resolve().parents[2]
+    playbook_path = backend_root / "agent_mold" / "playbooks" / "marketing" / "multichannel_post_v1.md"
+    playbook = load_playbook(playbook_path)
+
+    result = execute_marketing_multichannel_v1(
+        playbook,
+        SkillExecutionInput(
+            theme="Build a 4-week YouTube content calendar",
+            brand_name="WAOOAW",
+            requested_artifacts=[
+                ArtifactRequest(
+                    artifact_type=ArtifactType.TABLE,
+                    prompt="Generate a four-week content table",
+                    metadata={"rows": 4},
+                ),
+                ArtifactRequest(
+                    artifact_type=ArtifactType.IMAGE,
+                    prompt="Generate a thumbnail concept",
+                ),
+            ],
+        ),
+    )
+
+    assert [artifact.artifact_type for artifact in result.output.canonical.requested_artifacts] == [
+        ArtifactType.TABLE,
+        ArtifactType.IMAGE,
+    ]
+    assert result.output.generated_artifacts == []
+    assert result.output.variants
+    assert result.debug["requested_artifact_types"] == ["table", "image"]
+
+
+def test_artifact_request_rejects_unsupported_artifact_type():
+    with pytest.raises(ValidationError):
+        ArtifactRequest(
+            artifact_type="pdf",
+            prompt="Generate a PDF handout",
+        )
 
 
 def test_loader_returns_certification_status_for_valid_playbook():

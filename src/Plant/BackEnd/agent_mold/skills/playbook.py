@@ -42,6 +42,30 @@ class CanonicalMessage(BaseModel):
     call_to_action: str = Field(..., min_length=1)
     key_points: List[str] = Field(default_factory=list)
     hashtags: List[str] = Field(default_factory=list)
+    requested_artifacts: List["ArtifactRequest"] = Field(default_factory=list)
+    generated_artifacts: List["GeneratedArtifactReference"] = Field(default_factory=list)
+
+
+class ArtifactType(str, Enum):
+    TABLE = "table"
+    IMAGE = "image"
+    AUDIO = "audio"
+    VIDEO = "video"
+    VIDEO_AUDIO = "video_audio"
+
+
+class ArtifactRequest(BaseModel):
+    artifact_type: ArtifactType
+    prompt: str = Field(..., min_length=1)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class GeneratedArtifactReference(BaseModel):
+    artifact_type: ArtifactType
+    uri: str = Field(..., min_length=1)
+    preview_uri: Optional[str] = None
+    mime_type: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ChannelName(str, Enum):
@@ -56,11 +80,13 @@ class ChannelVariant(BaseModel):
     channel: ChannelName
     text: str
     hashtags: List[str] = Field(default_factory=list)
+    generated_artifacts: List[GeneratedArtifactReference] = Field(default_factory=list)
 
 
 class MarketingMultiChannelOutput(BaseModel):
     canonical: CanonicalMessage
     variants: List[ChannelVariant]
+    generated_artifacts: List[GeneratedArtifactReference] = Field(default_factory=list)
 
 
 class SkillPlaybookMetadata(BaseModel):
@@ -177,6 +203,7 @@ class SkillExecutionInput(BaseModel):
 
     # Optional channel selection (defaults to the executor's standard set).
     channels: Optional[List[ChannelName]] = None
+    requested_artifacts: Optional[List[ArtifactRequest]] = None
 
 
 class SkillExecutionResult(BaseModel):

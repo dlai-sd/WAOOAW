@@ -16,13 +16,15 @@ Implement the merged DMA media-generation upgrade plan end to end so DMA returns
 - [x] Create clean implementation worktree and branch from `origin/main`
 - [x] Re-read merged `DMA-MEDIA-1` plan and current DMA code path
 - [x] Seed live execution status into the plan file before code edits
-- [ ] Complete E1-S1 artifact contract changes
+- [x] Complete E1-S1 artifact contract changes
+- [x] Validate E1-S1 in Docker via `plant-backend-test --no-cov tests/unit/test_skill_playbook_pipeline.py -q`
+- [ ] Complete E1-S2 draft artifact persistence changes
 - [ ] Keep the plan tracking table and this note updated after each checkpoint commit
 - [ ] Run final Docker-only validation
 - [ ] Open implementation PR to `main`
 
 ### Next save point
-After E1-S1 code and tests are committed and pushed.
+After E1-S1 is committed and pushed, then E1-S2 is underway.
 
 ---
 
