@@ -5,7 +5,7 @@
 
 **Branch**: `docs/dma-media-1-agent-artifacts`
 **Plan file**: `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md`
-**Status**: Plan drafted and pushed for review
+**Status**: Plan drafted, pushed, and PR opened
 
 ### Goal
 Create a durable, agent-executable upgrade plan that turns DMA media generation into a first-class capability for tables, images, audio, video, and video+audio while preserving CP thin-proxy rules, Plant ownership, approval gates, and Docker-first validation.
@@ -17,10 +17,10 @@ Create a durable, agent-executable upgrade plan that turns DMA media generation 
 - [x] Commit and push skeleton checkpoint
 - [x] Write iteration story cards and dependency map
 - [x] Commit and push completed plan
-- [ ] Open PR to `main`
+- [x] Open PR to `main` (#1034)
 
 ### Next save point
-After the PR is opened.
+Resume from PR review feedback on `#1034`.
 
 ---
 
