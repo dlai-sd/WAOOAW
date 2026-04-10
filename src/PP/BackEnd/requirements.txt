@@ -14,7 +14,7 @@ PyJWT==2.12.0
 google-auth[requests]==2.37.0
 
 # Encryption support for exchange credential handling
-cryptography==46.0.6
+cryptography==46.0.7
 
 # Retry/backoff
 tenacity==8.2.3
