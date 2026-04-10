@@ -303,3 +303,231 @@ Do this before starting the next epic. If interrupted, completed work is already
 | E5 | 2 | DMA returns review-ready artifact payloads | Story cards pending | 🔴 Not Started | — |
 | E6 | 3 | CP proxies and types the artifact contract without owning logic | Story cards pending | 🔴 Not Started | — |
 | E7 | 3 | DMA customers can preview and approve media artifacts in CP | Story cards pending | 🔴 Not Started | — |
+
+---
+
+## Iteration 1 — Typed Artifact Contract + Persistence Foundation
+
+**Outcome**
+Plant can represent media-generation intent as a typed DMA artifact request, persist artifact metadata beside draft posts, and launch async generation work without blocking the customer-facing request path.
+
+### Dependency Map
+
+| Story | Depends on | Enables |
+|---|---|---|
+| E1-S1 | none | E1-S2, E2-S1, E3-S1 |
+| E1-S2 | E1-S1 | E3-S1, E4-S1 |
+| E2-S1 | E1-S1 | E3-S1, E4-S1 |
+| E3-S1 | E1-S1, E1-S2, E2-S1 | Iteration 2 |
+
+### E1 — DMA speaks a typed artifact language
+
+#### Story E1-S1 — Extend the Plant artifact contract beyond text-only outputs
+
+| Field | Value |
+|---|---|
+| Story ID | `E1-S1` |
+| Branch | `feat/dma-media-1-it1-artifact-contract` |
+| Estimate | 45 min |
+| BLOCKED UNTIL | none |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/Plant/BackEnd/agent_mold/skills/playbook.py`
+2. `src/Plant/BackEnd/agent_mold/skills/executor.py`
+3. `src/Plant/BackEnd/tests/test_content_creator.py`
+
+**Files to create / modify**
+- `src/Plant/BackEnd/agent_mold/skills/playbook.py`
+- `src/Plant/BackEnd/agent_mold/skills/executor.py`
+- `src/Plant/BackEnd/tests/test_content_creator.py`
+
+**Context**
+Today the canonical DMA contract only knows how to return a text canonical message plus per-channel text variants. That forces every downstream path to treat user requests for tables, images, audio, or video as plain text, which is the root reason artifact generation cannot be routed safely.
+
+**Code patterns to copy exactly**
+```python
+from pydantic import BaseModel, Field
+
+class CanonicalMessage(BaseModel):
+  schema_version: Literal["1.0"] = Field(default="1.0")
+```
+
+```python
+# Cloud-portable rule: store typed metadata, not provider SDK objects.
+class ArtifactRequest(BaseModel):
+  artifact_type: Literal["table", "image", "audio", "video", "video_audio"]
+  prompt: str = Field(..., min_length=1)
+  metadata: dict[str, Any] = Field(default_factory=dict)
+```
+
+**Acceptance criteria**
+1. Add typed Pydantic contracts in `playbook.py` for requested artifacts and generated artifact references.
+2. Extend `CanonicalMessage`, `ChannelVariant`, `MarketingMultiChannelOutput`, and `SkillExecutionInput` so later stories can carry artifact intent and artifact metadata without breaking existing text behavior.
+3. Keep deterministic execution backward-compatible: text-only DMA requests still work when no artifact request is supplied.
+4. Add unit coverage proving typed artifact contracts validate accepted values and reject unsupported artifact types.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/test_content_creator.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/test_content_creator.py
+```
+
+#### Story E1-S2 — Persist draft artifact metadata with a first-class schema
+
+| Field | Value |
+|---|---|
+| Story ID | `E1-S2` |
+| Branch | `feat/dma-media-1-it1-draft-artifact-persistence` |
+| Estimate | 60 min |
+| BLOCKED UNTIL | `E1-S1` merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/Plant/BackEnd/models/marketing_draft.py`
+2. `src/Plant/BackEnd/services/draft_batches.py`
+3. `src/Plant/BackEnd/database/migrations/versions/031_dma_iteration1_persistence.py`
+
+**Files to create / modify**
+- `src/Plant/BackEnd/models/marketing_draft.py`
+- `src/Plant/BackEnd/services/draft_batches.py`
+- `src/Plant/BackEnd/database/migrations/versions/033_dma_media_artifact_persistence.py`
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+
+**Context**
+Draft posts currently persist text, hashtags, review state, and provider posting fields only. If DMA generates an image, audio clip, or video, there is nowhere durable to record the artifact type, storage location, preview URL, or generation status, so later review and publish steps cannot behave deterministically.
+
+**Code patterns to copy exactly**
+```python
+from sqlalchemy.dialects.postgresql import JSONB
+
+artifact_metadata = Column(JSONB, nullable=False, default=dict)
+```
+
+```python
+# Persist provider-neutral asset references only.
+artifact_uri = Column(Text, nullable=True)
+artifact_type = Column(String(32), nullable=False, index=True)
+```
+
+**Acceptance criteria**
+1. Extend the draft-post persistence model to store artifact metadata and zero-or-more media assets per post.
+2. Add an Alembic migration that creates the new persistence surface without rewriting unrelated draft-batch tables.
+3. Extend `DraftPostRecord` and `DraftBatchRecord` to serialize and deserialize the new artifact metadata cleanly.
+4. Add unit coverage proving a stored batch round-trips typed artifact metadata.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py
+```
+
+### E2 — DMA stores and names media safely
+
+#### Story E2-S1 — Introduce a provider-agnostic media artifact store service
+
+| Field | Value |
+|---|---|
+| Story ID | `E2-S1` |
+| Branch | `feat/dma-media-1-it1-media-store-adapter` |
+| Estimate | 60 min |
+| BLOCKED UNTIL | `E1-S1` merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/Plant/BackEnd/services/draft_batches.py`
+2. `src/Plant/BackEnd/core/config.py`
+3. `src/Plant/BackEnd/worker/celery_app.py`
+
+**Files to create / modify**
+- `src/Plant/BackEnd/services/media_artifact_store.py`
+- `src/Plant/BackEnd/core/config.py`
+- `src/Plant/BackEnd/tests/unit/test_media_artifact_store.py`
+
+**Context**
+The platform needs a durable place to put generated tables, images, audio, and video without tying Plant business logic to one cloud or media vendor. This service is the portability seam: later provider integrations can upload bytes and return URIs, while the rest of Plant sees only stable metadata.
+
+**Code patterns to copy exactly**
+```python
+logger = logging.getLogger(__name__)
+logger.addFilter(PiiMaskingFilter())
+```
+
+```python
+@circuit_breaker(service="media_artifact_store")
+async def store_artifact(...):
+  ...
+```
+
+**Acceptance criteria**
+1. Add a `MediaArtifactStore` abstraction with a local-safe implementation and a provider-adapter seam for future cloud storage.
+2. Keep storage configuration runtime-driven through env vars or config, not hardcoded URIs.
+3. Ensure artifact storage returns provider-neutral metadata: URI, mime type, artifact type, size, and preview capability.
+4. Add unit tests for the local-safe implementation and for configuration validation.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/unit/test_media_artifact_store.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_media_artifact_store.py
+```
+
+### E3 — DMA generation jobs run asynchronously
+
+#### Story E3-S1 — Add async media job state to the draft-batch generation path
+
+| Field | Value |
+|---|---|
+| Story ID | `E3-S1` |
+| Branch | `feat/dma-media-1-it1-async-generation-jobs` |
+| Estimate | 90 min |
+| BLOCKED UNTIL | `E1-S1`, `E1-S2`, and `E2-S1` merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/Plant/BackEnd/api/v1/marketing_drafts.py`
+2. `src/Plant/BackEnd/worker/tasks/component_tasks.py`
+3. `src/Plant/BackEnd/services/draft_batches.py`
+
+**Files to create / modify**
+- `src/Plant/BackEnd/api/v1/marketing_drafts.py`
+- `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py`
+- `src/Plant/BackEnd/services/draft_batches.py`
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+
+**Context**
+Binary media generation cannot run inline inside the existing draft-batch POST handler without creating timeouts and poor user experience. The first async slice should let Plant acknowledge the draft batch quickly, mark requested artifacts as queued or running, and let later workers populate the persisted artifact metadata.
+
+**Code patterns to copy exactly**
+```python
+from core.routing import waooaw_router
+
+router = waooaw_router(prefix="/marketing", tags=["marketing"])
+```
+
+```python
+@router.get("/draft-batches", response_model=List[DraftBatchRecord])
+async def list_draft_batches(
+  db: AsyncSession = Depends(get_read_db_session),
+) -> List[DraftBatchRecord]:
+  ...
+```
+
+**Acceptance criteria**
+1. Extend the existing draft-batch creation flow so artifact requests create queued job state instead of pretending binary output is immediately available.
+2. Add a worker task file for media generation jobs; job payloads must carry correlation IDs and draft identifiers.
+3. Extend draft-batch list and get responses so callers can see artifact generation status and partial completion safely.
+4. Add unit coverage proving draft-batch creation remains backward-compatible for text-only requests and marks media requests as queued.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py
+```
