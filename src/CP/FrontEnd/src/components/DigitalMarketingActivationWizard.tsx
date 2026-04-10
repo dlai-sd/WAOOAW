@@ -927,15 +927,6 @@ export function DigitalMarketingActivationWizard({
     return () => clearInterval(interval)
   }, [outputItems, outputItemStatuses])
 
-  // Auto-open the Output panel when new items arrive and user is not already viewing it
-  useEffect(() => {
-    if (outputItems.length > 0 && activeBriefSection !== 'output') {
-      setActiveBriefSection('output')
-    }
-  // Only run when outputItems grows — not on every activeBriefSection change
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outputItems.length])
-
   const saveActivationWorkspaceWithRecovery = async (
     initialHiredInstanceId: string,
     payload: UpsertDigitalMarketingActivationInput,
@@ -1240,14 +1231,14 @@ export function DigitalMarketingActivationWizard({
         const fresh = newPosts.filter((p) => !existingIds.has(p.post_id))
         return fresh.length > 0 ? [...prev, ...fresh] : prev
       })
-      // Notify via chat
+      // Inject draft post cards directly into the chat thread
       if (newPosts.length > 0) {
         const queuedCount = newPosts.filter((p) => p.artifact_generation_status === 'queued').length
         const readyCount = newPosts.length - queuedCount
-        let msg = `I've created ${newPosts.length} draft post${newPosts.length > 1 ? 's' : ''} for you.`
-        if (readyCount > 0) msg += ` ${readyCount} ${readyCount === 1 ? 'is' : 'are'} ready to review.`
-        if (queuedCount > 0) msg += ` ${queuedCount} media asset${queuedCount > 1 ? 's are' : ' is'} being generated — check the Output panel for updates.`
-        msg += ' Open "Generated output" in the right panel to approve and publish.'
+        let msg = `Here ${newPosts.length === 1 ? 'is your draft post' : `are your ${newPosts.length} draft posts`}.`
+        if (readyCount > 0) msg += ` ${readyCount === 1 ? 'It\'s' : `${readyCount} are`} ready to review.`
+        if (queuedCount > 0) msg += ` ${queuedCount} media asset${queuedCount > 1 ? 's are' : ' is'} generating — ${queuedCount > 1 ? 'they\'ll' : 'it\'ll'} appear below when ready.`
+        msg += `\n[DRAFT_POSTS:${newPosts.map((p) => p.post_id).join(',')}]`
         setStrategyWorkshop((prev) => ({
           ...prev,
           messages: [
@@ -1350,6 +1341,20 @@ export function DigitalMarketingActivationWizard({
         const fresh = ytPosts.filter((p) => !existingIds.has(p.post_id))
         return fresh.length > 0 ? [...prev, ...fresh] : prev
       })
+      // Inject draft post cards into the chat thread
+      if (ytPosts.length > 0) {
+        const queuedCount = ytPosts.filter((p) => p.artifact_generation_status === 'queued').length
+        let msg = `Here ${ytPosts.length === 1 ? 'is your YouTube draft' : `are your ${ytPosts.length} YouTube drafts`}.`
+        if (queuedCount > 0) msg += ` ${queuedCount} media asset${queuedCount > 1 ? 's are' : ' is'} generating.`
+        msg += `\n[DRAFT_POSTS:${ytPosts.map((p) => p.post_id).join(',')}]`
+        setStrategyWorkshop((prev) => ({
+          ...prev,
+          messages: [
+            ...(prev.messages || []),
+            { role: 'assistant' as const, content: msg },
+          ],
+        }))
+      }
     } catch (e: any) {
       setDraftGenerateError(e?.message || 'Failed to generate YouTube draft.')
     } finally {
@@ -1498,6 +1503,178 @@ export function DigitalMarketingActivationWizard({
     } catch {
       setOutputItemActions((s) => ({ ...s, [post.post_id]: 'error' }))
     }
+  }
+
+  // Renders draft post cards directly inside a chat bubble for a list of post IDs
+  const renderInlineDraftCards = (postIds: string[]) => {
+    const posts = postIds
+      .map((id) => outputItems.find((p) => p.post_id === id))
+      .filter((p): p is DraftPost => Boolean(p))
+    if (posts.length === 0) return null
+
+    return (
+      <div style={{ display: 'grid', gap: '0.6rem', marginTop: '0.6rem' }} data-testid="inline-draft-cards">
+        {posts.map((post, idx) => {
+          const actionStatus = outputItemActions[post.post_id] || 'idle'
+          const isApproved = post.review_status === 'approved'
+          const isRejected = post.review_status === 'rejected'
+          const isPosted = post.execution_status === 'posted'
+          const artifactStatus = outputItemStatuses[post.post_id]
+          const effectiveMime = artifactStatus?.artifact_mime_type ?? post.artifact_mime_type
+          const effectiveUri = artifactStatus?.artifact_uri ?? post.artifact_uri
+          const effectiveGenStatus = artifactStatus?.artifact_generation_status ?? post.artifact_generation_status
+          const isExpanded = expandedOutputItems[post.post_id] ?? false
+          const receiptUrl = outputItemReceipts[post.post_id] || post.provider_post_url
+
+          return (
+            <div
+              key={post.post_id}
+              data-testid={`inline-draft-card-${post.post_id}`}
+              style={{
+                border: '1px solid color-mix(in srgb, var(--colorNeutralStroke2) 80%, transparent)',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                background: 'color-mix(in srgb, var(--colorNeutralBackground1) 95%, transparent)',
+              }}
+            >
+              {/* Card header */}
+              <button
+                type="button"
+                onClick={() => setExpandedOutputItems((e) => ({ ...e, [post.post_id]: !isExpanded }))}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 0.75rem',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+                aria-expanded={isExpanded}
+              >
+                <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                  Post {idx + 1}
+                  {post.channel ? ` · ${post.channel}` : ''}
+                  {post.artifact_type && post.artifact_type !== 'text' ? ` · ${post.artifact_type}` : ''}
+                </span>
+                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0 }}>
+                  <Badge
+                    appearance="outline"
+                    color={isApproved ? 'success' : isRejected ? 'danger' : 'warning'}
+                  >
+                    {isPosted ? 'published' : isApproved ? 'approved' : isRejected ? 'rejected' : 'pending'}
+                  </Badge>
+                  {effectiveGenStatus && effectiveGenStatus !== 'not_requested' && effectiveGenStatus !== 'ready' ? (
+                    <Badge appearance="outline" color={effectiveGenStatus === 'failed' ? 'danger' : 'informative'}>
+                      {effectiveGenStatus === 'queued' ? '⟳ generating' : effectiveGenStatus}
+                    </Badge>
+                  ) : null}
+                  <span style={{ opacity: 0.45, fontSize: '0.75rem' }}>{isExpanded ? '▲' : '▼'}</span>
+                </div>
+              </button>
+
+              {/* Collapsed preview — always visible */}
+              {!isExpanded ? (
+                <div style={{ padding: '0 0.75rem 0.5rem', fontSize: '0.88rem', opacity: 0.75, lineHeight: 1.45 }}>
+                  {post.text.length > 120 ? `${post.text.slice(0, 120)}…` : post.text}
+                </div>
+              ) : null}
+
+              {/* Expanded body */}
+              {isExpanded ? (
+                <div style={{ padding: '0 0.75rem 0.75rem', display: 'grid', gap: '0.55rem' }}>
+                  <div style={{ lineHeight: 1.55, fontSize: '0.9rem' }}>{post.text}</div>
+
+                  {/* Artifact: image inline, script as download link, table summary */}
+                  {effectiveUri && effectiveMime?.startsWith('image/') ? (
+                    <img
+                      src={effectiveUri}
+                      alt={`${post.artifact_type} asset`}
+                      style={{ maxWidth: '100%', maxHeight: '220px', borderRadius: '6px', objectFit: 'cover' }}
+                    />
+                  ) : effectiveUri && (effectiveMime === 'text/markdown' || effectiveMime?.startsWith('text/')) ? (
+                    <a
+                      href={effectiveUri}
+                      download
+                      style={{ fontSize: '0.82rem', color: 'var(--colorBrandForegroundLink)' }}
+                    >
+                      ↓ Download {post.artifact_type} script (.md)
+                    </a>
+                  ) : effectiveUri && effectiveMime === 'text/csv' ? (
+                    <a
+                      href={effectiveUri}
+                      download
+                      style={{ fontSize: '0.82rem', color: 'var(--colorBrandForegroundLink)' }}
+                    >
+                      ↓ Download content table (.csv)
+                    </a>
+                  ) : effectiveGenStatus === 'queued' || effectiveGenStatus === 'running' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: 0.7, fontSize: '0.82rem' }}>
+                      <Spinner size="tiny" />
+                      <span>Generating {post.artifact_type}…</span>
+                    </div>
+                  ) : null}
+
+                  {receiptUrl ? (
+                    <div style={{ fontSize: '0.82rem' }}>
+                      <span style={{ opacity: 0.6 }}>Published: </span>
+                      <a href={receiptUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--colorBrandForegroundLink)' }}>
+                        {receiptUrl}
+                      </a>
+                    </div>
+                  ) : null}
+
+                  {/* Action buttons */}
+                  {!isRejected && !isPosted ? (
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {!isApproved ? (
+                        <>
+                          <Button
+                            size="small"
+                            appearance="primary"
+                            disabled={actionStatus === 'loading' || readOnly}
+                            onClick={() => void handleOutputItemApprove(post.post_id)}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="small"
+                            appearance="subtle"
+                            disabled={actionStatus === 'loading' || readOnly}
+                            onClick={() => void handleOutputItemReject(post.post_id)}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      ) : null}
+                      {isApproved ? (
+                        <Button
+                          size="small"
+                          appearance="primary"
+                          disabled={actionStatus === 'loading' || !isYouTubeAttached || readOnly}
+                          title={!isYouTubeAttached ? 'YouTube must be connected first' : undefined}
+                          onClick={() => void handleOutputItemPublish(post)}
+                        >
+                          Publish now
+                        </Button>
+                      ) : null}
+                      {actionStatus === 'loading' ? <Spinner size="tiny" /> : null}
+                      {actionStatus === 'error' ? (
+                        <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed — try again</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {isPosted ? <Badge appearance="filled" color="success">Published ✓</Badge> : null}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   const renderOutputItemArtifact = (post: DraftPost) => {
@@ -2453,15 +2630,21 @@ export function DigitalMarketingActivationWizard({
                   <div className="dma-chat-thread" data-testid="dma-chat-thread">
                     <div className="dma-chat-scroll-region" ref={chatScrollRef} data-testid="dma-chat-scroll-region">
                       <div className="dma-chat-message-stack" data-testid="dma-chat-message-stack">
-                        {chatMessages.map((message, index) => (
-                          <div
-                            key={`${message.role}-${index}-${message.content.slice(0, 24)}`}
-                            className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
-                            data-testid={message.role === 'assistant' && index === chatMessages.length - 1 ? 'strategy-assistant-message' : undefined}
-                          >
-                            <div>{message.content}</div>
-                          </div>
-                        ))}
+                        {chatMessages.map((message, index) => {
+                          const draftPostMatch = message.content.match(/\[DRAFT_POSTS:([^\]]+)\]/)
+                          const inlinePostIds = draftPostMatch ? draftPostMatch[1].split(',').filter(Boolean) : []
+                          const displayContent = message.content.replace(/\n?\[DRAFT_POSTS:[^\]]+\]/g, '')
+                          return (
+                            <div
+                              key={`${message.role}-${index}-${message.content.slice(0, 24)}`}
+                              className={`dma-wizard-theme-workshop-message${message.role === 'assistant' ? ' dma-wizard-theme-workshop-message--assistant' : ' dma-wizard-theme-workshop-message--user'}`}
+                              data-testid={message.role === 'assistant' && index === chatMessages.length - 1 ? 'strategy-assistant-message' : undefined}
+                            >
+                              <div>{displayContent}</div>
+                              {inlinePostIds.length > 0 ? renderInlineDraftCards(inlinePostIds) : null}
+                            </div>
+                          )
+                        })}
 
                         {themePlanLoading ? (
                           <div
