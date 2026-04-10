@@ -74,6 +74,8 @@ def test_whitespace_only_never_triggers() -> None:
     ("create a content calendar", ArtifactType.TABLE),
     ("generate a table", ArtifactType.TABLE),
     ("give me a schedule", ArtifactType.TABLE),
+    # "tabular" must fire — real user phrasing confirmed in prod logs (Apr 2026)
+    ("give me themes for April 2026, in tabular format", ArtifactType.TABLE),
     ("show me an image", ArtifactType.IMAGE),
     ("create a thumbnail", ArtifactType.IMAGE),
     ("generate a video", ArtifactType.VIDEO),

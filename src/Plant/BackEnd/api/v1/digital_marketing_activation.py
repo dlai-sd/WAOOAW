@@ -106,7 +106,7 @@ _APPROVAL_PATTERNS = re.compile(
 )
 
 _ARTIFACT_KEYWORDS: List[Tuple[str, ArtifactType]] = [
-    (r"\b(table|spreadsheet|schedule|plan|calendar|list|comparison|checklist)\b", ArtifactType.TABLE),
+    (r"\b(table|tabular|tabulate|spreadsheet|schedule|plan|calendar|list|comparison|checklist)\b", ArtifactType.TABLE),
     (r"\b(image|picture|photo|visual|graphic|thumbnail|banner|design)\b", ArtifactType.IMAGE),
     (r"\b(video|clip|reel|short|film|recording)\b", ArtifactType.VIDEO),
     (r"\b(audio|voice|narration|podcast|sound)\b", ArtifactType.AUDIO),
