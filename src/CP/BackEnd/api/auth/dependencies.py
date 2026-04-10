@@ -13,7 +13,6 @@ from core.jwt_handler import verify_token
 from models.user import TokenData, User
 from services.cp_refresh_revocations import (
     FileCPRefreshRevocationStore,
-    RedisCPRefreshRevocationStore,
     get_cp_refresh_revocation_store,
 )
 
@@ -92,7 +91,7 @@ async def get_current_user_optional(
 async def verify_refresh_token(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
-    revocations: FileCPRefreshRevocationStore | RedisCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
+    revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
 ) -> TokenData:
     """
     Verify that the provided token is a valid refresh token

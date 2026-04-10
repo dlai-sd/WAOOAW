@@ -106,7 +106,12 @@ module "cp_backend" {
     } : {},
     {
       CP_REGISTRATION_KEY = "CP_REGISTRATION_KEY:latest"
-      REDIS_URL           = "${var.environment}-cp-backend-redis-url:latest"
+
+      # NOTE: REDIS_URL is intentionally NOT injected here.
+      # CP BackEnd is a thin proxy — it must not make direct connections to Redis
+      # or SQL. All stateful operations go through Plant Gateway/BackEnd.
+      # The refresh-token revocation store falls back to a local file store
+      # (cp_refresh_revocations.py) when REDIS_URL is absent.
 
       # Google Workspace SMTP credentials — always injected from Secret Manager
       CP_OTP_SMTP_USERNAME = "CP_OTP_SMTP_USERNAME:latest"
