@@ -32,9 +32,9 @@ If a story does not improve DMA value delivery, DMA enablement, or runtime safet
 |---|---|
 | Execution branch | `feat/dma-media-generation-agent` |
 | Execution started | `2026-04-10 UTC` |
-| Current phase | `Implementation complete — ready for PR` |
+| Current phase | `Implementation complete — PR open` |
 | Current story | `E7-S2 — Docker-only validation and PR handoff` |
-| Last durable checkpoint | `Plant + CP backend + CP frontend Docker validation passing` |
+| Last durable checkpoint | `PR #1035 opened from feat/dma-media-generation-agent` |
 | Final validation rule | `Docker only; no virtualenv` |
 
 ### Execution notes

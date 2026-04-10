@@ -5,7 +5,7 @@
 
 **Branch**: `feat/dma-media-generation-agent`
 **Plan file**: `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md`
-**Status**: Implementation complete — PR pending
+**Status**: Implementation complete — PR open (`#1035`)
 
 ### Goal
 Implement the merged DMA media-generation upgrade plan end to end so DMA returns typed media artifacts instead of text-only promises, while preserving Plant business-logic ownership, CP thin-proxy rules, approval safety, and Docker-only final validation.
@@ -27,10 +27,13 @@ Implement the merged DMA media-generation upgrade plan end to end so DMA returns
 - [x] Complete E6-S1 CP proxy and TypeScript contract passthrough
 - [x] Complete E7-S1 artifact request controls and preview rendering in the DMA UI
 - [x] Run Docker-only validation for Plant backend, CP backend, and CP frontend paths
-- [ ] Open implementation PR to `main`
+- [x] Open implementation PR to `main` (`#1035`)
 
 ### Next save point
-After the implementation PR is created and linked here.
+After PR review feedback arrives or merge completes.
+
+### PR
+- https://github.com/dlai-sd/WAOOAW/pull/1035
 
 ---
 
