@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
-from typing import Any, Optional
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, List, Optional, Tuple
+from uuid import uuid4
 
 from fastapi import Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agent_mold.skills.content_models import Campaign, CampaignWorkflowState, DailyThemeItem, estimate_cost
+from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.grok_client import GrokClientError, get_grok_client, grok_complete
+from agent_mold.skills.loader import load_playbook
+from agent_mold.skills.playbook import ArtifactRequest, ArtifactType, ChannelName, SkillExecutionInput
 from api.v1 import campaigns as campaigns_module
 from api.v1 import hired_agents_simple
 from api.v1.platform_connections import get_connected_platform_connection
@@ -18,6 +25,7 @@ from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 from repositories.campaign_repository import CampaignRepository
 from repositories.hired_agent_repository import HiredAgentRepository
+from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord
 
 
 router = waooaw_router(prefix="/hired-agents", tags=["digital-marketing-activation"])
@@ -71,6 +79,155 @@ class ThemePlanResponse(BaseModel):
     master_theme: str
     derived_themes: list[dict[str, Any]] = Field(default_factory=list)
     workspace: dict[str, Any] = Field(default_factory=dict)
+    # Populated when the customer's message triggers content generation directly from chat
+    auto_generated_draft: Optional[dict[str, Any]] = None
+
+
+@lru_cache(maxsize=1)
+def _dma_playbook():
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "agent_mold"
+        / "playbooks"
+        / "marketing"
+        / "multichannel_post_v1.md"
+    )
+    return load_playbook(path)
+
+
+# ---------------------------------------------------------------------------
+# Intent detection — recognises natural-language approval / generation signals
+# ---------------------------------------------------------------------------
+
+_APPROVAL_PATTERNS = re.compile(
+    r"\b(approve[ds]?|yes|confirm(s|ed)?|go ahead|start|proceed|lock.?it|lock.?in|looks? good|all set|"
+    r"let'?s go|move.?on|next step|finalize|finalise|done|ready|great|perfect|sounds? good|agreed)\b",
+    re.IGNORECASE,
+)
+
+_ARTIFACT_KEYWORDS: List[Tuple[str, ArtifactType]] = [
+    (r"\b(table|spreadsheet|schedule|plan|calendar|list|comparison|checklist)\b", ArtifactType.TABLE),
+    (r"\b(image|picture|photo|visual|graphic|thumbnail|banner|design)\b", ArtifactType.IMAGE),
+    (r"\b(video|clip|reel|short|film|recording)\b", ArtifactType.VIDEO),
+    (r"\b(audio|voice|narration|podcast|sound)\b", ArtifactType.AUDIO),
+    (r"\b(video.?audio|narrated.?video|video.?with.?(voice|narration|audio))\b", ArtifactType.VIDEO_AUDIO),
+]
+
+_GENERATE_VERBS = re.compile(
+    r"\b(show|give|create|generate|make|build|produce|draft|write|prepare|get)\b",
+    re.IGNORECASE,
+)
+
+
+def _detect_generation_intent(
+    pending_input: str,
+    workshop_status: str,
+) -> Tuple[bool, List[ArtifactType]]:
+    """Return (should_generate_draft, artifact_types_requested).
+
+    Fires when:
+    - customer explicitly requests an artifact type (table/image/video etc.), OR
+    - customer sends an approval signal AND the workshop is already approval_ready or approved.
+    """
+    text = pending_input.strip()
+    if not text:
+        return False, []
+
+    # Detect explicit artifact mention
+    requested_artifact_types: List[ArtifactType] = []
+    for pattern, artifact_type in _ARTIFACT_KEYWORDS:
+        if re.search(pattern, text, re.IGNORECASE):
+            requested_artifact_types.append(artifact_type)
+
+    has_generate_verb = bool(_GENERATE_VERBS.search(text))
+    has_approval_signal = bool(_APPROVAL_PATTERNS.search(text))
+
+    # Explicit "show me table/video/image" — always generate
+    if requested_artifact_types and has_generate_verb:
+        return True, requested_artifact_types
+
+    # Pure approval signal when strategy is ready — generate table by default
+    if has_approval_signal and workshop_status in {"approval_ready", "approved"}:
+        # Default to table if no specific artifact mentioned
+        return True, requested_artifact_types or [ArtifactType.TABLE]
+
+    # Conversational mention of an artifact type with approval signal
+    if requested_artifact_types and has_approval_signal:
+        return True, requested_artifact_types
+
+    return False, []
+
+
+async def _build_auto_draft(
+    *,
+    record: hired_agents_simple._HiredAgentRecord,
+    workspace: dict[str, Any],
+    master_theme: str,
+    campaign_id: str | None,
+    artifact_types: List[ArtifactType],
+    db: AsyncSession | None,
+) -> dict[str, Any]:
+    """Build and persist a draft batch inline from the chat handler. Returns the serialisable batch dict."""
+    playbook = _dma_playbook()
+    brand_name = str(workspace.get("brand_name") or record.nickname or "").strip()
+    location = str(workspace.get("location") or "").strip()
+    language = str(workspace.get("primary_language") or "en").strip()
+
+    subject = master_theme or brand_name or "the approved content plan"
+    requested_artifacts = [
+        ArtifactRequest(
+            artifact_type=art,
+            prompt=f"Create a {art.value.replace('_', ' ')} asset for: {subject}",
+            metadata={"source": "dma_chat_intent", "channel": "youtube"},
+        )
+        for art in artifact_types
+    ]
+
+    result = execute_marketing_multichannel_v1(
+        playbook,
+        SkillExecutionInput(
+            theme=master_theme or brand_name,
+            brand_name=brand_name,
+            offer=None,
+            location=location or None,
+            audience=None,
+            tone=None,
+            language=language,
+            channels=[ChannelName.YOUTUBE],
+            requested_artifacts=requested_artifacts,
+        ),
+    )
+
+    batch_id = str(uuid4())
+    posts = [
+        DraftPostRecord(
+            post_id=str(uuid4()),
+            channel=v.channel,
+            text=v.text,
+            hashtags=v.hashtags,
+        )
+        for v in result.output.variants
+    ]
+
+    batch = DraftBatchRecord(
+        batch_id=batch_id,
+        agent_id=str(record.agent_id or ""),
+        hired_instance_id=record.hired_instance_id,
+        campaign_id=campaign_id,
+        customer_id=str(record.customer_id or "") if record.customer_id else None,
+        theme=result.output.canonical.theme,
+        brand_name=brand_name,
+        brief_summary=None,
+        created_at=datetime.utcnow(),
+        posts=posts,
+    )
+
+    if db is not None:
+        store = DatabaseDraftBatchStore(db)
+        await store.save_batch(batch)
+        # Caller commits after this returns
+
+    return batch.model_dump(mode="json")
 
 
 def _workspace_from_config(config: dict[str, Any] | None) -> dict[str, Any]:
@@ -928,11 +1085,49 @@ async def generate_theme_plan(
     if db is not None:
         await db.commit()
 
+    # --- Intent detection: did the customer ask to generate content? ---
+    auto_draft: dict[str, Any] | None = None
+    should_generate, artifact_types = _detect_generation_intent(
+        pending_input,
+        workshop_status=strategy_workshop.get("status", "discovery"),
+    )
+    if should_generate and master_theme:
+        try:
+            auto_draft = await _build_auto_draft(
+                record=record,
+                workspace=persisted_workspace,
+                master_theme=master_theme,
+                campaign_id=campaign_id,
+                artifact_types=artifact_types,
+                db=db,
+            )
+            if db is not None:
+                await db.commit()
+            # Mark workshop as approved since content was generated
+            persisted_workspace = {
+                **persisted_workspace,
+                "campaign_setup": {
+                    **persisted_workspace.get("campaign_setup", {}),
+                    "strategy_workshop": {
+                        **persisted_workspace.get("campaign_setup", {}).get("strategy_workshop", {}),
+                        "status": "approved",
+                    },
+                },
+            }
+            logger.info(
+                "Auto-generated draft from chat intent for hired_instance_id=%s artifact_types=%s",
+                hired_instance_id,
+                [a.value for a in artifact_types],
+            )
+        except Exception as exc:
+            logger.warning("Auto-draft generation failed: %s", exc)
+
     return ThemePlanResponse(
         campaign_id=campaign_id,
         master_theme=master_theme,
         derived_themes=derived_themes,
         workspace=persisted_workspace,
+        auto_generated_draft=auto_draft,
     )
 
 

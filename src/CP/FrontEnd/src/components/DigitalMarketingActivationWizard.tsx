@@ -1145,7 +1145,7 @@ export function DigitalMarketingActivationWizard({
     })
   }
 
-  const applyThemePlanResponse = (response: { workspace?: unknown; master_theme?: string; derived_themes?: DigitalMarketingDerivedTheme[] }) => {
+  const applyThemePlanResponse = (response: { workspace?: unknown; master_theme?: string; derived_themes?: DigitalMarketingDerivedTheme[]; auto_generated_draft?: unknown }) => {
     const responseWorkspace = ((response.workspace as any)?.workspace || response.workspace || {}) as DigitalMarketingActivationResponse['workspace']
     const nextWorkspace = {
       ...(activation?.workspace || {}),
@@ -1168,6 +1168,14 @@ export function DigitalMarketingActivationWizard({
     setStrategyWorkshop(nextWorkshop)
     setStrategySummary(nextWorkshop.summary || {})
     setStrategyReply('')
+    // If the agent generated a draft inline (from chat approval/generation intent), surface it
+    if (response.auto_generated_draft && typeof response.auto_generated_draft === 'object') {
+      const batch = response.auto_generated_draft as DraftBatch
+      setGeneratedBatch(batch)
+      setDraftPosts((batch.posts || []).filter((p) => p.channel === 'youtube'))
+      setPostActionStatus({})
+      setPostPublishReceipts({})
+    }
   }
 
   const generateThemePlan = async (overrideReply?: string) => {
