@@ -78,6 +78,20 @@ The DMA workflow accepts a typed artifact request instead of treating every prom
 
 ---
 
+## PM Review Checklist
+
+- [x] Expert personas are filled for each iteration task block.
+- [x] Epic titles describe customer or platform outcomes, not generic technical chores.
+- [x] Every story includes an exact logical branch name.
+- [x] Every story embeds relevant code patterns inline.
+- [x] Every story limits “Files to read first” to 3 files.
+- [x] Every CP BackEnd story states the thin-proxy pattern explicitly.
+- [x] Backend work is sequenced before frontend work where there is a dependency.
+- [x] Docker-only validation is specified for the final execution slice.
+- [x] No placeholder text remains in the published plan.
+
+---
+
 ## How to Launch Each Iteration
 
 ### Iteration 1
@@ -296,13 +310,16 @@ Do this before starting the next epic. If interrupted, completed work is already
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1 | 1 | DMA speaks a typed artifact language | Story cards pending | 🔴 Not Started | — |
-| E2 | 1 | DMA stores draft artifact metadata safely | Story cards pending | 🔴 Not Started | — |
-| E3 | 1 | DMA generation jobs run asynchronously | Story cards pending | 🔴 Not Started | — |
-| E4 | 2 | DMA routes artifacts to provider-safe generation adapters | Story cards pending | 🔴 Not Started | — |
-| E5 | 2 | DMA returns review-ready artifact payloads | Story cards pending | 🔴 Not Started | — |
-| E6 | 3 | CP proxies and types the artifact contract without owning logic | Story cards pending | 🔴 Not Started | — |
-| E7 | 3 | DMA customers can preview and approve media artifacts in CP | Story cards pending | 🔴 Not Started | — |
+| E1-S1 | 1 | DMA speaks a typed artifact language | Extend the Plant artifact contract beyond text-only outputs | 🔴 Not Started | — |
+| E1-S2 | 1 | DMA speaks a typed artifact language | Persist draft artifact metadata with a first-class schema | 🔴 Not Started | — |
+| E2-S1 | 1 | DMA stores and names media safely | Introduce a provider-agnostic media artifact store service | 🔴 Not Started | — |
+| E3-S1 | 1 | DMA generation jobs run asynchronously | Add async media job state to the draft-batch generation path | 🔴 Not Started | — |
+| E4-S1 | 2 | DMA routes typed artifacts through provider-safe backend paths | Teach content generation to honor artifact requests | 🔴 Not Started | — |
+| E4-S2 | 2 | DMA routes typed artifacts through provider-safe backend paths | Route generated artifacts into channel-compatible variants | 🔴 Not Started | — |
+| E5-S1 | 2 | DMA returns review-ready artifact payloads and typed publish receipts | Expose artifact status, previews, and publish-ready media receipts through Plant APIs | 🔴 Not Started | — |
+| E6-S1 | 3 | CP stays a thin proxy while exposing the richer contract | Extend CP proxy and frontend service types for typed artifacts | 🔴 Not Started | — |
+| E7-S1 | 3 | DMA customers can request, preview, and approve richer artifacts | Add artifact request controls and preview renderers to the DMA UI | 🔴 Not Started | — |
+| E7-S2 | 3 | DMA customers can request, preview, and approve richer artifacts | Lock the upgrade with Docker-only backend and frontend validation | 🔴 Not Started | — |
 
 ---
 
@@ -424,6 +441,179 @@ artifact_type = Column(String(32), nullable=False, index=True)
 **Docker validation command**
 ```bash
 docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py
+```
+
+---
+
+## Iteration 3 — CP Thin Proxy + DMA Artifact Review UX + Docker Validation
+
+**Outcome**
+CP can request and display typed DMA artifacts without owning media logic, and the full upgraded path has a Docker-only validation recipe covering Plant, CP BackEnd, and CP FrontEnd.
+
+### Dependency Map
+
+| Story | Depends on | Enables |
+|---|---|---|
+| E6-S1 | Iteration 2 merged | E7-S1, E7-S2 |
+| E7-S1 | E6-S1 | E7-S2 |
+| E7-S2 | E6-S1, E7-S1 | Final PR |
+
+### E6 — CP stays a thin proxy while exposing the richer contract
+
+#### Story E6-S1 — Extend CP proxy and frontend service types for typed artifacts
+
+| Field | Value |
+|---|---|
+| Story ID | `E6-S1` |
+| Branch | `feat/dma-media-1-it3-cp-proxy-and-types` |
+| Estimate | 60 min |
+| BLOCKED UNTIL | Iteration 2 merged |
+| CP BackEnd pattern | `Pattern A` — extend the existing `/cp/marketing/*` route file `src/CP/BackEnd/api/marketing_review.py`; keep it as a pure forwarding layer |
+
+**Files to read first**
+1. `src/CP/BackEnd/api/marketing_review.py`
+2. `src/CP/FrontEnd/src/services/marketingReview.service.ts`
+3. `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts`
+
+**Files to create / modify**
+- `src/CP/BackEnd/api/marketing_review.py`
+- `src/CP/FrontEnd/src/services/marketingReview.service.ts`
+- `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts`
+- `src/CP/BackEnd/tests/test_marketing_review_proxy.py`
+
+**Context**
+By the time this iteration starts, Plant should already expose typed artifact payloads and media-ready draft metadata. CP’s job is only to pass that contract through cleanly, inject the customer scope, and present accurate TypeScript types so the UI can render previews without inventing business logic locally.
+
+**Code patterns to copy exactly**
+```python
+router = waooaw_router(prefix="/cp/marketing", tags=["cp-marketing"])
+```
+
+```python
+def _forward_headers(request: Request) -> Dict[str, str]:
+    headers: Dict[str, str] = {}
+    correlation = request.headers.get("x-correlation-id")
+    if correlation:
+        headers["X-Correlation-ID"] = correlation
+    return headers
+```
+
+**Acceptance criteria**
+1. Extend CP request and response types so artifact requests, artifact status, preview URIs, and typed media metadata pass through intact.
+2. Keep `marketing_review.py` as a pure proxy: no provider branching, no media orchestration, no data reshaping beyond customer scoping and HTTP forwarding.
+3. Add a CP backend test proving the proxy forwards the richer contract unchanged.
+4. Add TypeScript types that let the frontend distinguish `table`, `image`, `audio`, `video`, and `video_audio` safely.
+
+**Tests to add / update**
+- `src/CP/BackEnd/tests/test_marketing_review_proxy.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm cp-backend-test src/CP/BackEnd/tests/test_marketing_review_proxy.py
+```
+
+### E7 — DMA customers can request, preview, and approve richer artifacts
+
+#### Story E7-S1 — Add artifact request controls and preview renderers to the DMA UI
+
+| Field | Value |
+|---|---|
+| Story ID | `E7-S1` |
+| Branch | `feat/dma-media-1-it3-dma-artifact-ui` |
+| Estimate | 90 min |
+| BLOCKED UNTIL | `E6-S1` merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`
+2. `src/CP/FrontEnd/src/components/DigitalMarketingThemePlanCard.tsx`
+3. `src/CP/FrontEnd/src/__tests__/MyAgents.test.tsx`
+
+**Files to create / modify**
+- `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`
+- `src/CP/FrontEnd/src/components/DigitalMarketingThemePlanCard.tsx`
+- `src/CP/FrontEnd/src/components/DigitalMarketingArtifactPreviewCard.tsx`
+- `src/CP/FrontEnd/src/__tests__/MyAgents.test.tsx`
+- `src/CP/FrontEnd/src/__tests__/WizardPlatforms.test.tsx`
+
+**Context**
+The current DMA UI can capture strategy and show theme plans, but it has no first-class way to ask for or preview typed artifacts. This story adds just enough UI to request media intentionally, display generation state, and preview returned assets inside the existing activation and review flow instead of creating a parallel media studio.
+
+**Code patterns to copy exactly**
+```tsx
+type DraftPost = {
+  post_id: string
+  channel: string
+  text: string
+}
+```
+
+```tsx
+{loading ? <Spinner size="tiny" /> : null}
+```
+
+**Acceptance criteria**
+1. Add customer controls to request one or more artifact types from the DMA workflow.
+2. Render preview states for tables, images, audio, video, and video+audio, including queued, running, ready, and failed statuses.
+3. Keep approval behavior explicit: the UI may preview and schedule, but it must not imply auto-publish.
+4. Add frontend test coverage for artifact selection and at least one preview state per artifact family.
+
+**Tests to add / update**
+- `src/CP/FrontEnd/src/__tests__/MyAgents.test.tsx`
+- `src/CP/FrontEnd/src/__tests__/WizardPlatforms.test.tsx`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm cp-frontend-test
+```
+
+#### Story E7-S2 — Lock the upgrade with Docker-only backend and frontend validation
+
+| Field | Value |
+|---|---|
+| Story ID | `E7-S2` |
+| Branch | `feat/dma-media-1-it3-docker-validation` |
+| Estimate | 45 min |
+| BLOCKED UNTIL | `E6-S1` and `E7-S1` merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `docker-compose.test.yml`
+2. `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+3. `src/CP/FrontEnd/src/__tests__/MyAgents.test.tsx`
+
+**Files to create / modify**
+- `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md`
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+- `src/CP/BackEnd/tests/test_marketing_review_proxy.py`
+- `src/CP/FrontEnd/src/__tests__/MyAgents.test.tsx`
+
+**Context**
+The user explicitly asked that testing happen at the end using Docker only and without a virtual environment. This story makes that operational rule part of the implementation slice so the finishing agent cannot silently switch to local Python or ad hoc frontend commands.
+
+**Code patterns to copy exactly**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py
+docker compose -f docker-compose.test.yml run --rm cp-backend-test src/CP/BackEnd/tests/test_marketing_review_proxy.py
+docker compose -f docker-compose.test.yml run --rm cp-frontend-test
+```
+
+**Acceptance criteria**
+1. Add or update the narrowest backend and frontend tests needed for the DMA media contract.
+2. Record the exact Docker-only validation commands in the iteration PR description and in this plan’s Tracking Table update when executed.
+3. Do not use a virtual environment or non-Docker local test shortcut.
+4. Mark the iteration complete only after all three Docker commands succeed or a blocking failure is reported through STUCK PROTOCOL.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+- `src/CP/BackEnd/tests/test_marketing_review_proxy.py`
+- `src/CP/FrontEnd/src/__tests__/MyAgents.test.tsx`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py
+docker compose -f docker-compose.test.yml run --rm cp-backend-test src/CP/BackEnd/tests/test_marketing_review_proxy.py
+docker compose -f docker-compose.test.yml run --rm cp-frontend-test
 ```
 
 ---
