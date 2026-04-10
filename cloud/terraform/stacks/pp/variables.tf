@@ -69,3 +69,13 @@ variable "enable_metering_debug" {
   type        = string
   default     = "false"
 }
+variable "private_network_id" {
+  description = "VPC network ID for the Serverless Connector (format: projects/PROJECT/global/networks/NETWORK)"
+  type        = string
+}
+
+variable "vpc_connector_cidr" {
+  description = "CIDR range for PP VPC Serverless Connector. Must not overlap with Cloud SQL (10.19.0.0/16) or other connectors."
+  type        = string
+  default     = "10.8.0.32/28" # Plant uses 10.8.0.0/28; CP uses 10.8.0.16/28
+}

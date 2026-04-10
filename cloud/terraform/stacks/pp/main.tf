@@ -19,6 +19,22 @@ provider "google" {
   region  = var.region
 }
 
+# VPC Serverless Connector — gives PP backend Cloud Run access to the private
+# Memorystore Redis instance (10.53.167.x) per CONTEXT_AND_INDEX.md Redis policy.
+# PP backend uses DB /2 (cache).
+module "vpc_connector" {
+  source = "../../modules/vpc-connector"
+
+  connector_name = "pp-vpc-connector-${var.environment}"
+  region         = var.region
+  project_id     = var.project_id
+  network_id     = var.private_network_id
+  ip_cidr_range  = var.vpc_connector_cidr
+  min_instances  = 2
+  max_instances  = 3
+  machine_type   = "e2-micro"
+}
+
 module "pp_frontend" {
   source = "../../modules/cloud-run"
 
@@ -64,6 +80,8 @@ module "pp_backend" {
   memory        = "512Mi"
   min_instances = var.min_instances
   max_instances = var.max_instances
+
+  vpc_connector_id = module.vpc_connector.connector_id
 
   env_vars = {
     ENVIRONMENT       = var.environment
@@ -116,4 +134,6 @@ module "networking" {
   region      = var.region
   project_id  = var.project_id
   services    = local.services
+
+  depends_on = [module.vpc_connector]
 }
