@@ -441,7 +441,7 @@ export function DigitalMarketingActivationWizard({
   const [outputItemReceipts, setOutputItemReceipts] = useState<Record<string, string>>({})
   const [expandedOutputItems, setExpandedOutputItems] = useState<Record<string, boolean>>({})
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
-  const [activeBriefSection, setActiveBriefSection] = useState<'brief' | 'objective' | 'status' | 'next' | 'controls' | 'output'>('brief')
+  const [activeBriefSection, setActiveBriefSection] = useState<'brief' | 'objective' | 'status' | 'next' | 'controls' | 'output' | null>('brief')
   const profileRef = useRef<ProfileData | null>(null)
 
   const hiredInstanceId = useMemo(
@@ -2744,7 +2744,7 @@ export function DigitalMarketingActivationWizard({
 
             <div className="dma-brief-accordion">
               <section className={`dma-brief-accordion-item${activeBriefSection === 'brief' ? ' is-open' : ''}`}>
-                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('brief')} aria-expanded={activeBriefSection === 'brief'}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection(s => s === 'brief' ? null : 'brief')} aria-expanded={activeBriefSection === 'brief'}>
                   <div className="dma-brief-accordion-heading">
                     <span className="dma-wizard-section-label">Live business brief</span>
                     <span className="dma-brief-accordion-title">What the DMA understands so far</span>
@@ -2769,7 +2769,7 @@ export function DigitalMarketingActivationWizard({
               </section>
 
               <section className={`dma-brief-accordion-item${activeBriefSection === 'objective' ? ' is-open' : ''}`}>
-                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('objective')} aria-expanded={activeBriefSection === 'objective'}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection(s => s === 'objective' ? null : 'objective')} aria-expanded={activeBriefSection === 'objective'}>
                   <div className="dma-brief-accordion-heading">
                     <span className="dma-wizard-section-label">Business objective</span>
                     <span className="dma-brief-accordion-title">What success should look like</span>
@@ -2789,7 +2789,7 @@ export function DigitalMarketingActivationWizard({
               </section>
 
               <section className={`dma-brief-accordion-item${activeBriefSection === 'status' ? ' is-open' : ''}`}>
-                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('status')} aria-expanded={activeBriefSection === 'status'}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection(s => s === 'status' ? null : 'status')} aria-expanded={activeBriefSection === 'status'}>
                   <div className="dma-brief-accordion-heading">
                     <span className="dma-wizard-section-label">Operating status</span>
                     <span className="dma-brief-accordion-title">Readiness signals</span>
@@ -2811,7 +2811,7 @@ export function DigitalMarketingActivationWizard({
               </section>
 
               <section className={`dma-brief-accordion-item${activeBriefSection === 'next' ? ' is-open' : ''}`}>
-                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('next')} aria-expanded={activeBriefSection === 'next'}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection(s => s === 'next' ? null : 'next')} aria-expanded={activeBriefSection === 'next'}>
                   <div className="dma-brief-accordion-heading">
                     <span className="dma-wizard-section-label">Next action</span>
                     <span className="dma-brief-accordion-title">What to answer or do next</span>
@@ -2834,7 +2834,7 @@ export function DigitalMarketingActivationWizard({
               </section>
 
               <section className={`dma-brief-accordion-item${activeBriefSection === 'controls' ? ' is-open' : ''}`}>
-                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection('controls')} aria-expanded={activeBriefSection === 'controls'}>
+                <button type="button" className="dma-brief-accordion-trigger" onClick={() => setActiveBriefSection(s => s === 'controls' ? null : 'controls')} aria-expanded={activeBriefSection === 'controls'}>
                   <div className="dma-brief-accordion-heading">
                     <span className="dma-wizard-section-label">Setup controls</span>
                     <span className="dma-brief-accordion-title">Pin details and unlock activation</span>
