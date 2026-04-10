@@ -1,10 +1,34 @@
 import { gatewayRequestJson } from './gatewayApiClient'
 
+export type DraftArtifactType = 'text' | 'table' | 'image' | 'audio' | 'video' | 'video_audio'
+
+export type DraftArtifactRequest = {
+  artifact_type: Exclude<DraftArtifactType, 'text'>
+  prompt: string
+  metadata?: Record<string, unknown>
+}
+
+export type GeneratedArtifact = {
+  artifact_type: Exclude<DraftArtifactType, 'text'>
+  uri: string
+  preview_uri?: string | null
+  mime_type?: string | null
+  metadata?: Record<string, unknown>
+}
+
 export type DraftPost = {
   post_id: string
   channel: string
   text: string
   hashtags?: string[]
+  artifact_type?: DraftArtifactType
+  artifact_uri?: string | null
+  artifact_preview_uri?: string | null
+  artifact_mime_type?: string | null
+  artifact_metadata?: Record<string, unknown>
+  artifact_generation_status?: 'not_requested' | 'queued' | 'running' | 'ready' | 'failed'
+  artifact_job_id?: string | null
+  generated_artifacts?: GeneratedArtifact[]
   review_status: 'pending_review' | 'approved' | 'changes_requested' | 'rejected'
   approval_id?: string | null
   execution_status?: string
@@ -12,6 +36,8 @@ export type DraftPost = {
   credential_ref?: string | null
   provider_post_id?: string | null
   provider_post_url?: string | null
+  publish_ready?: boolean
+  publish_readiness_hint?: string | null
 }
 
 export type DraftBatch = {
@@ -42,6 +68,7 @@ export type CreateDraftBatchInput = {
   youtube_visibility?: string
   public_release_requested?: boolean
   channels?: string[] | null
+  requested_artifacts?: DraftArtifactRequest[] | null
 }
 
 export type ExecuteDraftPostInput = {

@@ -69,7 +69,23 @@ class _FakePlantClient:
                         "brand_name": body.get("brand_name", ""),
                         "created_at": "2026-01-01T00:00:00Z",
                         "status": "pending_review",
-                        "posts": [],
+                        "posts": [
+                            {
+                                "post_id": "post-yt-1",
+                                "channel": "youtube",
+                                "text": "Review the generated artifact",
+                                "review_status": "pending_review",
+                                "artifact_type": "table",
+                                "artifact_generation_status": "ready",
+                                "artifact_uri": "local://batch/post/table.csv",
+                                "artifact_metadata": {
+                                    "table_preview": {
+                                        "columns": ["content_pillar", "customer_angle"],
+                                        "rows": [{"content_pillar": "Hook", "customer_angle": "Families"}],
+                                    }
+                                },
+                            }
+                        ],
                     },
                     "headers": {},
                 },
@@ -232,15 +248,23 @@ def test_marketing_create_draft_batch_proxy(client, auth_headers, monkeypatch, t
             "theme": "YouTube health tips",
             "brand_name": "Care Clinic",
             "youtube_credential_ref": "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest",
+            "requested_artifacts": [
+                {"artifact_type": "table", "prompt": "Create a planning table", "metadata": {"layout": "weekly"}}
+            ],
         },
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["batch_id"] == "b-new"
+    assert data["posts"][0]["artifact_type"] == "table"
+    assert data["posts"][0]["artifact_generation_status"] == "ready"
 
     create_call = next(c for c in fake.calls if c["method"] == "POST" and "draft-batches" in c["path"])
     cid = (create_call["json"] or {}).get("customer_id", "")
     assert not cid.startswith("CUST-"), f"Expected raw customer id, got: {cid!r}"
+    assert (create_call["json"] or {}).get("requested_artifacts") == [
+        {"artifact_type": "table", "prompt": "Create a planning table", "metadata": {"layout": "weekly"}}
+    ]
 
     app.dependency_overrides.clear()
 

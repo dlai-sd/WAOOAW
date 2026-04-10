@@ -6,14 +6,14 @@ Marketing drafts are persisted in PostgreSQL and accessed through an async store
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from agent_mold.skills.playbook import ChannelName
+from agent_mold.skills.playbook import ChannelName, GeneratedArtifactReference
 from models.marketing_draft import MarketingDraftBatchModel, MarketingDraftPostModel
 
 
@@ -22,6 +22,8 @@ _UNSET = object()
 
 DraftReviewStatus = Literal["pending_review", "approved", "changes_requested", "rejected"]
 DraftExecutionStatus = Literal["not_scheduled", "scheduled", "running", "posted", "failed"]
+DraftArtifactType = Literal["text", "table", "image", "audio", "video", "video_audio"]
+DraftArtifactGenerationStatus = Literal["not_requested", "queued", "running", "ready", "failed"]
 
 
 class DraftPostRecord(BaseModel):
@@ -29,6 +31,14 @@ class DraftPostRecord(BaseModel):
     channel: ChannelName
     text: str = Field(..., min_length=1)
     hashtags: List[str] = Field(default_factory=list)
+    artifact_type: DraftArtifactType = "text"
+    artifact_uri: Optional[str] = None
+    artifact_preview_uri: Optional[str] = None
+    artifact_mime_type: Optional[str] = None
+    artifact_metadata: Dict[str, Any] = Field(default_factory=dict)
+    artifact_generation_status: DraftArtifactGenerationStatus = "not_requested"
+    artifact_job_id: Optional[str] = None
+    generated_artifacts: List[GeneratedArtifactReference] = Field(default_factory=list)
 
     review_status: DraftReviewStatus = "pending_review"
     approval_id: Optional[str] = None
@@ -44,6 +54,8 @@ class DraftPostRecord(BaseModel):
 
     provider_post_id: Optional[str] = None
     provider_post_url: Optional[str] = None
+    publish_ready: bool = False
+    publish_readiness_hint: Optional[str] = None
 
 
 class DraftBatchRecord(BaseModel):
@@ -126,6 +138,14 @@ class DatabaseDraftBatchStore:
         self,
         post_id: str,
         *,
+        artifact_type: DraftArtifactType | object = _UNSET,
+        artifact_uri: str | None | object = _UNSET,
+        artifact_preview_uri: str | None | object = _UNSET,
+        artifact_mime_type: str | None | object = _UNSET,
+        artifact_metadata: Dict[str, Any] | object = _UNSET,
+        artifact_generation_status: DraftArtifactGenerationStatus | object = _UNSET,
+        artifact_job_id: str | None | object = _UNSET,
+        generated_artifacts: List[GeneratedArtifactReference] | List[Dict[str, Any]] | object = _UNSET,
         review_status: DraftReviewStatus | object = _UNSET,
         approval_id: str | None | object = _UNSET,
         credential_ref: str | None | object = _UNSET,
@@ -150,6 +170,25 @@ class DatabaseDraftBatchStore:
         if post_model is None:
             return False
 
+        if artifact_type is not _UNSET:
+            post_model.artifact_type = artifact_type
+        if artifact_uri is not _UNSET:
+            post_model.artifact_uri = artifact_uri
+        if artifact_preview_uri is not _UNSET:
+            post_model.artifact_preview_uri = artifact_preview_uri
+        if artifact_mime_type is not _UNSET:
+            post_model.artifact_mime_type = artifact_mime_type
+        if artifact_metadata is not _UNSET:
+            post_model.artifact_metadata = artifact_metadata
+        if artifact_generation_status is not _UNSET:
+            post_model.artifact_generation_status = artifact_generation_status
+        if artifact_job_id is not _UNSET:
+            post_model.artifact_job_id = artifact_job_id
+        if generated_artifacts is not _UNSET:
+            post_model.generated_artifacts = [
+                artifact.model_dump(mode="json") if isinstance(artifact, GeneratedArtifactReference) else artifact
+                for artifact in generated_artifacts
+            ]
         if review_status is not _UNSET:
             post_model.review_status = review_status
         if approval_id is not _UNSET:
@@ -192,7 +231,7 @@ class DatabaseDraftBatchStore:
             batch_model.status = "pending_review"
 
     def _batch_model_to_record(self, model: MarketingDraftBatchModel) -> DraftBatchRecord:
-        return DraftBatchRecord(
+        return materialize_batch_record(DraftBatchRecord(
             batch_id=model.batch_id,
             agent_id=model.agent_id,
             hired_instance_id=model.hired_instance_id,
@@ -205,14 +244,25 @@ class DatabaseDraftBatchStore:
             status=model.status,
             workflow_state=model.workflow_state,
             posts=[self._post_model_to_record(post) for post in model.posts],
-        )
+        ))
 
     def _post_model_to_record(self, model: MarketingDraftPostModel) -> DraftPostRecord:
-        return DraftPostRecord(
+        return materialize_post_record(DraftPostRecord(
             post_id=model.post_id,
             channel=ChannelName(model.channel),
             text=model.text,
             hashtags=list(model.hashtags or []),
+            artifact_type=model.artifact_type or "text",
+            artifact_uri=model.artifact_uri,
+            artifact_preview_uri=model.artifact_preview_uri,
+            artifact_mime_type=model.artifact_mime_type,
+            artifact_metadata=dict(model.artifact_metadata or {}),
+            artifact_generation_status=model.artifact_generation_status or "not_requested",
+            artifact_job_id=model.artifact_job_id,
+            generated_artifacts=[
+                GeneratedArtifactReference.model_validate(artifact)
+                for artifact in (model.generated_artifacts or [])
+            ],
             review_status=model.review_status,
             approval_id=model.approval_id,
             credential_ref=model.credential_ref,
@@ -224,7 +274,7 @@ class DatabaseDraftBatchStore:
             last_error=model.last_error,
             provider_post_id=model.provider_post_id,
             provider_post_url=model.provider_post_url,
-        )
+        ))
 
     def _record_to_post_model(
         self,
@@ -237,6 +287,14 @@ class DatabaseDraftBatchStore:
             channel=record.channel.value,
             text=record.text,
             hashtags=record.hashtags,
+            artifact_type=record.artifact_type,
+            artifact_uri=record.artifact_uri,
+            artifact_preview_uri=record.artifact_preview_uri,
+            artifact_mime_type=record.artifact_mime_type,
+            artifact_metadata=record.artifact_metadata,
+            artifact_generation_status=record.artifact_generation_status,
+            artifact_job_id=record.artifact_job_id,
+            generated_artifacts=[artifact.model_dump(mode="json") for artifact in record.generated_artifacts],
             review_status=record.review_status,
             approval_id=record.approval_id,
             credential_ref=record.credential_ref,
@@ -249,3 +307,31 @@ class DatabaseDraftBatchStore:
             provider_post_id=record.provider_post_id,
             provider_post_url=record.provider_post_url,
         )
+
+
+def _build_publish_readiness_hint(post: DraftPostRecord) -> Optional[str]:
+    if post.review_status != "approved":
+        return "approval_required"
+    if post.artifact_generation_status in {"queued", "running"}:
+        return "artifact_generation_pending"
+    if post.artifact_generation_status == "failed":
+        return "artifact_generation_failed"
+    if post.execution_status == "failed":
+        return "publish_failed"
+    if post.artifact_type != "text" and post.artifact_type != "table" and not post.artifact_uri:
+        return "artifact_uri_missing"
+    return None
+
+
+def materialize_post_record(post: DraftPostRecord) -> DraftPostRecord:
+    hint = _build_publish_readiness_hint(post)
+    return post.model_copy(
+        update={
+            "publish_ready": hint is None,
+            "publish_readiness_hint": hint,
+        }
+    )
+
+
+def materialize_batch_record(batch: DraftBatchRecord) -> DraftBatchRecord:
+    return batch.model_copy(update={"posts": [materialize_post_record(post) for post in batch.posts]})

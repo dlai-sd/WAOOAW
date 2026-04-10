@@ -1,6 +1,42 @@
 
 ---
 
+## [2026-04-10 UTC] DMA-MEDIA-1 — implementation branch execution
+
+**Branch**: `feat/dma-media-generation-agent`
+**Plan file**: `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md`
+**Status**: Implementation complete — PR open (`#1035`)
+
+### Goal
+Implement the merged DMA media-generation upgrade plan end to end so DMA returns typed media artifacts instead of text-only promises, while preserving Plant business-logic ownership, CP thin-proxy rules, approval safety, and Docker-only final validation.
+
+### Checkpoint list
+- [x] Read required platform bootstrap context
+- [x] Confirm current user branch contains unrelated local changes and avoid touching it
+- [x] Create clean implementation worktree and branch from `origin/main`
+- [x] Re-read merged `DMA-MEDIA-1` plan and current DMA code path
+- [x] Seed live execution status into the plan file before code edits
+- [x] Complete E1-S1 artifact contract changes
+- [x] Validate E1-S1 in Docker via `plant-backend-test --no-cov tests/unit/test_skill_playbook_pipeline.py -q`
+- [x] Complete E1-S2 draft artifact persistence changes
+- [x] Validate E1-S2 in Docker via `plant-backend-test --no-cov tests/unit/test_marketing_draft_batch_api.py -q`
+- [x] Complete E2-S1 provider-agnostic media artifact store changes
+- [x] Complete E3-S1 queued media generation state in the draft path
+- [x] Complete E4-S1 and E4-S2 artifact request handling plus channel routing
+- [x] Complete E5-S1 review-ready artifact status and publish-readiness responses
+- [x] Complete E6-S1 CP proxy and TypeScript contract passthrough
+- [x] Complete E7-S1 artifact request controls and preview rendering in the DMA UI
+- [x] Run Docker-only validation for Plant backend, CP backend, and CP frontend paths
+- [x] Open implementation PR to `main` (`#1035`)
+
+### Next save point
+After PR review feedback arrives or merge completes.
+
+### PR
+- https://github.com/dlai-sd/WAOOAW/pull/1035
+
+---
+
 ## [2026-04-10 UTC] DMA-MEDIA-1 — agent media generation upgrade plan
 
 **Branch**: `docs/dma-media-1-agent-artifacts`

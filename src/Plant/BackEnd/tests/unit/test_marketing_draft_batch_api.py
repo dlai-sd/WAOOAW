@@ -1,3 +1,8 @@
+import pytest
+
+from agent_mold.skills.playbook import ChannelName, GeneratedArtifactReference
+
+
 def test_create_draft_batch_persists_posts_and_returns_ids(test_client, in_memory_marketing_draft_store):
     payload = {
         "agent_id": "AGT-MKT-HEALTH-001",
@@ -34,6 +39,7 @@ def test_create_draft_batch_persists_posts_and_returns_ids(test_client, in_memor
     assert len(set(post_ids)) == len(post_ids)
     assert all(p["review_status"] == "pending_review" for p in posts)
     assert all(p["execution_status"] == "not_scheduled" for p in posts)
+    assert all(p["artifact_generation_status"] == "not_requested" for p in posts)
 
     listed = test_client.get("/api/v1/marketing/draft-batches", params={"customer_id": payload["customer_id"]})
     assert listed.status_code == 200
@@ -245,3 +251,139 @@ def test_create_draft_batch_resolves_attached_youtube_secret_ref(
     assert create.status_code == 200
     yt_post = create.json()["posts"][0]
     assert yt_post["credential_ref"] == "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest"
+
+
+def test_create_draft_batch_round_trips_artifact_metadata(test_client, in_memory_marketing_draft_store, monkeypatch):
+    from agent_mold.skills.playbook import CanonicalMessage, ChannelVariant, MarketingMultiChannelOutput, SkillExecutionResult
+    import api.v1.marketing_drafts as marketing_drafts_module
+
+    artifact = GeneratedArtifactReference(
+        artifact_type="video",
+        uri="gs://waooaw-test/drafts/video-001.mp4",
+        preview_uri="https://cdn.waooaw.test/video-001-preview.jpg",
+        mime_type="video/mp4",
+        metadata={"duration_seconds": 45, "generation_status": "ready"},
+    )
+
+    def _fake_execute(_playbook, inp):
+        canonical = CanonicalMessage(
+            theme=inp.theme,
+            core_message="Video draft ready for review",
+            call_to_action="Approve the video draft",
+            generated_artifacts=[artifact],
+        )
+        variant = ChannelVariant(
+            channel=ChannelName.YOUTUBE,
+            text="Video draft ready for review",
+            hashtags=["WAOOAW"],
+            generated_artifacts=[artifact],
+        )
+        return SkillExecutionResult(
+            playbook_id="MARKETING.MULTICHANNEL.POST.V1",
+            output=MarketingMultiChannelOutput(
+                canonical=canonical,
+                variants=[variant],
+                generated_artifacts=[artifact],
+            ),
+            debug={"executor": "fake"},
+        )
+
+    monkeypatch.setattr(marketing_drafts_module, "execute_marketing_multichannel_v1", _fake_execute)
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-001",
+            "hired_instance_id": "HIRED-ART-001",
+            "campaign_id": "CAM-ART-001",
+            "customer_id": "CUST-ART-001",
+            "theme": "YouTube content sprint",
+            "brand_name": "WAOOAW",
+            "channels": ["youtube"],
+        },
+    )
+
+    assert create.status_code == 200
+    post = create.json()["posts"][0]
+    assert post["artifact_type"] == "video"
+    assert post["artifact_uri"] == "gs://waooaw-test/drafts/video-001.mp4"
+    assert post["artifact_preview_uri"] == "https://cdn.waooaw.test/video-001-preview.jpg"
+    assert post["artifact_mime_type"] == "video/mp4"
+    assert post["artifact_metadata"]["generation_status"] == "ready"
+    assert post["artifact_generation_status"] == "not_requested"
+    assert len(post["generated_artifacts"]) == 1
+    assert post["generated_artifacts"][0]["artifact_type"] == "video"
+
+    batch = next(iter(in_memory_marketing_draft_store._batches.values()))
+    stored_post = batch.posts[0]
+    assert stored_post.artifact_type == "video"
+    assert stored_post.generated_artifacts[0].artifact_type.value == "video"
+
+
+def test_create_draft_batch_generates_table_artifact_and_preview(
+    test_client, in_memory_marketing_draft_store, monkeypatch, tmp_path
+):
+    import core.config as config_module
+    import services.media_artifact_store as media_store_module
+
+    monkeypatch.setenv("MEDIA_ARTIFACT_LOCAL_ROOT", str(tmp_path))
+    config_module.get_settings.cache_clear()
+    media_store_module.get_media_artifact_store.cache_clear()
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-001",
+            "customer_id": "CUST-TABLE-001",
+            "theme": "Monthly YouTube growth sprint",
+            "brand_name": "WAOOAW",
+            "channels": ["youtube"],
+            "requested_artifacts": [
+                {"artifact_type": "table", "prompt": "Create a weekly content plan table"}
+            ],
+        },
+    )
+
+    assert create.status_code == 200
+    post = create.json()["posts"][0]
+    assert post["artifact_type"] == "table"
+    assert post["artifact_generation_status"] == "ready"
+    assert post["artifact_uri"].startswith("local://")
+    assert post["artifact_metadata"]["table_preview"]["columns"] == [
+        "content_pillar",
+        "customer_angle",
+        "channel_use",
+        "prompt_hint",
+    ]
+    assert len(post["generated_artifacts"]) == 1
+
+
+def test_create_draft_batch_marks_binary_requests_as_queued(
+    test_client, in_memory_marketing_draft_store, monkeypatch
+):
+    import api.v1.marketing_drafts as marketing_drafts_module
+
+    monkeypatch.setattr(marketing_drafts_module, "enqueue_media_generation_job", lambda **_: ("job-video-1", "deferred"))
+
+    create = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={
+            "agent_id": "AGT-MKT-001",
+            "customer_id": "CUST-QUEUE-001",
+            "theme": "Narrated product walk-through",
+            "brand_name": "WAOOAW",
+            "channels": ["youtube"],
+            "requested_artifacts": [
+                {"artifact_type": "video", "prompt": "Create a 30-second YouTube short"}
+            ],
+        },
+    )
+
+    assert create.status_code == 200
+    post = create.json()["posts"][0]
+    assert post["artifact_type"] == "video"
+    assert post["artifact_generation_status"] == "queued"
+    assert post["artifact_job_id"] == "job-video-1"
+    assert post["publish_ready"] is False
+    assert post["publish_readiness_hint"] == "approval_required"
+    assert post["artifact_metadata"]["queued_artifact_types"] == ["video"]

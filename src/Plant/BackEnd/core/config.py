@@ -72,6 +72,30 @@ class Settings(BaseSettings):
                 return normalized
 
         raise ValueError(f"Invalid log_level: {value!r}. Allowed: {sorted(allowed)}")
+
+    @field_validator("media_artifact_store_backend", mode="before")
+    @classmethod
+    def normalize_media_artifact_store_backend(cls, value: object) -> str:
+        allowed = {"local"}
+
+        if value is None:
+            return "local"
+
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in allowed:
+                return normalized
+
+        raise ValueError(
+            f"Invalid media_artifact_store_backend: {value!r}. Allowed: {sorted(allowed)}"
+        )
+
+    @field_validator("media_artifact_max_bytes")
+    @classmethod
+    def validate_media_artifact_max_bytes(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("media_artifact_max_bytes must be greater than zero")
+        return value
     
     # Database (Async-first SQLAlchemy configuration)
     database_url: str = "postgresql+asyncpg://user:password@localhost/plant"
@@ -91,6 +115,13 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
     redis_ttl_seconds: int = 86400  # 24 hours
+
+    # DMA media artifact storage
+    media_artifact_store_backend: str = "local"
+    media_artifact_local_root: str = "./tmp/media_artifacts"
+    media_artifact_public_base_url: Optional[str] = None
+    media_artifact_max_bytes: int = 25 * 1024 * 1024
+    media_artifact_queue_enabled: bool = False
     
     # ML Service
     ml_service_url: str = "http://localhost:8005"

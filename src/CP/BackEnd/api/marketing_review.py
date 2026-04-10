@@ -181,6 +181,11 @@ async def reject_draft_post(
     return RejectDraftPostResponse(post_id=body.post_id, decision="rejected")
 
 class CreateDraftBatchInput(BaseModel):
+    class ArtifactRequestInput(BaseModel):
+        artifact_type: str = Field(..., min_length=1)
+        prompt: str = Field(..., min_length=1)
+        metadata: Dict[str, Any] = Field(default_factory=dict)
+
     agent_id: str = Field(..., min_length=1)
     hired_instance_id: Optional[str] = None
     campaign_id: Optional[str] = None
@@ -196,6 +201,7 @@ class CreateDraftBatchInput(BaseModel):
     youtube_visibility: str = "private"
     public_release_requested: bool = False
     channels: Optional[List[str]] = None
+    requested_artifacts: Optional[List[ArtifactRequestInput]] = None
 
 
 @router.post("/draft-batches", response_model=Dict[str, Any])
