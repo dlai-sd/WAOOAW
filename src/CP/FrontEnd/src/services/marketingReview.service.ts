@@ -135,3 +135,17 @@ export async function scheduleDraftPost(
     body: JSON.stringify({ post_id: postId, scheduled_at: scheduledAtIso, approval_id: approvalId })
   })
 }
+
+export type ArtifactStatus = {
+  post_id: string
+  artifact_type: string
+  artifact_generation_status: 'not_requested' | 'queued' | 'running' | 'ready' | 'failed'
+  artifact_uri?: string | null
+  artifact_preview_uri?: string | null
+  artifact_mime_type?: string | null
+  artifact_job_id?: string | null
+}
+
+export async function pollDraftPostArtifactStatus(postId: string): Promise<ArtifactStatus> {
+  return gatewayRequestJson<ArtifactStatus>(`/cp/marketing/draft-posts/${postId}/artifact-status`)
+}

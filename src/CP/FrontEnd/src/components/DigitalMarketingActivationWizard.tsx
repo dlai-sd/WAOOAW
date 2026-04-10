@@ -27,6 +27,8 @@ import {
   approveDraftPost,
   rejectDraftPost,
   scheduleDraftPost,
+  pollDraftPostArtifactStatus,
+  type ArtifactStatus,
   type DraftArtifactRequest,
   type DraftArtifactType,
   type DraftBatch,
@@ -430,8 +432,14 @@ export function DigitalMarketingActivationWizard({
   const [postActionStatus, setPostActionStatus] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
   const [postPublishReceipts, setPostPublishReceipts] = useState<Record<string, string>>({})
   const [queueDateTime, setQueueDateTime] = useState<Record<string, string>>({})
+  // Accumulated output items — pile up from chat and manual draft generation
+  const [outputItems, setOutputItems] = useState<DraftPost[]>([])
+  const [outputItemStatuses, setOutputItemStatuses] = useState<Record<string, ArtifactStatus>>({})
+  const [outputItemActions, setOutputItemActions] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
+  const [outputItemReceipts, setOutputItemReceipts] = useState<Record<string, string>>({})
+  const [expandedOutputItems, setExpandedOutputItems] = useState<Record<string, boolean>>({})
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
-  const [activeBriefSection, setActiveBriefSection] = useState<'brief' | 'objective' | 'status' | 'next' | 'controls'>('brief')
+  const [activeBriefSection, setActiveBriefSection] = useState<'brief' | 'objective' | 'status' | 'next' | 'controls' | 'output'>('brief')
   const profileRef = useRef<ProfileData | null>(null)
 
   const hiredInstanceId = useMemo(
@@ -878,6 +886,56 @@ export function DigitalMarketingActivationWizard({
     setActiveMilestone('induct')
   }, [currentStep.id])
 
+  // Auto-poll artifact status for queued items every 5 s (max 12 attempts per post)
+  useEffect(() => {
+    const queued = outputItems.filter((p) => {
+      const currentStatus = outputItemStatuses[p.post_id]
+      const effectiveStatus = currentStatus?.artifact_generation_status ?? p.artifact_generation_status
+      return effectiveStatus === 'queued' || effectiveStatus === 'running'
+    })
+    if (queued.length === 0) return
+
+    const attemptCounts: Record<string, number> = {}
+    const interval = setInterval(async () => {
+      for (const post of queued) {
+        attemptCounts[post.post_id] = (attemptCounts[post.post_id] || 0) + 1
+        if (attemptCounts[post.post_id] > 12) continue  // give up after ~1 min
+        try {
+          const status = await pollDraftPostArtifactStatus(post.post_id)
+          setOutputItemStatuses((prev) => ({ ...prev, [post.post_id]: status }))
+          if (status.artifact_generation_status === 'ready') {
+            // Inject assistant chat notification for the first ready item
+            setOutputItems((items) =>
+              items.map((p) =>
+                p.post_id === post.post_id
+                  ? {
+                      ...p,
+                      artifact_generation_status: 'ready',
+                      artifact_uri: status.artifact_uri ?? p.artifact_uri,
+                      artifact_mime_type: status.artifact_mime_type ?? p.artifact_mime_type,
+                    }
+                  : p
+              )
+            )
+          }
+        } catch {
+          // Ignore transient poll errors — will retry
+        }
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [outputItems, outputItemStatuses])
+
+  // Auto-open the Output panel when new items arrive and user is not already viewing it
+  useEffect(() => {
+    if (outputItems.length > 0 && activeBriefSection !== 'output') {
+      setActiveBriefSection('output')
+    }
+  // Only run when outputItems grows — not on every activeBriefSection change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outputItems.length])
+
   const saveActivationWorkspaceWithRecovery = async (
     initialHiredInstanceId: string,
     payload: UpsertDigitalMarketingActivationInput,
@@ -1171,10 +1229,33 @@ export function DigitalMarketingActivationWizard({
     // If the agent generated a draft inline (from chat approval/generation intent), surface it
     if (response.auto_generated_draft && typeof response.auto_generated_draft === 'object') {
       const batch = response.auto_generated_draft as DraftBatch
+      const newPosts = (batch.posts || []).filter((p) => p.channel === 'youtube')
       setGeneratedBatch(batch)
-      setDraftPosts((batch.posts || []).filter((p) => p.channel === 'youtube'))
+      setDraftPosts(newPosts)
       setPostActionStatus({})
       setPostPublishReceipts({})
+      // Also accumulate into the Output Items panel
+      setOutputItems((prev) => {
+        const existingIds = new Set(prev.map((p) => p.post_id))
+        const fresh = newPosts.filter((p) => !existingIds.has(p.post_id))
+        return fresh.length > 0 ? [...prev, ...fresh] : prev
+      })
+      // Notify via chat
+      if (newPosts.length > 0) {
+        const queuedCount = newPosts.filter((p) => p.artifact_generation_status === 'queued').length
+        const readyCount = newPosts.length - queuedCount
+        let msg = `I've created ${newPosts.length} draft post${newPosts.length > 1 ? 's' : ''} for you.`
+        if (readyCount > 0) msg += ` ${readyCount} ${readyCount === 1 ? 'is' : 'are'} ready to review.`
+        if (queuedCount > 0) msg += ` ${queuedCount} media asset${queuedCount > 1 ? 's are' : ' is'} being generated — check the Output panel for updates.`
+        msg += ' Open "Generated output" in the right panel to approve and publish.'
+        setStrategyWorkshop((prev) => ({
+          ...prev,
+          messages: [
+            ...(prev.messages || []),
+            { role: 'assistant' as const, content: msg },
+          ],
+        }))
+      }
     }
   }
 
@@ -1259,9 +1340,16 @@ export function DigitalMarketingActivationWizard({
         requested_artifacts: requestedArtifacts,
       })
       setGeneratedBatch(batch)
-      setDraftPosts(batch.posts.filter((p) => p.channel === 'youtube'))
+      const ytPosts = batch.posts.filter((p) => p.channel === 'youtube')
+      setDraftPosts(ytPosts)
       setPostActionStatus({})
       setPostPublishReceipts({})
+      // Accumulate in Output Items panel
+      setOutputItems((prev) => {
+        const existingIds = new Set(prev.map((p) => p.post_id))
+        const fresh = ytPosts.filter((p) => !existingIds.has(p.post_id))
+        return fresh.length > 0 ? [...prev, ...fresh] : prev
+      })
     } catch (e: any) {
       setDraftGenerateError(e?.message || 'Failed to generate YouTube draft.')
     } finally {
@@ -1355,6 +1443,244 @@ export function DigitalMarketingActivationWizard({
     } catch {
       setPostActionStatus((s) => ({ ...s, [post.post_id]: 'error' }))
     }
+  }
+
+  // --- Output Items panel: approve/reject/publish handlers mirror the draft panel ---
+  const handleOutputItemApprove = async (postId: string) => {
+    setOutputItemActions((s) => ({ ...s, [postId]: 'loading' }))
+    try {
+      const approval = await approveDraftPost(postId)
+      setOutputItems((items) =>
+        items.map((p) =>
+          p.post_id === postId
+            ? { ...p, review_status: 'approved', approval_id: approval.approval_id || p.approval_id || null }
+            : p
+        )
+      )
+      setOutputItemActions((s) => ({ ...s, [postId]: 'done' }))
+    } catch {
+      setOutputItemActions((s) => ({ ...s, [postId]: 'error' }))
+    }
+  }
+
+  const handleOutputItemReject = async (postId: string) => {
+    setOutputItemActions((s) => ({ ...s, [postId]: 'loading' }))
+    try {
+      await rejectDraftPost(postId)
+      setOutputItems((items) =>
+        items.map((p) => (p.post_id === postId ? { ...p, review_status: 'rejected' } : p))
+      )
+      setOutputItemActions((s) => ({ ...s, [postId]: 'done' }))
+    } catch {
+      setOutputItemActions((s) => ({ ...s, [postId]: 'error' }))
+    }
+  }
+
+  const handleOutputItemPublish = async (post: DraftPost) => {
+    const agentId = String(draft?.agent_id || activeInstance?.agent_id || '').trim()
+    setOutputItemActions((s) => ({ ...s, [post.post_id]: 'loading' }))
+    try {
+      const result = await executeDraftPost({
+        post_id: post.post_id,
+        agent_id: agentId,
+        intent_action: 'publish',
+        approval_id: post.approval_id ?? undefined,
+      })
+      if (result.provider_post_url) {
+        setOutputItemReceipts((r) => ({ ...r, [post.post_id]: result.provider_post_url! }))
+      }
+      setOutputItems((items) =>
+        items.map((p) =>
+          p.post_id === post.post_id ? { ...p, execution_status: 'posted' } : p
+        )
+      )
+      setOutputItemActions((s) => ({ ...s, [post.post_id]: 'done' }))
+    } catch {
+      setOutputItemActions((s) => ({ ...s, [post.post_id]: 'error' }))
+    }
+  }
+
+  const renderOutputItemArtifact = (post: DraftPost) => {
+    const status = outputItemStatuses[post.post_id]
+    const effectiveMime = status?.artifact_mime_type ?? post.artifact_mime_type
+    const effectiveUri = status?.artifact_uri ?? post.artifact_uri
+    const effectiveGenStatus = status?.artifact_generation_status ?? post.artifact_generation_status
+
+    if (!effectiveUri && effectiveGenStatus === 'queued') {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', opacity: 0.7, fontSize: '0.82rem', marginTop: '0.5rem' }}>
+          <Spinner size="tiny" />
+          <span>Generating {post.artifact_type} asset…</span>
+        </div>
+      )
+    }
+    if (!effectiveUri) return null
+
+    if (effectiveMime?.startsWith('image/') || effectiveMime === 'image/svg+xml') {
+      return (
+        <div style={{ marginTop: '0.5rem' }}>
+          <img
+            src={effectiveUri}
+            alt={`${post.artifact_type} for ${post.channel}`}
+            style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '6px', objectFit: 'cover' }}
+          />
+        </div>
+      )
+    }
+    if (effectiveMime === 'text/csv') {
+      return (
+        <a href={effectiveUri} download style={{ fontSize: '0.82rem', color: 'var(--colorBrandForegroundLink)', display: 'block', marginTop: '0.4rem' }}>
+          ↓ Download content table (CSV)
+        </a>
+      )
+    }
+    if (effectiveMime === 'text/markdown' || effectiveMime?.startsWith('text/')) {
+      return (
+        <a href={effectiveUri} download style={{ fontSize: '0.82rem', color: 'var(--colorBrandForegroundLink)', display: 'block', marginTop: '0.4rem' }}>
+          ↓ Download {post.artifact_type} script (Markdown)
+        </a>
+      )
+    }
+    return (
+      <a href={effectiveUri} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', color: 'var(--colorBrandForegroundLink)', display: 'block', marginTop: '0.4rem' }}>
+        ↓ View artifact
+      </a>
+    )
+  }
+
+  const renderOutputItemsSection = () => {
+    if (outputItems.length === 0) return null
+    const queuedCount = outputItems.filter((p) => {
+      const s = outputItemStatuses[p.post_id]
+      const eff = s?.artifact_generation_status ?? p.artifact_generation_status
+      return eff === 'queued' || eff === 'running'
+    }).length
+
+    return (
+      <section className={`dma-brief-accordion-item${activeBriefSection === 'output' ? ' is-open' : ''}`} data-testid="dma-output-items-section">
+        <button
+          type="button"
+          className="dma-brief-accordion-trigger"
+          onClick={() => setActiveBriefSection(activeBriefSection === 'output' ? 'brief' : 'output')}
+          aria-expanded={activeBriefSection === 'output'}
+        >
+          <div className="dma-brief-accordion-heading">
+            <span className="dma-wizard-section-label">Generated output</span>
+            <span className="dma-brief-accordion-title">
+              Draft posts &amp; media assets ({outputItems.length})
+              {queuedCount > 0 ? (
+                <span style={{ marginLeft: '0.5rem' }}>
+                  <Spinner size="tiny" style={{ display: 'inline' }} />
+                  {' '}{queuedCount} generating…
+                </span>
+              ) : null}
+            </span>
+          </div>
+          <span className="dma-brief-accordion-preview">
+            {outputItems.filter((p) => p.review_status === 'approved').length} approved ·{' '}
+            {outputItems.filter((p) => p.review_status === 'pending_review').length} pending
+          </span>
+        </button>
+        <div className={`dma-brief-accordion-panel dma-brief-accordion-panel--scrollable${activeBriefSection === 'output' ? '' : ' is-hidden'}`}>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
+            {outputItems.map((post, idx) => {
+              const isExpanded = expandedOutputItems[post.post_id] ?? false
+              const actionStatus = outputItemActions[post.post_id] || 'idle'
+              const isApproved = post.review_status === 'approved'
+              const isRejected = post.review_status === 'rejected'
+              const isPosted = post.execution_status === 'posted'
+              const effectiveGenStatus =
+                outputItemStatuses[post.post_id]?.artifact_generation_status ?? post.artifact_generation_status
+              const receiptUrl = outputItemReceipts[post.post_id] || post.provider_post_url
+
+              return (
+                <div
+                  key={post.post_id}
+                  data-testid={`output-item-card-${post.post_id}`}
+                  style={{ border: '1px solid var(--colorNeutralStroke2)', borderRadius: '10px', overflow: 'hidden' }}
+                >
+                  {/* Collapsed header — always visible */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedOutputItems((e) => ({ ...e, [post.post_id]: !isExpanded }))}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.65rem 0.85rem',
+                      background: 'color-mix(in srgb, var(--colorNeutralBackground3) 76%, transparent)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    aria-expanded={isExpanded}
+                  >
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                      Post {idx + 1} · {post.channel}
+                      {post.artifact_type && post.artifact_type !== 'text' ? ` · ${post.artifact_type}` : ''}
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+                      <Badge appearance="outline" color={isApproved ? 'success' : isRejected ? 'danger' : 'warning'}>
+                        {post.review_status}
+                      </Badge>
+                      {effectiveGenStatus && effectiveGenStatus !== 'not_requested' ? (
+                        <Badge appearance="outline" color={effectiveGenStatus === 'ready' ? 'success' : effectiveGenStatus === 'failed' ? 'danger' : 'informative'}>
+                          {effectiveGenStatus === 'queued' ? '⟳ generating' : effectiveGenStatus}
+                        </Badge>
+                      ) : null}
+                      <span style={{ opacity: 0.5, fontSize: '0.8rem' }}>{isExpanded ? '▲' : '▼'}</span>
+                    </div>
+                  </button>
+
+                  {/* Expanded body */}
+                  {isExpanded ? (
+                    <div style={{ padding: '0.75rem 0.85rem', display: 'grid', gap: '0.6rem' }}>
+                      <div style={{ lineHeight: 1.5, fontSize: '0.9rem' }}>{post.text}</div>
+
+                      {renderOutputItemArtifact(post)}
+
+                      {receiptUrl ? (
+                        <div style={{ fontSize: '0.82rem' }}>
+                          <span style={{ opacity: 0.6 }}>Published: </span>
+                          <a href={receiptUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--colorBrandForegroundLink)' }}>
+                            {receiptUrl}
+                          </a>
+                        </div>
+                      ) : null}
+
+                      {!isRejected && !isPosted ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                          {!isApproved ? (
+                            <>
+                              <Button size="small" appearance="primary" disabled={actionStatus === 'loading' || readOnly} onClick={() => void handleOutputItemApprove(post.post_id)}>
+                                Approve
+                              </Button>
+                              <Button size="small" appearance="subtle" disabled={actionStatus === 'loading' || readOnly} onClick={() => void handleOutputItemReject(post.post_id)}>
+                                Reject
+                              </Button>
+                            </>
+                          ) : null}
+                          {isApproved ? (
+                            <Button size="small" appearance="primary" disabled={actionStatus === 'loading' || !isYouTubeAttached || readOnly} onClick={() => void handleOutputItemPublish(post)} title={!isYouTubeAttached ? 'YouTube must be connected' : undefined}>
+                              Publish now
+                            </Button>
+                          ) : null}
+                          {actionStatus === 'loading' ? <Spinner size="tiny" /> : null}
+                          {actionStatus === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed</span> : null}
+                        </div>
+                      ) : null}
+                      {isPosted ? <Badge appearance="filled" color="success">Published</Badge> : null}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+    )
   }
 
   const renderDraftGenerationPanel = () => {
@@ -2333,6 +2659,10 @@ export function DigitalMarketingActivationWizard({
                   </div>
                 </div>
               </section>
+
+              {/* ── Generated Output panel ── */}
+              {renderOutputItemsSection()}
+
             </div>
           </Card>
         </aside>

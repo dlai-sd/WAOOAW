@@ -332,3 +332,42 @@ async def schedule_draft_post(
         execution_status=str(payload.get("execution_status") or "scheduled"),
         scheduled_at=str(payload.get("scheduled_at") or body.scheduled_at.isoformat()),
     )
+
+
+class ArtifactStatusResponse(BaseModel):
+    post_id: str
+    artifact_type: str
+    artifact_generation_status: str
+    artifact_uri: Optional[str] = None
+    artifact_preview_uri: Optional[str] = None
+    artifact_mime_type: Optional[str] = None
+    artifact_job_id: Optional[str] = None
+
+
+@router.get("/draft-posts/{post_id}/artifact-status", response_model=ArtifactStatusResponse)
+async def get_draft_post_artifact_status(
+    post_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),  # noqa: ARG001
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> ArtifactStatusResponse:
+    """Poll the generation status of a media artifact. Forwarded directly to Plant."""
+    resp = await plant.request_json(
+        method="GET",
+        path=f"api/v1/marketing/draft-posts/{post_id}/artifact-status",
+        headers=_forward_headers(request),
+    )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail=resp.json)
+    payload = resp.json if isinstance(resp.json, dict) else {}
+    return ArtifactStatusResponse(
+        post_id=str(payload.get("post_id") or post_id),
+        artifact_type=str(payload.get("artifact_type") or "text"),
+        artifact_generation_status=str(payload.get("artifact_generation_status") or "not_requested"),
+        artifact_uri=payload.get("artifact_uri"),
+        artifact_preview_uri=payload.get("artifact_preview_uri"),
+        artifact_mime_type=payload.get("artifact_mime_type"),
+        artifact_job_id=payload.get("artifact_job_id"),
+    )
