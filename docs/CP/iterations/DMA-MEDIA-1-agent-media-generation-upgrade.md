@@ -426,6 +426,179 @@ artifact_type = Column(String(32), nullable=False, index=True)
 docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py
 ```
 
+---
+
+## Iteration 2 — Media Generation Execution + Review-Ready Backend Responses
+
+**Outcome**
+Plant can generate or prepare typed media artifacts through provider-safe adapters, route them into channel-compatible variants, and expose review-ready artifact payloads and publish receipts to upstream callers.
+
+### Dependency Map
+
+| Story | Depends on | Enables |
+|---|---|---|
+| E4-S1 | Iteration 1 merged | E4-S2, E5-S1 |
+| E4-S2 | E4-S1 | E5-S1 |
+| E5-S1 | E4-S1, E4-S2 | Iteration 3 |
+
+### E4 — DMA routes typed artifacts through provider-safe backend paths
+
+#### Story E4-S1 — Teach content generation to honor artifact requests
+
+| Field | Value |
+|---|---|
+| Story ID | `E4-S1` |
+| Branch | `feat/dma-media-1-it2-content-generation` |
+| Estimate | 90 min |
+| BLOCKED UNTIL | Iteration 1 merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/Plant/BackEnd/agent_mold/skills/content_creator.py`
+2. `src/Plant/BackEnd/agent_mold/skills/grok_client.py`
+3. `src/Plant/BackEnd/services/media_artifact_store.py`
+
+**Files to create / modify**
+- `src/Plant/BackEnd/agent_mold/skills/content_creator.py`
+- `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py`
+- `src/Plant/BackEnd/tests/test_content_creator.py`
+
+**Context**
+The current DMA generator can create themes and post copy, but it cannot translate a typed request like “make a table and an image” into backend work. This story makes the generator artifact-aware while keeping media provider specifics outside the main skill logic.
+
+**Code patterns to copy exactly**
+```python
+from agent_mold.skills.grok_client import get_grok_client, grok_complete
+client = get_grok_client()
+```
+
+```python
+@circuit_breaker(service="media_generation_provider")
+async def generate_artifact(...):
+  ...
+```
+
+**Acceptance criteria**
+1. Extend content generation input handling so artifact requests and prompt hints are carried into Grok-backed or deterministic generation paths.
+2. For binary artifacts, queue worker-side generation rather than trying to finish every asset inline.
+3. Keep text-only output paths unchanged when no artifact request is present.
+4. Add unit tests for mixed requests such as text+table and text+image, including fallback behavior when provider generation is unavailable.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/test_content_creator.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/test_content_creator.py
+```
+
+#### Story E4-S2 — Route generated artifacts into channel-compatible variants
+
+| Field | Value |
+|---|---|
+| Story ID | `E4-S2` |
+| Branch | `feat/dma-media-1-it2-artifact-routing` |
+| Estimate | 90 min |
+| BLOCKED UNTIL | `E4-S1` merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/Plant/BackEnd/agent_mold/skills/adapters.py`
+2. `src/Plant/BackEnd/agent_mold/skills/executor.py`
+3. `src/Plant/BackEnd/agent_mold/skills/playbook.py`
+
+**Files to create / modify**
+- `src/Plant/BackEnd/agent_mold/skills/adapters.py`
+- `src/Plant/BackEnd/agent_mold/skills/executor.py`
+- `src/Plant/BackEnd/agent_mold/skills/artifact_routing.py`
+- `src/Plant/BackEnd/tests/unit/test_artifact_routing.py`
+
+**Context**
+Once Plant can generate artifacts, it still needs to decide which channel can accept which artifact shape and how to package previewable outputs for review. This is the routing layer that keeps channel compatibility explicit instead of burying it in ad hoc conditionals.
+
+**Code patterns to copy exactly**
+```python
+def adapt_youtube(canonical: CanonicalMessage, *, constraints: YouTubeConstraints = YouTubeConstraints()) -> ChannelVariant:
+  ...
+```
+
+```python
+# Make compatibility explicit and testable.
+ALLOWED_ARTIFACTS = {
+  ChannelName.YOUTUBE: {"video", "video_audio", "image", "table"},
+}
+```
+
+**Acceptance criteria**
+1. Add an artifact-routing module that validates channel-to-artifact compatibility before review or publish.
+2. Extend the executor and adapters so channel variants can carry artifact references and preview metadata in addition to text.
+3. Keep routing failures explicit and testable rather than silently dropping unsupported artifacts.
+4. Add unit tests covering at least YouTube, Facebook, and LinkedIn compatibility rules.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/unit/test_artifact_routing.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_artifact_routing.py
+```
+
+### E5 — DMA returns review-ready artifact payloads and typed publish receipts
+
+#### Story E5-S1 — Expose artifact status, previews, and publish-ready media receipts through Plant APIs
+
+| Field | Value |
+|---|---|
+| Story ID | `E5-S1` |
+| Branch | `feat/dma-media-1-it2-review-and-publish-contract` |
+| Estimate | 90 min |
+| BLOCKED UNTIL | `E4-S1` and `E4-S2` merged |
+| CP BackEnd pattern | `N/A` |
+
+**Files to read first**
+1. `src/Plant/BackEnd/api/v1/marketing_drafts.py`
+2. `src/Plant/BackEnd/integrations/social/youtube_client.py`
+3. `src/Plant/BackEnd/integrations/social/facebook_client.py`
+
+**Files to create / modify**
+- `src/Plant/BackEnd/api/v1/marketing_drafts.py`
+- `src/Plant/BackEnd/agent_mold/skills/adapters_youtube.py`
+- `src/Plant/BackEnd/integrations/social/youtube_client.py`
+- `src/Plant/BackEnd/integrations/social/facebook_client.py`
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+
+**Context**
+Upstream callers need one stable contract that tells them whether an artifact is queued, ready for preview, failed, or publishable. The publish clients already support some media cases, but their contract is still too implicit for DMA to expose typed publish readiness to CP safely.
+
+**Code patterns to copy exactly**
+```python
+from core.routing import waooaw_router
+router = waooaw_router(prefix="/marketing", tags=["marketing"])
+```
+
+```python
+@router.get("/draft-batches/{batch_id}", response_model=DraftBatchRecord)
+async def get_draft_batch(
+  batch_id: str,
+  db: AsyncSession = Depends(get_read_db_session),
+) -> DraftBatchRecord:
+  ...
+```
+
+**Acceptance criteria**
+1. Extend Plant draft-batch responses to include artifact status, preview URIs, mime types, and publish-readiness hints.
+2. Expand YouTube and Facebook media-capable methods so the contract distinguishes text-only posts from media-backed posts and returns typed receipt data.
+3. Keep publishing separate from generation: this story may expose publish-ready metadata, but it must not bypass approval requirements.
+4. Add unit coverage showing media-backed draft responses and typed publish receipt serialization.
+
+**Tests to add / update**
+- `src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py`
+
+**Docker validation command**
+```bash
+docker compose -f docker-compose.test.yml run --rm plant-backend-test src/Plant/BackEnd/tests/unit/test_marketing_draft_batch_api.py
+```
+
 ### E2 — DMA stores and names media safely
 
 #### Story E2-S1 — Introduce a provider-agnostic media artifact store service
