@@ -26,6 +26,25 @@ If a story does not improve DMA value delivery, DMA enablement, or runtime safet
 
 ---
 
+## Live Execution Status
+
+| Field | Value |
+|---|---|
+| Execution branch | `feat/dma-media-generation-agent` |
+| Execution started | `2026-04-10 UTC` |
+| Current phase | `Iteration 1 implementation` |
+| Current story | `E1-S1 — Extend the Plant artifact contract beyond text-only outputs` |
+| Last durable checkpoint | `Plan and commentary status seeded before code edits` |
+| Final validation rule | `Docker only; no virtualenv` |
+
+### Execution notes
+
+- This plan is now the live implementation tracker, not just a planning artifact.
+- Checkpoint commits must update this section and the Tracking Table before moving to the next story or epic.
+- The execution branch was created from `origin/main` after merge of PR `#1034` so implementation starts from the approved plan state.
+
+---
+
 ## Vision Intake
 
 - Area: Plant BackEnd is the primary implementation owner for media generation, artifact typing, storage, and publish contracts; CP FrontEnd and CP BackEnd changes exist to let customers request, review, and approve those artifacts without violating the thin-proxy pattern.
@@ -310,7 +329,7 @@ Do this before starting the next epic. If interrupted, completed work is already
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | DMA speaks a typed artifact language | Extend the Plant artifact contract beyond text-only outputs | 🔴 Not Started | — |
+| E1-S1 | 1 | DMA speaks a typed artifact language | Extend the Plant artifact contract beyond text-only outputs | 🟡 In Progress | — |
 | E1-S2 | 1 | DMA speaks a typed artifact language | Persist draft artifact metadata with a first-class schema | 🔴 Not Started | — |
 | E2-S1 | 1 | DMA stores and names media safely | Introduce a provider-agnostic media artifact store service | 🔴 Not Started | — |
 | E3-S1 | 1 | DMA generation jobs run asynchronously | Add async media job state to the draft-batch generation path | 🔴 Not Started | — |
