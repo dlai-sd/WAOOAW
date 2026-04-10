@@ -2,12 +2,11 @@
 
 AUTH-1.2 requires logout to revoke refresh tokens.
 
-Minimal CP-local implementation:
-- File-backed JSONL event store.
-- Per-user revocation timestamp: on logout we record a `revoked_at` time.
-- Any refresh token with `iat` <= `revoked_at` is treated as revoked.
-
-In production, consider Redis and per-token `jti` revocation.
+File-backed JSONL event store — CP BackEnd is a thin proxy and must NOT make
+direct connections to Redis or SQL. Per platform policy, all stateful operations
+go through Plant Gateway/BackEnd. This store lives on the container filesystem;
+because Cloud Run containers are ephemeral, a logout revocation only persists
+for the lifetime of that instance, which is acceptable for the thin-proxy tier.
 """
 
 from __future__ import annotations
@@ -18,7 +17,6 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-import redis
 
 from models.user import TokenData
 
@@ -79,51 +77,8 @@ class FileCPRefreshRevocationStore:
                 continue
 
 
-class RedisCPRefreshRevocationStore:
-    def __init__(self, redis_url: str):
-        self._client = redis.Redis.from_url(
-            redis_url,
-            decode_responses=True,
-            socket_connect_timeout=2,
-            socket_timeout=2,
-        )
-
-    @staticmethod
-    def _key(user_id: str) -> str:
-        return f"cp:refresh-revocations:{user_id}"
-
-    def revoke_user(self, user_id: str, *, revoked_at: datetime | None = None) -> None:
-        event = CPRefreshRevocationEvent(user_id=user_id, revoked_at=revoked_at or _utcnow())
-        self._client.set(self._key(user_id), event.revoked_at.isoformat())
-
-    def revoked_at_for_user(self, user_id: str) -> datetime | None:
-        value = self._client.get(self._key(user_id))
-        if not value:
-            return None
-        return datetime.fromisoformat(value)
-
-    def is_refresh_token_revoked(self, token_data: TokenData) -> bool:
-        if token_data.token_type != "refresh":
-            return False
-
-        token_iat = token_data.iat
-        if token_iat is None:
-            return False
-
-        revoked_at = self.revoked_at_for_user(token_data.user_id)
-        if revoked_at is None:
-            return False
-
-        issued_at = datetime.fromtimestamp(int(token_iat), tz=timezone.utc)
-        return issued_at <= revoked_at
-
-
 @lru_cache(maxsize=1)
-def default_cp_refresh_revocation_store() -> FileCPRefreshRevocationStore | RedisCPRefreshRevocationStore:
-    redis_url = (os.getenv("REDIS_URL") or "").strip()
-    if redis_url:
-        return RedisCPRefreshRevocationStore(redis_url)
-
+def default_cp_refresh_revocation_store() -> FileCPRefreshRevocationStore:
     explicit_path = os.getenv("CP_REFRESH_REVOKE_STORE_PATH")
     if explicit_path:
         return FileCPRefreshRevocationStore(explicit_path)
@@ -134,5 +89,5 @@ def default_cp_refresh_revocation_store() -> FileCPRefreshRevocationStore | Redi
     return FileCPRefreshRevocationStore(default_path)
 
 
-def get_cp_refresh_revocation_store() -> FileCPRefreshRevocationStore | RedisCPRefreshRevocationStore:
+def get_cp_refresh_revocation_store() -> FileCPRefreshRevocationStore:
     return default_cp_refresh_revocation_store()

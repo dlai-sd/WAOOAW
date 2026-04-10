@@ -29,7 +29,6 @@ from services.cp_2fa import (
 )
 from services.cp_refresh_revocations import (
     FileCPRefreshRevocationStore,
-    RedisCPRefreshRevocationStore,
     get_cp_refresh_revocation_store,
 )
 from services.audit_dependency import AuditLogger, get_audit_logger  # C2 (NFR It-2)
@@ -383,11 +382,12 @@ async def create_e2e_session(
 async def logout(
     response: Response,
     current_user: User = Depends(get_current_user),
-    revocations: FileCPRefreshRevocationStore | RedisCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
+    revocations: FileCPRefreshRevocationStore = Depends(get_cp_refresh_revocation_store),
 ):
     """
     Logout current user
-    Uses the configured revocation store (Redis-first when REDIS_URL is present).
+    Revocation is recorded in the local file store — CP BackEnd must not
+    connect to Redis directly (platform policy).
 
     Args:
         current_user: Authenticated user
