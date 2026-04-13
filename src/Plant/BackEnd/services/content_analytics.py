@@ -127,3 +127,47 @@ async def get_content_recommendations(
         total_posts_analyzed=total_posts,
         recommendation_text=recommendation_text,
     )
+
+
+# Industry-standard posting time defaults by industry
+_INDUSTRY_POSTING_DEFAULTS = {
+    "marketing": [
+        {"day": "Tuesday", "time": "10:00 AM", "reason": "Highest B2B engagement window"},
+        {"day": "Thursday", "time": "2:00 PM", "reason": "Pre-weekend content consumption spike"},
+        {"day": "Saturday", "time": "9:00 AM", "reason": "Weekend discovery browsing"},
+    ],
+    "education": [
+        {"day": "Monday", "time": "8:00 AM", "reason": "Start-of-week study planning"},
+        {"day": "Wednesday", "time": "4:00 PM", "reason": "After-school content peak"},
+        {"day": "Sunday", "time": "7:00 PM", "reason": "Weekend revision session"},
+    ],
+    "sales": [
+        {"day": "Tuesday", "time": "9:00 AM", "reason": "Decision-maker morning email window"},
+        {"day": "Wednesday", "time": "11:00 AM", "reason": "Mid-week pipeline review"},
+        {"day": "Thursday", "time": "3:00 PM", "reason": "Pre-Friday urgency window"},
+    ],
+}
+
+
+async def get_posting_time_suggestions(
+    industry: str,
+    channel: str = "youtube",
+    audience_profile: str = "",
+) -> list[dict[str, str]]:
+    """Return posting-time recommendations for the given industry and channel.
+    
+    Args:
+        industry: Industry category (marketing, education, sales)
+        channel: Platform channel (youtube, linkedin, etc.) - reserved for future use
+        audience_profile: Audience description - reserved for future use
+        
+    Returns:
+        List of posting-time recommendations with day, time, and reason.
+        Falls back to marketing defaults for unknown industries.
+    """
+    defaults = _INDUSTRY_POSTING_DEFAULTS.get(
+        industry.lower(),
+        _INDUSTRY_POSTING_DEFAULTS["marketing"]
+    )
+    return defaults
+

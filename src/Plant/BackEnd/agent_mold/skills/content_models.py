@@ -290,6 +290,8 @@ class PostGeneratorInput(BaseModel):
     """Input to generate platform-specific posts for one approved theme item."""
     campaign: Campaign
     theme_item: DailyThemeItem
+    niche_keywords: List[str] = Field(default_factory=list, description="Niche-specific keywords for SEO and hashtags")
+    competitor_context: List[str] = Field(default_factory=list, description="Competitor names to differentiate from")
 
 
 class PostGeneratorOutput(BaseModel):

@@ -355,11 +355,11 @@ git add -A && git commit -m "feat(DMA-CONV-1): [epic-id] — [epic title]" && gi
 | E2-S2 | 1 | Customer sees conversation progress | Align workshop summary fields to required-fields list and CampaignBrief model | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
 | E3-S1 | 1 | Artifact rendering fix | Diagnose and fix table artifact not rendering after DMA-MEDIA-1 deploy | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
 | E3-S2 | 1 | Artifact rendering fix | Verify image/video/audio artifact request-to-preview path works end-to-end | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
-| E4-S1 | 2 | Brand voice feeds content quality | Inject brand voice into conversation prompt and content generation | 🔴 Not Started | — |
-| E4-S2 | 2 | Brand voice feeds content quality | Add content-pillar framework to prompt guidance | 🔴 Not Started | — |
-| E5-S1 | 2 | Market-aware theme creation | Add competitor/niche context fields to discovery and prompt | 🔴 Not Started | — |
-| E5-S2 | 2 | Market-aware theme creation | Inject niche hashtags and SEO keywords into content generation | 🔴 Not Started | — |
-| E6-S1 | 2 | Optimal posting schedule | Add posting-time recommendation based on industry and audience data | 🔴 Not Started | — |
+| E4-S1 | 2 | Brand voice feeds content quality | Inject brand voice into conversation prompt and content generation | 🟢 Done | copilot/iteration-2-epics-e4-e5-e6 |
+| E4-S2 | 2 | Brand voice feeds content quality | Add content-pillar framework to prompt guidance | 🟢 Done | copilot/iteration-2-epics-e4-e5-e6 |
+| E5-S1 | 2 | Market-aware theme creation | Add competitor/niche context fields to discovery and prompt | 🟢 Done | copilot/iteration-2-epics-e4-e5-e6 |
+| E5-S2 | 2 | Market-aware theme creation | Inject niche hashtags and SEO keywords into content generation | 🟢 Done | copilot/iteration-2-epics-e4-e5-e6 |
+| E6-S1 | 2 | Optimal posting schedule | Add posting-time recommendation based on industry and audience data | 🟢 Done | copilot/iteration-2-epics-e4-e5-e6 |
 | E7-S1 | 3 | Agent improves from performance data | Inject content_analytics recommendations into theme cycle prompt | 🔴 Not Started | — |
 | E7-S2 | 3 | Agent improves from performance data | Surface performance-driven suggestions in wizard UI | 🔴 Not Started | — |
 | E8-S1 | 3 | Platform-accurate content previews | Build YouTube/LinkedIn/Instagram preview components for approval UI | 🔴 Not Started | — |

@@ -253,8 +253,17 @@ class ContentCreatorSkill(BaseProcessor):
                 f"Theme: {theme.theme_title}. Context: {theme.theme_description}. "
                 f"Brand: {brief.brand_name}. Audience: {brief.audience}. Tone: {brief.tone}. "
                 f"Language: {brief.language}. "
-                f"Include 3-5 relevant hashtags at the end."
             )
+            if inp.niche_keywords:
+                user += (
+                    f"Use these niche keywords where relevant: {', '.join(inp.niche_keywords)}. "
+                )
+            if inp.competitor_context:
+                user += (
+                    f"Differentiate from these competitors: {', '.join(inp.competitor_context)}. "
+                )
+            user += "Include 3-5 niche-specific hashtags per post."
+            
             text = grok_complete(client, system, user, temperature=0.8)
             scheduled = _compute_schedule(
                 base_date=theme.scheduled_date,
