@@ -356,6 +356,8 @@ Use this vocabulary in plans, route reviews, API design, and code comments to pr
 | `agent_mold/skills/adapters_publish.py` | `SimulatedAdapter` (Phase 1 publisher) |
 | `integrations/delta_exchange/` | Delta Exchange client, order placement, risk engine |
 | `integrations/social/` | LinkedIn / social credential resolver |
+| `services/content_analytics.py` | Content analytics — last-30-day performance insights for DMA content improvement recommendations (DMA-CONV-1 It3 #1050) |
+| `api/v1/digital_marketing_activation.py` | DMA conversation loop — chat, required-fields gate, strategy workshop, theme generation, gated deliverable rule, auto-draft (DMA-CONV-1 + PR #1052) |
 
 #### Construct Execution Flow (v2)
 
@@ -403,6 +405,7 @@ class ConstraintPolicy(BaseModel):
 | `max_goal_runs_per_day` | 10 | 3 |
 | `approval_required` | Yes | Yes |
 | Key hook override | `on_deliverable_approved` → place real order | `on_deliverable_approved` → trigger Publisher |
+| DMA activation path | N/A | `digital_marketing_activation.py` — chat → required-fields gate → strategy workshop → derived themes → gated deliverable rule → content-calendar table → auto-draft creation. (DMA-CONV-1 #1046–#1052) |
 
 ---
 
@@ -1134,7 +1137,7 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembi
 | `src/Plant/BackEnd/database/init_db.py` | Table creation script |
 | `src/Plant/BackEnd/database/seed_data.py` | Seed data loader |
 | `src/Plant/BackEnd/database/seeds/` | Seed definitions (agent types) |
-| `src/Plant/BackEnd/database/migrations/` | Alembic migrations |
+| `src/Plant/BackEnd/database/migrations/` | Alembic migrations — latest: `038_add_brand_voices.py` (DMA-CONV-1 It2 #1048, adds `brand_voices` table), `037_dma_media_artifact_persistence.py` (DMA-MEDIA-1 plan, adds media artifact columns to marketing drafts) |
 | `src/Plant/BackEnd/alembic.ini` | Alembic config |
 | `src/Plant/BackEnd/create_tables.py` | Direct table creation |
 | `src/Plant/BackEnd/Dockerfile.migrations` | Migration runner Docker image |
@@ -1606,6 +1609,17 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
+### Recently merged — 2026-04-12
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#1053** | `docs/dma-media-1-pr1052-upstream-dep` | **DMA-MEDIA-1 plan update — upstream dependency on PR #1052** — adds "Upstream Dependency — PR #1052" section documenting the gated deliverable rule, two-tier readiness (`draft_ready` / `approval_ready`), and `CORE_REQUIRED_FIELDS` that DMA-MEDIA-1 implementers must know. Flags `draft_ready` normalization defect in `_normalize_strategy_workshop()`. | `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md` |
+| **#1052** | `fix/dma-prompt-table-generation` | **DMA gated deliverable rule + targeted theme generation + 7 table tests** — fixes the root cause of DMA returning conversational filler instead of content-calendar tables. Adds `CORE_REQUIRED_FIELDS` and `_FIELD_PURPOSE` dict for field-level validation; gated deliverable rule in system prompt (produce table only when all fields present); two-tier readiness gate (`draft_ready` / `approval_ready`); targeted second LLM call when `derived_themes` is empty; auto-draft status guard. 7 new unit tests covering table generation scenarios. | `src/Plant/BackEnd/api/v1/digital_marketing_activation.py`, `src/Plant/BackEnd/tests/unit/test_dma_table_generation.py` (new), `src/Plant/BackEnd/tests/unit/test_dma_prompt_fields.py`, `src/Plant/BackEnd/tests/unit/test_digital_marketing_theme_generation_api.py` |
+| **#1051** | `docs/DMA-MEDIA-1-media-generation` | **DMA-MEDIA-1 plan — media generation pipeline** — 1 iteration, 4 epics, 6 stories covering typed artifact pipeline (Pollinations.ai images, Edge TTS audio, FFmpeg video), CP artifact preview, and Plant artifact store. | `docs/plant/iterations/DMA-MEDIA-1-media-generation.md` (new), `docs/CP/iterations/DMA-MEDIA-1-agent-media-generation-upgrade.md` |
+| **#1050** | `copilot/iteration-3-epics-e7-e8-e9` | **DMA-CONV-1 Iteration 3: performance analytics + preview cards + E2E test** — E7-S1 injects performance analytics into DMA conversation prompt via `content_analytics.py`; E7-S2 adds performance insights card in wizard UI; E8-S1 adds platform-accurate preview cards (YouTube, LinkedIn, Instagram) via `PlatformPreviewCards.tsx`; E9-S1 adds end-to-end DMA integration test. | `src/Plant/BackEnd/services/content_analytics.py` (new), `src/CP/FrontEnd/src/components/PlatformPreviewCards.tsx` (new), `src/Plant/BackEnd/tests/integration/test_dma_e2e.py` (new), `src/Plant/BackEnd/tests/unit/test_dma_feedback_loop.py` (new) |
+| **#1048** | `copilot/iteration-2-epics-e4-e5-e6` | **DMA-CONV-1 Iteration 2: brand voice + market context + posting time** — E4-S1/S2 inject brand voice into DMA prompt and content generation; E5-S1/S2 add competitor/niche context and SEO/hashtag enrichment; E6-S1 adds posting-time optimization recommendations. Migration 038 adds `brand_voices` table. | `src/Plant/BackEnd/agent_mold/skills/content_creator.py`, `src/Plant/BackEnd/agent_mold/skills/content_models.py`, `src/Plant/BackEnd/database/migrations/versions/038_add_brand_voices.py` (new), `src/Plant/BackEnd/tests/unit/test_dma_brand_voice.py` (new), `src/Plant/BackEnd/tests/unit/test_dma_market_context.py` (new), `src/Plant/BackEnd/tests/unit/test_posting_time.py` (new) |
+| **#1046** | `copilot/iteration-1-epics-e1-e2-e3` | **DMA-CONV-1 Iteration 1: prompt rewrite + validation gate + auto-draft + artifact rendering** — E1-S1 rewrites DMA system prompt with required-fields gate and lock-and-confirm rules; E2-S1 adds strategy workshop validation gate preventing premature theme generation; E3-S1 fixes table artifact rendering with structured preview and markdown fallback. | `src/Plant/BackEnd/api/v1/digital_marketing_activation.py`, `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`, `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts`, `src/Plant/BackEnd/tests/unit/test_dma_prompt_fields.py` (new), `src/Plant/BackEnd/tests/unit/test_dma_auto_draft.py` (new) |
+
 ### Open PR — 2026-03-30
 
 | PR | Branch | Summary | Key files |
@@ -1791,6 +1805,7 @@ Use this shortlist first when the task is about Agent/Skill/Component runtime be
 | Canonical runtime vocabulary | `docs/PP/AGENT-CONSTRUCT-DESIGN.md` | `docs/CONTEXT_AND_INDEX.md` §4.6–§4.7 | Executable runtime source of truth for AgentSpec, hired-agent hierarchy, construct bindings, lifecycle hooks, skills, runs, and deliverables |
 | Current agent-management and catalog direction | `docs/WAOOAW_agents.md` | `docs/PP/AGENT-CONSTRUCT-DESIGN.md`, `src/Plant/BackEnd/agent_mold/reference_agents.py`, `src/Plant/BackEnd/api/v1/reference_agents.py` | Fastest way to recover the live runtime vocabulary, hire-ready supply model, and catalog-facing API surfaces |
 | DMA customer setup and approval loop | `src/CP/FrontEnd/src/pages/HireSetupWizard.tsx` | `src/CP/BackEnd/api/marketing_review.py`, `src/Plant/BackEnd/api/v1/marketing_drafts.py`, `src/Plant/BackEnd/agent_mold/skills/publisher_engine.py` | Shortest path from customer setup to draft generation, approval, and publish flow |
+| DMA conversation + theme generation loop | `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`, `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts`, `src/Plant/BackEnd/services/content_analytics.py` | Owns the DMA chat, required-fields gate, strategy workshop, derived theme generation, gated deliverable rule, and auto-draft creation. Start here for any DMA content-calendar or table-generation issue |
 | Legacy marketing flow-run path | `src/CP/BackEnd/api/cp_flow_runs.py` | `src/Plant/BackEnd/api/v1/flow_runs.py`, `src/Plant/BackEnd/marketing_agent_flows.py`, `src/Plant/BackEnd/flow_executor.py` | Use this when a task mentions old DMA flow definitions or run-history APIs |
 | CP hired-agent skills flow | `src/CP/FrontEnd/src/services/agentSkills.service.ts` | `src/CP/BackEnd/api/cp_skills.py` → `src/Plant/BackEnd/api/v1/agent_skills.py` | Full FE → proxy → Plant chain |
 | Customer skill config save | `src/CP/BackEnd/api/cp_skills.py` | `src/Plant/BackEnd/api/v1/skill_configs.py` | Canonical hired-agent skill config write path |
@@ -1870,6 +1885,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `flow_runs.py` | Flow-run backing store plus public runtime aliases — `/flow-runs`, `/skill-runs`, `/component-runs` |
 | `campaigns.py` | Campaign management — DB-backed by default; persists campaign runtime rollups (`workflow_state`, `brief_summary`, `approval_state`, `draft_deliverables`) and YouTube publish-gating metadata on `content_posts`. Legacy in-memory fallback is test-only and must be explicitly opted into. |
 | `marketing_drafts.py` | Marketing content drafts — persisted in PostgreSQL (`marketing_draft_batches`, `marketing_draft_posts`), not JSONL |
+| `digital_marketing_activation.py` | DMA conversation loop — chat endpoint, required-fields validation gate (`CORE_REQUIRED_FIELDS`), strategy workshop with lock-and-confirm rules, derived theme generation (targeted second LLM call when themes empty), gated deliverable rule (produce table only when all fields present), two-tier readiness gate (`draft_ready` / `approval_ready`), auto-draft creation with status guard. ~1600 lines. (DMA-CONV-1 #1046–#1050, PR #1052) |
 | `notifications.py` | Notification endpoints |
 | `usage_events.py` | Usage event tracking |
 | `reference_agents.py` | Reference agent catalog |
@@ -1930,6 +1946,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `marketing_providers.py` | Social media providers |
 | `marketing_scheduler.py` | Marketing post scheduling |
 | `draft_batches.py` | Draft batch management |
+| `content_analytics.py` | Content analytics — reads `performance_stats` for a hired agent (last 30 days), identifies top-performing dimensions and posting times, returns structured recommendations for DMA content generation. (DMA-CONV-1 It3 #1050) |
 | `credential_resolver.py` | Credential resolution |
 | `social_credential_resolver.py` | Social media credentials |
 | `security_audit.py` | Security audit logging |
@@ -1972,8 +1989,8 @@ Use this shortlist when the task is broader than runtime routes.
 #### Agent Mold Skills (`agent_mold/skills/`)
 | File | Purpose |
 |------|---------|
-| `content_models.py` | All Pydantic models for the content pipeline: `Campaign`, `DailyThemeItem`, `ContentPost`, `CampaignBrief`, `CostEstimate`, `DestinationRef`, `ReviewStatus` enum, `CampaignStatus` enum, `PublishStatus` enum, `PublishInput`, `PublishReceipt`; also pure-function `estimate_cost(brief) → CostEstimate` (PLANT-CONTENT-1 It1 #869). |
-| `content_creator.py` | `ContentCreatorProcessor` (was `ContentCreatorSkill`) — reads `EXECUTOR_BACKEND` env var; if `"grok"` calls Grok API via `grok_client.py`; otherwise uses deterministic templates. Implements `BaseProcessor.execute()`. Registered as `content.creator.v1`. (PLANT-CONTENT-1 #869, MOULD-GAP-1) |
+| `content_models.py` | All Pydantic models for the content pipeline: `Campaign`, `DailyThemeItem`, `ContentPost`, `CampaignBrief`, `CostEstimate`, `DestinationRef`, `ReviewStatus` enum, `CampaignStatus` enum, `PublishStatus` enum, `PublishInput`, `PublishReceipt`; also pure-function `estimate_cost(brief) → CostEstimate` (PLANT-CONTENT-1 It1 #869). Updated with brand-voice and niche/hashtag fields (DMA-CONV-1 It2 #1048). |
+| `content_creator.py` | `ContentCreatorProcessor` (was `ContentCreatorSkill`) — reads `EXECUTOR_BACKEND` env var; if `"grok"` calls Grok API via `grok_client.py`; otherwise uses deterministic templates. Implements `BaseProcessor.execute()`. Registered as `content.creator.v1`. Updated with brand-voice injection, competitor/niche context, SEO hashtag enrichment, and content-pillar framework (DMA-CONV-1 #1046–#1050). (PLANT-CONTENT-1 #869, MOULD-GAP-1) |
 | `trading_executor.py` | `TradingProcessor` — given `TradingProcessorInput` (with live position state from `TradingPump`), produces `TradingProcessorOutput(draft_only=True)`. **Never places a real order** — that only happens in `on_deliverable_approved`. |
 | `grok_client.py` | Thin Grok API client — OpenAI-SDK-compatible interface; reads `XAI_API_KEY` from env; used by `ContentCreatorProcessor` when `EXECUTOR_BACKEND=grok` (PLANT-CONTENT-1 It1 #869). |
 | `publisher_engine.py` | `DestinationAdapter` ABC (abstract `publish(PublishInput) → PublishReceipt`); `DestinationRegistry` plug-and-play dict; `PublisherEngine`; `build_default_registry()` with `SimulatedAdapter`. Registered as `content.publisher.v1` (PLANT-CONTENT-1 It3+It4 #871, #872). |
@@ -2100,6 +2117,9 @@ Use this shortlist when the task is broader than runtime routes.
 | `components/FeedbackIndicators.tsx` | Loading/success/error feedback indicators |
 | `components/HelpTooltip.tsx` | Contextual help tooltips |
 | `components/TrialStatusBanner.tsx` | Trial status banner |
+| `components/DigitalMarketingActivationWizard.tsx` | DMA setup wizard — multi-step conversation flow for marketing agent activation; embeds chat, strategy workshop, content-calendar preview with structured table rendering and markdown fallback; wired to `digitalMarketingActivation.service.ts`. (DMA-CONV-1 #1046–#1050) |
+| `components/DigitalMarketingArtifactPreviewCard.tsx` | Artifact preview card for DMA deliverables — renders content-calendar table artifacts with inline preview |
+| `components/PlatformPreviewCards.tsx` | Platform-accurate preview cards (YouTube, LinkedIn, Instagram) showing how a content post will look on each platform. (DMA-CONV-1 It3 #1050) |
 | `components/auth/AuthModal.tsx` | Auth modal (sign-in/sign-up overlay) |
 | `components/auth/AuthPanel.tsx` | Auth form container panel |
 | `components/auth/CaptchaWidget.tsx` | Cloudflare Turnstile CAPTCHA integration |
@@ -2126,6 +2146,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `services/subscriptions.service.ts` | Subscription management API calls |
 | `services/trialStatus.service.ts` | Trial status polling |
 | `services/marketingReview.service.ts` | Marketing content review API calls |
+| `services/digitalMarketingActivation.service.ts` | DMA activation API — chat message send, strategy workshop state, theme generation trigger, content-calendar retrieval; wired to `DigitalMarketingActivationWizard.tsx`. (DMA-CONV-1 #1046) |
 | `services/myAgentsSummary.service.ts` | My agents summary API calls |
 | `services/paymentsConfig.service.ts` | Payment gateway config API calls |
 | `services/couponCheckout.service.ts` | Coupon/discount checkout flow |
@@ -2416,6 +2437,9 @@ http://localhost:8020/docs   # CP Backend Swagger
 | Codespace browser URLs | Use `https://${CODESPACE_NAME}-{PORT}.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}/` format. |
 | No docs without asking | AI agents must NOT auto-create documentation files — always ask user first. |
 | **`waooaw_router()` is mandatory everywhere** | Never use bare `APIRouter()` in any `api/` directory across CP, Plant, or PP. Ruff TID251 bans it in CI. Use `from core.routing import waooaw_router`. Core routing files: `src/CP/BackEnd/core/routing.py`, `src/Plant/BackEnd/core/routing.py`, `src/PP/BackEnd/core/routing.py`. |
+| **DMA gated deliverable rule (PR #1052)** | `digital_marketing_activation.py` has a gated deliverable rule: the LLM is instructed to produce a content-calendar table **only** when all `CORE_REQUIRED_FIELDS` (industry, platforms, goals, audience, frequency, budget) are present. If you add new required fields, update both `CORE_REQUIRED_FIELDS` and `_FIELD_PURPOSE`. If the DMA returns conversational filler instead of tables, check whether fields are missing or `derived_themes` is empty. |
+| **DMA `draft_ready` normalization defect (known)** | `_normalize_strategy_workshop()` resets `draft_ready` to `not_started` on every normalization call. This defeats the two-tier readiness gate (`draft_ready` / `approval_ready`). Flagged in DMA-MEDIA-1 plan — must be fixed before DMA-MEDIA-1 implementation starts. |
+| **DMA test files — naming convention** | DMA unit tests follow `test_dma_<aspect>.py` naming: `test_dma_prompt_fields.py`, `test_dma_auto_draft.py`, `test_dma_brand_voice.py`, `test_dma_feedback_loop.py`, `test_dma_market_context.py`, `test_dma_table_generation.py`, `test_posting_time.py`. Integration test: `test_dma_e2e.py`. The older `test_digital_marketing_theme_generation_api.py` and `test_digital_marketing_activation_api.py` predate the DMA-CONV-1 convention. |
 | **OPA is Gate 1; Plant Backend is Gate 2** | Plant Gateway middleware queries OPA for RBAC/policy decisions (Gate 1 — role-level). Plant Backend `/api/v1/admin/db/*` has its own hard admin-role check `_require_admin_via_gateway` (Gate 2). A non-admin role may pass OPA Gate 1 for `resource="admin"` (level-based) but will be rejected at Gate 2. Never remove either gate. |
 | **OPA Dockerfile — never add env-specific values** | `src/Plant/Gateway/opa/Dockerfile` must not contain env names, GCP URLs, secrets, or environment labels. Runtime config (log level only) is passed as Cloud Run env vars at deploy time. Image is built once and promoted demo → uat → prod. |
 | **OPA CI test — use static binary, not Docker bind-mount** | GitHub Actions overlay filesystem rejects bind-mounts (`-v` flag on `docker run`). CI downloads `opa_linux_amd64_static` from GitHub releases and runs `opa test src/Plant/Gateway/opa -v` natively. Do NOT revert to `docker run -v`. |
