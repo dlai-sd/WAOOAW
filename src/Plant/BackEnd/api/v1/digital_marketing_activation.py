@@ -217,7 +217,16 @@ async def _build_auto_draft(
     playbook = _dma_playbook()
     # Use the customer's brand name from the workspace brief — never fall back to the
     # agent's own hire nickname (that causes the agent's personal name to appear in posts).
+    # D2 fix: if brand_name is empty, fall back to workshop summary fields before giving up.
     brand_name = str(workspace.get("brand_name") or "").strip()
+    if not brand_name:
+        summary = (workspace.get("campaign_setup") or {}).get("strategy_workshop", {}).get("summary", {})
+        brand_name = (
+            str(summary.get("profession_name") or "").strip()
+            or str(summary.get("business_focus") or "").strip()
+            or str(workspace.get("agent_type_id") or record.agent_type_id or "").strip()
+            or "Brand"
+        )
     location = str(workspace.get("location") or "").strip()
     language = str(workspace.get("primary_language") or "en").strip()
 
@@ -321,13 +330,18 @@ async def _build_auto_draft(
                 )
             )
 
+    # E1 fix: agent_id, theme, and brand_name all have min_length=1 in DraftBatchRecord.
+    # Ensure none of them can be empty strings to prevent silent Pydantic validation failures.
+    safe_agent_id = str(record.agent_id or "").strip() or str(record.agent_type_id or "").strip() or "unknown-agent"
+    safe_theme = (master_theme or brand_name or "Content Plan").strip() or "Content Plan"
+
     batch = DraftBatchRecord(
         batch_id=batch_id,
-        agent_id=str(record.agent_id or ""),
+        agent_id=safe_agent_id,
         hired_instance_id=record.hired_instance_id,
         campaign_id=campaign_id,
         customer_id=str(record.customer_id or "") if record.customer_id else None,
-        theme=master_theme or brand_name,
+        theme=safe_theme,
         brand_name=brand_name,
         brief_summary=None,
         created_at=datetime.utcnow(),
@@ -535,7 +549,7 @@ def _normalize_workshop_summary(raw_summary: Any, workspace: dict[str, Any]) -> 
 def _normalize_strategy_workshop(raw_workshop: Any, workspace: dict[str, Any]) -> dict[str, Any]:
     workshop = dict(raw_workshop or {}) if isinstance(raw_workshop, dict) else {}
     status = str(workshop.get("status") or "not_started").strip().lower()
-    if status not in {"not_started", "discovery", "approval_ready", "approved"}:
+    if status not in {"not_started", "discovery", "draft_ready", "approval_ready", "approved"}:
         status = "not_started"
 
     approved_at = workshop.get("approved_at")

@@ -501,3 +501,553 @@ def test_conversational_only_response_does_not_silently_pass_as_table(test_clien
                     assert "Content plan for" not in theme_val, (
                         f"Got a useless placeholder table instead of real themes: {table_rows}"
                     )
+
+
+# ---------------------------------------------------------------------------
+# Test 8: draft_ready status survives normalization (D1 regression)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_draft_ready_status_survives_normalization():
+    """D1 regression: _normalize_strategy_workshop must preserve 'draft_ready' status.
+    Before the fix, draft_ready was not in the allowed set and was reset to not_started."""
+    from api.v1.digital_marketing_activation import _normalize_strategy_workshop
+
+    raw = {"status": "draft_ready", "summary": _core_only_summary()}
+    result = _normalize_strategy_workshop(raw, {})
+    assert result["status"] == "draft_ready", (
+        f"Expected draft_ready to survive normalization, got: {result['status']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 9: auto-draft succeeds when brand_name is empty (D2 regression)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_auto_draft_with_empty_brand_name_uses_fallback(test_client, monkeypatch):
+    """D2 regression: when workspace.brand_name is empty, _build_auto_draft should
+    fall back to workshop summary's profession_name instead of failing with a
+    Pydantic validation error on DraftBatchRecord.brand_name."""
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    # Create a hire WITHOUT brand_name in the workspace
+    checkout = test_client.post(
+        "/api/v1/payments/coupon/checkout",
+        json={
+            "coupon_code": "WAOOAW100",
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "duration": "monthly",
+            "customer_id": "cust-no-brand",
+        },
+    )
+    assert checkout.status_code == 200
+    subscription_id = checkout.json()["subscription_id"]
+
+    draft = test_client.put(
+        "/api/v1/hired-agents/draft",
+        json={
+            "subscription_id": subscription_id,
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "agent_type_id": "marketing.digital_marketing.v1",
+            "customer_id": "cust-no-brand",
+            "nickname": "Test Agent",
+            "theme": "dark",
+            "config": {
+                "primary_language": "en",
+                "timezone": "Asia/Kolkata",
+                "brand_name": "",  # Deliberately empty — reproduces D2
+                "location": "Pune",
+            },
+        },
+    )
+    assert draft.status_code == 200
+    hired_instance_id = draft.json()["hired_instance_id"]
+
+    # Set workspace WITHOUT brand_name
+    saved = test_client.put(
+        f"/api/v1/hired-agents/{hired_instance_id}/digital-marketing-activation",
+        json={
+            "customer_id": "cust-no-brand",
+            "workspace": {
+                "brand_name": "",  # Empty!
+                "location": "Pune",
+                "primary_language": "en",
+            },
+        },
+    )
+    assert saved.status_code == 200
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(
+        dma_module,
+        "grok_complete",
+        lambda *args, **kwargs: json.dumps({
+            "assistant_message": "Here is your content calendar.",
+            "status": "approval_ready",
+            "summary": _full_summary(),
+            "master_theme": "Beauty services content plan",
+            "derived_themes": [
+                {"title": "Tutorials", "description": "How-to bridal looks", "frequency": "weekly", "pillar": "Education"},
+                {"title": "Testimonials", "description": "Happy bride stories", "frequency": "biweekly", "pillar": "Trust"},
+            ],
+            "checkpoint_summary": "All fields locked.",
+            "current_focus_question": "",
+            "next_step_options": ["Approve"],
+            "time_saving_note": "",
+        }),
+    )
+
+    response = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "campaign_setup": {
+                "strategy_workshop": {
+                    "pending_input": "show me the themes in table format",
+                    "messages": [{"role": "user", "content": "show me the themes in table format"}],
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    # D2 fix: auto-draft should NOT fail — it should use summary's profession_name as fallback
+    assert body["auto_generated_draft"] is not None, (
+        "auto_generated_draft should not be None when brand_name is empty — "
+        "the D2 fix should fall back to workshop summary's profession_name"
+    )
+    draft = body["auto_generated_draft"]
+    assert len(draft.get("posts", [])) >= 1, "Expected at least one post"
+    # The brand_name in the batch should be the fallback, not empty
+    assert draft.get("brand_name", "") != "", "brand_name should not be empty after fallback"
+
+
+# ---------------------------------------------------------------------------
+# Test 10: All allowed statuses survive normalization (parametrized)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+@pytest.mark.parametrize("status", [
+    "not_started",
+    "discovery",
+    "draft_ready",
+    "approval_ready",
+    "approved",
+])
+def test_all_allowed_statuses_survive_normalization(status):
+    """Every allowed status value must be preserved by _normalize_strategy_workshop."""
+    from api.v1.digital_marketing_activation import _normalize_strategy_workshop
+
+    raw = {"status": status, "summary": _core_only_summary()}
+    result = _normalize_strategy_workshop(raw, {})
+    assert result["status"] == status, (
+        f"Status '{status}' was changed to '{result['status']}' during normalization"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 11: Unknown statuses are safely reset to not_started
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+@pytest.mark.parametrize("bad_status", ["complete", "DONE", "ready", "", "null", "active"])
+def test_unknown_statuses_reset_to_not_started(bad_status):
+    """Unknown/invalid statuses must be normalized to not_started, not crash."""
+    from api.v1.digital_marketing_activation import _normalize_strategy_workshop
+
+    raw = {"status": bad_status, "summary": _core_only_summary()}
+    result = _normalize_strategy_workshop(raw, {})
+    assert result["status"] == "not_started", (
+        f"Bad status '{bad_status}' should reset to 'not_started', got '{result['status']}'"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 12: Approval signal + draft_ready status triggers TABLE generation
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_approval_signal_with_draft_ready_triggers_table_generation():
+    """When user says 'Approve' and workshop is draft_ready, intent detection
+    should trigger TABLE generation (the default artifact type)."""
+    from api.v1.digital_marketing_activation import _detect_generation_intent
+
+    should_gen, artifact_types = _detect_generation_intent(
+        "Approve this direction", workshop_status="draft_ready"
+    )
+    assert should_gen is True, "draft_ready + approval signal should trigger generation"
+    assert any(a.value == "table" for a in artifact_types), (
+        f"Should default to TABLE artifact, got: {[a.value for a in artifact_types]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 13: Empty agent_id does not crash auto-draft (E1 regression)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_build_auto_draft_with_empty_agent_id():
+    """E1 regression: when record.agent_id is empty, _build_auto_draft should
+    fall back to agent_type_id instead of failing Pydantic validation."""
+    from datetime import datetime, timezone
+    from api.v1 import hired_agents_simple
+    from api.v1.digital_marketing_activation import _build_auto_draft
+    from agent_mold.skills.playbook import ArtifactType
+
+    now = datetime.now(timezone.utc)
+    record = hired_agents_simple._HiredAgentRecord(
+        hired_instance_id="hired-e1-test",
+        subscription_id="sub-e1",
+        agent_id="",  # Empty agent_id — the E1 defect
+        agent_type_id="marketing.digital_marketing.v1",
+        customer_id="cust-e1",
+        nickname="Test DMA",
+        theme=None,
+        config={},
+        configured=True,
+        goals_completed=False,
+        active=True,
+        trial_status="active",
+        trial_start_at=now,
+        trial_end_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+
+    workspace = {
+        "brand_name": "Test Brand",
+        "location": "Mumbai",
+        "primary_language": "en",
+        "campaign_setup": {
+            "master_theme": "Test Theme",
+            "derived_themes": [
+                {"title": "Theme A", "description": "Desc A", "frequency": "weekly"},
+            ],
+        },
+    }
+
+    batch = await _build_auto_draft(
+        record=record,
+        workspace=workspace,
+        master_theme="Test Theme",
+        campaign_id=None,
+        artifact_types=[ArtifactType.TABLE],
+        db=None,
+    )
+
+    assert batch is not None, "Auto-draft should succeed even with empty agent_id"
+    # agent_id should fall back to agent_type_id
+    assert batch["agent_id"] == "marketing.digital_marketing.v1", (
+        f"Expected agent_type_id fallback, got: {batch['agent_id']}"
+    )
+    assert len(batch["posts"]) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Test 14: Empty master_theme uses brand_name in table header
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_build_auto_draft_with_empty_master_theme():
+    """When master_theme is empty, the table should use brand_name as fallback
+    for the header and the theme field in DraftBatchRecord."""
+    from datetime import datetime, timezone
+    from api.v1 import hired_agents_simple
+    from api.v1.digital_marketing_activation import _build_auto_draft
+    from agent_mold.skills.playbook import ArtifactType
+
+    now = datetime.now(timezone.utc)
+    record = hired_agents_simple._HiredAgentRecord(
+        hired_instance_id="hired-mt-test",
+        subscription_id="sub-mt",
+        agent_id="agent-mt",
+        agent_type_id="marketing.digital_marketing.v1",
+        customer_id="cust-mt",
+        nickname="Test DMA",
+        theme=None,
+        config={},
+        configured=True,
+        goals_completed=False,
+        active=True,
+        trial_status="active",
+        trial_start_at=now,
+        trial_end_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+
+    workspace = {
+        "brand_name": "Acme Health",
+        "location": "Mumbai",
+        "primary_language": "en",
+        "campaign_setup": {
+            "master_theme": "",
+            "derived_themes": [
+                {"title": "Tips", "description": "Health tips", "frequency": "weekly"},
+            ],
+        },
+    }
+
+    batch = await _build_auto_draft(
+        record=record,
+        workspace=workspace,
+        master_theme="",  # Empty master_theme
+        campaign_id=None,
+        artifact_types=[ArtifactType.TABLE],
+        db=None,
+    )
+
+    assert batch is not None
+    # theme field should have fallen back to brand_name, not be empty
+    assert batch["theme"] != "", "theme should not be empty when master_theme is empty"
+    assert "Acme Health" in batch["theme"] or "Content Plan" in batch["theme"]
+    # Table post should still exist and have content
+    assert len(batch["posts"]) >= 1
+    table_text = batch["posts"][0]["text"]
+    assert "Tips" in table_text, "Table should contain derived theme titles"
+
+
+# ---------------------------------------------------------------------------
+# Test 15: Brand name fallback chain covers all levels
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_brand_name_fallback_chain_all_levels():
+    """D2 extended: verify the full fallback chain —
+    brand_name → profession_name → business_focus → agent_type_id → 'Brand'."""
+    from datetime import datetime, timezone
+    from api.v1 import hired_agents_simple
+    from api.v1.digital_marketing_activation import _build_auto_draft
+    from agent_mold.skills.playbook import ArtifactType
+
+    now = datetime.now(timezone.utc)
+
+    def _make_record(**overrides):
+        defaults = dict(
+            hired_instance_id="hired-fallback",
+            subscription_id="sub-fb",
+            agent_id="agent-fb",
+            agent_type_id="marketing.digital_marketing.v1",
+            customer_id="cust-fb",
+            nickname="Test DMA",
+            theme=None,
+            config={},
+            configured=True,
+            goals_completed=False,
+            active=True,
+            trial_status="active",
+            trial_start_at=now,
+            trial_end_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        defaults.update(overrides)
+        return hired_agents_simple._HiredAgentRecord(**defaults)
+
+    def _make_workspace(brand_name, summary_overrides=None):
+        summary = summary_overrides or {}
+        return {
+            "brand_name": brand_name,
+            "location": "Mumbai",
+            "primary_language": "en",
+            "campaign_setup": {
+                "master_theme": "Test",
+                "derived_themes": [{"title": "T1", "description": "D1", "frequency": "weekly"}],
+                "strategy_workshop": {"summary": summary},
+            },
+        }
+
+    # Level 1: brand_name present → use it
+    batch = await _build_auto_draft(
+        record=_make_record(), workspace=_make_workspace("Acme Corp"),
+        master_theme="Test", campaign_id=None, artifact_types=[ArtifactType.TABLE], db=None,
+    )
+    assert batch["brand_name"] == "Acme Corp"
+
+    # Level 2: brand_name empty, profession_name present → use profession_name
+    batch = await _build_auto_draft(
+        record=_make_record(),
+        workspace=_make_workspace("", {"profession_name": "Beauty Artist"}),
+        master_theme="Test", campaign_id=None, artifact_types=[ArtifactType.TABLE], db=None,
+    )
+    assert batch["brand_name"] == "Beauty Artist"
+
+    # Level 3: brand_name + profession_name empty, business_focus present
+    batch = await _build_auto_draft(
+        record=_make_record(),
+        workspace=_make_workspace("", {"business_focus": "Bridal makeup studio"}),
+        master_theme="Test", campaign_id=None, artifact_types=[ArtifactType.TABLE], db=None,
+    )
+    assert batch["brand_name"] == "Bridal makeup studio"
+
+    # Level 4: all empty, falls back to agent_type_id
+    batch = await _build_auto_draft(
+        record=_make_record(),
+        workspace=_make_workspace("", {}),
+        master_theme="Test", campaign_id=None, artifact_types=[ArtifactType.TABLE], db=None,
+    )
+    assert batch["brand_name"] == "marketing.digital_marketing.v1"
+
+    # Level 5: everything empty including agent_type_id → "Brand"
+    batch = await _build_auto_draft(
+        record=_make_record(agent_type_id=""),
+        workspace=_make_workspace("", {}),
+        master_theme="Test", campaign_id=None, artifact_types=[ArtifactType.TABLE], db=None,
+    )
+    assert batch["brand_name"] == "Brand"
+
+
+# ---------------------------------------------------------------------------
+# Test 16: Targeted theme generation failure degrades gracefully
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_targeted_theme_gen_json_failure_degrades_gracefully(test_client, monkeypatch):
+    """When the second targeted LLM call returns malformed JSON (not valid themes),
+    the endpoint should return 200 with empty derived_themes — not crash."""
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    hired_instance_id = _create_marketing_hire(test_client, customer_id="cust-json-fail")
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    call_count = {"n": 0}
+
+    def mock_grok_complete(*args, **kwargs):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return json.dumps({
+                "assistant_message": "Here are themes.",
+                "status": "approval_ready",
+                "summary": _core_only_summary(),
+                "master_theme": "Content Plan",
+                "derived_themes": [],  # Empty — triggers second call
+                "checkpoint_summary": "",
+                "current_focus_question": "",
+                "next_step_options": [],
+                "time_saving_note": "",
+            })
+        else:
+            # Second call returns garbage JSON
+            return "NOT VALID JSON {{{broken"
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(dma_module, "grok_complete", mock_grok_complete)
+
+    response = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "campaign_setup": {
+                "strategy_workshop": {
+                    "pending_input": "show me themes in table format",
+                    "messages": [{"role": "user", "content": "show me themes in table format"}],
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200, f"Should gracefully degrade, got: {response.status_code}"
+    body = response.json()
+    # Second LLM call should have been attempted
+    assert call_count["n"] >= 2, "Expected at least 2 LLM calls"
+    # Should still return a valid response (possibly with empty themes)
+    assert "derived_themes" in body
+
+
+# ---------------------------------------------------------------------------
+# Test 17: Auto-draft exception produces None, not 500
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_auto_draft_exception_returns_none_not_500(test_client, monkeypatch):
+    """When _build_auto_draft raises an unexpected exception, the endpoint
+    should return 200 with auto_generated_draft=None — not a 500 error."""
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    hired_instance_id = _create_marketing_hire(test_client, customer_id="cust-draft-exc")
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(
+        dma_module,
+        "grok_complete",
+        lambda *args, **kwargs: json.dumps({
+            "assistant_message": "Here is your calendar.",
+            "status": "approval_ready",
+            "summary": _full_summary(),
+            "master_theme": "Test Theme",
+            "derived_themes": [
+                {"title": "T1", "description": "D1", "frequency": "weekly", "pillar": "Education"},
+            ],
+            "checkpoint_summary": "All locked.",
+            "current_focus_question": "",
+            "next_step_options": ["Approve"],
+            "time_saving_note": "",
+        }),
+    )
+
+    # Patch _build_auto_draft to raise an exception
+    original_build = dma_module._build_auto_draft
+
+    async def exploding_build(*args, **kwargs):
+        raise RuntimeError("Simulated infrastructure failure")
+
+    monkeypatch.setattr(dma_module, "_build_auto_draft", exploding_build)
+
+    response = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "campaign_setup": {
+                "strategy_workshop": {
+                    "pending_input": "show me themes in table format",
+                    "messages": [{"role": "user", "content": "show me themes in table format"}],
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200, f"Should be 200 with None draft, got {response.status_code}"
+    body = response.json()
+    assert body["auto_generated_draft"] is None, (
+        "auto_generated_draft should be None when _build_auto_draft fails"
+    )
+    # But themes should still be present (they come from the first LLM call)
+    assert len(body["derived_themes"]) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Test 18: Intent detection edge cases (parametrized)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+@pytest.mark.parametrize("text,status,expect_generate,expect_table", [
+    # Explicit artifact + generate verb
+    ("show me themes in table format", "draft_ready", True, True),
+    ("generate a content calendar", "approval_ready", True, True),
+    ("give me the table", "approved", True, True),
+    # Approval signal + draft_ready
+    ("Approve this direction", "draft_ready", True, True),
+    ("looks good, approve", "approval_ready", True, True),
+    # No trigger
+    ("tell me about marketing", "discovery", False, False),
+    ("", "draft_ready", False, False),
+    # Approval signal but wrong status
+    ("Approve this", "discovery", False, False),
+    ("Approve this", "not_started", False, False),
+])
+def test_detect_generation_intent_parametrized(text, status, expect_generate, expect_table):
+    from api.v1.digital_marketing_activation import _detect_generation_intent
+
+    should_gen, artifact_types = _detect_generation_intent(text, workshop_status=status)
+    assert should_gen == expect_generate, (
+        f"For text='{text}' status='{status}': expected generate={expect_generate}, got {should_gen}"
+    )
+    if expect_table:
+        assert any(a.value == "table" for a in artifact_types), (
+            f"Expected TABLE in artifact_types, got: {[a.value for a in artifact_types]}"
+        )
