@@ -501,3 +501,126 @@ def test_conversational_only_response_does_not_silently_pass_as_table(test_clien
                     assert "Content plan for" not in theme_val, (
                         f"Got a useless placeholder table instead of real themes: {table_rows}"
                     )
+
+
+# ---------------------------------------------------------------------------
+# Test 8: draft_ready status survives normalization (D1 regression)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_draft_ready_status_survives_normalization():
+    """D1 regression: _normalize_strategy_workshop must preserve 'draft_ready' status.
+    Before the fix, draft_ready was not in the allowed set and was reset to not_started."""
+    from api.v1.digital_marketing_activation import _normalize_strategy_workshop
+
+    raw = {"status": "draft_ready", "summary": _core_only_summary()}
+    result = _normalize_strategy_workshop(raw, {})
+    assert result["status"] == "draft_ready", (
+        f"Expected draft_ready to survive normalization, got: {result['status']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 9: auto-draft succeeds when brand_name is empty (D2 regression)
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_auto_draft_with_empty_brand_name_uses_fallback(test_client, monkeypatch):
+    """D2 regression: when workspace.brand_name is empty, _build_auto_draft should
+    fall back to workshop summary's profession_name instead of failing with a
+    Pydantic validation error on DraftBatchRecord.brand_name."""
+    monkeypatch.setenv("PAYMENTS_MODE", "coupon")
+    monkeypatch.setenv("PERSISTENCE_MODE", "memory")
+    monkeypatch.setenv("CAMPAIGN_PERSISTENCE_MODE", "memory")
+
+    # Create a hire WITHOUT brand_name in the workspace
+    checkout = test_client.post(
+        "/api/v1/payments/coupon/checkout",
+        json={
+            "coupon_code": "WAOOAW100",
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "duration": "monthly",
+            "customer_id": "cust-no-brand",
+        },
+    )
+    assert checkout.status_code == 200
+    subscription_id = checkout.json()["subscription_id"]
+
+    draft = test_client.put(
+        "/api/v1/hired-agents/draft",
+        json={
+            "subscription_id": subscription_id,
+            "agent_id": "AGT-MKT-HEALTH-001",
+            "agent_type_id": "marketing.digital_marketing.v1",
+            "customer_id": "cust-no-brand",
+            "nickname": "Test Agent",
+            "theme": "dark",
+            "config": {
+                "primary_language": "en",
+                "timezone": "Asia/Kolkata",
+                "brand_name": "",  # Deliberately empty — reproduces D2
+                "location": "Pune",
+            },
+        },
+    )
+    assert draft.status_code == 200
+    hired_instance_id = draft.json()["hired_instance_id"]
+
+    # Set workspace WITHOUT brand_name
+    saved = test_client.put(
+        f"/api/v1/hired-agents/{hired_instance_id}/digital-marketing-activation",
+        json={
+            "customer_id": "cust-no-brand",
+            "workspace": {
+                "brand_name": "",  # Empty!
+                "location": "Pune",
+                "primary_language": "en",
+            },
+        },
+    )
+    assert saved.status_code == 200
+
+    import api.v1.digital_marketing_activation as dma_module
+
+    monkeypatch.setattr(dma_module, "get_grok_client", lambda: object())
+    monkeypatch.setattr(
+        dma_module,
+        "grok_complete",
+        lambda *args, **kwargs: json.dumps({
+            "assistant_message": "Here is your content calendar.",
+            "status": "approval_ready",
+            "summary": _full_summary(),
+            "master_theme": "Beauty services content plan",
+            "derived_themes": [
+                {"title": "Tutorials", "description": "How-to bridal looks", "frequency": "weekly", "pillar": "Education"},
+                {"title": "Testimonials", "description": "Happy bride stories", "frequency": "biweekly", "pillar": "Trust"},
+            ],
+            "checkpoint_summary": "All fields locked.",
+            "current_focus_question": "",
+            "next_step_options": ["Approve"],
+            "time_saving_note": "",
+        }),
+    )
+
+    response = test_client.post(
+        f"/api/v1/digital-marketing-activation/{hired_instance_id}/generate-theme-plan",
+        headers={"Authorization": "Bearer test-token"},
+        json={
+            "campaign_setup": {
+                "strategy_workshop": {
+                    "pending_input": "show me the themes in table format",
+                    "messages": [{"role": "user", "content": "show me the themes in table format"}],
+                },
+            },
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    # D2 fix: auto-draft should NOT fail — it should use summary's profession_name as fallback
+    assert body["auto_generated_draft"] is not None, (
+        "auto_generated_draft should not be None when brand_name is empty — "
+        "the D2 fix should fall back to workshop summary's profession_name"
+    )
+    draft = body["auto_generated_draft"]
+    assert len(draft.get("posts", [])) >= 1, "Expected at least one post"
+    # The brand_name in the batch should be the fallback, not empty
+    assert draft.get("brand_name", "") != "", "brand_name should not be empty after fallback"
