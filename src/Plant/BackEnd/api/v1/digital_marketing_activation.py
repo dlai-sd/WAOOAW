@@ -191,11 +191,19 @@ async def _build_auto_draft(
                 "| # | Theme | Description | Frequency |",
                 "|---|-------|-------------|-----------|",
             ]
+            table_preview_rows = []
             for i, theme in enumerate(derived_themes, 1):
                 title = str(theme.get("title") or "").replace("|", "\\|")
                 desc = str(theme.get("description") or "").replace("|", "\\|")
                 freq = str(theme.get("frequency") or "").replace("|", "\\|")
                 table_lines.append(f"| {i} | {title} | {desc} | {freq} |")
+                # Build structured table_preview for frontend
+                table_preview_rows.append({
+                    "#": str(i),
+                    "Theme": str(theme.get("title") or ""),
+                    "Description": str(theme.get("description") or ""),
+                    "Frequency": str(theme.get("frequency") or "weekly"),
+                })
             table_text = header + "\n".join(table_lines)
         else:
             table_text = (
@@ -204,6 +212,12 @@ async def _build_auto_draft(
                 "|---|-------|-------------|----------|\n"
                 f"| 1 | {master_theme_val} | Content plan for {brand_name or 'your brand'} | weekly |\n"
             )
+            table_preview_rows = [{
+                "#": "1",
+                "Theme": master_theme_val,
+                "Description": f"Content plan for {brand_name or 'your brand'}",
+                "Frequency": "weekly",
+            }]
 
         posts.append(
             DraftPostRecord(
@@ -212,6 +226,12 @@ async def _build_auto_draft(
                 text=table_text,
                 artifact_type="table",
                 hashtags=[],
+                artifact_metadata={
+                    "table_preview": {
+                        "columns": ["#", "Theme", "Description", "Frequency"],
+                        "rows": table_preview_rows,
+                    }
+                },
             )
         )
 

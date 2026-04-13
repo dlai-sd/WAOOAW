@@ -47,4 +47,26 @@ describe('DigitalMarketingArtifactPreviewCard', () => {
     expect(screen.getByText(/Status: queued/i)).toBeInTheDocument()
     expect(screen.getByText(/queued generation/i)).toBeInTheDocument()
   })
+
+  it('E3-S1-T2: renders markdown table fallback when table_preview is missing but text contains GFM', () => {
+    render(
+      <DigitalMarketingArtifactPreviewCard
+        post={{
+          post_id: 'post-3',
+          channel: 'youtube',
+          text: '| # | Theme | Description |\n|---|-------|-------------|\n| 1 | Test | Test theme |',
+          review_status: 'pending_review',
+          artifact_type: 'table',
+          artifact_generation_status: 'ready',
+          // No artifact_metadata.table_preview
+        }}
+      />
+    )
+
+    // Should render the markdown table fallback
+    expect(screen.getByText(/Requested asset: table/i)).toBeInTheDocument()
+    // ReactMarkdown should convert the GFM to a table element
+    const tableElement = document.querySelector('table')
+    expect(tableElement).toBeInTheDocument()
+  })
 })
