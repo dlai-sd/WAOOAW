@@ -8,6 +8,7 @@ import pytest
 from agent_mold.reference_agents import THEME_DISCOVERY_REQUIRED_FIELDS
 from api.v1.digital_marketing_activation import (
     _normalize_workshop_messages,
+    _parse_theme_workshop_response,
     _theme_workshop_prompt,
 )
 
@@ -109,3 +110,82 @@ class TestE1S1PromptRewrite:
         source = inspect.getsource(generate_theme_plan)
         # Case-insensitive check for "produce it immediately"
         assert "produce it immediately" in source.lower() or "produce" in source.lower()
+
+
+class TestE1S2FieldCompletenessValidation:
+    """E1-S2: Server-side field-completeness validation before approval_ready transition"""
+
+    def test_llm_approval_with_insufficient_fields_forced_to_discovery(self):
+        """E1-S2-T1: LLM says approval_ready but only 5 fields filled → status forced to discovery"""
+        raw_response = json.dumps({
+            "assistant_message": "Great! Here's your strategy.",
+            "status": "approval_ready",
+            "master_theme": "Test Master Theme",
+            "derived_themes": [
+                {"title": "Theme 1", "description": "Test", "frequency": "weekly"}
+            ],
+            "summary": {
+                "business_focus": "Fitness coaching",
+                "business_goal": "Generate leads",
+                "profession_name": "Fitness",
+                "location_focus": "Mumbai",
+                "audience": "Working professionals",
+                # Only 5 fields filled, missing 6 more
+            },
+            "checkpoint_summary": "Strategy is ready",
+            "current_focus_question": "",
+            "next_step_options": ["Approve"],
+        })
+        
+        workspace = {"brand_name": "Test"}
+        existing_workshop = {"messages": [], "summary": {}}
+        
+        master_theme, derived_themes, workshop = _parse_theme_workshop_response(
+            raw_response,
+            workspace=workspace,
+            existing_workshop=existing_workshop,
+            pending_input="",
+        )
+        
+        # Should be forced to discovery because only 5 < 9 fields filled
+        assert workshop["status"] == "discovery"
+
+    def test_llm_approval_with_all_fields_passes_through(self):
+        """E1-S2-T2: LLM says approval_ready and all 11 fields filled → status stays approval_ready"""
+        raw_response = json.dumps({
+            "assistant_message": "Great! Here's your strategy.",
+            "status": "approval_ready",
+            "master_theme": "Test Master Theme",
+            "derived_themes": [
+                {"title": "Theme 1", "description": "Test", "frequency": "weekly"}
+            ],
+            "summary": {
+                "business_focus": "Fitness coaching",
+                "business_goal": "Generate leads",
+                "profession_name": "Fitness",
+                "location_focus": "Mumbai",
+                "audience": "Working professionals",
+                "customer_profile": "30-45 years",
+                "tone": "Motivational",
+                "cta": "Book consultation",
+                "youtube_angle": "Quick tips",
+                "first_content_direction": "Weekly series",
+                "positioning": "Premium coach",
+            },
+            "checkpoint_summary": "Strategy is ready",
+            "current_focus_question": "",
+            "next_step_options": ["Approve"],
+        })
+        
+        workspace = {"brand_name": "Test"}
+        existing_workshop = {"messages": [], "summary": {}}
+        
+        master_theme, derived_themes, workshop = _parse_theme_workshop_response(
+            raw_response,
+            workspace=workspace,
+            existing_workshop=existing_workshop,
+            pending_input="",
+        )
+        
+        # All 11 fields filled, should stay approval_ready
+        assert workshop["status"] == "approval_ready"

@@ -789,6 +789,35 @@ def _parse_theme_workshop_response(
         workshop["approved_at"] = None
         if not workshop["next_step_options"]:
             workshop["next_step_options"] = ["Approve this direction", "Refine the positioning", "Request another theme version"]
+    
+    # E1-S2: Server-side field-completeness validation gate
+    # Field mapping from THEME_DISCOVERY_REQUIRED_FIELDS to workshop summary keys
+    _FIELD_TO_SUMMARY_KEY = {
+        "business_background": "business_focus",
+        "objective": "business_goal",
+        "industry": "profession_name",
+        "locality": "location_focus",
+        "target_audience": "audience",
+        "persona": "customer_profile",
+        "tone": "tone",
+        "offer": "cta",
+        "channel_intent": "youtube_angle",
+        "posting_cadence": "first_content_direction",
+        "success_metrics": "positioning",
+    }
+    filled_count = sum(
+        1 for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
+        if str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+    )
+    if workshop["status"] == "approval_ready" and filled_count < 9:
+        logger.warning(
+            "LLM tried approval_ready with only %d/%d fields filled — forcing discovery",
+            filled_count, len(THEME_DISCOVERY_REQUIRED_FIELDS),
+        )
+        workshop["status"] = "discovery"
+        if not workshop["current_focus_question"]:
+            workshop["current_focus_question"] = "A few details are still needed before I can lock the strategy. What is the primary business result this content should drive?"
+    
     return master_theme or "Digital marketing activation plan", derived_themes, workshop
 
 
