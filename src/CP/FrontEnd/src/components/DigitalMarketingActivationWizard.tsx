@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
 import { DigitalMarketingArtifactPreviewCard } from './DigitalMarketingArtifactPreviewCard'
 import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
+import { YouTubePreviewCard, LinkedInPreviewCard, InstagramPreviewCard } from './PlatformPreviewCards'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
 import {
@@ -1588,7 +1589,32 @@ export function DigitalMarketingActivationWizard({
               {/* Expanded body */}
               {isExpanded ? (
                 <div style={{ padding: '0 0.75rem 0.75rem', display: 'grid', gap: '0.55rem' }}>
-                  {post.artifact_type === 'table' ? (
+                  {/* Platform-specific preview */}
+                  {post.channel === 'youtube' ? (
+                    <YouTubePreviewCard
+                      title={post.title || post.text.slice(0, 100)}
+                      text={post.text}
+                      hashtags={post.hashtags || []}
+                      thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
+                      channelName={businessLabel || 'Your Channel'}
+                    />
+                  ) : post.channel === 'linkedin' ? (
+                    <LinkedInPreviewCard
+                      title={post.title || ''}
+                      text={post.text}
+                      hashtags={post.hashtags || []}
+                      thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
+                      channelName={businessLabel || 'Your Business'}
+                    />
+                  ) : post.channel === 'instagram' ? (
+                    <InstagramPreviewCard
+                      title={post.title || ''}
+                      text={post.text}
+                      hashtags={post.hashtags || []}
+                      thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
+                      channelName={businessLabel || 'Your Page'}
+                    />
+                  ) : post.artifact_type === 'table' ? (
                     <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
                     </div>
@@ -1597,7 +1623,7 @@ export function DigitalMarketingActivationWizard({
                   )}
 
                   {/* Artifact: image inline, table as rendered markdown, script as download */}
-                  {effectiveUri && effectiveMime?.startsWith('image/') ? (
+                  {effectiveUri && effectiveMime?.startsWith('image/') && !['youtube', 'linkedin', 'instagram'].includes(post.channel || '') ? (
                     <img
                       src={effectiveUri}
                       alt={`${post.artifact_type} asset`}

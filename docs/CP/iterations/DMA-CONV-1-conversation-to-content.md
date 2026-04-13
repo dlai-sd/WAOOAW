@@ -362,7 +362,7 @@ git add -A && git commit -m "feat(DMA-CONV-1): [epic-id] — [epic title]" && gi
 | E6-S1 | 2 | Optimal posting schedule | Add posting-time recommendation based on industry and audience data | 🟢 Done | copilot/iteration-2-epics-e4-e5-e6 |
 | E7-S1 | 3 | Agent improves from performance data | Inject content_analytics recommendations into theme cycle prompt | 🟢 Done | copilot/iteration-3-epics-e7-e8-e9 |
 | E7-S2 | 3 | Agent improves from performance data | Surface performance-driven suggestions in wizard UI | 🟢 Done | copilot/iteration-3-epics-e7-e8-e9 |
-| E8-S1 | 3 | Platform-accurate content previews | Build YouTube/LinkedIn/Instagram preview components for approval UI | 🔴 Not Started | — |
+| E8-S1 | 3 | Platform-accurate content previews | Build YouTube/LinkedIn/Instagram preview components for approval UI | 🟢 Done | copilot/iteration-3-epics-e7-e8-e9 |
 | E9-S1 | 3 | Docker validation and PR | End-to-end Docker validation for conversation → content → preview → publish path | 🔴 Not Started | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
