@@ -27,7 +27,7 @@ from core.routing import waooaw_router
 from repositories.campaign_repository import CampaignRepository
 from repositories.hired_agent_repository import HiredAgentRepository
 from services.brand_voice_service import get_brand_voice
-from services.content_analytics import get_posting_time_suggestions
+from services.content_analytics import get_content_recommendations, get_posting_time_suggestions
 from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord
 
 
@@ -586,6 +586,7 @@ def _theme_workshop_prompt(
     workspace: dict[str, Any],
     campaign_setup: dict[str, Any],
     brand_voice_section: dict[str, Any] | None = None,
+    performance_insights: dict[str, Any] | None = None,
 ) -> str:
     workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
     profession_label = _infer_profession_label(workspace, workshop)
@@ -647,6 +648,7 @@ def _theme_workshop_prompt(
             },
             "pending_customer_input": pending_input,
             "brand_voice_context": brand_voice_section or {},
+            "performance_insights": performance_insights or {},
             "response_contract": {
                 "assistant_message": "One compact, high-conviction, thread-aware strategist reply in plain English. It should feel like premium live chat: warm, commercially sharp, and easy to respond to.",
                 "checkpoint_summary": "One short paragraph summarizing what is now locked.",
@@ -1186,6 +1188,22 @@ async def generate_theme_plan(
             "voice_description": brand_voice.voice_description or "",
         }
 
+    # Load performance insights for this hired agent
+    performance_insights = {}
+    try:
+        recommendations = await get_content_recommendations(
+            hired_instance_id=hired_instance_id, db=db
+        ) if db is not None else None
+        if recommendations and recommendations.avg_engagement_rate > 0:
+            performance_insights = {
+                "top_performing_dimensions": recommendations.top_dimensions,
+                "best_posting_hours": recommendations.best_posting_hours,
+                "avg_engagement_rate": recommendations.avg_engagement_rate,
+                "recommendation_summary": recommendations.recommendation_text,
+            }
+    except Exception:
+        logger.warning("Could not load performance insights — proceeding without")
+
     try:
         client = get_grok_client()
         proposal = grok_complete(
@@ -1210,12 +1228,15 @@ async def generate_theme_plan(
                 "Include `competitor_names` and `niche_keywords` in the summary. "
                 "\n\nBRAND VOICE:\n"
                 "The customer's brand voice is provided in the context. Use this exact tone, vocabulary, and messaging patterns in all conversation responses and generated content. "
+                "\n\nPERFORMANCE INSIGHTS:\n"
+                "Performance insights from previous content cycles are provided below. Use these to guide theme recommendations — favor topics and formats that drove higher engagement. "
+                "Reference specific performance data when making suggestions. "
                 "\n\nDELIVERABLE REQUEST RULE:\n"
                 "When the customer asks for any concrete deliverable (plan, table, draft, schedule), produce it immediately. Do not deflect with more questions. "
                 "\n\nAsk probing questions only until the strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. "
                 "Always return JSON matching the requested response contract."
             ),
-            user=_theme_workshop_prompt(workspace, campaign_setup, brand_voice_section),
+            user=_theme_workshop_prompt(workspace, campaign_setup, brand_voice_section, performance_insights),
             model="grok-3-latest",
             temperature=0.7,
         )

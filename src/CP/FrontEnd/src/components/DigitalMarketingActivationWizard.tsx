@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndicators'
 import { DigitalMarketingArtifactPreviewCard } from './DigitalMarketingArtifactPreviewCard'
 import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
+import { YouTubePreviewCard, LinkedInPreviewCard, InstagramPreviewCard } from './PlatformPreviewCards'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
 import {
@@ -1588,7 +1589,32 @@ export function DigitalMarketingActivationWizard({
               {/* Expanded body */}
               {isExpanded ? (
                 <div style={{ padding: '0 0.75rem 0.75rem', display: 'grid', gap: '0.55rem' }}>
-                  {post.artifact_type === 'table' ? (
+                  {/* Platform-specific preview */}
+                  {post.channel === 'youtube' ? (
+                    <YouTubePreviewCard
+                      title={post.text.slice(0, 100)}
+                      text={post.text}
+                      hashtags={post.hashtags || []}
+                      thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
+                      channelName={businessLabel || 'Your Channel'}
+                    />
+                  ) : post.channel === 'linkedin' ? (
+                    <LinkedInPreviewCard
+                      title={''}
+                      text={post.text}
+                      hashtags={post.hashtags || []}
+                      thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
+                      channelName={businessLabel || 'Your Business'}
+                    />
+                  ) : post.channel === 'instagram' ? (
+                    <InstagramPreviewCard
+                      title={''}
+                      text={post.text}
+                      hashtags={post.hashtags || []}
+                      thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
+                      channelName={businessLabel || 'Your Page'}
+                    />
+                  ) : post.artifact_type === 'table' ? (
                     <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
                     </div>
@@ -1597,7 +1623,7 @@ export function DigitalMarketingActivationWizard({
                   )}
 
                   {/* Artifact: image inline, table as rendered markdown, script as download */}
-                  {effectiveUri && effectiveMime?.startsWith('image/') ? (
+                  {effectiveUri && effectiveMime?.startsWith('image/') && !['youtube', 'linkedin', 'instagram'].includes(post.channel || '') ? (
                     <img
                       src={effectiveUri}
                       alt={`${post.artifact_type} asset`}
@@ -2672,6 +2698,45 @@ export function DigitalMarketingActivationWizard({
                         ) : null}
                       </div>
                     </div>
+
+                    {/* Performance Insights Section */}
+                    {strategyWorkshop.performance_insights && 
+                     strategyWorkshop.performance_insights.avg_engagement_rate > 0 ? (
+                      <div className="dma-performance-insights-card" data-testid="performance-insights-card">
+                        <details className="dma-performance-insights-accordion">
+                          <summary className="dma-performance-insights-summary">
+                            <Text weight="semibold" size={400}>📊 Performance Insights</Text>
+                            <Text size={300}>What's worked before</Text>
+                          </summary>
+                          <div className="dma-performance-insights-body">
+                            <div className="dma-performance-metric">
+                              <Text size={300} className="dma-performance-label">Top performing content types:</Text>
+                              <Text size={300} weight="semibold">
+                                {strategyWorkshop.performance_insights.top_performing_dimensions.join(', ') || 'N/A'}
+                              </Text>
+                            </div>
+                            <div className="dma-performance-metric">
+                              <Text size={300} className="dma-performance-label">Average engagement:</Text>
+                              <Text size={300} weight="semibold">
+                                {strategyWorkshop.performance_insights.avg_engagement_rate.toFixed(1)}%
+                              </Text>
+                            </div>
+                            <div className="dma-performance-metric">
+                              <Text size={300} className="dma-performance-label">Best posting hours (UTC):</Text>
+                              <Text size={300} weight="semibold">
+                                {strategyWorkshop.performance_insights.best_posting_hours.join(', ')}
+                              </Text>
+                            </div>
+                            {strategyWorkshop.performance_insights.recommendation_summary ? (
+                              <div className="dma-performance-recommendation">
+                                <Text size={300} className="dma-performance-label">Recommendation:</Text>
+                                <Text size={300}>{strategyWorkshop.performance_insights.recommendation_summary}</Text>
+                              </div>
+                            ) : null}
+                          </div>
+                        </details>
+                      </div>
+                    ) : null}
 
                     <div className="dma-chat-composer" data-testid="dma-chat-composer">
                       {(strategyWorkshop.next_step_options || []).length > 0 ? (

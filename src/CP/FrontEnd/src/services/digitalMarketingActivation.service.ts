@@ -69,6 +69,12 @@ export type DigitalMarketingStrategyWorkshop = {
     missing_fields: string[]
     locked_fields: Record<string, string>
   }
+  performance_insights?: {
+    top_performing_dimensions: string[]
+    best_posting_hours: number[]
+    avg_engagement_rate: number
+    recommendation_summary: string
+  }
 }
 
 export type DigitalMarketingCampaignSetup = {
