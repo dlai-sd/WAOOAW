@@ -154,10 +154,10 @@ EXECUTION ORDER:
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
 **Prerequisite evidence:**
-- Iteration 1 merge status: `[PENDING HUMAN UPDATE BEFORE LAUNCH]`
-- Iteration 1 PR: `[PR URL or #NUMBER]`
-- Merge commit on `main`: `[FULL SHA]`
-- Merged at: `[UTC TIMESTAMP]`
+- Iteration 1 merge status: **MERGED**
+- Iteration 1 PR: https://github.com/dlai-sd/WAOOAW/pull/1046
+- Merge commit on `main`: `ebba193a`
+- Merged at: 2026-04-13 UTC
 
 **Steps to launch:** same as Iteration 1 (GitHub repository → Agents tab)
 
