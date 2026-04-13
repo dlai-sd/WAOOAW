@@ -13,6 +13,7 @@ from fastapi import Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_mold.reference_agents import THEME_DISCOVERY_REQUIRED_FIELDS
 from agent_mold.skills.content_models import Campaign, CampaignWorkflowState, DailyThemeItem, estimate_cost
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.grok_client import GrokClientError, get_grok_client, grok_complete
@@ -383,7 +384,7 @@ def _normalize_workshop_messages(raw_messages: Any) -> list[dict[str, str]]:
         if role not in {"assistant", "user"} or not content:
             continue
         normalized.append({"role": role, "content": content})
-    return normalized[-4:]
+    return normalized[-12:]
 
 
 def _normalize_string_list(raw_items: Any) -> list[str]:
@@ -546,6 +547,34 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
     workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
     profession_label = _infer_profession_label(workspace, workshop)
     pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
+    
+    # Field mapping from THEME_DISCOVERY_REQUIRED_FIELDS to workshop summary keys
+    _FIELD_TO_SUMMARY_KEY = {
+        "business_background": "business_focus",
+        "objective": "business_goal",
+        "industry": "profession_name",
+        "locality": "location_focus",
+        "target_audience": "audience",
+        "persona": "customer_profile",
+        "tone": "tone",
+        "offer": "cta",
+        "channel_intent": "youtube_angle",
+        "posting_cadence": "first_content_direction",
+        "success_metrics": "positioning",
+    }
+    
+    # Compute locked and missing fields
+    summary = workshop["summary"]
+    locked_fields = {}
+    missing_fields = []
+    for req_field in THEME_DISCOVERY_REQUIRED_FIELDS:
+        summary_key = _FIELD_TO_SUMMARY_KEY.get(req_field, req_field)
+        value = str(summary.get(summary_key) or "").strip()
+        if value:
+            locked_fields[req_field] = value
+        else:
+            missing_fields.append(req_field)
+    
     return json.dumps(
         {
             "operating_mode": {
@@ -580,6 +609,13 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
                 "messages": workshop["messages"],
                 "summary": workshop["summary"],
                 "follow_up_questions": workshop["follow_up_questions"],
+                "required_fields_checklist": {
+                    "total": len(THEME_DISCOVERY_REQUIRED_FIELDS),
+                    "filled": len(locked_fields),
+                    "missing": len(missing_fields),
+                    "locked_fields": locked_fields,
+                    "missing_fields": missing_fields,
+                },
             },
             "pending_customer_input": pending_input,
             "response_contract": {
@@ -1083,8 +1119,16 @@ async def generate_theme_plan(
                 "You are the Digital Marketing Agent the customer has already hired, and you are running a live strategy conversation. "
                 "Sound like a world-class strategist inside a premium chat product: warm, confident, commercially sharp, and easy to reply to. "
                 "Do not sound like a wizard, onboarding checklist, status dashboard, or form. Lead the customer through the fewest possible questions, "
-                "extract signal quickly, and make each reply feel useful enough that the customer wants to keep going. Ask probing questions only until the "
-                "strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. Always return JSON matching the requested response contract."
+                "extract signal quickly, and make each reply feel useful enough that the customer wants to keep going. "
+                "\n\nREQUIRED FIELDS COLLECTION RULES:\n"
+                "Here are the 11 fields you must collect. When a field has a value, it is LOCKED — never ask about it again. "
+                "The required fields are: business_background, objective, industry, locality, target_audience, persona, tone, offer, channel_intent, posting_cadence, success_metrics. "
+                "When the customer gives a direct answer, lock that field and confirm in one sentence. Do NOT re-offer locked fields as next-step options. "
+                "When all 11 fields are filled, you MUST set status to approval_ready and present the master theme for approval. Do not ask more questions. "
+                "\n\nDELIVERABLE REQUEST RULE:\n"
+                "When the customer asks for any concrete deliverable (plan, table, draft, schedule), produce it immediately. Do not deflect with more questions. "
+                "\n\nAsk probing questions only until the strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. "
+                "Always return JSON matching the requested response contract."
             ),
             user=_theme_workshop_prompt(workspace, campaign_setup),
             model="grok-3-latest",
