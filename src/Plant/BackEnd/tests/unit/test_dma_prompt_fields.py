@@ -108,8 +108,9 @@ class TestE1S1PromptRewrite:
         import inspect
         
         source = inspect.getsource(generate_theme_plan)
-        # The system prompt must contain the exact O6 enforcement phrase
-        assert "produce it immediately" in source.lower()
+        # The system prompt must contain the gated deliverable rule (replaced the old "produce it immediately")
+        assert "deliverable request rule" in source.lower()
+        assert "produce the deliverable now" in source.lower()
 
 
 class TestE1S2FieldCompletenessValidation:
