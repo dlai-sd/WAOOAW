@@ -1,6 +1,49 @@
 
 ---
 
+## [2026-04-13 UTC] DMA-MEDIA-1 — Media Generation Pipeline (Phase 1)
+
+**Branch**: `docs/DMA-MEDIA-1-media-generation`
+**Plan file**: `docs/plant/iterations/DMA-MEDIA-1-media-generation.md`
+**Status**: Writing plan
+
+### Goal
+Wire real media generation into the DMA artifact pipeline: Pollinations.ai image fallback, Edge TTS narration for audio artifacts, and FFmpeg stitching (image + TTS → MP4) for video_audio artifacts. Single iteration, 6 stories, all Plant BackEnd.
+
+### Checkpoint list
+- [x] Read context files (template, grok_client.py, media_generation_tasks.py, media_artifact_store.py, Dockerfile)
+- [x] Vision intake confirmed (from previous conversation)
+- [x] Plan branch created
+- [ ] Plan skeleton committed
+- [ ] Story cards committed
+- [ ] Push & PR created
+
+---
+
+## [2026-04-13 UTC] DMA-CONV-1 — DMA Conversation-to-Content Pipeline Overhaul
+
+**Branch**: `docs/dma-conv-1-conversation-overhaul` (to be created)
+**Plan file**: `docs/CP/iterations/DMA-CONV-1-conversation-to-content.md` (to be created)
+**Status**: Vision intake — preparing plan
+
+### Goal
+Fix the DMA conversation loop so customers can brief the agent in a structured, concluding conversation → produce a master theme and supporting sub-themes → get schedule approval → generate content per approved themes → get content approval → publish approved content. The agent must stop looping, lock dimensions when the customer gives clear signals, track required-field completeness, and produce artifacts when asked.
+
+### Checkpoint list
+- [x] Deep-dive into current prompt, frontend wizard, backend API, DB schema, and content pipeline
+- [x] Gap analysis produced (Section 1: prompt/arch flaws, Section 2: industry best practices)
+- [ ] Vision intake confirmed with user
+- [ ] Plan branch created
+- [ ] Plan skeleton committed
+- [ ] Iteration 1 stories committed
+- [ ] Iteration 2 stories committed (if needed)
+- [ ] PR opened
+
+### Next save point
+After vision intake confirmation from user.
+
+---
+
 ## [2026-04-10 UTC] DMA-MEDIA-1 — implementation branch execution
 
 **Branch**: `feat/dma-media-generation-agent`
