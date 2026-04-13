@@ -2628,6 +2628,13 @@ export function DigitalMarketingActivationWizard({
                 <div className="dma-chat-header-badges">
                   <Badge appearance="outline" color={isThemeApproved ? 'success' : 'informative'}>{stageStateLabel}</Badge>
                   <Badge appearance="outline" color={readiness.can_finalize ? 'success' : 'warning'}>{completedMilestones}/5 signals locked</Badge>
+                  {strategyWorkshop.brief_progress ? (
+                    <Badge appearance="outline" color={
+                      strategyWorkshop.brief_progress.filled >= strategyWorkshop.brief_progress.total ? 'success' : 'informative'
+                    }>
+                      {strategyWorkshop.brief_progress.filled}/{strategyWorkshop.brief_progress.total} fields locked
+                    </Badge>
+                  ) : null}
                 </div>
               </div>
             </div>

@@ -809,6 +809,22 @@ def _parse_theme_workshop_response(
         1 for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
         if str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
     )
+    
+    # E2-S1: Add brief_progress to workshop dict
+    workshop["brief_progress"] = {
+        "filled": filled_count,
+        "total": len(THEME_DISCOVERY_REQUIRED_FIELDS),
+        "missing_fields": [
+            req_field for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
+            if not str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+        ],
+        "locked_fields": {
+            req_field: str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+            for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
+            if str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+        },
+    }
+    
     if workshop["status"] == "approval_ready" and filled_count < 9:
         logger.warning(
             "LLM tried approval_ready with only %d/%d fields filled — forcing discovery",

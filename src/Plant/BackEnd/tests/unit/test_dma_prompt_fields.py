@@ -189,3 +189,43 @@ class TestE1S2FieldCompletenessValidation:
         
         # All 11 fields filled, should stay approval_ready
         assert workshop["status"] == "approval_ready"
+
+
+class TestE2S1FieldProgressCounter:
+    """E2-S1: Add field-level progress counter to response contract and wizard UI"""
+
+    def test_brief_progress_with_7_filled_fields(self):
+        """E2-S1-T1: Parse a workshop response with 7 filled summary fields"""
+        raw_response = json.dumps({
+            "assistant_message": "We're making good progress.",
+            "status": "discovery",
+            "summary": {
+                "business_focus": "Fitness coaching",
+                "business_goal": "Generate leads",
+                "profession_name": "Fitness",
+                "location_focus": "Mumbai",
+                "audience": "Working professionals",
+                "customer_profile": "30-45 years",
+                "tone": "Motivational",
+                # Missing: cta, youtube_angle, first_content_direction, positioning
+            },
+            "checkpoint_summary": "Getting closer",
+            "current_focus_question": "What action should viewers take?",
+            "next_step_options": ["Continue"],
+        })
+        
+        workspace = {"brand_name": "Test"}
+        existing_workshop = {"messages": [], "summary": {}}
+        
+        master_theme, derived_themes, workshop = _parse_theme_workshop_response(
+            raw_response,
+            workspace=workspace,
+            existing_workshop=existing_workshop,
+            pending_input="",
+        )
+        
+        assert "brief_progress" in workshop
+        assert workshop["brief_progress"]["filled"] == 7
+        assert workshop["brief_progress"]["total"] == 11
+        assert len(workshop["brief_progress"]["missing_fields"]) == 4
+        assert len(workshop["brief_progress"]["locked_fields"]) == 7
