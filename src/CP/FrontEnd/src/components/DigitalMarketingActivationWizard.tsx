@@ -7,6 +7,7 @@ import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndi
 import { DigitalMarketingArtifactPreviewCard } from './DigitalMarketingArtifactPreviewCard'
 import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
 import { YouTubePreviewCard, LinkedInPreviewCard, InstagramPreviewCard } from './PlatformPreviewCards'
+import { AgentContentRenderer, ArtifactPreviewRegistry } from './rendering'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
 import {
@@ -1589,11 +1590,16 @@ export function DigitalMarketingActivationWizard({
               {/* Expanded body */}
               {isExpanded ? (
                 <div style={{ padding: '0 0.75rem 0.75rem', display: 'grid', gap: '0.55rem' }}>
-                  {/* Table artifacts get markdown rendering regardless of channel */}
+                  {/* Artifact type determines renderer via the registry; platform cards are
+                     only used for non-table, channel-specific social previews. */}
                   {post.artifact_type === 'table' ? (
-                    <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
-                    </div>
+                    <ArtifactPreviewRegistry
+                      artifactType="table"
+                      post={post}
+                      effectiveUri={effectiveUri}
+                      effectiveMime={effectiveMime}
+                      effectiveGenStatus={effectiveGenStatus}
+                    />
                   ) : post.channel === 'youtube' ? (
                     <YouTubePreviewCard
                       title={post.text.slice(0, 100)}
@@ -1619,7 +1625,7 @@ export function DigitalMarketingActivationWizard({
                       channelName={businessLabel || 'Your Page'}
                     />
                   ) : (
-                    <div style={{ lineHeight: 1.55, fontSize: '0.9rem' }}>{post.text}</div>
+                    <AgentContentRenderer content={post.text} />
                   )}
 
                   {/* Artifact: image inline, table as rendered markdown, script as download */}
@@ -1849,11 +1855,9 @@ export function DigitalMarketingActivationWizard({
                   {isExpanded ? (
                     <div style={{ padding: '0.75rem 0.85rem', display: 'grid', gap: '0.6rem' }}>
                       {post.artifact_type === 'table' ? (
-                        <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
-                        </div>
+                        <ArtifactPreviewRegistry artifactType="table" post={post} />
                       ) : (
-                        <div style={{ lineHeight: 1.5, fontSize: '0.9rem' }}>{post.text}</div>
+                        <AgentContentRenderer content={post.text} />
                       )}
 
                       {renderOutputItemArtifact(post)}

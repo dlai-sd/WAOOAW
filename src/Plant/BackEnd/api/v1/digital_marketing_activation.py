@@ -23,6 +23,7 @@ from api.v1 import campaigns as campaigns_module
 from api.v1 import hired_agents_simple
 from api.v1.platform_connections import get_connected_platform_connection
 from core.logging import PiiMaskingFilter
+from services.agent_response_validator import detect_filler
 from core.routing import waooaw_router
 from repositories.campaign_repository import CampaignRepository
 from repositories.hired_agent_repository import HiredAgentRepository
@@ -837,6 +838,12 @@ def _parse_theme_workshop_response(
         payload.get("assistant_message") or (master_theme if derived_themes else fallback_message),
         fallback_message,
     )
+    # Filler gate: if the LLM returned conversational fluff instead of actionable
+    # guidance, replace with the deterministic fallback so the user gets a real
+    # next-step instead of "I'm thrilled to present…" prose.
+    if detect_filler(assistant_message):
+        logger.info("Filler detected in LLM assistant_message, using fallback")
+        assistant_message = fallback_message
     workshop = _normalize_strategy_workshop(payload.get("strategy_workshop") or payload, workspace)
 
     if pending_input:
