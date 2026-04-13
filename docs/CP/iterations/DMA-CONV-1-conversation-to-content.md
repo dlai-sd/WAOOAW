@@ -405,11 +405,11 @@ All three epics are independent of each other and can execute in parallel, but w
 
 **What to do (self-contained):**
 
-The current system prompt in `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` lines 1088-1094 tells the LLM to "move to approval_ready as soon as coherent" but never defines what coherent means. The 11 required fields exist in `src/Plant/BackEnd/agent_mold/reference_agents.py` lines 52-63 (`THEME_DISCOVERY_REQUIRED_FIELDS`) but are never mentioned in the prompt. The message history is truncated to the last 4 messages (line 388 `normalized[-4:]`) which causes the agent to forget earlier answers.
+The current system prompt in `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` lines 1082-1088 tells the LLM to "Ask probing questions only until the strategy is strong enough for approval, then return a clear master theme" but never defines what "strong enough" means — there is no checklist of required fields. The 11 required fields exist in `src/Plant/BackEnd/agent_mold/reference_agents.py` lines 52-63 (`THEME_DISCOVERY_REQUIRED_FIELDS`) but are never mentioned in the prompt. The message history is truncated to the last 4 messages (line 388 `normalized[-4:]`) which causes the agent to forget earlier answers.
 
 Changes:
 1. In `_theme_workshop_prompt()` (line 533), inject the `THEME_DISCOVERY_REQUIRED_FIELDS` list into the prompt payload as a `required_fields_checklist` with current fill status (filled/empty for each field based on the workshop summary).
-2. In the system prompt (line 1088), add explicit rules: (a) "Here are the 11 fields you must collect. When a field has a value, it is LOCKED — never ask about it again." (b) "When the customer gives a direct answer, lock that field and confirm in one sentence. Do NOT re-offer locked fields as next-step options." (c) "When all 11 fields are filled, you MUST set status to approval_ready and present the master theme for approval. Do not ask more questions." (d) "When the customer asks for any concrete deliverable (plan, table, draft, schedule), produce it immediately. Do not deflect with more questions."
+2. In the system prompt (line 1082), add explicit rules: (a) "Here are the 11 fields you must collect. When a field has a value, it is LOCKED — never ask about it again." (b) "When the customer gives a direct answer, lock that field and confirm in one sentence. Do NOT re-offer locked fields as next-step options." (c) "When all 11 fields are filled, you MUST set status to approval_ready and present the master theme for approval. Do not ask more questions." (d) "When the customer asks for any concrete deliverable (plan, table, draft, schedule), produce it immediately. Do not deflect with more questions."
 3. Change `_normalize_workshop_messages()` line 388 from `normalized[-4:]` to `normalized[-12:]` so the LLM retains more conversation context.
 4. In the `workshop_state` section of the prompt payload, add `locked_fields` (dict of field_name → value for all non-empty fields) and `missing_fields` (list of field names still empty) derived from the workshop summary.
 
@@ -417,14 +417,14 @@ Changes:
 
 | File | Lines | What to look for |
 |---|---|---|
-| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 375-395, 480-620, 1080-1130 | `_normalize_workshop_messages` truncation, `_theme_workshop_prompt` payload construction, system prompt text |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 373-390, 545-620, 1078-1100 | `_normalize_workshop_messages` truncation (L373, returns `normalized[-4:]` at L387), `_theme_workshop_prompt` payload construction (L545), system prompt text (L1082) |
 | `src/Plant/BackEnd/agent_mold/reference_agents.py` | 52-63 | `THEME_DISCOVERY_REQUIRED_FIELDS` list |
 
 **Files to create / modify:**
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | 1. Line 388: change `normalized[-4:]` to `normalized[-12:]`. 2. In `_theme_workshop_prompt()`: add `required_fields_checklist`, `locked_fields`, `missing_fields` to the JSON payload under `workshop_state`. 3. In `generate_theme_plan()` system prompt (line 1088): add the four rules listed above. |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | 1. Line 387: change `normalized[-4:]` to `normalized[-12:]`. 2. In `_theme_workshop_prompt()`: add `required_fields_checklist`, `locked_fields`, `missing_fields` to the JSON payload under `workshop_state`. 3. In `generate_theme_plan()` system prompt (line 1088): add the four rules listed above. |
 
 **Code patterns to copy exactly:**
 
@@ -894,14 +894,14 @@ All three epics are independent of each other, but within E4 and E5, stories are
 Changes:
 1. In `_theme_workshop_prompt()`, load the customer's brand voice via `brand_voice_service.get_brand_voice()` and inject it into the prompt payload as a `brand_voice_context` section.
 2. Add a system prompt instruction: "Use this brand voice throughout the conversation and generated content. Match tone, vocabulary, and messaging patterns exactly."
-3. In `src/Plant/BackEnd/agent_mold/skills/content_creator.py`, in `generate_posts_for_theme()`, load brand voice and pass it as the `brand_voice_context` parameter (already exists as empty string).
+3. In `src/Plant/BackEnd/agent_mold/skills/content_creator.py`, in `generate_theme_list()` (not `generate_posts_for_theme`), pass brand voice as the `brand_voice_context: str` parameter (already exists as empty string default). Note: `generate_posts_for_theme()` takes a `PostGeneratorInput` object — do NOT add loose keyword arguments to it.
 
 **Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
 | `src/Plant/BackEnd/services/brand_voice_service.py` | 1-42 | `get_brand_voice(customer_id, db)` signature and return shape |
-| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 1-50, 180-220 | `generate_posts_for_theme()` brand_voice_context parameter |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 75-120 | `generate_theme_list()` (L78) has `brand_voice_context: str = ""` param. `generate_posts_for_theme(inp: PostGeneratorInput)` (L107) takes a Pydantic input — no loose kwargs |
 | `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 533-620 | `_theme_workshop_prompt()` — where to add brand voice |
 
 **Files to create / modify:**
@@ -909,7 +909,7 @@ Changes:
 | File | Action | Precise instruction |
 |---|---|---|
 | `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In `_theme_workshop_prompt()`: call `brand_voice_service.get_brand_voice(customer_id, db)` where `customer_id` is extracted from the hired agent relation. If a brand voice exists, add a `brand_voice_context` section to the prompt payload with the tone_keywords, vocabulary_preferences, messaging_patterns, example_phrases, and voice_description. In the system prompt, add: "The customer's brand voice is provided. Use this exact tone, vocabulary, and messaging patterns in all conversation responses and generated content." |
-| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | In `generate_posts_for_theme()`: accept a `db` session and `customer_id` parameter. If `brand_voice_context` is empty, load it from `brand_voice_service.get_brand_voice(customer_id, db)` and format it as a summary string. |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | In `generate_theme_list()` (L78): the `brand_voice_context: str = ""` param already exists. At the call site in `digital_marketing_activation.py` where `generate_theme_list()` is invoked, format the loaded BrandVoiceModel into a summary string and pass it as `brand_voice_context`. Do NOT modify `generate_posts_for_theme()` — it takes `PostGeneratorInput`, not loose kwargs. |
 
 **Code patterns to copy exactly:**
 
@@ -936,7 +936,7 @@ if brand_voice:
 **Acceptance criteria:**
 1. When a customer has a saved brand voice, the DMA prompt payload includes `brand_voice_context` with all five fields.
 2. When no brand voice exists, `brand_voice_context` is an empty dict (graceful degradation).
-3. Content generation in `generate_posts_for_theme()` uses brand voice when available.
+3. Content generation in `generate_theme_list()` uses brand voice when available via its existing `brand_voice_context: str` parameter.
 4. All existing tests pass.
 
 **Tests to write:**
@@ -1079,36 +1079,40 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_market_context.py -v
 
 After discovery captures `competitor_names` and `niche_keywords`, the content generation pipeline in `content_creator.py` should use these to produce more targeted hashtags and SEO keywords in each post.
 
+**Important:** `generate_posts_for_theme()` takes `PostGeneratorInput` (a Pydantic model), not loose keyword arguments. The niche/competitor context must be added to `PostGeneratorInput` or injected via the existing prompt-construction path in the `_grok_posts()` / `_deterministic_posts()` internal methods.
+
 Changes:
-1. In `content_creator.py` → `generate_posts_for_theme()`, accept new parameters `niche_keywords: list[str] = []` and `competitor_context: list[str] = []`.
-2. In the post-generation prompt sent to Grok, include: "Use these niche keywords where relevant: {niche_keywords}. Differentiate from these competitors: {competitor_context}. Include 3-5 niche-specific hashtags per post."
-3. In `digital_marketing_activation.py`, when calling `generate_posts_for_theme()`, pass the `niche_keywords` and `competitor_names` from the workshop summary.
+1. In `content_creator.py`, add `niche_keywords: list[str] = []` and `competitor_context: list[str] = []` fields to the `PostGeneratorInput` model (in `content_models.py`).
+2. In `_grok_posts()` (the internal method that builds the Grok prompt for post generation), read `inp.niche_keywords` and `inp.competitor_context` and include: "Use these niche keywords where relevant: {niche_keywords}. Differentiate from these competitors: {competitor_context}. Include 3-5 niche-specific hashtags per post."
+3. In `digital_marketing_activation.py`, when building the `PostGeneratorInput` object, populate `niche_keywords` and `competitor_context` from the workshop summary.
 
 **Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
-| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 180-298 | `generate_posts_for_theme()` — prompt construction, params |
-| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 280-320 | Where `generate_posts_for_theme()` is called |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 107-160 | `generate_posts_for_theme(inp: PostGeneratorInput)` and internal `_grok_posts()` — prompt construction |
+| `src/Plant/BackEnd/agent_mold/skills/content_models.py` | 1-60 | `PostGeneratorInput` model definition — where to add niche_keywords and competitor_context fields |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 280-320 | Where `PostGeneratorInput` is constructed and passed to `generate_posts_for_theme()` |
 
 **Files to create / modify:**
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | Add `niche_keywords: list[str] = []` and `competitor_context: list[str] = []` params to `generate_posts_for_theme()`. Inject into the Grok prompt. |
-| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | At the call site of `generate_posts_for_theme()`, extract `niche_keywords` and `competitor_names` from workshop summary and pass them. |
+| `src/Plant/BackEnd/agent_mold/skills/content_models.py` | modify | Add `niche_keywords: list[str] = []` and `competitor_context: list[str] = []` fields to the `PostGeneratorInput` model. |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | In `_grok_posts()`, read `inp.niche_keywords` and `inp.competitor_context` and inject into the Grok prompt. |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | At the site where `PostGeneratorInput` is constructed, populate `niche_keywords` and `competitor_context` from workshop summary. |
 
 **Acceptance criteria:**
-1. `generate_posts_for_theme()` accepts and uses niche_keywords and competitor_context.
-2. The Grok prompt for post generation includes the niche keywords and competitor names.
+1. `PostGeneratorInput` model has `niche_keywords` and `competitor_context` fields.
+2. The Grok prompt for post generation (in `_grok_posts()`) includes the niche keywords and competitor names when populated.
 3. Existing tests pass.
 
 **Tests to write:**
 
 | Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| E5-S2-T1 | `src/Plant/BackEnd/tests/unit/test_dma_market_context.py` | Call `generate_posts_for_theme()` with `niche_keywords=["ai tutoring", "edtech"]` | The prompt sent to Grok contains "ai tutoring" and "edtech" |
-| E5-S2-T2 | same | Call with empty lists | Prompt does not contain "niche keywords" section (graceful degradation) |
+| E5-S2-T1 | `src/Plant/BackEnd/tests/unit/test_dma_market_context.py` | Build a `PostGeneratorInput` with `niche_keywords=["ai tutoring", "edtech"]`, call `_grok_posts()` | The prompt sent to Grok contains "ai tutoring" and "edtech" |
+| E5-S2-T2 | same | Build `PostGeneratorInput` with empty lists | Prompt does not contain "niche keywords" section (graceful degradation) |
 
 **Test command:**
 ```bash
@@ -1117,7 +1121,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_market_context.py -v
 
 **Commit message:** `feat(DMA-CONV-1): E5-S2 — niche hashtags and SEO in content generation`
 
-**Done signal:** `"E5-S2 done. Changed: content_creator.py, digital_marketing_activation.py. Tests: T1 ✅ T2 ✅"`
+**Done signal:** `"E5-S2 done. Changed: content_models.py, content_creator.py, digital_marketing_activation.py. Tests: T1 ✅ T2 ✅"`
 
 ---
 
@@ -1255,10 +1259,10 @@ E7 and E8 are independent. E9 depends on both.
 
 **What to do (self-contained):**
 
-`content_analytics.py` already has `get_content_recommendations(hired_agent_id, db)` which returns `top_dimensions`, `best_posting_hours`, `avg_engagement_rate`, and `recommendation_text` from `PerformanceStatModel`. This data is never fed back into the DMA conversation prompt.
+`content_analytics.py` already has `get_content_recommendations(hired_instance_id, db)` which returns `top_dimensions`, `best_posting_hours`, `avg_engagement_rate`, and `recommendation_text` from `PerformanceStatModel`. This data is never fed back into the DMA conversation prompt.
 
 Changes:
-1. In `_theme_workshop_prompt()`, when the hired agent has performance history (PerformanceStatModel records exist), call `get_content_recommendations(hired_agent_id, db)` and inject the results into the prompt payload as a `performance_insights` section.
+1. In `_theme_workshop_prompt()`, when the hired agent has performance history (PerformanceStatModel records exist), call `get_content_recommendations(hired_instance_id=hired_agent.id, db=db)` and inject the results into the prompt payload as a `performance_insights` section.
 2. In the system prompt, add: "Performance insights from previous content cycles are provided below. Use these to guide theme recommendations — favor topics and formats that drove higher engagement. Reference specific performance data when making suggestions."
 3. When no performance data exists (new customer), omit the section gracefully.
 
@@ -1274,7 +1278,7 @@ Changes:
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In `_theme_workshop_prompt()`: call `get_content_recommendations(hired_agent_id, db)`. If results exist and `avg_engagement_rate > 0`, add `performance_insights` section to the prompt payload. Add system prompt instruction to use performance data. |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In `_theme_workshop_prompt()`: call `get_content_recommendations(hired_instance_id=hired_agent.id, db=db)`. If results exist and `avg_engagement_rate > 0`, add `performance_insights` section to the prompt payload. Add system prompt instruction to use performance data. |
 
 **Code patterns to copy exactly:**
 
@@ -1286,7 +1290,7 @@ from services.content_analytics import get_content_recommendations
 performance_insights = {}
 try:
     recommendations = await get_content_recommendations(
-        hired_agent_id=hired_agent.id, db=db
+        hired_instance_id=hired_agent.id, db=db
     )
     if recommendations and recommendations.get("avg_engagement_rate", 0) > 0:
         performance_insights = {
