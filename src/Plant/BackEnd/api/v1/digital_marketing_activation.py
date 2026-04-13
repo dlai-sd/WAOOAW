@@ -40,6 +40,32 @@ logger.addFilter(PiiMaskingFilter())
 _WORKSPACE_KEY = "digital_marketing_activation"
 _DIGITAL_MARKETING_AGENT_TYPE = "marketing.digital_marketing.v1"
 
+# Bare-minimum fields required before the DMA can generate a rough theme draft.
+# The full 11 fields are needed for approval_ready, but these 5 unlock early drafts.
+CORE_REQUIRED_FIELDS: list[str] = [
+    "industry",
+    "locality",
+    "target_audience",
+    "objective",
+    "offer",
+]
+
+# Human-readable purpose for each field — sent to the LLM so it can explain
+# *why* each piece of information matters (not just demand it).
+_FIELD_PURPOSE: dict[str, str] = {
+    "business_background": "So your content reflects what you actually do, not generic marketing.",
+    "objective": "So every theme drives a specific result — leads, bookings, trust — not random content.",
+    "industry": "So the strategy uses the right language, trends, and competitor context for your field.",
+    "locality": "So the content targets your actual catchment area and local search terms.",
+    "target_audience": "So every post speaks to the right customer segment, not everyone.",
+    "persona": "So the content tone and examples match your ideal customer's life-stage and motivation.",
+    "tone": "So the brand voice feels consistent and intentional across all content.",
+    "offer": "So each post has a clear call-to-action tied to something you actually sell.",
+    "channel_intent": "So the content format and style match the platform you chose (e.g. YouTube vs Instagram).",
+    "posting_cadence": "So the theme calendar has the right number of slots and pacing.",
+    "success_metrics": "So we can measure whether the content is working and adjust.",
+}
+
 # Canonical mapping from THEME_DISCOVERY_REQUIRED_FIELDS to workshop summary keys.
 # Defined once at module level to avoid drift between prompt construction and validation.
 _FIELD_TO_SUMMARY_KEY: dict[str, str] = {
@@ -167,7 +193,7 @@ def _detect_generation_intent(
         return True, requested_artifact_types
 
     # Pure approval signal when strategy is ready — generate table by default
-    if has_approval_signal and workshop_status in {"approval_ready", "approved"}:
+    if has_approval_signal and workshop_status in {"approval_ready", "approved", "draft_ready"}:
         # Default to table if no specific artifact mentioned
         return True, requested_artifact_types or [ArtifactType.TABLE]
 
@@ -644,6 +670,11 @@ def _theme_workshop_prompt(
                     "missing": len(missing_fields),
                     "locked_fields": locked_fields,
                     "missing_fields": missing_fields,
+                    "core_fields": CORE_REQUIRED_FIELDS,
+                    "core_filled": [f for f in CORE_REQUIRED_FIELDS if f in locked_fields],
+                    "core_missing": [f for f in CORE_REQUIRED_FIELDS if f not in locked_fields],
+                    "can_generate_draft": len([f for f in CORE_REQUIRED_FIELDS if f in locked_fields]) >= 5,
+                    "field_purposes": {f: _FIELD_PURPOSE.get(f, "") for f in missing_fields},
                 },
             },
             "pending_customer_input": pending_input,
@@ -845,14 +876,42 @@ def _parse_theme_workshop_response(
         },
     }
     
+    # Count how many CORE fields are filled (for draft-readiness)
+    core_filled_count = sum(
+        1 for req_field in CORE_REQUIRED_FIELDS
+        if str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+    )
+    workshop["brief_progress"]["core_filled_count"] = core_filled_count
+    workshop["brief_progress"]["can_generate_draft"] = core_filled_count >= len(CORE_REQUIRED_FIELDS)
+
     if workshop["status"] == "approval_ready" and filled_count < 9:
-        logger.warning(
-            "LLM tried approval_ready with only %d/%d fields filled — forcing discovery",
-            filled_count, len(THEME_DISCOVERY_REQUIRED_FIELDS),
-        )
-        workshop["status"] = "discovery"
-        if not workshop["current_focus_question"]:
-            workshop["current_focus_question"] = "A few details are still needed before I can lock the strategy. What is the primary business result this content should drive?"
+        # If all 5 core fields are filled, allow "draft_ready" — a middle state
+        # where the DMA can produce a rough theme calendar but not final approval.
+        if core_filled_count >= len(CORE_REQUIRED_FIELDS):
+            logger.info(
+                "LLM tried approval_ready with %d/%d fields (%d/%d core) — allowing draft_ready",
+                filled_count, len(THEME_DISCOVERY_REQUIRED_FIELDS),
+                core_filled_count, len(CORE_REQUIRED_FIELDS),
+            )
+            workshop["status"] = "draft_ready"
+        else:
+            core_missing = [
+                f for f in CORE_REQUIRED_FIELDS
+                if not str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(f, f)) or "").strip()
+            ]
+            logger.warning(
+                "LLM tried approval_ready with only %d/%d fields filled (core missing: %s) — forcing discovery",
+                filled_count, len(THEME_DISCOVERY_REQUIRED_FIELDS), core_missing,
+            )
+            workshop["status"] = "discovery"
+            missing_explanations = "; ".join(
+                f"{f}: {_FIELD_PURPOSE.get(f, '')}" for f in core_missing[:3]
+            )
+            if not workshop["current_focus_question"]:
+                workshop["current_focus_question"] = (
+                    f"To build your content calendar I still need: {', '.join(core_missing)}. "
+                    f"{missing_explanations}. Which of these can you share first?"
+                )
     
     return master_theme or "Digital marketing activation plan", derived_themes, workshop
 
@@ -1231,8 +1290,29 @@ async def generate_theme_plan(
                 "\n\nPERFORMANCE INSIGHTS:\n"
                 "Performance insights from previous content cycles are provided below. Use these to guide theme recommendations — favor topics and formats that drove higher engagement. "
                 "Reference specific performance data when making suggestions. "
-                "\n\nDELIVERABLE REQUEST RULE:\n"
-                "When the customer asks for any concrete deliverable (plan, table, draft, schedule), produce it immediately. Do not deflect with more questions. "
+                "\n\nDELIVERABLE REQUEST RULE (MANDATORY — READ CAREFULLY):\n"
+                "When the customer asks for a concrete deliverable (plan, table, draft, schedule, themes, calendar):\n"
+                "1. Check the required_fields_checklist in the context below.\n"
+                "2. If 5 or more CORE fields are filled (industry, locality, target_audience, objective, offer), "
+                "produce the deliverable NOW — return master_theme and 2-4 derived_themes in the JSON response. "
+                "Use reasonable defaults for any still-missing non-core fields and note what you assumed.\n"
+                "3. If fewer than 5 core fields are filled, tell the customer clearly: "
+                "'To build your content calendar I need [list the missing core fields]. Here is why each matters: [one line per field from the field_purposes below].' "
+                "Then ask for the most important missing field. Do NOT produce empty themes or filler text.\n"
+                "4. NEVER respond with just conversational text like 'I would be happy to provide...' when a deliverable is requested. "
+                "Either produce the deliverable or state exactly what is missing.\n"
+                "\n\nFIELD PURPOSE REFERENCE (use when explaining why a field is needed):\n"
+                "- industry: So the strategy uses the right language, trends, and competitor context.\n"
+                "- locality: So content targets your actual catchment area and local search terms.\n"
+                "- target_audience: So every post speaks to the right customer, not everyone.\n"
+                "- objective: So every theme drives a specific result, not random content.\n"
+                "- offer: So each post has a clear call-to-action tied to what you sell.\n"
+                "- persona: So content matches your ideal customer's life-stage and motivation.\n"
+                "- tone: So brand voice is consistent across all content.\n"
+                "- channel_intent: So content format matches the chosen platform.\n"
+                "- posting_cadence: So the calendar has the right pacing.\n"
+                "- success_metrics: So we can measure and adjust.\n"
+                "- business_background: So content reflects what you actually do.\n"
                 "\n\nAsk probing questions only until the strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. "
                 "Always return JSON matching the requested response contract."
             ),
@@ -1287,7 +1367,68 @@ async def generate_theme_plan(
         pending_input,
         workshop_status=strategy_workshop.get("status", "discovery"),
     )
-    if should_generate and master_theme:
+    # Also allow generation when workshop is draft_ready (5+ core fields)
+    if not should_generate and strategy_workshop.get("status") == "draft_ready":
+        # Check if the pending input mentions a deliverable
+        should_generate, artifact_types = _detect_generation_intent(
+            pending_input,
+            workshop_status="approval_ready",  # Treat draft_ready like approval_ready for intent
+        )
+
+    # If we should generate a TABLE but derived_themes are empty, generate them now
+    if should_generate and ArtifactType.TABLE in artifact_types and not derived_themes:
+        brief = strategy_workshop.get("brief_progress", {})
+        core_filled = brief.get("core_filled_count", 0)
+        if core_filled >= len(CORE_REQUIRED_FIELDS):
+            # Second targeted LLM call: "generate themes from what we have"
+            try:
+                summary_snapshot = strategy_workshop.get("summary", {})
+                theme_gen_prompt = (
+                    f"Generate a content theme calendar for this business. Return ONLY JSON with "
+                    f"master_theme (string) and derived_themes (array of 2-4 objects with title, description, frequency, pillar).\n\n"
+                    f"Business: {summary_snapshot.get('profession_name', '')} in {summary_snapshot.get('location_focus', '')}\n"
+                    f"Audience: {summary_snapshot.get('audience', '')}\n"
+                    f"Goal: {summary_snapshot.get('business_goal', '')}\n"
+                    f"Offer: {summary_snapshot.get('cta', '')}\n"
+                    f"Tone: {summary_snapshot.get('tone', 'professional')}\n"
+                    f"Channel: {summary_snapshot.get('youtube_angle', 'YouTube')}\n"
+                    f"Brand: {workspace.get('brand_name', '')}"
+                )
+                theme_json_str = grok_complete(
+                    client,
+                    system="You are a content strategist. Return ONLY valid JSON with master_theme and derived_themes. No conversational text.",
+                    user=theme_gen_prompt,
+                    model="grok-3-latest",
+                    temperature=0.5,
+                )
+                import json as _json
+                theme_data = _json.loads(theme_json_str)
+                derived_themes = _normalize_derived_themes(theme_data.get("derived_themes", []))
+                if derived_themes:
+                    master_theme = str(theme_data.get("master_theme") or master_theme)
+                    # Persist the newly generated themes
+                    campaign_id = await _persist_theme_plan_to_campaign(
+                        record=record, workspace=workspace,
+                        master_theme=master_theme, derived_themes=derived_themes,
+                        campaign_setup=campaign_setup, db=db,
+                    )
+                    persisted_workspace = _build_theme_plan_workspace(
+                        workspace=workspace,
+                        campaign_setup={**campaign_setup, "strategy_workshop": strategy_workshop,
+                                        "master_theme": master_theme, "derived_themes": derived_themes},
+                        campaign_id=campaign_id,
+                        master_theme=master_theme,
+                        derived_themes=derived_themes,
+                    )
+                    if db is not None:
+                        await db.commit()
+                    logger.info("Generated themes via targeted LLM call for table intent, %d themes", len(derived_themes))
+            except Exception as exc:
+                logger.warning("Targeted theme generation for table intent failed: %s", exc)
+
+    # Only auto-generate when the workshop has enough field coverage
+    ws_status = strategy_workshop.get("status", "discovery")
+    if should_generate and master_theme and ws_status in ("draft_ready", "approval_ready", "approved"):
         try:
             auto_draft = await _build_auto_draft(
                 record=record,
