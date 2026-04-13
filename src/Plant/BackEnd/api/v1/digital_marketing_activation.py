@@ -26,6 +26,7 @@ from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 from repositories.campaign_repository import CampaignRepository
 from repositories.hired_agent_repository import HiredAgentRepository
+from services.brand_voice_service import get_brand_voice
 from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord
 
 
@@ -579,7 +580,11 @@ def _profession_flavor(label: str) -> str:
     )
 
 
-def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, Any]) -> str:
+def _theme_workshop_prompt(
+    workspace: dict[str, Any],
+    campaign_setup: dict[str, Any],
+    brand_voice_section: dict[str, Any] | None = None,
+) -> str:
     workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
     profession_label = _infer_profession_label(workspace, workshop)
     pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
@@ -639,6 +644,7 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
                 },
             },
             "pending_customer_input": pending_input,
+            "brand_voice_context": brand_voice_section or {},
             "response_contract": {
                 "assistant_message": "One compact, high-conviction, thread-aware strategist reply in plain English. It should feel like premium live chat: warm, commercially sharp, and easy to respond to.",
                 "checkpoint_summary": "One short paragraph summarizing what is now locked.",
@@ -1163,6 +1169,18 @@ async def generate_theme_plan(
     existing_workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
     pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
 
+    # Load brand voice for this customer
+    brand_voice = await get_brand_voice(customer_id=str(record.customer_id), db=db) if db is not None else None
+    brand_voice_section = {}
+    if brand_voice:
+        brand_voice_section = {
+            "tone_keywords": brand_voice.tone_keywords or [],
+            "vocabulary_preferences": brand_voice.vocabulary_preferences or [],
+            "messaging_patterns": brand_voice.messaging_patterns or [],
+            "example_phrases": brand_voice.example_phrases or [],
+            "voice_description": brand_voice.voice_description or "",
+        }
+
     try:
         client = get_grok_client()
         proposal = grok_complete(
@@ -1177,12 +1195,14 @@ async def generate_theme_plan(
                 "The required fields are: business_background, objective, industry, locality, target_audience, persona, tone, offer, channel_intent, posting_cadence, success_metrics. "
                 "When the customer gives a direct answer, lock that field and confirm in one sentence. Do NOT re-offer locked fields as next-step options. "
                 "When all 11 fields are filled, you MUST set status to approval_ready and present the master theme for approval. Do not ask more questions. "
+                "\n\nBRAND VOICE:\n"
+                "The customer's brand voice is provided in the context. Use this exact tone, vocabulary, and messaging patterns in all conversation responses and generated content. "
                 "\n\nDELIVERABLE REQUEST RULE:\n"
                 "When the customer asks for any concrete deliverable (plan, table, draft, schedule), produce it immediately. Do not deflect with more questions. "
                 "\n\nAsk probing questions only until the strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. "
                 "Always return JSON matching the requested response contract."
             ),
-            user=_theme_workshop_prompt(workspace, campaign_setup),
+            user=_theme_workshop_prompt(workspace, campaign_setup, brand_voice_section),
             model="grok-3-latest",
             temperature=0.7,
         )
