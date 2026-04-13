@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent_mold.skills.content_creator import ContentCreatorProcessor
+from agent_mold.skills.content_creator import ContentCreatorSkill
 from agent_mold.skills.content_models import (
     Campaign,
     CampaignBrief,
@@ -79,8 +79,8 @@ class TestCompetitorNicheDiscovery:
 class TestNicheHashtagInjection:
     """E5-S2: Niche hashtags and SEO keywords in content generation."""
 
-    @patch("agent_mold.skills.content_creator.grok_complete")
-    @patch("agent_mold.skills.content_creator.get_grok_client")
+    @patch("agent_mold.skills.grok_client.grok_complete")
+    @patch("agent_mold.skills.grok_client.get_grok_client")
     def test_grok_posts_includes_niche_keywords(self, mock_get_client, mock_grok_complete):
         """E5-S2-T1: The prompt sent to Grok contains niche keywords."""
         mock_get_client.return_value = MagicMock()
@@ -126,7 +126,7 @@ class TestNicheHashtagInjection:
             competitor_context=["Khan Academy"],
         )
 
-        processor = ContentCreatorProcessor()
+        processor = ContentCreatorSkill()
         posts = processor._grok_posts(inp)
 
         # Verify grok_complete was called with niche keywords in the prompt
@@ -136,8 +136,8 @@ class TestNicheHashtagInjection:
         assert "ai tutoring" in user_prompt.lower()
         assert "edtech" in user_prompt.lower()
 
-    @patch("agent_mold.skills.content_creator.grok_complete")
-    @patch("agent_mold.skills.content_creator.get_grok_client")
+    @patch("agent_mold.skills.grok_client.grok_complete")
+    @patch("agent_mold.skills.grok_client.get_grok_client")
     def test_grok_posts_graceful_without_niche_keywords(self, mock_get_client, mock_grok_complete):
         """E5-S2-T2: Prompt does not break when niche_keywords is empty."""
         mock_get_client.return_value = MagicMock()
@@ -183,7 +183,7 @@ class TestNicheHashtagInjection:
             competitor_context=[],
         )
 
-        processor = ContentCreatorProcessor()
+        processor = ContentCreatorSkill()
         posts = processor._grok_posts(inp)
 
         # Verify it doesn't crash and produces posts

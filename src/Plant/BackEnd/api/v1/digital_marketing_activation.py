@@ -27,6 +27,7 @@ from core.routing import waooaw_router
 from repositories.campaign_repository import CampaignRepository
 from repositories.hired_agent_repository import HiredAgentRepository
 from services.brand_voice_service import get_brand_voice
+from services.content_analytics import get_posting_time_suggestions
 from services.draft_batches import DatabaseDraftBatchStore, DraftBatchRecord, DraftPostRecord
 
 
@@ -99,6 +100,7 @@ class ThemePlanResponse(BaseModel):
     workspace: dict[str, Any] = Field(default_factory=dict)
     # Populated when the customer's message triggers content generation directly from chat
     auto_generated_draft: Optional[dict[str, Any]] = None
+    posting_time_suggestions: list[dict[str, str]] = Field(default_factory=list)
 
 
 @lru_cache(maxsize=1)
@@ -1295,12 +1297,22 @@ async def generate_theme_plan(
         except Exception as exc:
             logger.warning("Auto-draft generation failed: %s", exc)
 
+    # Surface posting-time suggestions when workshop is near scheduling
+    posting_suggestions: list[dict[str, str]] = []
+    workshop_status = strategy_workshop.get("status", "discovery")
+    summary = strategy_workshop.get("summary") or {}
+    filled_count = sum(1 for v in summary.values() if v)
+    if workshop_status == "approval_ready" or filled_count >= 9:
+        industry = str(summary.get("industry") or workspace.get("industry") or "marketing")
+        posting_suggestions = await get_posting_time_suggestions(industry)
+
     return ThemePlanResponse(
         campaign_id=campaign_id,
         master_theme=master_theme,
         derived_themes=derived_themes,
         workspace=persisted_workspace,
         auto_generated_draft=auto_draft,
+        posting_time_suggestions=posting_suggestions,
     )
 
 
