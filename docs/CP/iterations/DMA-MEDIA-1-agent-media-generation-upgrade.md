@@ -42,6 +42,7 @@ If a story does not improve DMA value delivery, DMA enablement, or runtime safet
 - This plan is now the live implementation tracker, not just a planning artifact.
 - Checkpoint commits must update this section and the Tracking Table before moving to the next story or epic.
 - The execution branch was created from `origin/main` after merge of PR `#1034` so implementation starts from the approved plan state.
+- **2026-04-13**: Reviewed against PR #1052 (`fix/dma-prompt-table-generation`). No file conflicts. Upstream dependency and `draft_ready` normalization defect recorded in new plan section.
 
 ---
 
@@ -67,6 +68,25 @@ If a story does not improve DMA value delivery, DMA enablement, or runtime safet
 | Image promotion | No environment-specific URIs or credentials baked into code or Dockerfiles. |
 | Observability | New generation jobs and storage calls must be traceable with correlation IDs, structured logs, and metrics. |
 | DMA-first scope | Build the minimal platform shape that unlocks DMA artifacts now; defer generalized marketplace-wide media tooling. |
+
+---
+
+## Upstream Dependency — PR #1052 (fix/dma-prompt-table-generation)
+
+> Added 2026-04-13 after plan execution was complete.
+
+PR #1052 modifies `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` — the DMA conversation handler — which is the primary caller of the artifact pipeline this plan introduced. No file-level merge conflict exists (DMA-MEDIA-1 did not modify `digital_marketing_activation.py`), but execution agents working on future iterations must account for the behavioral changes listed below.
+
+| Change in PR #1052 | Impact on DMA-MEDIA-1 artifact pipeline | Action required |
+|---|---|---|
+| New `draft_ready` workshop status (two-tier readiness: 5 core fields = `draft_ready`, 9 = `approval_ready`) | `_detect_generation_intent()` now accepts `draft_ready` → artifact generation can fire earlier in the conversation than before | None — broadens the set of states where media artifacts can be requested, which is additive |
+| Auto-draft status guard: `_build_auto_draft()` only runs when `ws_status in ("draft_ready", "approval_ready", "approved")` | Prevents accidental placeholder tables during `discovery` status — tighter coupling between field completeness and artifact output | None — this guard does not restrict media artifacts when the workshop has progressed past discovery |
+| Targeted second LLM call when `derived_themes` is empty but core fields are filled | A new `grok_complete()` call can fire inside `generate_theme_plan` before `_build_auto_draft` runs | Future stories that add media-artifact generation to the `generate_theme_plan` path must be aware that the LLM may be called twice per request |
+| `CORE_REQUIRED_FIELDS` constant and `_FIELD_PURPOSE` dict added at module level | New module-level state that stories importing from `digital_marketing_activation` should not shadow | None |
+
+### Defect: `draft_ready` not in `_normalize_strategy_workshop` allowed set
+
+`_normalize_strategy_workshop()` (line 538) allows `{"not_started", "discovery", "approval_ready", "approved"}`. The new `draft_ready` status set by `_parse_theme_workshop_response()` is not in this set. On the next conversation turn, the persisted `draft_ready` status is normalized to `not_started`, losing the two-tier readiness signal. This should be fixed in a follow-up PR by adding `"draft_ready"` to the allowed status set.
 
 ---
 
