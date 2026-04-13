@@ -1592,7 +1592,7 @@ export function DigitalMarketingActivationWizard({
                   {/* Platform-specific preview */}
                   {post.channel === 'youtube' ? (
                     <YouTubePreviewCard
-                      title={post.title || post.text.slice(0, 100)}
+                      title={post.text.slice(0, 100)}
                       text={post.text}
                       hashtags={post.hashtags || []}
                       thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
@@ -1600,7 +1600,7 @@ export function DigitalMarketingActivationWizard({
                     />
                   ) : post.channel === 'linkedin' ? (
                     <LinkedInPreviewCard
-                      title={post.title || ''}
+                      title={''}
                       text={post.text}
                       hashtags={post.hashtags || []}
                       thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
@@ -1608,7 +1608,7 @@ export function DigitalMarketingActivationWizard({
                     />
                   ) : post.channel === 'instagram' ? (
                     <InstagramPreviewCard
-                      title={post.title || ''}
+                      title={''}
                       text={post.text}
                       hashtags={post.hashtags || []}
                       thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
