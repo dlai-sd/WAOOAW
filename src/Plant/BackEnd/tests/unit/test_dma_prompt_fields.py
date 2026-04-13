@@ -229,3 +229,51 @@ class TestE2S1FieldProgressCounter:
         assert workshop["brief_progress"]["total"] == 11
         assert len(workshop["brief_progress"]["missing_fields"]) == 4
         assert len(workshop["brief_progress"]["locked_fields"]) == 7
+
+
+class TestE2S2FieldNameAlignment:
+    """E2-S2: Align workshop summary field names to required-fields list"""
+
+    def test_response_contract_summary_maps_to_all_required_fields(self):
+        """E2-S2-T1: Call _theme_workshop_prompt and verify summary field mappings"""
+        workspace = {
+            "brand_name": "Test Brand",
+            "location": "Mumbai",
+            "primary_language": "en",
+            "timezone": "Asia/Kolkata",
+        }
+        campaign_setup = {
+            "strategy_workshop": {
+                "status": "discovery",
+                "messages": [],
+                "summary": {},
+                "follow_up_questions": [],
+            },
+            "schedule": {},
+        }
+
+        prompt_json = _theme_workshop_prompt(workspace, campaign_setup)
+        prompt = json.loads(prompt_json)
+
+        # Verify the response_contract.summary has all expected field mappings
+        summary_spec = prompt["response_contract"]["summary"]
+        
+        # Check that each of the 11 required fields has a corresponding summary key
+        # via the _FIELD_TO_SUMMARY_KEY mapping
+        _FIELD_TO_SUMMARY_KEY = {
+            "business_background": "business_focus",
+            "objective": "business_goal",
+            "industry": "profession_name",
+            "locality": "location_focus",
+            "target_audience": "audience",
+            "persona": "customer_profile",
+            "tone": "tone",
+            "offer": "cta",
+            "channel_intent": "youtube_angle",
+            "posting_cadence": "first_content_direction",
+            "success_metrics": "positioning",
+        }
+        
+        # All mapped summary keys should exist in the response contract
+        for req_field, summary_key in _FIELD_TO_SUMMARY_KEY.items():
+            assert summary_key in summary_spec, f"Missing summary key {summary_key} for required field {req_field}"
