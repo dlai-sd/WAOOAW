@@ -2673,6 +2673,45 @@ export function DigitalMarketingActivationWizard({
                       </div>
                     </div>
 
+                    {/* Performance Insights Section */}
+                    {strategyWorkshop.performance_insights && 
+                     strategyWorkshop.performance_insights.avg_engagement_rate > 0 ? (
+                      <div className="dma-performance-insights-card" data-testid="performance-insights-card">
+                        <details className="dma-performance-insights-accordion">
+                          <summary className="dma-performance-insights-summary">
+                            <Text weight="semibold" size={400}>📊 Performance Insights</Text>
+                            <Text size={300}>What's worked before</Text>
+                          </summary>
+                          <div className="dma-performance-insights-body">
+                            <div className="dma-performance-metric">
+                              <Text size={300} className="dma-performance-label">Top performing content types:</Text>
+                              <Text size={300} weight="semibold">
+                                {strategyWorkshop.performance_insights.top_performing_dimensions.join(', ') || 'N/A'}
+                              </Text>
+                            </div>
+                            <div className="dma-performance-metric">
+                              <Text size={300} className="dma-performance-label">Average engagement:</Text>
+                              <Text size={300} weight="semibold">
+                                {strategyWorkshop.performance_insights.avg_engagement_rate.toFixed(1)}%
+                              </Text>
+                            </div>
+                            <div className="dma-performance-metric">
+                              <Text size={300} className="dma-performance-label">Best posting hours (UTC):</Text>
+                              <Text size={300} weight="semibold">
+                                {strategyWorkshop.performance_insights.best_posting_hours.join(', ')}
+                              </Text>
+                            </div>
+                            {strategyWorkshop.performance_insights.recommendation_summary ? (
+                              <div className="dma-performance-recommendation">
+                                <Text size={300} className="dma-performance-label">Recommendation:</Text>
+                                <Text size={300}>{strategyWorkshop.performance_insights.recommendation_summary}</Text>
+                              </div>
+                            ) : null}
+                          </div>
+                        </details>
+                      </div>
+                    ) : null}
+
                     <div className="dma-chat-composer" data-testid="dma-chat-composer">
                       {(strategyWorkshop.next_step_options || []).length > 0 ? (
                         <div className="dma-chat-quick-replies">
