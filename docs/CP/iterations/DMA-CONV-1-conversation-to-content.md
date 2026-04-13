@@ -349,12 +349,12 @@ git add -A && git commit -m "feat(DMA-CONV-1): [epic-id] — [epic title]" && gi
 
 | ID | Iteration | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | Prompt rewrite with required-fields gate | Rewrite system prompt with field checklist, lock-and-confirm rules, and full context injection | 🔴 Not Started | — |
-| E1-S2 | 1 | Prompt rewrite with required-fields gate | Server-side field-completeness validation before approval_ready transition | 🔴 Not Started | — |
-| E2-S1 | 1 | Customer sees conversation progress | Add field-level progress counter to response contract and wizard UI | 🔴 Not Started | — |
-| E2-S2 | 1 | Customer sees conversation progress | Align workshop summary fields to required-fields list and CampaignBrief model | 🔴 Not Started | — |
-| E3-S1 | 1 | Artifact rendering fix | Diagnose and fix table artifact not rendering after DMA-MEDIA-1 deploy | 🔴 Not Started | — |
-| E3-S2 | 1 | Artifact rendering fix | Verify image/video/audio artifact request-to-preview path works end-to-end | 🔴 Not Started | — |
+| E1-S1 | 1 | Prompt rewrite with required-fields gate | Rewrite system prompt with field checklist, lock-and-confirm rules, and full context injection | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
+| E1-S2 | 1 | Prompt rewrite with required-fields gate | Server-side field-completeness validation before approval_ready transition | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
+| E2-S1 | 1 | Customer sees conversation progress | Add field-level progress counter to response contract and wizard UI | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
+| E2-S2 | 1 | Customer sees conversation progress | Align workshop summary fields to required-fields list and CampaignBrief model | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
+| E3-S1 | 1 | Artifact rendering fix | Diagnose and fix table artifact not rendering after DMA-MEDIA-1 deploy | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
+| E3-S2 | 1 | Artifact rendering fix | Verify image/video/audio artifact request-to-preview path works end-to-end | 🟢 Done | copilot/iteration-1-epics-e1-e2-e3 |
 | E4-S1 | 2 | Brand voice feeds content quality | Inject brand voice into conversation prompt and content generation | 🔴 Not Started | — |
 | E4-S2 | 2 | Brand voice feeds content quality | Add content-pillar framework to prompt guidance | 🔴 Not Started | — |
 | E5-S1 | 2 | Market-aware theme creation | Add competitor/niche context fields to discovery and prompt | 🔴 Not Started | — |
