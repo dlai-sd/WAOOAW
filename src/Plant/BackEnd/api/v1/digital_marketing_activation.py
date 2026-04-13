@@ -665,6 +665,8 @@ def _theme_workshop_prompt(
                     "positioning": "Short sentence.  [canonical: success_metrics]",
                     "tone": "Short sentence.  [canonical: tone]",
                     "content_pillars": ["Three concise pillars."],
+                    "competitor_names": ["2-5 competitor or peer names."],
+                    "niche_keywords": ["5-10 niche keywords or trending topics."],
                     "youtube_angle": "Short sentence.  [canonical: channel_intent]",
                     "cta": "Short sentence.  [canonical: offer]",
                 },
@@ -1200,6 +1202,10 @@ async def generate_theme_plan(
                 "During discovery, help the customer define 3-5 content pillars — recurring categories that all content should map to. "
                 "Examples: Educational, Behind the scenes, Customer stories, Industry trends, Product showcase. "
                 "Each derived theme must map to one pillar. Include `content_pillars` in the summary. "
+                "\n\nCOMPETITOR AND NICHE CONTEXT:\n"
+                "Ask the customer to name 2-5 competitors or industry peers they want to differentiate from. "
+                "Also ask for 5-10 niche keywords or topics that are trending in their space. "
+                "Include `competitor_names` and `niche_keywords` in the summary. "
                 "\n\nBRAND VOICE:\n"
                 "The customer's brand voice is provided in the context. Use this exact tone, vocabulary, and messaging patterns in all conversation responses and generated content. "
                 "\n\nDELIVERABLE REQUEST RULE:\n"
