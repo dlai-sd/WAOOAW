@@ -108,8 +108,8 @@ class TestE1S1PromptRewrite:
         import inspect
         
         source = inspect.getsource(generate_theme_plan)
-        # Case-insensitive check for "produce it immediately"
-        assert "produce it immediately" in source.lower() or "produce" in source.lower()
+        # The system prompt must contain the exact O6 enforcement phrase
+        assert "produce it immediately" in source.lower()
 
 
 class TestE1S2FieldCompletenessValidation:

@@ -12,19 +12,29 @@ class TestE3S1TableArtifactRendering:
     @pytest.mark.asyncio
     async def test_build_auto_draft_table_has_structured_preview(self):
         """E3-S1-T1: Call _build_auto_draft with 3 derived themes and TABLE artifact type"""
+        from datetime import datetime, timezone
         from api.v1 import hired_agents_simple
         from agent_mold.skills.playbook import ArtifactType
         
-        # Mock hired agent record
+        now = datetime.now(timezone.utc)
+        # Mock hired agent record with all required fields
         record = hired_agents_simple._HiredAgentRecord(
             hired_instance_id="hired-123",
+            subscription_id="sub-123",
+            agent_id="agent-123",
+            agent_type_id="marketing.digital_marketing.v1",
             customer_id="cust-123",
-            agent_type="marketing.digital_marketing.v1",
             nickname="Test DMA",
-            status="active",
-            trial_mode=False,
-            created_at="2024-01-01T00:00:00Z",
-            materialized_config={},
+            theme=None,
+            config={},
+            configured=True,
+            goals_completed=False,
+            active=True,
+            trial_status="active",
+            trial_start_at=now,
+            trial_end_at=now,
+            created_at=now,
+            updated_at=now,
         )
         
         workspace = {

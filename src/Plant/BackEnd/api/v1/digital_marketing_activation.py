@@ -38,6 +38,22 @@ logger.addFilter(PiiMaskingFilter())
 _WORKSPACE_KEY = "digital_marketing_activation"
 _DIGITAL_MARKETING_AGENT_TYPE = "marketing.digital_marketing.v1"
 
+# Canonical mapping from THEME_DISCOVERY_REQUIRED_FIELDS to workshop summary keys.
+# Defined once at module level to avoid drift between prompt construction and validation.
+_FIELD_TO_SUMMARY_KEY: dict[str, str] = {
+    "business_background": "business_focus",
+    "objective": "business_goal",
+    "industry": "profession_name",
+    "locality": "location_focus",
+    "target_audience": "audience",
+    "persona": "customer_profile",
+    "tone": "tone",
+    "offer": "cta",
+    "channel_intent": "youtube_angle",
+    "posting_cadence": "first_content_direction",
+    "success_metrics": "positioning",
+}
+
 
 class ActivationWorkspaceUpsertRequest(BaseModel):
     customer_id: str = Field(..., min_length=1)
@@ -568,21 +584,6 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
     profession_label = _infer_profession_label(workspace, workshop)
     pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
     
-    # Field mapping from THEME_DISCOVERY_REQUIRED_FIELDS to workshop summary keys
-    _FIELD_TO_SUMMARY_KEY = {
-        "business_background": "business_focus",
-        "objective": "business_goal",
-        "industry": "profession_name",
-        "locality": "location_focus",
-        "target_audience": "audience",
-        "persona": "customer_profile",
-        "tone": "tone",
-        "offer": "cta",
-        "channel_intent": "youtube_angle",
-        "posting_cadence": "first_content_direction",
-        "success_metrics": "positioning",
-    }
-    
     # Compute locked and missing fields
     summary = workshop["summary"]
     locked_fields = {}
@@ -811,20 +812,6 @@ def _parse_theme_workshop_response(
             workshop["next_step_options"] = ["Approve this direction", "Refine the positioning", "Request another theme version"]
     
     # E1-S2: Server-side field-completeness validation gate
-    # Field mapping from THEME_DISCOVERY_REQUIRED_FIELDS to workshop summary keys
-    _FIELD_TO_SUMMARY_KEY = {
-        "business_background": "business_focus",
-        "objective": "business_goal",
-        "industry": "profession_name",
-        "locality": "location_focus",
-        "target_audience": "audience",
-        "persona": "customer_profile",
-        "tone": "tone",
-        "offer": "cta",
-        "channel_intent": "youtube_angle",
-        "posting_cadence": "first_content_direction",
-        "success_metrics": "positioning",
-    }
     filled_count = sum(
         1 for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
         if str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
