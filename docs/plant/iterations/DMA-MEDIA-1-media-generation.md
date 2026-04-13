@@ -69,6 +69,13 @@ with limited context windows. Every structural decision in this plan exists to p
 
 **Estimate basis:** New service module = 45 min | Wiring into existing task = 45 min | Dockerfile + deps = 30 min | Tests = 45 min. Add 20% buffer for zero-cost model context loading.
 
+### PR-Overhead Optimization Rules
+
+- Single iteration — one PR merge gate.
+- 6 stories / ~5 hours of agent work — within the 4-6 story target.
+- All work is Plant BackEnd only — no cross-service coordination overhead.
+- Deployment happens through the `waooaw deploy` workflow after the merged iteration, not mid-flight.
+
 ---
 
 ## How to Launch Each Iteration
@@ -198,7 +205,7 @@ Do this BEFORE starting the next epic.
 
 | # | Rule | Consequence of violation |
 |---|---|---|
-| 1 | `PIIMaskingFilter()` on every logger | PII incident |
+| 1 | `PiiMaskingFilter()` on every logger | PII incident |
 | 2 | `@circuit_breaker(service=...)` on every external HTTP call | Cascading failure |
 | 3 | Never embed env-specific values in Dockerfile or code | Image cannot be promoted |
 | 4 | Tests >= 80% coverage on all new BE code | PR blocked by CI |
@@ -255,13 +262,15 @@ Execution order: E1-S1 → E1-S2 → E2-S1 → E2-S2 → E3-S1 → E4-S1
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
-> `src/Plant/BackEnd/agent_mold/skills/grok_client.py` currently has `xai_generate_image()` (lines 52-98) which calls xAI Aurora and falls back to a branded SVG placeholder if the API fails. Add a new function `pollinations_generate_image(prompt: str) -> bytes` that calls the free Pollinations.ai API (`https://image.pollinations.ai/prompt/{url_encoded_prompt}?width=800&height=600&nologo=true`) via `httpx.get()` with a 30-second timeout. Then modify `xai_generate_image()` to call `pollinations_generate_image()` as the intermediate fallback before the SVG placeholder — so the cascade is: xAI Aurora → Pollinations.ai → SVG placeholder.
+> `src/Plant/BackEnd/agent_mold/skills/grok_client.py` currently has `xai_generate_image()` (lines 53-97) which calls xAI Aurora and falls back to a branded SVG placeholder if the API fails. Add a new function `pollinations_generate_image(prompt: str) -> bytes` that calls the free Pollinations.ai API (`https://image.pollinations.ai/prompt/{url_encoded_prompt}?width=800&height=600&nologo=true`) via `httpx.get()` with a 30-second timeout. Then modify `xai_generate_image()` to call `pollinations_generate_image()` as the intermediate fallback before the SVG placeholder — so the cascade is: xAI Aurora → Pollinations.ai → SVG placeholder.
+>
+> **Circuit-breaker note:** `pollinations_generate_image` is an external HTTP call. The existing `grok_client.py` functions (`xai_generate_image`, `grok_complete`) do not use `@circuit_breaker` — they rely on try/except + timeout. Follow the same pattern here for consistency. Wrapping with `@circuit_breaker` is deferred to a future NFR-compliance sweep across all of `grok_client.py`.
 
 **Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
-| `src/Plant/BackEnd/agent_mold/skills/grok_client.py` | 1–100 | `xai_generate_image` function, existing httpx usage, SVG fallback pattern |
+| `src/Plant/BackEnd/agent_mold/skills/grok_client.py` | 1–97 | `xai_generate_image` function (lines 53-97), existing httpx usage, SVG fallback pattern |
 
 **Files to create / modify:**
 
@@ -344,13 +353,13 @@ docker compose -f docker-compose.test.yml run --rm --entrypoint "" plant-backend
 **CP BackEnd pattern:** N/A
 
 **What to do (self-contained):**
-> `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` lines 90-107 handle `image` artifact type by calling `xai_generate_image()`. The fallback chain is now inside `xai_generate_image()` (from E1-S1), so no dispatch change is needed. However, the task currently catches `GrokClientError` (no API key) on line 83 and returns `deferred`. Update this: when `GrokClientError` is caught (no xAI key), instead of deferring, try `pollinations_generate_image(first_prompt)` directly as a standalone image generator. This allows image generation to work even when `XAI_API_KEY` is not set at all. Add `pollinations_generate_image` to the import block on line 51.
+> `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` lines 87-103 handle `image` artifact type by calling `xai_generate_image()`. The fallback chain is now inside `xai_generate_image()` (from E1-S1), so no dispatch change is needed. However, the task currently catches `GrokClientError` (no API key) on lines 83-85 and returns `deferred`. Update this: when `GrokClientError` is caught (no xAI key), instead of deferring, try `pollinations_generate_image(first_prompt)` directly as a standalone image generator. This allows image generation to work even when `XAI_API_KEY` is not set at all. Add `pollinations_generate_image` to the import block at line 46.
 
 **Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
-| `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` | 46–110 | Import block, `GrokClientError` catch on line 83, image generation block lines 90-107 |
+| `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` | 46–103 | Import block (lines 46-50), `GrokClientError` catch (lines 82-85), image generation block (lines 87-103) |
 | `src/Plant/BackEnd/agent_mold/skills/grok_client.py` | 52–70 | `pollinations_generate_image` function signature (added in E1-S1) |
 
 **Files to create / modify:**
@@ -562,13 +571,13 @@ docker compose -f docker-compose.test.yml run --rm --entrypoint "" plant-backend
 **CP BackEnd pattern:** N/A
 
 **What to do (self-contained):**
-> `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` lines 108-128 handle `audio` artifacts by calling `grok_generate_script()` to produce a text markdown script. Replace this: when `first_artifact_type == "audio"`, call `generate_narration(text)` from `services.tts_service` to produce actual MP3 audio bytes. Store as `{channel}-narration.mp3` with `mime_type="audio/mpeg"`. If TTS fails, fall back to the existing Grok script behavior. Import `generate_narration` inside the function (inline import pattern matching existing code style).
+> `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` lines 104-130 currently handle all non-image artifacts (video, audio, video_audio) in a single `else` block that calls `grok_generate_script()` to produce a text markdown script. Add a new `elif first_artifact_type == "audio":` block **before** this `else` block. In the new block: call `generate_narration(text)` from `services.tts_service` to produce actual MP3 audio bytes. Store as `{channel}-narration.mp3` with `mime_type="audio/mpeg"`. If TTS fails, fall back to the existing Grok script behavior. Import `generate_narration` inside the function (inline import pattern matching existing code style).
 
 **Files to read first (max 3):**
 
 | File | Lines | What to look for |
 |---|---|---|
-| `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` | 46–140 | Import block, the `else` branch handling video/audio/video_audio (lines 108-128) |
+| `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` | 46–130 | Import block (lines 46-50), the `else` branch handling video/audio/video_audio (lines 104-130) |
 | `src/Plant/BackEnd/services/tts_service.py` | 1–30 | `generate_narration` function signature (created in E2-S1) |
 
 **Files to create / modify:**
@@ -847,7 +856,7 @@ docker compose -f docker-compose.test.yml run --rm --entrypoint "" plant-backend
 |---|---|---|
 | `src/Plant/BackEnd/Dockerfile` | 28–35 | Stage 2 runtime `apt-get install` line to add `ffmpeg` |
 | `src/Plant/BackEnd/requirements.txt` | last 15 lines | Where to add `edge-tts` |
-| `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` | 46–140 | Import block, image generation block, audio block (from E2-S2), else block for video/video_audio |
+| `src/Plant/BackEnd/worker/tasks/media_generation_tasks.py` | 46–130 | Import block (lines 46-50), image block (lines 87-103), audio block (from E2-S2), else block for video/video_audio |
 
 **Files to create / modify:**
 
@@ -872,11 +881,15 @@ docker compose -f docker-compose.test.yml run --rm --entrypoint "" plant-backend
             else:
                 image_bytes = pollinations_generate_image(first_prompt)
 
+            # Step 1b: SVG images can't be looped by FFmpeg — skip stitching
+            if image_bytes[:5] == b"<svg ":
+                raise RuntimeError("SVG image not suitable for FFmpeg stitching")
+
             # Step 2: Generate TTS narration
             audio_bytes = await generate_narration(text)
 
             # Step 3: Stitch into video
-            image_fmt = "svg" if image_bytes[:5] == b"<svg " else "jpg"
+            image_fmt = "png" if image_bytes[:4] == b"\x89PNG" else "jpg"
             video_bytes = await stitch_image_audio_to_video(
                 image_bytes, audio_bytes, image_format=image_fmt,
             )
@@ -931,9 +944,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 1. `src/Plant/BackEnd/requirements.txt` contains `edge-tts>=6.1.0`
 2. `src/Plant/BackEnd/Dockerfile` Stage 2 apt-get includes `ffmpeg`
 3. When `first_artifact_type == "video_audio"` and all steps succeed, stored artifact has `mime_type="video/mp4"` and `source="ffmpeg_stitch"`
-4. When stitching fails but Grok is available, falls back to markdown script
-5. When stitching fails and no Grok client, returns `deferred`
-6. `docker build` succeeds (Dockerfile syntax valid)
+4. When image is SVG (both providers down), stitching is skipped and falls back to markdown script
+5. When stitching fails but Grok is available, falls back to markdown script
+6. When stitching fails and no Grok client, returns `deferred`
+7. `docker build` succeeds (Dockerfile syntax valid)
 
 **Tests to write:**
 
@@ -942,8 +956,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 | E4-S1-T1 | `src/Plant/BackEnd/tests/unit/test_media_gen_video_audio_wire.py` | Mock `xai_generate_image` returns b"img", mock `generate_narration` returns b"mp3", mock `stitch_image_audio_to_video` returns b"mp4", mock DB + store | Result has `artifact_mime_type: "video/mp4"` and `source: "ffmpeg_stitch"` |
 | E4-S1-T2 | same | Mock stitch raises RuntimeError, mock `grok_generate_script` returns "script text" | Result has `artifact_mime_type: "text/markdown"` |
 | E4-S1-T3 | same | Mock stitch raises, client is None | Result has `status: "deferred"` |
-| E4-S1-T4 | `src/Plant/BackEnd/tests/unit/test_requirements_dockerfile.py` | Read `requirements.txt` content | `"edge-tts"` appears in file |
-| E4-S1-T5 | same | Read `Dockerfile` content | `"ffmpeg"` appears in Stage 2 apt-get line |
+| E4-S1-T4 | same | Mock `xai_generate_image` returns b"<svg ..." (SVG bytes) | Falls through to grok_generate_script fallback (SVG skips stitching) |
+| E4-S1-T5 | `src/Plant/BackEnd/tests/unit/test_requirements_dockerfile.py` | Read `requirements.txt` content | `"edge-tts"` appears in file |
+| E4-S1-T6 | same | Read `Dockerfile` content | `"ffmpeg"` appears in Stage 2 apt-get line |
 
 **Test command:**
 ```bash
@@ -953,7 +968,7 @@ docker compose -f docker-compose.test.yml run --rm --entrypoint "" plant-backend
 
 **Commit message:** `feat(DMA-MEDIA-1): E4-S1 — Dockerfile, requirements, video_audio integration`
 
-**Done signal:** `"E4-S1 done. Changed: Dockerfile, requirements.txt, media_generation_tasks.py. Created: test files. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅"`
+**Done signal:** `"E4-S1 done. Changed: Dockerfile, requirements.txt, media_generation_tasks.py. Created: test files. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5 ✅ T6 ✅"`
 
 ---
 
