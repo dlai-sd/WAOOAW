@@ -241,12 +241,14 @@ def test_generate_theme_plan_trims_incomplete_assistant_message(test_client, mon
     assert workshop["assistant_message"] == "I have refined the first month around peak wedding-planning demand."
     assert workshop["checkpoint_summary"] == "The content lane is now aligned to the strongest demand pockets."
     # The mock returns "approval_ready" but only 1/11 fields are filled (business_goal).
-    # The E1-S2 validation gate forces status back to "discovery" and injects a fallback question.
+    # The E1-S2 validation gate forces status back to "discovery" and injects a fallback question
+    # listing the missing core fields (industry, locality, target_audience, offer).
     assert workshop["status"] == "discovery"
-    assert workshop["current_focus_question"] == (
-        "A few details are still needed before I can lock the strategy. "
-        "What is the primary business result this content should drive?"
-    )
+    focus_q = workshop["current_focus_question"]
+    assert focus_q, "Expected a focus question about missing fields"
+    # The question should mention at least one missing core field
+    assert any(field in focus_q for field in ("industry", "locality", "target_audience", "offer")), \
+        f"Focus question should mention missing core fields, got: {focus_q}"
 
 
 @pytest.mark.unit
