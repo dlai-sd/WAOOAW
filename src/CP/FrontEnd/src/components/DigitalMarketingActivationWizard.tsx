@@ -1526,7 +1526,7 @@ export function DigitalMarketingActivationWizard({
           const effectiveMime = artifactStatus?.artifact_mime_type ?? post.artifact_mime_type
           const effectiveUri = artifactStatus?.artifact_uri ?? post.artifact_uri
           const effectiveGenStatus = artifactStatus?.artifact_generation_status ?? post.artifact_generation_status
-          const isExpanded = expandedOutputItems[post.post_id] ?? false
+          const isExpanded = expandedOutputItems[post.post_id] ?? (post.artifact_type === 'table')
           const receiptUrl = outputItemReceipts[post.post_id] || post.provider_post_url
 
           return (
@@ -1589,8 +1589,12 @@ export function DigitalMarketingActivationWizard({
               {/* Expanded body */}
               {isExpanded ? (
                 <div style={{ padding: '0 0.75rem 0.75rem', display: 'grid', gap: '0.55rem' }}>
-                  {/* Platform-specific preview */}
-                  {post.channel === 'youtube' ? (
+                  {/* Table artifacts get markdown rendering regardless of channel */}
+                  {post.artifact_type === 'table' ? (
+                    <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
+                    </div>
+                  ) : post.channel === 'youtube' ? (
                     <YouTubePreviewCard
                       title={post.text.slice(0, 100)}
                       text={post.text}
@@ -1614,10 +1618,6 @@ export function DigitalMarketingActivationWizard({
                       thumbnailUrl={effectiveUri && effectiveMime?.startsWith('image/') ? effectiveUri : undefined}
                       channelName={businessLabel || 'Your Page'}
                     />
-                  ) : post.artifact_type === 'table' ? (
-                    <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
-                    </div>
                   ) : (
                     <div style={{ lineHeight: 1.55, fontSize: '0.9rem' }}>{post.text}</div>
                   )}
@@ -1795,7 +1795,7 @@ export function DigitalMarketingActivationWizard({
         <div className={`dma-brief-accordion-panel dma-brief-accordion-panel--scrollable${activeBriefSection === 'output' ? '' : ' is-hidden'}`}>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             {outputItems.map((post, idx) => {
-              const isExpanded = expandedOutputItems[post.post_id] ?? false
+              const isExpanded = expandedOutputItems[post.post_id] ?? (post.artifact_type === 'table')
               const actionStatus = outputItemActions[post.post_id] || 'idle'
               const isApproved = post.review_status === 'approved'
               const isRejected = post.review_status === 'rejected'
@@ -1848,7 +1848,13 @@ export function DigitalMarketingActivationWizard({
                   {/* Expanded body */}
                   {isExpanded ? (
                     <div style={{ padding: '0.75rem 0.85rem', display: 'grid', gap: '0.6rem' }}>
-                      <div style={{ lineHeight: 1.5, fontSize: '0.9rem' }}>{post.text}</div>
+                      {post.artifact_type === 'table' ? (
+                        <div className="dma-chat-inline-table-md" style={{ overflowX: 'auto', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div style={{ lineHeight: 1.5, fontSize: '0.9rem' }}>{post.text}</div>
+                      )}
 
                       {renderOutputItemArtifact(post)}
 
