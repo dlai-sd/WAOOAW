@@ -7,7 +7,7 @@ import { FeedbackMessage, LoadingIndicator, SaveIndicator } from './FeedbackIndi
 import { DigitalMarketingArtifactPreviewCard } from './DigitalMarketingArtifactPreviewCard'
 import { DigitalMarketingThemePlanCard } from './DigitalMarketingThemePlanCard'
 import { YouTubePreviewCard, LinkedInPreviewCard, InstagramPreviewCard } from './PlatformPreviewCards'
-import { AgentContentRenderer, ArtifactPreviewRegistry } from './rendering'
+import { AgentContentRenderer, ArtifactPreviewRegistry, AgentThinkingIndicator } from './rendering'
 import { getHiredAgentBySubscription, upsertHiredAgentDraft, type HiredAgentInstance } from '../services/hiredAgents.service'
 import type { MyAgentInstanceSummary } from '../services/myAgentsSummary.service'
 import {
@@ -2703,7 +2703,7 @@ export function DigitalMarketingActivationWizard({
                             className="dma-wizard-theme-workshop-message dma-wizard-theme-workshop-message--assistant dma-wizard-theme-workshop-message--pending"
                             data-testid="strategy-thinking-indicator"
                           >
-                            <div>Thinking through the brief and tightening the next decision...</div>
+                            <AgentThinkingIndicator message="DMA agent is analyzing your brief" />
                           </div>
                         ) : null}
                       </div>
