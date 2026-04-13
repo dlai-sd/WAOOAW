@@ -674,6 +674,7 @@ def _theme_workshop_prompt(
                         "title": "Theme title",
                         "description": "What this content lane covers",
                         "frequency": "weekly",
+                        "pillar": "Content pillar name",
                     }
                 ],
             },
@@ -1195,6 +1196,10 @@ async def generate_theme_plan(
                 "The required fields are: business_background, objective, industry, locality, target_audience, persona, tone, offer, channel_intent, posting_cadence, success_metrics. "
                 "When the customer gives a direct answer, lock that field and confirm in one sentence. Do NOT re-offer locked fields as next-step options. "
                 "When all 11 fields are filled, you MUST set status to approval_ready and present the master theme for approval. Do not ask more questions. "
+                "\n\nCONTENT PILLARS:\n"
+                "During discovery, help the customer define 3-5 content pillars — recurring categories that all content should map to. "
+                "Examples: Educational, Behind the scenes, Customer stories, Industry trends, Product showcase. "
+                "Each derived theme must map to one pillar. Include `content_pillars` in the summary. "
                 "\n\nBRAND VOICE:\n"
                 "The customer's brand voice is provided in the context. Use this exact tone, vocabulary, and messaging patterns in all conversation responses and generated content. "
                 "\n\nDELIVERABLE REQUEST RULE:\n"
