@@ -391,7 +391,7 @@ All three epics are independent of each other and can execute in parallel, but w
 
 ### Epic E1: Customer completes the strategy conversation instead of looping forever
 
-**Branch:** `feat/DMA-CONV-1-it1-e1`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, I can brief my DMA in a conversation that concludes when I've given enough information, so that I get a master theme and supporting themes instead of endless questions.
 
 ---
@@ -400,7 +400,7 @@ All three epics are independent of each other and can execute in parallel, but w
 
 **BLOCKED UNTIL:** none
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it1-e1`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -472,7 +472,8 @@ for req_field in THEME_DISCOVERY_REQUIRED_FIELDS:
 1. The system prompt sent to Grok contains explicit instructions about the 11 required fields, lock-and-confirm behaviour, and immediate artifact production when requested.
 2. The prompt payload includes `required_fields_checklist` with `locked_fields` and `missing_fields` derived from current workshop summary state.
 3. Message history window is 12 messages instead of 4.
-4. All existing tests in `src/Plant/BackEnd/tests/` that reference `digital_marketing_activation` still pass.
+4. The system prompt contains an explicit rule: when the customer asks for a deliverable (plan, table, draft, schedule), produce it immediately — do not deflect with more questions. *(This enforces O6.)*
+5. All existing tests in `src/Plant/BackEnd/tests/` that reference `digital_marketing_activation` still pass.
 
 **Tests to write:**
 
@@ -481,6 +482,7 @@ for req_field in THEME_DISCOVERY_REQUIRED_FIELDS:
 | E1-S1-T1 | `src/Plant/BackEnd/tests/unit/test_dma_prompt_fields.py` | Call `_theme_workshop_prompt()` with a workspace where 6 of 11 summary fields are filled | `required_fields_checklist.filled == 6`, `required_fields_checklist.missing == 5`, `locked_fields` has 6 keys |
 | E1-S1-T2 | same | Call `_normalize_workshop_messages()` with 15 messages | Returns exactly 12 messages (not 4) |
 | E1-S1-T3 | same | Call `_theme_workshop_prompt()` with all 11 fields filled | `missing_fields` is empty list |
+| E1-S1-T4 | same | Extract system prompt text from the Grok call | System prompt contains the substring "produce it immediately" (case-insensitive) — validates O6 enforcement |
 
 **Test command:**
 ```bash
@@ -497,7 +499,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_prompt_fields.py -v
 
 **BLOCKED UNTIL:** E1-S1 committed
 **Estimated time:** 45 min
-**Branch:** `feat/DMA-CONV-1-it1-e1`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -560,7 +562,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_prompt_fields.py -v
 
 ### Epic E2: Customer sees how close they are to finishing the brief
 
-**Branch:** `feat/DMA-CONV-1-it1-e2`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, I can see a progress indicator ("8/11 fields locked") during the DMA conversation, so that I know how close I am to finishing and feel motivated to complete.
 
 ---
@@ -569,7 +571,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_prompt_fields.py -v
 
 **BLOCKED UNTIL:** none
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it1-e2`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd response + CP FrontEnd display
 
 **What to do (self-contained):**
@@ -587,7 +589,7 @@ The `ThemePlanResponse` model (line 82) and the `_parse_theme_workshop_response`
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In `_parse_theme_workshop_response()`, after the validation gate from E1-S2, compute `brief_progress` dict and add it to the `workshop` dict before returning. |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In `_parse_theme_workshop_response()`, compute `filled_count` (same logic as E1-S2 validation gate — use `_FIELD_TO_SUMMARY_KEY` and `THEME_DISCOVERY_REQUIRED_FIELDS`), then build `brief_progress` dict and add it to the `workshop` dict before returning. If E1-S2 has already been committed on this branch, reuse its `filled_count` variable; if not, compute it independently. |
 | `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | Extract `brief_progress` from the strategy workshop state. Add a Badge component next to existing badges in the chat header showing "{filled}/{total} fields locked". |
 | `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts` | modify | Add `brief_progress` to the `DigitalMarketingStrategyWorkshop` TypeScript type. |
 
@@ -649,7 +651,7 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingActivationWiz
 
 **BLOCKED UNTIL:** E2-S1 committed
 **Estimated time:** 45 min
-**Branch:** `feat/DMA-CONV-1-it1-e2`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -693,7 +695,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_prompt_fields.py -v
 
 ### Epic E3: Artifact rendering works end-to-end after deploy
 
-**Branch:** `feat/DMA-CONV-1-it1-e3`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, I can see tables, images, and media artifacts rendered in the DMA wizard after the agent generates them, so that I can review and approve real content instead of seeing blank cards.
 
 ---
@@ -702,7 +704,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_prompt_fields.py -v
 
 **BLOCKED UNTIL:** none
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it1-e3`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd data shape + CP FrontEnd rendering
 
 **What to do (self-contained):**
@@ -805,7 +807,7 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingArtifactPrevi
 
 **BLOCKED UNTIL:** E3-S1 committed
 **Estimated time:** 45 min
-**Branch:** `feat/DMA-CONV-1-it1-e3`
+**Branch:** `feat/DMA-CONV-1-iteration-1` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A
 
 **What to do (self-contained):**
@@ -875,7 +877,7 @@ All three epics are independent of each other, but within E4 and E5, stories are
 
 ### Epic E4: Brand voice feeds content quality
 
-**Branch:** `feat/DMA-CONV-1-it2-e4`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, my brand voice is automatically loaded into every DMA conversation and content generation call, so that all generated content sounds like my brand without me repeating preferences.
 
 ---
@@ -884,7 +886,7 @@ All three epics are independent of each other, but within E4 and E5, stories are
 
 **BLOCKED UNTIL:** Iteration 1 PR merged to main
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it2-e4`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -961,7 +963,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_brand_voice.py -v
 
 **BLOCKED UNTIL:** E4-S1 committed
 **Estimated time:** 45 min
-**Branch:** `feat/DMA-CONV-1-it2-e4`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -1010,7 +1012,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_brand_voice.py -v
 
 ### Epic E5: Market-aware theme creation
 
-**Branch:** `feat/DMA-CONV-1-it2-e5`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, the DMA asks about my competitors and niche keywords during discovery, and uses that context to generate differentiated themes with niche-specific hashtags and SEO terms.
 
 ---
@@ -1019,7 +1021,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_brand_voice.py -v
 
 **BLOCKED UNTIL:** Iteration 1 PR merged to main
 **Estimated time:** 45 min
-**Branch:** `feat/DMA-CONV-1-it2-e5`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -1072,7 +1074,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_market_context.py -v
 
 **BLOCKED UNTIL:** E5-S1 committed
 **Estimated time:** 45 min
-**Branch:** `feat/DMA-CONV-1-it2-e5`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -1127,7 +1129,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_market_context.py -v
 
 ### Epic E6: Optimal posting schedule
 
-**Branch:** `feat/DMA-CONV-1-it2-e6`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, the DMA recommends the best posting times based on my industry and audience, so I maximize engagement without manual research.
 
 ---
@@ -1136,7 +1138,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_market_context.py -v
 
 **BLOCKED UNTIL:** Iteration 1 PR merged to main
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it2-e6`
+**Branch:** `feat/DMA-CONV-1-iteration-2` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only + CP FrontEnd display
 
 **What to do (self-contained):**
@@ -1245,7 +1247,7 @@ E7 and E8 are independent. E9 depends on both.
 
 ### Epic E7: Agent improves from performance data
 
-**Branch:** `feat/DMA-CONV-1-it3-e7`
+**Branch:** `feat/DMA-CONV-1-iteration-3` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, my DMA learns from past content performance and uses that data to suggest better themes and content in the next cycle, so that engagement improves automatically over time.
 
 ---
@@ -1254,7 +1256,7 @@ E7 and E8 are independent. E9 depends on both.
 
 **BLOCKED UNTIL:** Iteration 2 PR merged to main
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it3-e7`
+**Branch:** `feat/DMA-CONV-1-iteration-3` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd only
 
 **What to do (self-contained):**
@@ -1335,7 +1337,7 @@ cd src/Plant/BackEnd && pytest tests/unit/test_dma_feedback_loop.py -v
 
 **BLOCKED UNTIL:** E7-S1 committed
 **Estimated time:** 45 min
-**Branch:** `feat/DMA-CONV-1-it3-e7`
+**Branch:** `feat/DMA-CONV-1-iteration-3` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — Plant BackEnd response + CP FrontEnd display
 
 **What to do (self-contained):**
@@ -1386,7 +1388,7 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingActivationWiz
 
 ### Epic E8: Platform-accurate content previews
 
-**Branch:** `feat/DMA-CONV-1-it3-e8`
+**Branch:** `feat/DMA-CONV-1-iteration-3` (GitHub Agents auto-creates the task branch)
 **User story:** As a customer, I see platform-accurate previews (YouTube thumbnail card, LinkedIn post card, Instagram square, etc.) of each content piece before approving, so I know exactly what will be posted.
 
 ---
@@ -1395,7 +1397,7 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingActivationWiz
 
 **BLOCKED UNTIL:** Iteration 2 PR merged to main
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it3-e8`
+**Branch:** `feat/DMA-CONV-1-iteration-3` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A — CP FrontEnd only
 
 **What to do (self-contained):**
@@ -1494,7 +1496,7 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/PlatformPreviewCards.test.tsx
 
 ### Epic E9: End-to-end Docker validation
 
-**Branch:** `feat/DMA-CONV-1-it3-e9`
+**Branch:** `feat/DMA-CONV-1-iteration-3` (GitHub Agents auto-creates the task branch)
 **User story:** As a platform engineer, I can run a Docker-based test that validates the full DMA conversation → theme → content → preview → publish path end-to-end, so that regressions are caught before deploy.
 
 ---
@@ -1503,7 +1505,7 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/PlatformPreviewCards.test.tsx
 
 **BLOCKED UNTIL:** E7-S2 and E8-S1 committed
 **Estimated time:** 90 min
-**Branch:** `feat/DMA-CONV-1-it3-e9`
+**Branch:** `feat/DMA-CONV-1-iteration-3` (GitHub Agents auto-creates the task branch)
 **CP BackEnd pattern:** N/A
 
 **What to do (self-contained):**
@@ -1611,6 +1613,7 @@ All files referenced in this plan, grouped by service:
 | `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | Main DMA API — prompt, parsing, draft builder | E1-S1, E1-S2, E2-S1, E2-S2, E3-S1, E4-S1, E4-S2, E5-S1, E5-S2, E6-S1, E7-S1 |
 | `src/Plant/BackEnd/agent_mold/reference_agents.py` | THEME_DISCOVERY_REQUIRED_FIELDS | E1-S1, E1-S2, E2-S2 |
 | `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | Theme and post generation | E4-S1, E5-S2 |
+| `src/Plant/BackEnd/agent_mold/skills/content_models.py` | PostGeneratorInput, CampaignBrief, ThemeDiscoveryBrief models | E5-S2 |
 | `src/Plant/BackEnd/services/brand_voice_service.py` | Brand voice CRUD | E4-S1 |
 | `src/Plant/BackEnd/services/content_analytics.py` | Performance recommendations + posting times | E6-S1, E7-S1 |
 | `src/Plant/BackEnd/models/brand_voice.py` | BrandVoiceModel | E4-S1 |
