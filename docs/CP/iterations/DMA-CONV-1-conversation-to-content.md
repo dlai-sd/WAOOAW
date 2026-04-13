@@ -1219,4 +1219,418 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingActivationWiz
 
 ## Iteration 3 — Feedback Loop and Platform Previews
 
-> Stories for Iteration 3 will be committed in the next chunk.
+**Scope:** Performance analytics injection into the next theme cycle, platform-accurate content previews in approval UI, end-to-end Docker validation.
+**Lane:** B — Plant BackEnd analytics integration + CP FrontEnd preview components
+**⏱ Estimated:** 5h | **Come back:** 2026-04-16 06:00 UTC
+**Epics:** E7, E8, E9
+**Advances:** P4 DMA value (feedback loop) + P2 DMA value (previews) — the DMA autonomously improves over time and customers see exactly what will be posted before approving.
+
+### Dependency Map (Iteration 3)
+
+```
+E7-S1 ──► E7-S2    (S2 surfaces recommendations from S1 in UI)
+E8-S1              (independent — preview components)
+E9-S1              (runs after E7 and E8 are complete — full-path validation)
+
+E7 + E8 ──► E9
+```
+
+E7 and E8 are independent. E9 depends on both.
+
+---
+
+### Epic E7: Agent improves from performance data
+
+**Branch:** `feat/DMA-CONV-1-it3-e7`
+**User story:** As a customer, my DMA learns from past content performance and uses that data to suggest better themes and content in the next cycle, so that engagement improves automatically over time.
+
+---
+
+#### Story E7-S1: Inject content_analytics recommendations into theme cycle prompt
+
+**BLOCKED UNTIL:** Iteration 2 PR merged to main
+**Estimated time:** 90 min
+**Branch:** `feat/DMA-CONV-1-it3-e7`
+**CP BackEnd pattern:** N/A — Plant BackEnd only
+
+**What to do (self-contained):**
+
+`content_analytics.py` already has `get_content_recommendations(hired_agent_id, db)` which returns `top_dimensions`, `best_posting_hours`, `avg_engagement_rate`, and `recommendation_text` from `PerformanceStatModel`. This data is never fed back into the DMA conversation prompt.
+
+Changes:
+1. In `_theme_workshop_prompt()`, when the hired agent has performance history (PerformanceStatModel records exist), call `get_content_recommendations(hired_agent_id, db)` and inject the results into the prompt payload as a `performance_insights` section.
+2. In the system prompt, add: "Performance insights from previous content cycles are provided below. Use these to guide theme recommendations — favor topics and formats that drove higher engagement. Reference specific performance data when making suggestions."
+3. When no performance data exists (new customer), omit the section gracefully.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/services/content_analytics.py` | 1-129 | `get_content_recommendations()` — return shape, what metrics it provides |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 533-620 | `_theme_workshop_prompt()` — where to add performance insights |
+| `src/Plant/BackEnd/models/performance_stat.py` | 1-40 | `PerformanceStatModel` fields |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In `_theme_workshop_prompt()`: call `get_content_recommendations(hired_agent_id, db)`. If results exist and `avg_engagement_rate > 0`, add `performance_insights` section to the prompt payload. Add system prompt instruction to use performance data. |
+
+**Code patterns to copy exactly:**
+
+```python
+# Import at top:
+from services.content_analytics import get_content_recommendations
+
+# In _theme_workshop_prompt(), after brand_voice_section computation:
+performance_insights = {}
+try:
+    recommendations = await get_content_recommendations(
+        hired_agent_id=hired_agent.id, db=db
+    )
+    if recommendations and recommendations.get("avg_engagement_rate", 0) > 0:
+        performance_insights = {
+            "top_performing_dimensions": recommendations.get("top_dimensions", []),
+            "best_posting_hours": recommendations.get("best_posting_hours", []),
+            "avg_engagement_rate": recommendations["avg_engagement_rate"],
+            "recommendation_summary": recommendations.get("recommendation_text", ""),
+        }
+except Exception:
+    logger.warning("Could not load performance insights — proceeding without")
+
+# Add to prompt payload:
+"performance_insights": performance_insights,
+```
+
+**Acceptance criteria:**
+1. When the hired agent has performance data, the prompt payload includes `performance_insights` with top_performing_dimensions, best_posting_hours, avg_engagement_rate, and recommendation_summary.
+2. When no performance data exists, `performance_insights` is an empty dict — no error.
+3. The system prompt instructs the LLM to use performance data.
+4. Existing tests pass.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E7-S1-T1 | `src/Plant/BackEnd/tests/unit/test_dma_feedback_loop.py` | Mock `get_content_recommendations()` to return `{"avg_engagement_rate": 4.2, "top_dimensions": ["video", "carousel"]}`. Call `_theme_workshop_prompt()` | `performance_insights.avg_engagement_rate == 4.2` and `top_performing_dimensions` contains "video" |
+| E7-S1-T2 | same | Mock `get_content_recommendations()` to return `{"avg_engagement_rate": 0}` | `performance_insights == {}` |
+| E7-S1-T3 | same | Mock `get_content_recommendations()` to raise Exception | `performance_insights == {}`, no exception propagated |
+
+**Test command:**
+```bash
+cd src/Plant/BackEnd && pytest tests/unit/test_dma_feedback_loop.py -v
+```
+
+**Commit message:** `feat(DMA-CONV-1): E7-S1 — inject performance analytics into DMA conversation prompt`
+
+**Done signal:** `"E7-S1 done. Changed: digital_marketing_activation.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+#### Story E7-S2: Surface performance-driven suggestions in wizard UI
+
+**BLOCKED UNTIL:** E7-S1 committed
+**Estimated time:** 45 min
+**Branch:** `feat/DMA-CONV-1-it3-e7`
+**CP BackEnd pattern:** N/A — Plant BackEnd response + CP FrontEnd display
+
+**What to do (self-contained):**
+
+After E7-S1, the backend includes `performance_insights` in the workshop response. Surface this in the wizard UI as a collapsible "Performance Insights" card in the Brief Chat step (Step 2), so the customer can see what content worked before.
+
+Changes:
+1. In `DigitalMarketingActivationWizard.tsx`, extract `performance_insights` from the strategy workshop response.
+2. Add a collapsible Accordion section below the chat thread (when performance data exists) showing: "Your top-performing content types: {dimensions}. Average engagement: {rate}%. Recommendation: {text}."
+3. TypeScript interface update: add `performance_insights` type to the workshop response.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 2500-2640 | Brief Chat step layout, where to add the insights card |
+| `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts` | 1-60 | Workshop response TypeScript types |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | In Step 2 (Brief Chat), after the chat messages div, add a collapsible Accordion section that renders performance insights when `strategyWorkshop.performance_insights` has data. |
+| `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts` | modify | Add `performance_insights?: { top_performing_dimensions: string[], best_posting_hours: number[], avg_engagement_rate: number, recommendation_summary: string }` to the workshop TypeScript interface. |
+
+**Acceptance criteria:**
+1. When performance data exists in the workshop response, Step 2 shows a "Performance Insights" accordion.
+2. When no performance data exists, no accordion is shown (no empty state).
+3. Accordion shows top dimensions, engagement rate, and recommendation text.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E7-S2-T1 | `src/CP/FrontEnd/src/__tests__/DigitalMarketingActivationWizard.test.tsx` | Render wizard with mock workshop containing `performance_insights: { avg_engagement_rate: 4.2, top_performing_dimensions: ["video"], recommendation_summary: "Focus on video" }` | DOM contains "Performance Insights" heading and "video" text |
+| E7-S2-T2 | same | Render with `performance_insights: {}` | DOM does NOT contain "Performance Insights" heading |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingActivationWizard.test.tsx
+```
+
+**Commit message:** `feat(DMA-CONV-1): E7-S2 — performance insights card in wizard UI`
+
+**Done signal:** `"E7-S2 done. Changed: DigitalMarketingActivationWizard.tsx, digitalMarketingActivation.service.ts. Tests: T1 ✅ T2 ✅"`
+
+---
+
+### Epic E8: Platform-accurate content previews
+
+**Branch:** `feat/DMA-CONV-1-it3-e8`
+**User story:** As a customer, I see platform-accurate previews (YouTube thumbnail card, LinkedIn post card, Instagram square, etc.) of each content piece before approving, so I know exactly what will be posted.
+
+---
+
+#### Story E8-S1: Build YouTube/LinkedIn/Instagram preview components for approval UI
+
+**BLOCKED UNTIL:** Iteration 2 PR merged to main
+**Estimated time:** 90 min
+**Branch:** `feat/DMA-CONV-1-it3-e8`
+**CP BackEnd pattern:** N/A — CP FrontEnd only
+
+**What to do (self-contained):**
+
+Currently, generated content is shown as plain text/markdown in the approval step. Customers cannot visualize how it will look on each platform. Build platform-specific preview card components that approximate the real platform appearance.
+
+Changes:
+1. Create `src/CP/FrontEnd/src/components/PlatformPreviewCards.tsx` with 3 components:
+   - `YouTubePreviewCard`: Mimics a YouTube video card — thumbnail placeholder (16:9 aspect ratio), title (max 2 lines), channel name, view/date metadata.
+   - `LinkedInPreviewCard`: Mimics a LinkedIn post — profile header, post text, image placeholder, engagement bar (like/comment/repost/send).
+   - `InstagramPreviewCard`: Mimics an Instagram post — square image placeholder, caption below with hashtags.
+2. Each component accepts: `title: string`, `text: string`, `hashtags: string[]`, `thumbnailUrl?: string`, `channelName: string`.
+3. In `DigitalMarketingActivationWizard.tsx`, in the approval step (Step 4), replace the plain text rendering of posts with the appropriate platform preview component based on `post.channel`.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 2700-2964 | Step 4 (Review & Activate) — how posts are currently rendered for approval |
+| `src/CP/FrontEnd/src/components/DigitalMarketingArtifactPreviewCard.tsx` | 1-85 | Existing artifact preview patterns and styles |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/PlatformPreviewCards.tsx` | create | Create file with YouTubePreviewCard, LinkedInPreviewCard, and InstagramPreviewCard React components. Use WAOOAW dark theme (--bg-black: #0a0a0a, --color-neon-cyan: #00f2fe). Each component mimics the target platform layout. Export all three. |
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | In Step 4 post rendering, import the preview cards and conditionally render the appropriate one based on `post.channel`. Default to plain markdown if channel is unknown. |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// PlatformPreviewCards.tsx — Component structure
+import React from 'react'
+
+interface PlatformPreviewProps {
+  title: string
+  text: string
+  hashtags: string[]
+  thumbnailUrl?: string
+  channelName: string
+}
+
+export const YouTubePreviewCard: React.FC<PlatformPreviewProps> = ({
+  title, text, hashtags, thumbnailUrl, channelName
+}) => (
+  <div style={{
+    background: '#0f0f0f', borderRadius: '12px', overflow: 'hidden',
+    maxWidth: '360px', fontFamily: 'Roboto, sans-serif',
+  }}>
+    <div style={{
+      width: '100%', aspectRatio: '16/9',
+      background: thumbnailUrl ? `url(${thumbnailUrl}) center/cover` : 'linear-gradient(135deg, #667eea, #00f2fe)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#fff', fontSize: '48px',
+    }}>▶</div>
+    <div style={{ padding: '12px' }}>
+      <div style={{
+        color: '#f1f1f1', fontSize: '14px', fontWeight: 500,
+        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+        overflow: 'hidden', lineHeight: '20px', marginBottom: '8px',
+      }}>{title}</div>
+      <div style={{ color: '#aaa', fontSize: '12px' }}>{channelName}</div>
+    </div>
+  </div>
+)
+
+// LinkedInPreviewCard and InstagramPreviewCard follow the same pattern
+// with platform-appropriate layouts
+```
+
+**Acceptance criteria:**
+1. `YouTubePreviewCard` renders a video card with 16:9 thumbnail, title, and channel name.
+2. `LinkedInPreviewCard` renders a post with profile header, text, and engagement bar.
+3. `InstagramPreviewCard` renders a square image post with caption and hashtags.
+4. Step 4 of the wizard uses the correct preview component per channel.
+5. All components use WAOOAW dark theme colors.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E8-S1-T1 | `src/CP/FrontEnd/src/__tests__/PlatformPreviewCards.test.tsx` | Render `YouTubePreviewCard` with title="Test" channelName="WAOOAW" | DOM contains "Test" title and "WAOOAW" channel name |
+| E8-S1-T2 | same | Render `LinkedInPreviewCard` with text="Hello world" | DOM contains "Hello world" text and engagement bar icons |
+| E8-S1-T3 | same | Render `InstagramPreviewCard` with hashtags=["#ai", "#marketing"] | DOM contains "#ai" and "#marketing" |
+
+**Test command:**
+```bash
+cd src/CP/FrontEnd && npx vitest run src/__tests__/PlatformPreviewCards.test.tsx
+```
+
+**Commit message:** `feat(DMA-CONV-1): E8-S1 — platform-accurate preview cards (YouTube, LinkedIn, Instagram)`
+
+**Done signal:** `"E8-S1 done. Created: PlatformPreviewCards.tsx. Changed: DigitalMarketingActivationWizard.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+### Epic E9: End-to-end Docker validation
+
+**Branch:** `feat/DMA-CONV-1-it3-e9`
+**User story:** As a platform engineer, I can run a Docker-based test that validates the full DMA conversation → theme → content → preview → publish path end-to-end, so that regressions are caught before deploy.
+
+---
+
+#### Story E9-S1: End-to-end Docker validation for conversation → content → preview → publish path
+
+**BLOCKED UNTIL:** E7-S2 and E8-S1 committed
+**Estimated time:** 90 min
+**Branch:** `feat/DMA-CONV-1-it3-e9`
+**CP BackEnd pattern:** N/A
+
+**What to do (self-contained):**
+
+Create an integration test that exercises the full DMA path: conversation discovery (with required fields), theme generation, content generation with brand voice, artifact rendering, and schedule creation. This test runs against the local Docker stack using `docker-compose.test.yml`.
+
+Changes:
+1. Create `src/Plant/BackEnd/tests/integration/test_dma_e2e.py` with a test that:
+   a. Creates a mock hired agent with a DMA skill configuration.
+   b. Simulates a theme workshop conversation that fills all 11 required fields.
+   c. Verifies the conversation transitions to `approval_ready` status.
+   d. Verifies the workshop response contains `brief_progress.filled == 11`.
+   e. Verifies a master theme and derived themes are returned.
+   f. Triggers content generation and verifies posts are created with brand voice context.
+   g. Verifies artifact_metadata is populated for table artifacts.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/tests/` | directory listing | Existing test structure and fixtures |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 1-30, 90-120 | Route definitions, request/response models |
+| `docker-compose.test.yml` | 1-50 | How Plant BackEnd tests are configured |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/tests/integration/test_dma_e2e.py` | create | Create an integration test file with test_full_dma_conversation_to_content_path that exercises the complete DMA workflow. Use TestClient from FastAPI and mock the Grok client to return predetermined responses that fill all required fields over 3 conversation turns. |
+
+**Code patterns to copy exactly:**
+
+```python
+"""End-to-end integration test for DMA conversation → content pipeline."""
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, patch
+
+# NFR: waooaw_router pattern — test must use the app that uses waooaw_router
+from app.main import app
+
+client = TestClient(app)
+
+
+class TestDMAE2E:
+    """Full-path DMA conversation → theme → content → artifact."""
+
+    @pytest.fixture(autouse=True)
+    def setup_mocks(self):
+        """Mock external dependencies for isolated testing."""
+        # Mock Grok client, database sessions, etc.
+        pass
+
+    def test_conversation_reaches_approval_ready(self):
+        """After filling all 11 required fields, status transitions to approval_ready."""
+        # Test implementation
+        pass
+
+    def test_artifact_metadata_populated_for_table(self):
+        """Table artifacts include artifact_metadata.table_preview with columns and rows."""
+        # Test implementation
+        pass
+
+    def test_brand_voice_injected_when_available(self):
+        """When customer has a brand voice, it appears in the prompt payload."""
+        # Test implementation
+        pass
+```
+
+**Acceptance criteria:**
+1. Integration test file exists and can be discovered by pytest.
+2. `test_conversation_reaches_approval_ready` validates the full 11-field collection → approval_ready transition.
+3. `test_artifact_metadata_populated_for_table` validates table artifacts have structured preview data.
+4. `test_brand_voice_injected_when_available` validates brand voice injection.
+5. All tests pass with mocked Grok client (no real LLM calls).
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E9-S1-T1 | `src/Plant/BackEnd/tests/integration/test_dma_e2e.py` | Simulate 3 conversation turns filling all 11 fields | Final response status is `approval_ready`, `brief_progress.filled == 11` |
+| E9-S1-T2 | same | Generate table artifact from derived themes | `artifact_metadata.table_preview.columns` has 4 items |
+| E9-S1-T3 | same | Load brand voice before prompt call | Prompt payload contains `brand_voice_context.tone_keywords` |
+
+**Test command:**
+```bash
+cd src/Plant/BackEnd && pytest tests/integration/test_dma_e2e.py -v
+# Or via Docker:
+docker-compose -f docker-compose.test.yml run plant-test pytest tests/integration/test_dma_e2e.py -v
+```
+
+**Commit message:** `feat(DMA-CONV-1): E9-S1 — end-to-end DMA integration test`
+
+**Done signal:** `"E9-S1 done. Created: test_dma_e2e.py. Tests: T1 ✅ T2 ✅ T3 ✅"`
+
+---
+
+## Appendix: File Index
+
+All files referenced in this plan, grouped by service:
+
+### Plant BackEnd
+| File | Purpose | Stories |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | Main DMA API — prompt, parsing, draft builder | E1-S1, E1-S2, E2-S1, E2-S2, E3-S1, E4-S1, E4-S2, E5-S1, E5-S2, E6-S1, E7-S1 |
+| `src/Plant/BackEnd/agent_mold/reference_agents.py` | THEME_DISCOVERY_REQUIRED_FIELDS | E1-S1, E1-S2, E2-S2 |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | Theme and post generation | E4-S1, E5-S2 |
+| `src/Plant/BackEnd/services/brand_voice_service.py` | Brand voice CRUD | E4-S1 |
+| `src/Plant/BackEnd/services/content_analytics.py` | Performance recommendations + posting times | E6-S1, E7-S1 |
+| `src/Plant/BackEnd/models/brand_voice.py` | BrandVoiceModel | E4-S1 |
+| `src/Plant/BackEnd/models/performance_stat.py` | PerformanceStatModel | E7-S1 |
+| `src/Plant/BackEnd/services/draft_batches.py` | DraftPostRecord schema | E3-S1 |
+
+### CP FrontEnd
+| File | Purpose | Stories |
+|---|---|---|
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 4-step DMA wizard UI | E2-S1, E3-S1, E6-S1, E7-S2, E8-S1 |
+| `src/CP/FrontEnd/src/components/DigitalMarketingArtifactPreviewCard.tsx` | Artifact preview rendering | E3-S1, E3-S2 |
+| `src/CP/FrontEnd/src/components/PlatformPreviewCards.tsx` | Platform preview components (new) | E8-S1 |
+| `src/CP/FrontEnd/src/services/digitalMarketingActivation.service.ts` | Workshop TypeScript types | E2-S1, E7-S2 |
+
+### Tests
+| File | Purpose | Stories |
+|---|---|---|
+| `src/Plant/BackEnd/tests/unit/test_dma_prompt_fields.py` (new) | Prompt field injection, validation gate, progress | E1-S1, E1-S2, E2-S1, E2-S2 |
+| `src/Plant/BackEnd/tests/unit/test_dma_auto_draft.py` (new) | Auto-draft table artifact | E3-S1 |
+| `src/Plant/BackEnd/tests/unit/test_dma_brand_voice.py` (new) | Brand voice injection, content pillars | E4-S1, E4-S2 |
+| `src/Plant/BackEnd/tests/unit/test_dma_market_context.py` (new) | Competitor/niche context, hashtags | E5-S1, E5-S2 |
+| `src/Plant/BackEnd/tests/unit/test_posting_time.py` (new) | Posting time recommendations | E6-S1 |
+| `src/Plant/BackEnd/tests/unit/test_dma_feedback_loop.py` (new) | Performance analytics injection | E7-S1 |
+| `src/Plant/BackEnd/tests/integration/test_dma_e2e.py` (new) | End-to-end DMA path | E9-S1 |
+| `src/CP/FrontEnd/src/__tests__/DigitalMarketingArtifactPreviewCard.test.tsx` | Artifact preview tests | E3-S1, E3-S2 |
+| `src/CP/FrontEnd/src/__tests__/DigitalMarketingActivationWizard.test.tsx` | Wizard UI tests | E2-S1, E6-S1, E7-S2 |
+| `src/CP/FrontEnd/src/__tests__/PlatformPreviewCards.test.tsx` (new) | Platform preview tests | E8-S1 |
