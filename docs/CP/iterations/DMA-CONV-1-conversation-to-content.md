@@ -855,7 +855,365 @@ cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingArtifactPrevi
 
 ## Iteration 2 — Content Quality Features
 
-> Stories for Iteration 2 will be committed in the next chunk.
+**Scope:** Brand voice injection, content-pillar framework, competitor/niche context, hashtag/SEO strategy, posting-time optimization.
+**Lane:** B — Plant BackEnd service integration + prompt enhancement + CP FrontEnd UX
+**⏱ Estimated:** 5h | **Come back:** 2026-04-15 06:00 UTC
+**Epics:** E4, E5, E6
+**Advances:** P2 DMA value — generated content is commercially competitive (branded, niche-aware, SEO-optimized, timed correctly).
+
+### Dependency Map (Iteration 2)
+
+```
+E4-S1 ──► E4-S2    (S2 content pillars build on brand voice context from S1)
+E5-S1 ──► E5-S2    (S2 hashtag injection needs competitor/niche data from S1)
+E6-S1              (independent — posting-time optimization)
+```
+
+All three epics are independent of each other, but within E4 and E5, stories are sequential.
+
+---
+
+### Epic E4: Brand voice feeds content quality
+
+**Branch:** `feat/DMA-CONV-1-it2-e4`
+**User story:** As a customer, my brand voice is automatically loaded into every DMA conversation and content generation call, so that all generated content sounds like my brand without me repeating preferences.
+
+---
+
+#### Story E4-S1: Inject brand voice into conversation prompt and content generation
+
+**BLOCKED UNTIL:** Iteration 1 PR merged to main
+**Estimated time:** 90 min
+**Branch:** `feat/DMA-CONV-1-it2-e4`
+**CP BackEnd pattern:** N/A — Plant BackEnd only
+
+**What to do (self-contained):**
+
+`BrandVoiceModel` already exists at `src/Plant/BackEnd/models/brand_voice.py` with fields `tone_keywords`, `vocabulary_preferences`, `messaging_patterns`, `example_phrases`, `voice_description`. The service at `src/Plant/BackEnd/services/brand_voice_service.py` has `get_brand_voice(customer_id, db)`. Neither is called from the DMA conversation prompt or content generation path.
+
+Changes:
+1. In `_theme_workshop_prompt()`, load the customer's brand voice via `brand_voice_service.get_brand_voice()` and inject it into the prompt payload as a `brand_voice_context` section.
+2. Add a system prompt instruction: "Use this brand voice throughout the conversation and generated content. Match tone, vocabulary, and messaging patterns exactly."
+3. In `src/Plant/BackEnd/agent_mold/skills/content_creator.py`, in `generate_posts_for_theme()`, load brand voice and pass it as the `brand_voice_context` parameter (already exists as empty string).
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/services/brand_voice_service.py` | 1-42 | `get_brand_voice(customer_id, db)` signature and return shape |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 1-50, 180-220 | `generate_posts_for_theme()` brand_voice_context parameter |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 533-620 | `_theme_workshop_prompt()` — where to add brand voice |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In `_theme_workshop_prompt()`: call `brand_voice_service.get_brand_voice(customer_id, db)` where `customer_id` is extracted from the hired agent relation. If a brand voice exists, add a `brand_voice_context` section to the prompt payload with the tone_keywords, vocabulary_preferences, messaging_patterns, example_phrases, and voice_description. In the system prompt, add: "The customer's brand voice is provided. Use this exact tone, vocabulary, and messaging patterns in all conversation responses and generated content." |
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | In `generate_posts_for_theme()`: accept a `db` session and `customer_id` parameter. If `brand_voice_context` is empty, load it from `brand_voice_service.get_brand_voice(customer_id, db)` and format it as a summary string. |
+
+**Code patterns to copy exactly:**
+
+```python
+# In digital_marketing_activation.py, import:
+from services.brand_voice_service import get_brand_voice
+
+# In _theme_workshop_prompt(), before building final payload:
+brand_voice = await get_brand_voice(customer_id=hired_agent.customer_id, db=db)
+brand_voice_section = {}
+if brand_voice:
+    brand_voice_section = {
+        "tone_keywords": brand_voice.tone_keywords or [],
+        "vocabulary_preferences": brand_voice.vocabulary_preferences or [],
+        "messaging_patterns": brand_voice.messaging_patterns or [],
+        "example_phrases": brand_voice.example_phrases or [],
+        "voice_description": brand_voice.voice_description or "",
+    }
+
+# Add to prompt payload:
+"brand_voice_context": brand_voice_section,
+```
+
+**Acceptance criteria:**
+1. When a customer has a saved brand voice, the DMA prompt payload includes `brand_voice_context` with all five fields.
+2. When no brand voice exists, `brand_voice_context` is an empty dict (graceful degradation).
+3. Content generation in `generate_posts_for_theme()` uses brand voice when available.
+4. All existing tests pass.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S1-T1 | `src/Plant/BackEnd/tests/unit/test_dma_brand_voice.py` | Mock `get_brand_voice()` to return a BrandVoiceModel with tone_keywords=["bold","direct"]. Call `_theme_workshop_prompt()` | Prompt payload contains `brand_voice_context.tone_keywords == ["bold","direct"]` |
+| E4-S1-T2 | same | Mock `get_brand_voice()` to return None. Call `_theme_workshop_prompt()` | Prompt payload contains `brand_voice_context == {}` |
+
+**Test command:**
+```bash
+cd src/Plant/BackEnd && pytest tests/unit/test_dma_brand_voice.py -v
+```
+
+**Commit message:** `feat(DMA-CONV-1): E4-S1 — inject brand voice into DMA prompt and content generation`
+
+**Done signal:** `"E4-S1 done. Changed: digital_marketing_activation.py, content_creator.py. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E4-S2: Add content-pillar framework to prompt guidance
+
+**BLOCKED UNTIL:** E4-S1 committed
+**Estimated time:** 45 min
+**Branch:** `feat/DMA-CONV-1-it2-e4`
+**CP BackEnd pattern:** N/A — Plant BackEnd only
+
+**What to do (self-contained):**
+
+Content pillars are recurring categories (3-5) that anchor a content strategy — e.g., "Educational", "Behind the scenes", "Customer stories", "Industry trends", "Product showcase". Currently the DMA prompt has no content-pillar concept. The LLM generates themes ad hoc without strategic structure.
+
+Changes:
+1. In the system prompt within `_theme_workshop_prompt()`, add guidance: "During discovery, help the customer define 3-5 content pillars — recurring categories that all content should map to. Examples: Educational, Behind the scenes, Customer stories, Industry trends, Product showcase. Each derived theme must map to one pillar. Include `content_pillars` in the summary."
+2. Add `content_pillars` to the response contract summary section as an optional list of strings.
+3. Add content pillars to `_FIELD_TO_SUMMARY_KEY` mapping and update the progress counter logic to count it as a bonus field (not required, but tracked).
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 533-620, 1080-1130 | System prompt, response contract summary section |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | 1. System prompt: add content-pillar guidance text. 2. Response contract summary: add `content_pillars: ["pillar1", ...]` as optional field. 3. In derived_themes response contract: add `pillar: "pillar_name"` field. |
+
+**Acceptance criteria:**
+1. System prompt includes content-pillar guidance with examples.
+2. Response contract summary section includes `content_pillars` as an optional list.
+3. Derived themes response contract includes `pillar` field.
+4. Existing tests pass.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S2-T1 | `src/Plant/BackEnd/tests/unit/test_dma_brand_voice.py` | Call `_theme_workshop_prompt()` | System prompt text contains the substring "content pillars" (case-insensitive) |
+
+**Test command:**
+```bash
+cd src/Plant/BackEnd && pytest tests/unit/test_dma_brand_voice.py -v
+```
+
+**Commit message:** `feat(DMA-CONV-1): E4-S2 — content-pillar framework in DMA prompt guidance`
+
+**Done signal:** `"E4-S2 done. Changed: digital_marketing_activation.py. Tests: T1 ✅"`
+
+---
+
+### Epic E5: Market-aware theme creation
+
+**Branch:** `feat/DMA-CONV-1-it2-e5`
+**User story:** As a customer, the DMA asks about my competitors and niche keywords during discovery, and uses that context to generate differentiated themes with niche-specific hashtags and SEO terms.
+
+---
+
+#### Story E5-S1: Add competitor/niche context fields to discovery and prompt
+
+**BLOCKED UNTIL:** Iteration 1 PR merged to main
+**Estimated time:** 45 min
+**Branch:** `feat/DMA-CONV-1-it2-e5`
+**CP BackEnd pattern:** N/A — Plant BackEnd only
+
+**What to do (self-contained):**
+
+The DMA conversation currently never asks about competitors or niche-specific keywords. Add two new fields to the discovery prompt:
+- `competitor_names`: list of 2-5 competitor names/handles the customer wants to differentiate from
+- `niche_keywords`: list of 5-10 niche-specific keywords relevant to the customer's industry
+
+Changes:
+1. In the system prompt, add instructions: "Ask the customer to name 2-5 competitors or industry peers they want to differentiate from. Also ask for 5-10 niche keywords or topics that are trending in their space."
+2. Add `competitor_names` and `niche_keywords` to the response contract summary section.
+3. Add both fields to `_FIELD_TO_SUMMARY_KEY` mapping — these are optional fields (not in the 11 required, but tracked in the summary).
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 533-620, 1080-1130 | System prompt, response contract summary section |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | 1. System prompt: add competitor and niche discovery instructions. 2. Response contract summary: add `competitor_names: [...]` and `niche_keywords: [...]` fields. |
+
+**Acceptance criteria:**
+1. System prompt instructs the LLM to ask about competitors and niche keywords.
+2. Response contract summary includes both new fields.
+3. Existing tests pass.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E5-S1-T1 | `src/Plant/BackEnd/tests/unit/test_dma_market_context.py` | Call `_theme_workshop_prompt()` | System prompt text contains "competitor" |
+| E5-S1-T2 | same | Same call | Response contract summary section contains keys `competitor_names` and `niche_keywords` |
+
+**Test command:**
+```bash
+cd src/Plant/BackEnd && pytest tests/unit/test_dma_market_context.py -v
+```
+
+**Commit message:** `feat(DMA-CONV-1): E5-S1 — competitor/niche context in DMA discovery prompt`
+
+**Done signal:** `"E5-S1 done. Changed: digital_marketing_activation.py. Tests: T1 ✅ T2 ✅"`
+
+---
+
+#### Story E5-S2: Inject niche hashtags and SEO keywords into content generation
+
+**BLOCKED UNTIL:** E5-S1 committed
+**Estimated time:** 45 min
+**Branch:** `feat/DMA-CONV-1-it2-e5`
+**CP BackEnd pattern:** N/A — Plant BackEnd only
+
+**What to do (self-contained):**
+
+After discovery captures `competitor_names` and `niche_keywords`, the content generation pipeline in `content_creator.py` should use these to produce more targeted hashtags and SEO keywords in each post.
+
+Changes:
+1. In `content_creator.py` → `generate_posts_for_theme()`, accept new parameters `niche_keywords: list[str] = []` and `competitor_context: list[str] = []`.
+2. In the post-generation prompt sent to Grok, include: "Use these niche keywords where relevant: {niche_keywords}. Differentiate from these competitors: {competitor_context}. Include 3-5 niche-specific hashtags per post."
+3. In `digital_marketing_activation.py`, when calling `generate_posts_for_theme()`, pass the `niche_keywords` and `competitor_names` from the workshop summary.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | 180-298 | `generate_posts_for_theme()` — prompt construction, params |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | 280-320 | Where `generate_posts_for_theme()` is called |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/agent_mold/skills/content_creator.py` | modify | Add `niche_keywords: list[str] = []` and `competitor_context: list[str] = []` params to `generate_posts_for_theme()`. Inject into the Grok prompt. |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | At the call site of `generate_posts_for_theme()`, extract `niche_keywords` and `competitor_names` from workshop summary and pass them. |
+
+**Acceptance criteria:**
+1. `generate_posts_for_theme()` accepts and uses niche_keywords and competitor_context.
+2. The Grok prompt for post generation includes the niche keywords and competitor names.
+3. Existing tests pass.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E5-S2-T1 | `src/Plant/BackEnd/tests/unit/test_dma_market_context.py` | Call `generate_posts_for_theme()` with `niche_keywords=["ai tutoring", "edtech"]` | The prompt sent to Grok contains "ai tutoring" and "edtech" |
+| E5-S2-T2 | same | Call with empty lists | Prompt does not contain "niche keywords" section (graceful degradation) |
+
+**Test command:**
+```bash
+cd src/Plant/BackEnd && pytest tests/unit/test_dma_market_context.py -v
+```
+
+**Commit message:** `feat(DMA-CONV-1): E5-S2 — niche hashtags and SEO in content generation`
+
+**Done signal:** `"E5-S2 done. Changed: content_creator.py, digital_marketing_activation.py. Tests: T1 ✅ T2 ✅"`
+
+---
+
+### Epic E6: Optimal posting schedule
+
+**Branch:** `feat/DMA-CONV-1-it2-e6`
+**User story:** As a customer, the DMA recommends the best posting times based on my industry and audience, so I maximize engagement without manual research.
+
+---
+
+#### Story E6-S1: Add posting-time recommendation based on industry and audience data
+
+**BLOCKED UNTIL:** Iteration 1 PR merged to main
+**Estimated time:** 90 min
+**Branch:** `feat/DMA-CONV-1-it2-e6`
+**CP BackEnd pattern:** N/A — Plant BackEnd only + CP FrontEnd display
+
+**What to do (self-contained):**
+
+`content_analytics.py` already has `get_content_recommendations()` which returns `best_posting_hours` (list of hours). This data is never surfaced to the customer during the scheduling step.
+
+Changes:
+1. In Plant BackEnd: create a new helper `get_posting_time_suggestions(industry: str, channel: str, audience_profile: str)` in `src/Plant/BackEnd/services/content_analytics.py` that combines the existing `best_posting_hours` from historical performance data with industry-standard defaults if no data exists. Returns a list of `{ day: str, time: str, reason: str }` recommendations.
+2. In the schedule-related prompt/response: when the conversation reaches the scheduling step (status near approval_ready), include posting-time suggestions in the prompt context.
+3. In CP FrontEnd `DigitalMarketingActivationWizard.tsx`: in Step 3 (Plan step), display posting-time recommendations as a subtle info card alongside the schedule selector. Data comes from the workshop response.
+
+**Files to read first (max 3):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/Plant/BackEnd/services/content_analytics.py` | 1-129 | `get_content_recommendations()` return shape, `best_posting_hours` |
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | 1250-1350 | Step 3 (Plan) schedule selector UI |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/Plant/BackEnd/services/content_analytics.py` | modify | Add `get_posting_time_suggestions(industry, channel, audience_profile)` function that returns industry-standard posting time suggestions as a list of dicts. Use existing `best_posting_hours` if available from performance data, otherwise use hardcoded industry defaults. |
+| `src/Plant/BackEnd/api/v1/digital_marketing_activation.py` | modify | In the workshop response, when status is `approval_ready` or workshop progress shows 9+ fields filled, add `posting_time_suggestions` to the response by calling `get_posting_time_suggestions()`. |
+| `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx` | modify | In Step 3, render posting-time suggestions as a card: "Recommended posting times" with day, time, and reason per row. |
+
+**Code patterns to copy exactly:**
+
+```python
+# In content_analytics.py:
+_INDUSTRY_POSTING_DEFAULTS = {
+    "marketing": [
+        {"day": "Tuesday", "time": "10:00 AM", "reason": "Highest B2B engagement window"},
+        {"day": "Thursday", "time": "2:00 PM", "reason": "Pre-weekend content consumption spike"},
+        {"day": "Saturday", "time": "9:00 AM", "reason": "Weekend discovery browsing"},
+    ],
+    "education": [
+        {"day": "Monday", "time": "8:00 AM", "reason": "Start-of-week study planning"},
+        {"day": "Wednesday", "time": "4:00 PM", "reason": "After-school content peak"},
+        {"day": "Sunday", "time": "7:00 PM", "reason": "Weekend revision session"},
+    ],
+    "sales": [
+        {"day": "Tuesday", "time": "9:00 AM", "reason": "Decision-maker morning email window"},
+        {"day": "Wednesday", "time": "11:00 AM", "reason": "Mid-week pipeline review"},
+        {"day": "Thursday", "time": "3:00 PM", "reason": "Pre-Friday urgency window"},
+    ],
+}
+
+async def get_posting_time_suggestions(
+    industry: str,
+    channel: str = "youtube",
+    audience_profile: str = "",
+) -> list[dict]:
+    """Return posting-time recommendations for the given industry and channel."""
+    defaults = _INDUSTRY_POSTING_DEFAULTS.get(industry.lower(), _INDUSTRY_POSTING_DEFAULTS["marketing"])
+    return defaults
+```
+
+**Acceptance criteria:**
+1. `get_posting_time_suggestions()` returns a list of 3+ posting time recommendations with day, time, and reason.
+2. The workshop response includes `posting_time_suggestions` when the customer is near the scheduling step.
+3. Step 3 of the wizard displays posting-time recommendations.
+4. If no industry match, falls back to marketing defaults.
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E6-S1-T1 | `src/Plant/BackEnd/tests/unit/test_posting_time.py` | Call `get_posting_time_suggestions("education", "youtube")` | Returns 3 items each with day, time, reason keys |
+| E6-S1-T2 | same | Call with `"unknown_industry"` | Returns marketing defaults (3 items) |
+| E6-S1-T3 | `src/CP/FrontEnd/src/__tests__/DigitalMarketingActivationWizard.test.tsx` | Render Step 3 with mock `posting_time_suggestions` data | DOM contains "Recommended posting times" text and 3 time entries |
+
+**Test command:**
+```bash
+cd src/Plant/BackEnd && pytest tests/unit/test_posting_time.py -v
+cd src/CP/FrontEnd && npx vitest run src/__tests__/DigitalMarketingActivationWizard.test.tsx
+```
+
+**Commit message:** `feat(DMA-CONV-1): E6-S1 — posting-time optimization recommendations`
+
+**Done signal:** `"E6-S1 done. Changed: content_analytics.py, digital_marketing_activation.py, DigitalMarketingActivationWizard.tsx. Tests: T1 ✅ T2 ✅ T3 ✅"`
 
 ---
 
