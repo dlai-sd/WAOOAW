@@ -13,6 +13,7 @@ from fastapi import Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agent_mold.reference_agents import THEME_DISCOVERY_REQUIRED_FIELDS
 from agent_mold.skills.content_models import Campaign, CampaignWorkflowState, DailyThemeItem, estimate_cost
 from agent_mold.skills.executor import execute_marketing_multichannel_v1
 from agent_mold.skills.grok_client import GrokClientError, get_grok_client, grok_complete
@@ -36,6 +37,22 @@ logger.addFilter(PiiMaskingFilter())
 
 _WORKSPACE_KEY = "digital_marketing_activation"
 _DIGITAL_MARKETING_AGENT_TYPE = "marketing.digital_marketing.v1"
+
+# Canonical mapping from THEME_DISCOVERY_REQUIRED_FIELDS to workshop summary keys.
+# Defined once at module level to avoid drift between prompt construction and validation.
+_FIELD_TO_SUMMARY_KEY: dict[str, str] = {
+    "business_background": "business_focus",
+    "objective": "business_goal",
+    "industry": "profession_name",
+    "locality": "location_focus",
+    "target_audience": "audience",
+    "persona": "customer_profile",
+    "tone": "tone",
+    "offer": "cta",
+    "channel_intent": "youtube_angle",
+    "posting_cadence": "first_content_direction",
+    "success_metrics": "positioning",
+}
 
 
 class ActivationWorkspaceUpsertRequest(BaseModel):
@@ -190,11 +207,19 @@ async def _build_auto_draft(
                 "| # | Theme | Description | Frequency |",
                 "|---|-------|-------------|-----------|",
             ]
+            table_preview_rows = []
             for i, theme in enumerate(derived_themes, 1):
                 title = str(theme.get("title") or "").replace("|", "\\|")
                 desc = str(theme.get("description") or "").replace("|", "\\|")
                 freq = str(theme.get("frequency") or "").replace("|", "\\|")
                 table_lines.append(f"| {i} | {title} | {desc} | {freq} |")
+                # Build structured table_preview for frontend
+                table_preview_rows.append({
+                    "#": str(i),
+                    "Theme": str(theme.get("title") or ""),
+                    "Description": str(theme.get("description") or ""),
+                    "Frequency": str(theme.get("frequency") or "weekly"),
+                })
             table_text = header + "\n".join(table_lines)
         else:
             table_text = (
@@ -203,6 +228,12 @@ async def _build_auto_draft(
                 "|---|-------|-------------|----------|\n"
                 f"| 1 | {master_theme_val} | Content plan for {brand_name or 'your brand'} | weekly |\n"
             )
+            table_preview_rows = [{
+                "#": "1",
+                "Theme": master_theme_val,
+                "Description": f"Content plan for {brand_name or 'your brand'}",
+                "Frequency": "weekly",
+            }]
 
         posts.append(
             DraftPostRecord(
@@ -211,6 +242,12 @@ async def _build_auto_draft(
                 text=table_text,
                 artifact_type="table",
                 hashtags=[],
+                artifact_metadata={
+                    "table_preview": {
+                        "columns": ["#", "Theme", "Description", "Frequency"],
+                        "rows": table_preview_rows,
+                    }
+                },
             )
         )
 
@@ -383,7 +420,7 @@ def _normalize_workshop_messages(raw_messages: Any) -> list[dict[str, str]]:
         if role not in {"assistant", "user"} or not content:
             continue
         normalized.append({"role": role, "content": content})
-    return normalized[-4:]
+    return normalized[-12:]
 
 
 def _normalize_string_list(raw_items: Any) -> list[str]:
@@ -546,6 +583,19 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
     workshop = _normalize_strategy_workshop(campaign_setup.get("strategy_workshop"), workspace)
     profession_label = _infer_profession_label(workspace, workshop)
     pending_input = str(campaign_setup.get("strategy_workshop", {}).get("pending_input") or "").strip() if isinstance(campaign_setup.get("strategy_workshop"), dict) else ""
+    
+    # Compute locked and missing fields
+    summary = workshop["summary"]
+    locked_fields = {}
+    missing_fields = []
+    for req_field in THEME_DISCOVERY_REQUIRED_FIELDS:
+        summary_key = _FIELD_TO_SUMMARY_KEY.get(req_field, req_field)
+        value = str(summary.get(summary_key) or "").strip()
+        if value:
+            locked_fields[req_field] = value
+        else:
+            missing_fields.append(req_field)
+    
     return json.dumps(
         {
             "operating_mode": {
@@ -580,6 +630,13 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
                 "messages": workshop["messages"],
                 "summary": workshop["summary"],
                 "follow_up_questions": workshop["follow_up_questions"],
+                "required_fields_checklist": {
+                    "total": len(THEME_DISCOVERY_REQUIRED_FIELDS),
+                    "filled": len(locked_fields),
+                    "missing": len(missing_fields),
+                    "locked_fields": locked_fields,
+                    "missing_fields": missing_fields,
+                },
             },
             "pending_customer_input": pending_input,
             "response_contract": {
@@ -590,20 +647,20 @@ def _theme_workshop_prompt(workspace: dict[str, Any], campaign_setup: dict[str, 
                 "time_saving_note": "One sentence that makes it explicit how you are saving the customer's time.",
                 "status": "One of discovery or approval_ready.",
                 "summary": {
-                    "profession_name": "Beauty Artist / Doctor / Share Trader / Tutor / etc.",
-                    "location_focus": "Locality or geography to prioritize.",
-                    "customer_profile": "Age, life-stage, income, event, or motivation summary.",
+                    "profession_name": "Beauty Artist / Doctor / Share Trader / Tutor / etc.  [canonical: industry]",
+                    "location_focus": "Locality or geography to prioritize.  [canonical: locality]",
+                    "customer_profile": "Age, life-stage, income, event, or motivation summary.  [canonical: persona]",
                     "service_focus": "Key services or offer cluster.",
                     "signature_differentiator": "What makes the business distinct.",
-                    "business_goal": "Primary commercial goal from content.",
-                    "first_content_direction": "Recommended first angle or series to start with.",
-                    "business_focus": "Short sentence.",
-                    "audience": "Short sentence.",
-                    "positioning": "Short sentence.",
-                    "tone": "Short sentence.",
+                    "business_goal": "Primary commercial goal from content.  [canonical: objective]",
+                    "first_content_direction": "Recommended first angle or series to start with.  [canonical: posting_cadence]",
+                    "business_focus": "Short sentence.  [canonical: business_background]",
+                    "audience": "Short sentence.  [canonical: target_audience]",
+                    "positioning": "Short sentence.  [canonical: success_metrics]",
+                    "tone": "Short sentence.  [canonical: tone]",
                     "content_pillars": ["Three concise pillars."],
-                    "youtube_angle": "Short sentence.",
-                    "cta": "Short sentence.",
+                    "youtube_angle": "Short sentence.  [canonical: channel_intent]",
+                    "cta": "Short sentence.  [canonical: offer]",
                 },
                 "master_theme": "A clear approved-ready master theme statement.",
                 "derived_themes": [
@@ -753,6 +810,37 @@ def _parse_theme_workshop_response(
         workshop["approved_at"] = None
         if not workshop["next_step_options"]:
             workshop["next_step_options"] = ["Approve this direction", "Refine the positioning", "Request another theme version"]
+    
+    # E1-S2: Server-side field-completeness validation gate
+    filled_count = sum(
+        1 for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
+        if str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+    )
+    
+    # E2-S1: Add brief_progress to workshop dict
+    workshop["brief_progress"] = {
+        "filled": filled_count,
+        "total": len(THEME_DISCOVERY_REQUIRED_FIELDS),
+        "missing_fields": [
+            req_field for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
+            if not str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+        ],
+        "locked_fields": {
+            req_field: str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+            for req_field in THEME_DISCOVERY_REQUIRED_FIELDS
+            if str(workshop["summary"].get(_FIELD_TO_SUMMARY_KEY.get(req_field, req_field)) or "").strip()
+        },
+    }
+    
+    if workshop["status"] == "approval_ready" and filled_count < 9:
+        logger.warning(
+            "LLM tried approval_ready with only %d/%d fields filled — forcing discovery",
+            filled_count, len(THEME_DISCOVERY_REQUIRED_FIELDS),
+        )
+        workshop["status"] = "discovery"
+        if not workshop["current_focus_question"]:
+            workshop["current_focus_question"] = "A few details are still needed before I can lock the strategy. What is the primary business result this content should drive?"
+    
     return master_theme or "Digital marketing activation plan", derived_themes, workshop
 
 
@@ -1083,8 +1171,16 @@ async def generate_theme_plan(
                 "You are the Digital Marketing Agent the customer has already hired, and you are running a live strategy conversation. "
                 "Sound like a world-class strategist inside a premium chat product: warm, confident, commercially sharp, and easy to reply to. "
                 "Do not sound like a wizard, onboarding checklist, status dashboard, or form. Lead the customer through the fewest possible questions, "
-                "extract signal quickly, and make each reply feel useful enough that the customer wants to keep going. Ask probing questions only until the "
-                "strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. Always return JSON matching the requested response contract."
+                "extract signal quickly, and make each reply feel useful enough that the customer wants to keep going. "
+                "\n\nREQUIRED FIELDS COLLECTION RULES:\n"
+                "Here are the 11 fields you must collect. When a field has a value, it is LOCKED — never ask about it again. "
+                "The required fields are: business_background, objective, industry, locality, target_audience, persona, tone, offer, channel_intent, posting_cadence, success_metrics. "
+                "When the customer gives a direct answer, lock that field and confirm in one sentence. Do NOT re-offer locked fields as next-step options. "
+                "When all 11 fields are filled, you MUST set status to approval_ready and present the master theme for approval. Do not ask more questions. "
+                "\n\nDELIVERABLE REQUEST RULE:\n"
+                "When the customer asks for any concrete deliverable (plan, table, draft, schedule), produce it immediately. Do not deflect with more questions. "
+                "\n\nAsk probing questions only until the strategy is strong enough for approval, then return a clear master theme, 2-4 derived themes, and a structured summary. "
+                "Always return JSON matching the requested response contract."
             ),
             user=_theme_workshop_prompt(workspace, campaign_setup),
             model="grok-3-latest",

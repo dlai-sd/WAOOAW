@@ -63,6 +63,12 @@ export type DigitalMarketingStrategyWorkshop = {
   messages?: DigitalMarketingStrategyWorkshopMessage[]
   summary?: DigitalMarketingStrategyWorkshopSummary
   approved_at?: string | null
+  brief_progress?: {
+    filled: number
+    total: number
+    missing_fields: string[]
+    locked_fields: Record<string, string>
+  }
 }
 
 export type DigitalMarketingCampaignSetup = {

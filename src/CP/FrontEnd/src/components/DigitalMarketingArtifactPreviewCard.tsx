@@ -1,3 +1,5 @@
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { DraftPost } from '../services/marketingReview.service'
 
 function renderTablePreview(post: DraftPost) {
@@ -6,6 +8,14 @@ function renderTablePreview(post: DraftPost) {
     | undefined
 
   if (!preview?.columns?.length || !preview?.rows?.length) {
+    // Fallback: render raw markdown table if post.text contains pipe characters
+    if (post.text && post.text.includes('|')) {
+      return (
+        <div style={{ overflowX: 'auto' }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.text}</ReactMarkdown>
+        </div>
+      )
+    }
     return null
   }
 
