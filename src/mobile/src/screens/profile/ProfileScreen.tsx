@@ -61,6 +61,7 @@ export const ProfileScreen = () => {
         { label: 'Edit Profile', icon: '✏️', action: () => navigation.navigate('EditProfile') },
         { label: 'Payment Methods', icon: '💳', action: () => navigation.navigate('PaymentMethods') },
         { label: 'Subscription Management', icon: '📋', action: () => navigation.navigate('SubscriptionManagement') },
+        { label: 'Usage & Billing', icon: '🧾', action: () => navigation.navigate('UsageBilling') },
       ],
     },
     {

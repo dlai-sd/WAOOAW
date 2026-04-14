@@ -16,6 +16,32 @@ describe('Navigation Configuration', () => {
       expect(src).toContain('name="HireWizard"');
       expect(src).toContain('HireWizardScreen');
     });
+
+    it('registers parity screens in MyAgentsNavigator', () => {
+      const fs = require('fs');
+      const path = require('path');
+      const src = fs.readFileSync(
+        path.join(__dirname, '../src/navigation/MainNavigator.tsx'),
+        'utf8',
+      );
+      expect(src).toContain('name="Inbox"');
+      expect(src).toContain('InboxScreen');
+      expect(src).toContain('name="ContentAnalytics"');
+      expect(src).toContain('ContentAnalyticsScreen');
+      expect(src).toContain('name="PlatformConnections"');
+      expect(src).toContain('PlatformConnectionsScreen');
+    });
+
+    it('registers UsageBilling in ProfileNavigator', () => {
+      const fs = require('fs');
+      const path = require('path');
+      const src = fs.readFileSync(
+        path.join(__dirname, '../src/navigation/MainNavigator.tsx'),
+        'utf8',
+      );
+      expect(src).toContain('name="UsageBilling"');
+      expect(src).toContain('UsageBillingScreen');
+    });
   });
 
   describe('deep linking', () => {
@@ -58,6 +84,10 @@ describe('Navigation Configuration', () => {
       expect(myAgentsScreens.TrialDashboard).toBe('trial/:trialId');
       expect(myAgentsScreens.ActiveTrialsList).toBe('trials/active');
       expect(myAgentsScreens.HiredAgentsList).toBe('agents/hired');
+      // Parity screens
+      expect(myAgentsScreens.Inbox).toBeDefined();
+      expect(myAgentsScreens.ContentAnalytics).toBeDefined();
+      expect(myAgentsScreens.PlatformConnections).toBeDefined();
     });
 
     it('should have ProfileTab screens configured', () => {
@@ -72,6 +102,8 @@ describe('Navigation Configuration', () => {
       expect(profileScreens.HelpCenter).toBe('help');
       expect(profileScreens.PrivacyPolicy).toBe('privacy');
       expect(profileScreens.TermsOfService).toBe('terms');
+      // Parity screen
+      expect(profileScreens.UsageBilling).toBeDefined();
     });
 
     it('should support URL parameter extraction for agent detail', () => {

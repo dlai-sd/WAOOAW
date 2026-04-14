@@ -25,10 +25,10 @@ import { HomeScreen } from "../screens/home/HomeScreen";
 import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
 import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
 import { HireWizardScreen } from "../screens/hire/HireWizardScreen";
-import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen } from "../screens/agents";
+import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen, InboxScreen, ContentAnalyticsScreen, PlatformConnectionsScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
-import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen, PaymentMethodsScreen, SubscriptionManagementScreen } from "../screens/profile";
+import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen, PaymentMethodsScreen, SubscriptionManagementScreen, UsageBillingScreen } from "../screens/profile";
 
 // Stack navigators for each tab
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -99,6 +99,9 @@ const MyAgentsNavigator = () => {
       <MyAgentsStack.Screen name="ActiveTrialsList" component={ActiveTrialsListScreen} />
       <MyAgentsStack.Screen name="HiredAgentsList" component={HiredAgentsListScreen} />
       <MyAgentsStack.Screen name="AgentOperations" component={AgentOperationsScreen} />
+      <MyAgentsStack.Screen name="Inbox" component={InboxScreen} />
+      <MyAgentsStack.Screen name="ContentAnalytics" component={ContentAnalyticsScreen} />
+      <MyAgentsStack.Screen name="PlatformConnections" component={PlatformConnectionsScreen} />
     </MyAgentsStack.Navigator>
   );
 };
@@ -123,6 +126,7 @@ const ProfileNavigator = () => {
       <ProfileStack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
       <ProfileStack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
       <ProfileStack.Screen name="SubscriptionManagement" component={SubscriptionManagementScreen} />
+      <ProfileStack.Screen name="UsageBilling" component={UsageBillingScreen} />
     </ProfileStack.Navigator>
   );
 };

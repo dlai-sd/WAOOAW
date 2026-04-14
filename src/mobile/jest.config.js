@@ -69,6 +69,7 @@ module.exports = {
       "<rootDir>/__mocks__/@react-native-google-signin/google-signin.js",
     "^react-native$": "<rootDir>/node_modules/react-native",
     "^@/(.*)$": "<rootDir>/src/$1",
+    "^@shopify/flash-list$": "<rootDir>/src/__flashlist-mock.js",
     "^\\.\\./\\.\\./src/(.*)$": "<rootDir>/src/$1",
     "^\\.\\./src/services/TokenManagerService$":
       "<rootDir>/src/services/tokenManager.service.ts",
