@@ -16,14 +16,14 @@ Single-iteration plan to bring the mobile React Native/Expo app to feature parit
 - [x] Explore CP Frontend features (33 services, 14+ pages)
 - [x] Explore Mobile app current state (screens, services, hooks, tests)
 - [x] Gap analysis: Mobile is ~85% parity; missing Deliverables page, Inbox, Usage/Billing, Content Analytics, Platform Connections UI
-- [ ] Vision intake confirmed with user
-- [ ] Plan branch created
-- [ ] Plan skeleton committed
-- [ ] Story cards committed
-- [ ] Push & PR created
+- [x] Vision intake confirmed with user
+- [x] Plan branch created
+- [x] Plan skeleton committed
+- [x] Story cards committed (E1-E3 + E4-E6)
+- [x] Push & PR created — PR #1059
 
 ### Next save point
-After user confirms vision intake bullets.
+Plan ready for review. After merge, launch Iteration 1 from GitHub Agents tab.
 
 ---
 
