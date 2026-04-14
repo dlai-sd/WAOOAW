@@ -441,6 +441,7 @@ export function DigitalMarketingActivationWizard({
   const [outputItemStatuses, setOutputItemStatuses] = useState<Record<string, ArtifactStatus>>({})
   const [outputItemActions, setOutputItemActions] = useState<Record<string, 'idle' | 'loading' | 'done' | 'error'>>({})
   const [outputItemReceipts, setOutputItemReceipts] = useState<Record<string, string>>({})
+  const [actionErrorMessages, setActionErrorMessages] = useState<Record<string, string>>({})
   const [expandedOutputItems, setExpandedOutputItems] = useState<Record<string, boolean>>({})
   const chatScrollRef = useRef<HTMLDivElement | null>(null)
   const [activeBriefSection, setActiveBriefSection] = useState<'brief' | 'objective' | 'status' | 'next' | 'controls' | 'output' | null>('brief')
@@ -794,10 +795,9 @@ export function DigitalMarketingActivationWizard({
     }
 
     const latestAssistantMessage = String(strategyWorkshop.assistant_message || '').trim()
-    const lastMessage = messages[messages.length - 1]
     if (
       latestAssistantMessage
-      && (lastMessage?.role !== 'assistant' || lastMessage.content !== latestAssistantMessage)
+      && !messages.some((m) => m.role === 'assistant' && m.content === latestAssistantMessage)
     ) {
       messages.push({ role: 'assistant', content: latestAssistantMessage })
     }
@@ -1430,8 +1430,9 @@ export function DigitalMarketingActivationWizard({
         )
       )
       setPostActionStatus((s) => ({ ...s, [post.post_id]: 'done' }))
-    } catch {
+    } catch (err: any) {
       setPostActionStatus((s) => ({ ...s, [post.post_id]: 'error' }))
+      setActionErrorMessages((s) => ({ ...s, [post.post_id]: err?.message || 'Publish failed' }))
     }
   }
 
@@ -1504,8 +1505,9 @@ export function DigitalMarketingActivationWizard({
         )
       )
       setOutputItemActions((s) => ({ ...s, [post.post_id]: 'done' }))
-    } catch {
+    } catch (err: any) {
       setOutputItemActions((s) => ({ ...s, [post.post_id]: 'error' }))
+      setActionErrorMessages((s) => ({ ...s, [post.post_id]: err?.message || 'Publish failed' }))
     }
   }
 
@@ -1703,7 +1705,7 @@ export function DigitalMarketingActivationWizard({
                       ) : null}
                       {actionStatus === 'loading' ? <Spinner size="tiny" /> : null}
                       {actionStatus === 'error' ? (
-                        <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed — try again</span>
+                        <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>{actionErrorMessages[post.post_id] || 'Action failed'} — try again</span>
                       ) : null}
                     </div>
                   ) : null}
@@ -1889,7 +1891,7 @@ export function DigitalMarketingActivationWizard({
                             </Button>
                           ) : null}
                           {actionStatus === 'loading' ? <Spinner size="tiny" /> : null}
-                          {actionStatus === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed</span> : null}
+                          {actionStatus === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>{actionErrorMessages[post.post_id] || 'Action failed'}</span> : null}
                         </div>
                       ) : null}
                       {isPosted ? <Badge appearance="filled" color="success">Published</Badge> : null}
@@ -2061,7 +2063,7 @@ export function DigitalMarketingActivationWizard({
                         </>
                       ) : null}
                       {status === 'loading' ? <Spinner size="tiny" /> : null}
-                      {status === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>Action failed</span> : null}
+                      {status === 'error' ? <span style={{ color: '#ef4444', fontSize: '0.82rem' }}>{actionErrorMessages[post.post_id] || 'Action failed'}</span> : null}
                     </div>
                   ) : null}
                 </div>
