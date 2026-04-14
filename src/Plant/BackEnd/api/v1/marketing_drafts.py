@@ -34,6 +34,7 @@ from services.policy_denial_audit import (
     get_policy_denial_audit_store,
 )
 from services.marketing_credential_resolver import resolve_youtube_secret_ref
+from services.social_credential_resolver import DatabaseCredentialResolver
 from worker.tasks.media_generation_tasks import enqueue_media_generation_job
 
 router = waooaw_router(prefix="/marketing", tags=["marketing"])
@@ -630,7 +631,10 @@ async def execute_draft_post(
         try:
             from integrations.social.youtube_client import YouTubeClient
 
-            client = YouTubeClient(customer_id=batch.customer_id)
+            client = YouTubeClient(
+                customer_id=batch.customer_id,
+                credential_resolver=DatabaseCredentialResolver(db),
+            )
             if post.artifact_type in {"video", "video_audio"} and post.artifact_uri:
                 result = await client.post_short(
                     credential_ref=effective_credential_ref,

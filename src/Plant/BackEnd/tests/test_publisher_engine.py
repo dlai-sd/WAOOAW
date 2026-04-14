@@ -193,6 +193,9 @@ async def test_youtube_public_release_requires_explicit_customer_action():
                 },
             )()
         ),
+    ), patch(
+        "agent_mold.skills.adapters_youtube.YouTubeAdapter._open_db_session",
+        new=AsyncMock(return_value=AsyncMock()),
     ):
         allowed = await engine.publish(
             PublishInput(
