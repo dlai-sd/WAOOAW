@@ -1,6 +1,32 @@
 
 ---
 
+## [2026-04-14 UTC] MOB-PARITY-1 — Mobile CP Feature Parity Plan
+
+**Branch**: `docs/MOB-PARITY-1-mobile-cp-parity`
+**Plan file**: `docs/mobile/iterations/MOB-PARITY-1-mobile-cp-parity.md`
+**Status**: Vision intake — presenting to user for confirmation
+
+### Goal
+Single-iteration plan to bring the mobile React Native/Expo app to feature parity with the CP Frontend. Key gaps: standalone Deliverables/Inbox screen, Usage & Billing (invoices/receipts), Content Analytics dashboard, YouTube/Platform connection setup UI, and full test coverage per norms.
+
+### Checkpoint list
+- [x] Read platform context (§1, §3, §5, §13, §23)
+- [x] Read iteration plan template
+- [x] Explore CP Frontend features (33 services, 14+ pages)
+- [x] Explore Mobile app current state (screens, services, hooks, tests)
+- [x] Gap analysis: Mobile is ~85% parity; missing Deliverables page, Inbox, Usage/Billing, Content Analytics, Platform Connections UI
+- [x] Vision intake confirmed with user
+- [x] Plan branch created
+- [x] Plan skeleton committed
+- [x] Story cards committed (E1-E3 + E4-E6)
+- [x] Push & PR created — PR #1059
+
+### Next save point
+Plan ready for review. After merge, launch Iteration 1 from GitHub Agents tab.
+
+---
+
 ## [2026-04-13 UTC] DMA-MEDIA-1 — Media Generation Pipeline (Phase 1)
 
 **Branch**: `docs/DMA-MEDIA-1-media-generation`
