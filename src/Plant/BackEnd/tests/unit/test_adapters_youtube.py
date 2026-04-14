@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -29,6 +29,13 @@ def _make_publish_input() -> PublishInput:
     )
 
 
+def _mock_db_session():
+    """Return an AsyncMock that behaves like an AsyncSession."""
+    session = AsyncMock()
+    session.close = AsyncMock()
+    return session
+
+
 @pytest.mark.asyncio
 async def test_youtube_adapter_publish_success():
     now = datetime.now(timezone.utc)
@@ -45,6 +52,8 @@ async def test_youtube_adapter_publish_success():
                 raw_response={"id": "yt123"},
             )
         ),
+    ), patch.object(
+        YouTubeAdapter, "_open_db_session", new=AsyncMock(return_value=_mock_db_session()),
     ):
         receipt = await YouTubeAdapter().publish(_make_publish_input())
 
@@ -68,6 +77,8 @@ async def test_youtube_adapter_publish_failure():
                 error_code="POST_FAILED",
             )
         ),
+    ), patch.object(
+        YouTubeAdapter, "_open_db_session", new=AsyncMock(return_value=_mock_db_session()),
     ):
         receipt = await YouTubeAdapter().publish(_make_publish_input())
 
