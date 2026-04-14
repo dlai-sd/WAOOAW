@@ -84,7 +84,7 @@ with limited context windows. Every structural decision in this plan exists to p
 
 | Iteration | Scope | Epics | Stories | ⏱ Est. | Come back |
 |---|---|---|---|---|---|
-| 1 | Lane A — Wire existing Plant Gateway APIs into 6 new mobile screens/services with voice chat toggle, achieving full CP feature parity | 6 | 6 | 6h | 2026-04-14 21:00 UTC |
+| 1 | Lane A — Wire existing Plant Gateway APIs into new mobile screens/services with voice command overlay, achieving full CP feature parity | 6 | 6 | 6h | 2026-04-14 21:00 UTC |
 
 **Estimate basis:** Each story = new screen + service + hook + tests ≈ 60 min average. Add 20% buffer for zero-cost model context loading. Total = 6 × 60 min = 6h.
 
@@ -278,7 +278,7 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | E2-S1 | 1 | Customer views usage, invoices, and receipts on mobile | Usage & Billing screen with invoice/receipt download | 🔴 Not Started | — |
 | E3-S1 | 1 | Customer sees DMA content performance insights on mobile | Content Analytics dashboard with recommendations | 🔴 Not Started | — |
 | E4-S1 | 1 | Customer manages YouTube and platform connections on mobile | Platform Connections setup and management screen | 🔴 Not Started | — |
-| E5-S1 | 1 | Customer uses voice or text to interact with agent chat | Voice Chat toggle integrated into agent interaction surfaces | 🔴 Not Started | — |
+| E5-S1 | 1 | Customer uses voice or text to interact with agent screens | Voice command layer integrated into agent interaction surfaces | 🔴 Not Started | — |
 | E6-S1 | 1 | Drift prevention: parity test suite validates mobile matches CP | Parity test suite covering all new screens + navigation | 🔴 Not Started | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
@@ -287,11 +287,11 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 
 ## Iteration 1 — Mobile CP Feature Parity with Voice Chat
 
-**Scope:** Customer can perform all CP Frontend operations from the mobile app — review deliverables, manage billing, view analytics, manage platform connections, and interact via voice or text — with ≥80% test coverage and drift-prevention parity tests.
+**Scope:** Customer can perform all CP Frontend operations from the mobile app — review deliverables, manage billing, view analytics, manage platform connections, and use voice commands for hands-free operation — with ≥80% test coverage and drift-prevention parity tests.
 **Lane:** A (wire existing Plant Gateway APIs only — no backend changes)
 **⏱ Estimated:** 6h | **Come back:** 2026-04-14 21:00 UTC
 **Epics:** E1, E2, E3, E4, E5, E6
-**Objective alignment:** DMA enablement — mobile parity ensures DMA customers can approve content, review analytics, manage YouTube connections, and monitor deliverables from mobile, directly enabling trial-to-paid conversion.
+**Objective alignment:** DMA enablement — mobile parity ensures DMA customers can approve content, review analytics, manage YouTube connections, and monitor deliverables from mobile with voice command support, directly enabling trial-to-paid conversion.
 
 ### Dependency Map (Iteration 1)
 
@@ -300,11 +300,11 @@ E1-S1 (Deliverables & Inbox)     — independent
 E2-S1 (Usage & Billing)          — independent
 E3-S1 (Content Analytics)        — independent
 E4-S1 (Platform Connections)     — independent
-E5-S1 (Voice Chat Toggle)        — independent (uses existing voice infra)
+E5-S1 (Voice Command Overlay)    — soft dependency on E1, E3 (modifies their screens to add VoiceFAB)
 E6-S1 (Parity Test Suite)        — depends on E1–E5 (runs last)
 ```
 
-All stories E1–E5 are independent vertical slices. E6 (parity tests) runs last as it validates all preceding screens.
+All stories E1–E4 are independent vertical slices. E5 modifies screens from E1 and E3 (adding voice FAB). E6 (parity tests) runs last as it validates all preceding screens. Recommended execution order: E1 → E2 → E3 → E4 → E5 → E6.
 
 ---
 
@@ -568,9 +568,9 @@ cd src/mobile && npx jest __tests__/UsageBillingScreen.test.tsx __tests__/billin
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/mobile/src/screens/agents/ContentAnalyticsScreen.tsx` | create | New screen: performance summary cards at top (3 stat cards: total views, avg engagement %, top content type), time period filter chips (7d/30d/90d), recommendations FlashList below (each card: title, description, confidence badge, category tag). "Read Insights" FAB uses `useTextToSpeech` to speak top 3 recommendations. Loading/error/empty states. Dark theme. All elements with `testID`. |
-| `src/mobile/src/services/contentAnalytics.service.ts` | create | `getContentRecommendations(hiredAgentId: string, period?: string)` → `cpApiClient.get('/cp/hired-agents/{id}/content-analytics', { params: { period } })`. Types: `ContentAnalytics { summary: { views, engagement_rate, top_content_type }, recommendations: Recommendation[] }`, `Recommendation { title, description, confidence, category }`. |
-| `src/mobile/src/hooks/useContentAnalytics.ts` | create | React Query hook wrapping `getContentRecommendations`. Accepts `hiredAgentId` and `period` params. Returns `{ data, isLoading, error, refetch }`. |
+| `src/mobile/src/screens/agents/ContentAnalyticsScreen.tsx` | create | New screen: performance summary cards at top (4 stat cards: total posts analyzed, avg engagement rate %, top dimensions, best posting hours), recommendations text block with AI-generated improvement advice. "Read Insights" FAB uses `useTextToSpeech` to speak the recommendation text aloud. Loading/error/empty states. Dark theme. All elements with `testID`. |
+| `src/mobile/src/services/contentAnalytics.service.ts` | create | `getContentRecommendations(hiredAgentId: string)` → `cpApiClient.get('/cp/content-recommendations/{hiredAgentId}')`. Types: `ContentRecommendation { top_dimensions: string[], best_posting_hours: number[], avg_engagement_rate: number, total_posts_analyzed: number, recommendation_text: string }`. **Endpoint**: `/cp/content-recommendations/${hiredAgentId}` — matches CP FE's `contentAnalytics.service.ts`. |
+| `src/mobile/src/hooks/useContentAnalytics.ts` | create | React Query hook wrapping `getContentRecommendations`. Accepts `hiredAgentId` param. Returns `{ data, isLoading, error, refetch }`. |
 | `src/mobile/src/navigation/types.ts` | modify | Add `ContentAnalytics: { hiredAgentId: string }` to `MyAgentsStackParamList` |
 | `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `ContentAnalyticsScreen` and add to `MyAgentsNavigator` stack |
 | `src/mobile/src/screens/agents/index.ts` | modify | Export `ContentAnalyticsScreen` |
@@ -578,32 +578,22 @@ cd src/mobile && npx jest __tests__/UsageBillingScreen.test.tsx __tests__/billin
 **Code patterns to copy exactly:**
 
 ```typescript
-// Content analytics service pattern:
+// Content analytics service pattern (matches CP FE contentAnalytics.service.ts):
 import cpApiClient from '../lib/cpApiClient';
 
-export interface Recommendation {
-  title: string;
-  description: string;
-  confidence: number; // 0.0 - 1.0
-  category: string;
-}
-
-export interface ContentAnalytics {
-  summary: {
-    views: number;
-    engagement_rate: number;
-    top_content_type: string;
-  };
-  recommendations: Recommendation[];
+export interface ContentRecommendation {
+  top_dimensions: string[];
+  best_posting_hours: number[];
+  avg_engagement_rate: number;
+  total_posts_analyzed: number;
+  recommendation_text: string;
 }
 
 export async function getContentRecommendations(
-  hiredAgentId: string,
-  period: string = '30d'
-): Promise<ContentAnalytics> {
-  const response = await cpApiClient.get<ContentAnalytics>(
-    `/cp/hired-agents/${hiredAgentId}/content-analytics`,
-    { params: { period } }
+  hiredAgentId: string
+): Promise<ContentRecommendation> {
+  const response = await cpApiClient.get<ContentRecommendation>(
+    `/cp/content-recommendations/${hiredAgentId}`
   );
   return response.data;
 }
@@ -618,31 +608,31 @@ const { speak, isSpeaking, stop } = useTextToSpeech();
 
 const readInsights = async () => {
   if (isSpeaking) { await stop(); return; }
-  const topRecs = data?.recommendations.slice(0, 3) ?? [];
-  const script = topRecs.map((r, i) => `Recommendation ${i + 1}: ${r.title}. ${r.description}`).join('. ');
+  const script = data
+    ? `You have ${data.total_posts_analyzed} posts analyzed with ${data.avg_engagement_rate.toFixed(1)} percent average engagement. Top dimensions are ${data.top_dimensions.join(', ')}. Recommendation: ${data.recommendation_text}`
+    : 'No insights available yet.';
   await speak(script);
 };
 ```
 
 **Acceptance criteria (binary pass/fail only):**
-1. `ContentAnalyticsScreen` renders 3 summary stat cards (views, engagement rate, top content type)
-2. Time period filter chips switch between 7d / 30d / 90d and refetch data
-3. Recommendations list shows title, description, and confidence badge per item
-4. "Read Insights" button uses TTS to speak top 3 recommendations aloud
-5. Loading/error/empty states use shared components
-6. Screen is navigable from `AgentOperationsScreen` performance section
-7. All interactive elements have `testID` props
+1. `ContentAnalyticsScreen` renders 4 summary stat cards (total posts analyzed, avg engagement rate, top dimensions, best posting hours)
+2. Recommendation text block shows AI-generated advice from `recommendation_text`
+3. "Read Insights" button uses TTS to speak the summary and recommendation aloud
+4. Loading/error/empty states use shared components
+5. Screen is navigable from `AgentOperationsScreen` performance section
+6. All interactive elements have `testID` props
 
 **Tests to write:**
 
 | Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| E3-S1-T1 | `src/mobile/__tests__/ContentAnalyticsScreen.test.tsx` | Mock `useContentAnalytics` returns summary + 3 recommendations | Summary cards rendered, 3 recommendation cards rendered |
-| E3-S1-T2 | same | Mock returns empty recommendations | `EmptyState` component shown |
+| E3-S1-T1 | `src/mobile/__tests__/ContentAnalyticsScreen.test.tsx` | Mock `useContentAnalytics` returns `ContentRecommendation` with 5 top_dimensions, 3 posting hours, 42 posts, 7.2% engagement | Summary cards rendered: total posts, engagement rate, dimensions, posting hours |
+| E3-S1-T2 | same | Mock returns null data | `EmptyState` component shown |
 | E3-S1-T3 | same | Mock loading=true | `LoadingSpinner` shown |
 | E3-S1-T4 | same | Mock error | `ErrorView` shown with retry |
-| E3-S1-T5 | same | Press "Read Insights" button | `speak` function called with recommendation text |
-| E3-S1-T6 | `src/mobile/__tests__/contentAnalytics.service.test.ts` | Mock cpApiClient returns analytics data | Service function returns typed `ContentAnalytics` object |
+| E3-S1-T5 | same | Press "Read Insights" button | `speak` function called with summary + recommendation text |
+| E3-S1-T6 | `src/mobile/__tests__/contentAnalytics.service.test.ts` | Mock cpApiClient returns analytics data | Service function returns typed `ContentRecommendation` object |
 
 **Test command:**
 ```bash
@@ -667,9 +657,11 @@ cd src/mobile && npx jest __tests__/ContentAnalyticsScreen.test.tsx __tests__/co
 **Objective alignment:** DMA enablement — YouTube/platform connections are a prerequisite for DMA content publish pipeline; without mobile setup, customers are blocked from activating their DMA agent on-the-go
 
 **What to do (self-contained — read this card, then act):**
-> The mobile app currently shows YouTube publish status inside `MyAgentsScreen` but has no dedicated screen for connecting or managing platform connections. The CP Frontend has `PlatformConnectionsPanel.tsx` component and services (`youtubeConnections.service.ts`, `platformConnections.service.ts`) for OAuth connections.
+> The mobile app currently shows YouTube publish status inside `MyAgentsScreen` but has no dedicated screen for connecting or managing platform connections. The CP Frontend has `platformConnections.service.ts` (credential-based connections: YouTube, Instagram, Facebook, LinkedIn, X, etc.) and `youtubeConnections.service.ts` (YouTube-specific OAuth flow).
 >
-> Create a new `PlatformConnectionsScreen.tsx` in `src/mobile/src/screens/agents/` that shows: (a) connected platforms list with status badges (Connected ✅ / Disconnected ❌ / Expired ⚠️), (b) "Connect" button for each platform that opens the OAuth URL in device browser via `WebBrowser.openBrowserAsync()` from `expo-web-browser`, (c) connection health check — shows last-verified date and a "Refresh" button. Create `platformConnections.service.ts` in services. The YouTube callback is already handled by `YouTubeConnectionCallback.tsx` page in the CP Frontend — on mobile this returns via deep link which is already configured in `app.json` scheme. Register the screen in navigation.
+> Create a new `PlatformConnectionsScreen.tsx` in `src/mobile/src/screens/agents/` that shows: (a) connected platforms list with status badges (Connected ✅ / Disconnected ❌ / Pending ⚠️), (b) "Connect" button for each platform that opens a credentials input form (matching `CreateConnectionBody` from CP FE: `skill_id`, `platform_key`, `credentials`), (c) YouTube-specific "Connect" button that triggers OAuth via `/cp/youtube-connections/connect/start` and opens the returned URL in device browser via `WebBrowser.openBrowserAsync()`, (d) connection health check — shows `last_verified_at` date. Create `platformConnections.service.ts` in services using the **actual CP FE endpoints**: GET/POST/DELETE on `/cp/hired-agents/{id}/platform-connections`. Register the screen in navigation.
+>
+> **IMPORTANT**: The platform connections API does NOT have a per-platform OAuth URL endpoint. Connections are created by POSTing `{ skill_id, platform_key, credentials }` to `/cp/hired-agents/{id}/platform-connections`. YouTube is the only platform with OAuth (via a separate `/cp/youtube-connections/connect/start` endpoint). Other platforms require manual credential input.
 
 **Files to read first (max 3 — read only these, nothing else):**
 
@@ -683,9 +675,9 @@ cd src/mobile && npx jest __tests__/ContentAnalyticsScreen.test.tsx __tests__/co
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/mobile/src/screens/agents/PlatformConnectionsScreen.tsx` | create | New screen: list of platforms (YouTube, Instagram, Facebook, LinkedIn, X, WhatsApp) each rendered as a card showing: platform icon/name, connection status badge (Connected/Disconnected/Expired), last verified timestamp, "Connect"/"Reconnect"/"Disconnect" action button. "Connect" opens OAuth URL via `WebBrowser.openBrowserAsync()`. Show a summary header: "X of Y platforms connected". Loading/error/empty states. Dark theme, `testID` on all interactive elements. |
-| `src/mobile/src/services/platformConnections.service.ts` | create | `listPlatformConnections(hiredAgentId: string)` → `cpApiClient.get('/cp/hired-agents/{id}/platform-connections')`. `startPlatformOAuth(hiredAgentId: string, platform: string)` → `cpApiClient.post('/cp/hired-agents/{id}/platform-connections/{platform}/connect')` returns `{ oauth_url: string }`. `disconnectPlatform(hiredAgentId: string, platform: string)` → `cpApiClient.delete(...)`. Types: `PlatformConnection { platform, status, connected_at, last_verified_at, display_name }`. |
-| `src/mobile/src/hooks/usePlatformConnections.ts` | create | React Query hook wrapping `listPlatformConnections`. Returns `{ connections, isLoading, error, refetch, connect, disconnect }`. `connect` and `disconnect` are `useMutation` wrappers that invalidate the query on success. |
+| `src/mobile/src/screens/agents/PlatformConnectionsScreen.tsx` | create | New screen: list of platforms rendered as cards showing: platform icon/name, connection status badge (Connected/Disconnected/Pending), `last_verified_at` timestamp, action button based on state. For YouTube: "Connect via Google" opens OAuth flow. For other platforms: "Connect" opens a credentials form (platform_key, credentials dict). Connected platforms show "Disconnect" button. Summary header: "X of Y platforms connected". Loading/error/empty states. Dark theme, `testID` on all interactive elements. |
+| `src/mobile/src/services/platformConnections.service.ts` | create | `listPlatformConnections(hiredAgentId: string)` → `cpApiClient.get('/cp/hired-agents/{id}/platform-connections')`. `createPlatformConnection(hiredAgentId: string, body: CreateConnectionBody)` → `cpApiClient.post('/cp/hired-agents/{id}/platform-connections', body)` where `CreateConnectionBody = { skill_id: string, platform_key: string, credentials?: Record<string, unknown> }`. `deletePlatformConnection(hiredAgentId: string, connectionId: string)` → `cpApiClient.delete('/cp/hired-agents/{id}/platform-connections/{connectionId}')`. `startYouTubeOAuth(redirectUri: string)` → `cpApiClient.post('/cp/youtube-connections/connect/start', { redirect_uri: redirectUri })` returns `{ authorization_url: string }`. Types: `PlatformConnection { id, hired_instance_id, skill_id, platform_key, status, connected_at, last_verified_at, created_at, updated_at }`. |
+| `src/mobile/src/hooks/usePlatformConnections.ts` | create | React Query hook wrapping `listPlatformConnections`. Returns `{ connections, isLoading, error, refetch, connect, disconnect }`. `connect` is a `useMutation` wrapping `createPlatformConnection` (or `startYouTubeOAuth` for YouTube). `disconnect` wraps `deletePlatformConnection`. Both invalidate the query on success. |
 | `src/mobile/src/navigation/types.ts` | modify | Add `PlatformConnections: { hiredAgentId: string }` to `MyAgentsStackParamList` |
 | `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `PlatformConnectionsScreen` and add to `MyAgentsNavigator` stack |
 | `src/mobile/src/screens/agents/index.ts` | modify | Export `PlatformConnectionsScreen` |
@@ -693,43 +685,83 @@ cd src/mobile && npx jest __tests__/ContentAnalyticsScreen.test.tsx __tests__/co
 **Code patterns to copy exactly:**
 
 ```typescript
-// Platform connections service pattern:
+// Platform connections service pattern (matches CP FE platformConnections.service.ts):
 import cpApiClient from '../lib/cpApiClient';
 
 export interface PlatformConnection {
-  platform: string; // 'youtube' | 'instagram' | 'facebook' | 'linkedin' | 'x' | 'whatsapp'
-  status: 'connected' | 'disconnected' | 'expired';
-  connected_at?: string;
-  last_verified_at?: string;
-  display_name?: string;
+  id: string;
+  hired_instance_id: string;
+  skill_id: string;
+  customer_platform_credential_id?: string | null;
+  platform_key: string; // e.g. 'youtube', 'instagram', 'facebook', 'linkedin', 'x'
+  status?: string; // 'connected' | 'active' | 'pending' | 'disconnected'
+  connected_at?: string | null;
+  last_verified_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateConnectionBody {
+  skill_id: string;
+  platform_key: string;
+  credentials?: Record<string, unknown>;
 }
 
 export async function listPlatformConnections(hiredAgentId: string): Promise<PlatformConnection[]> {
   const response = await cpApiClient.get<PlatformConnection[]>(
     `/cp/hired-agents/${hiredAgentId}/platform-connections`
   );
+  // Handle both array and { connections: [...] } response shapes
+  const data = response.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray((data as any)?.connections)) return (data as any).connections;
+  return [];
+}
+
+export async function createPlatformConnection(
+  hiredAgentId: string,
+  body: CreateConnectionBody
+): Promise<PlatformConnection> {
+  const response = await cpApiClient.post<PlatformConnection>(
+    `/cp/hired-agents/${hiredAgentId}/platform-connections`,
+    body
+  );
   return response.data;
 }
 
-export async function startPlatformOAuth(
+export async function deletePlatformConnection(
   hiredAgentId: string,
-  platform: string
-): Promise<{ oauth_url: string }> {
-  const response = await cpApiClient.post<{ oauth_url: string }>(
-    `/cp/hired-agents/${hiredAgentId}/platform-connections/${platform}/connect`
+  connectionId: string
+): Promise<void> {
+  await cpApiClient.delete(
+    `/cp/hired-agents/${hiredAgentId}/platform-connections/${connectionId}`
+  );
+}
+
+// YouTube-specific OAuth (separate endpoint from general platform connections):
+export async function startYouTubeOAuth(redirectUri: string): Promise<{ authorization_url: string }> {
+  const response = await cpApiClient.post<{ authorization_url: string }>(
+    '/cp/youtube-connections/connect/start',
+    { redirect_uri: redirectUri }
   );
   return response.data;
 }
 ```
 
 ```typescript
-// OAuth flow on mobile — open in system browser:
+// YouTube OAuth flow on mobile — open in system browser:
 import * as WebBrowser from 'expo-web-browser';
 
-const handleConnect = async (platform: string) => {
-  const { oauth_url } = await startPlatformOAuth(hiredAgentId, platform);
-  await WebBrowser.openBrowserAsync(oauth_url);
+const handleConnectYouTube = async () => {
+  const { authorization_url } = await startYouTubeOAuth(Linking.createURL('/youtube-callback'));
+  await WebBrowser.openBrowserAsync(authorization_url);
   // After OAuth completes, deep link returns to app — refetch connections
+  refetch();
+};
+
+// Non-OAuth platform connection — credential form submit:
+const handleConnectPlatform = async (skillId: string, platformKey: string, credentials: Record<string, unknown>) => {
+  await createPlatformConnection(hiredAgentId, { skill_id: skillId, platform_key: platformKey, credentials });
   refetch();
 };
 ```
@@ -737,22 +769,25 @@ const handleConnect = async (platform: string) => {
 **Acceptance criteria (binary pass/fail only):**
 1. `PlatformConnectionsScreen` renders a list of platform cards with status badges
 2. Summary header shows "X of Y platforms connected"
-3. Tapping "Connect" on a disconnected platform calls `startPlatformOAuth` and opens browser
-4. Connected platforms show "Disconnect" button; tapping it calls disconnect API
-5. Loading/error/empty states use shared components
-6. Screen is navigable from `AgentOperationsScreen`
-7. All interactive elements have `testID` props
+3. Tapping "Connect via Google" on YouTube calls `startYouTubeOAuth` and opens browser with `authorization_url`
+4. Tapping "Connect" on non-YouTube platforms opens a credentials input form; submitting calls `createPlatformConnection` with `{ skill_id, platform_key, credentials }`
+5. Connected platforms show "Disconnect" button; tapping it calls `deletePlatformConnection` API
+6. Loading/error/empty states use shared components
+7. Screen is navigable from `AgentOperationsScreen`
+8. All interactive elements have `testID` props
 
 **Tests to write:**
 
 | Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| E4-S1-T1 | `src/mobile/__tests__/PlatformConnectionsScreen.test.tsx` | Mock `usePlatformConnections` returns 3 connections (1 connected, 1 disconnected, 1 expired) | 3 cards rendered with correct status badges; summary shows "1 of 3" |
+| E4-S1-T1 | `src/mobile/__tests__/PlatformConnectionsScreen.test.tsx` | Mock `usePlatformConnections` returns 3 connections (1 connected, 1 disconnected, 1 pending) | 3 cards rendered with correct status badges; summary shows "1 of 3" |
 | E4-S1-T2 | same | Mock returns empty array | `EmptyState` shown |
 | E4-S1-T3 | same | Mock loading=true | `LoadingSpinner` shown |
-| E4-S1-T4 | same | Press "Connect" on disconnected platform | `startPlatformOAuth` called, `WebBrowser.openBrowserAsync` called |
-| E4-S1-T5 | `src/mobile/__tests__/platformConnections.service.test.ts` | Mock cpApiClient returns connections | `listPlatformConnections` returns typed array |
-| E4-S1-T6 | same | Mock cpApiClient for OAuth start | `startPlatformOAuth` returns `{ oauth_url }` |
+| E4-S1-T4 | same | Press "Connect" on YouTube platform | `startYouTubeOAuth` called, `WebBrowser.openBrowserAsync` called with `authorization_url` |
+| E4-S1-T5 | same | Press "Connect" on non-YouTube platform, submit credentials | `createPlatformConnection` called with correct `CreateConnectionBody` |
+| E4-S1-T6 | `src/mobile/__tests__/platformConnections.service.test.ts` | Mock cpApiClient returns connections | `listPlatformConnections` returns typed array |
+| E4-S1-T7 | same | Mock cpApiClient for YouTube OAuth start | `startYouTubeOAuth` returns `{ authorization_url }` |
+| E4-S1-T8 | same | Mock cpApiClient for create connection | `createPlatformConnection` returns typed `PlatformConnection` |
 
 **Test command:**
 ```bash
@@ -761,25 +796,31 @@ cd src/mobile && npx jest __tests__/PlatformConnectionsScreen.test.tsx __tests__
 
 ---
 
-### Epic E5: Customer uses voice or text to interact with agent chat
+### Epic E5: Customer uses voice or text to interact with agent screens
 
 **Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
-**User story:** As a customer, I can toggle between voice and text input when interacting with my agent, so that I can give instructions hands-free (e.g., while driving) or type when in a quiet environment, with the agent responding via text and optional voice readback.
+**User story:** As a customer, I can toggle between voice and text input across all agent screens, so that I can approve deliverables hands-free, request analytics readback, and navigate between operations without typing.
 
 ---
 
-#### Story E5-S1: Voice Chat toggle integrated into agent interaction surfaces
+#### Story E5-S1: Voice command layer integrated into agent interaction surfaces
 
 **BLOCKED UNTIL:** none
 **Estimated time:** 60 min
 **Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
 **CP BackEnd pattern:** N/A — voice is a client-side input mode; no backend changes
-**Objective alignment:** DMA enablement — voice chat lets DMA customers brief their marketing agent, review content, and approve deliverables hands-free, reducing friction and increasing engagement
+**Objective alignment:** DMA enablement — voice commands let DMA customers approve content, hear analytics, and navigate agent operations hands-free, reducing friction and increasing engagement
+
+> **NOTE — Chat endpoint deferred:** The CP Frontend does not currently have a chat/messaging
+> service. A standalone agent chat screen would require a new backend endpoint (Lane B). This
+> story instead delivers voice input as a **command overlay** across the E1–E4 screens, which is
+> Lane A work (purely client-side, no new backend). A future iteration can add the chat endpoint
+> and build a dedicated `VoiceChatScreen` on top of it.
 
 **What to do (self-contained — read this card, then act):**
-> The mobile app has full voice infrastructure: `useSpeechToText` hook (speech-to-text), `useTextToSpeech` hook (text-to-speech), `useVoiceCommands` hook (command parsing), `VoiceFAB` component (floating mic button), and `VoiceControl` component. However, these are not wired into any chat or agent interaction surface. There is no chat screen yet in the mobile app.
+> The mobile app has full voice infrastructure: `useSpeechToText` hook (speech-to-text), `useTextToSpeech` hook (text-to-speech), `useVoiceCommands` hook (command parsing), `VoiceFAB` component (floating mic button), and `VoiceControl` component. However, these are not wired into any agent operation surface yet.
 >
-> Create a `VoiceChatScreen.tsx` in `src/mobile/src/screens/agents/` that provides a conversational interface for interacting with hired agents. Features: (a) message list (FlashList) showing user messages and agent responses, (b) text input bar at bottom with send button, (c) voice toggle — mic button next to text input; when toggled to voice mode, `useSpeechToText` captures speech and auto-sends as a text message (same API call), (d) agent responses can be read aloud via `useTextToSpeech` (toggleable "auto-read" setting), (e) input mode preference persisted in Zustand store. The chat calls the DMA activation endpoint (same as CP Frontend's `digitalMarketingActivation.service.ts` chat endpoint). Create a `chat.service.ts` for the API call. Register in navigation.
+> Create a `useAgentVoiceOverlay` hook in `src/mobile/src/hooks/` that provides a reusable voice command layer for any agent screen. Features: (a) activates STT when user taps the mic FAB, (b) parses transcript for known commands: "approve [title]", "reject [title]", "read insights", "go to inbox", "go to billing", "go to connections", (c) executes the matched command callback, (d) provides TTS feedback on command execution ("Approved: [title]"). Wire this hook into `InboxScreen` (E1), `ContentAnalyticsScreen` (E3), and update `AgentOperationsScreen` to use voice navigation. Add the `VoiceFAB` component as a floating button on each of these screens. Default input mode is text; voice activates on FAB tap. Persist voice preference in Zustand `uiStore`.
 
 **Files to read first (max 3 — read only these, nothing else):**
 
@@ -793,117 +834,102 @@ cd src/mobile && npx jest __tests__/PlatformConnectionsScreen.test.tsx __tests__
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/mobile/src/screens/agents/VoiceChatScreen.tsx` | create | New screen: message list (FlashList) with user/agent message bubbles, text input bar at bottom with send button, voice toggle icon (mic) next to text input. When voice mode active: mic button shows pulsing animation (use `VoiceFAB` styling), speech captured via `useSpeechToText`, transcript shown in input field in real-time, auto-sent when speech finalizes. Agent response bubbles have a speaker icon — tap to read aloud via `useTextToSpeech`. "Auto-read" toggle in header. Dark theme with neon cyan user bubbles and gray-900 agent bubbles. All elements with `testID`. |
-| `src/mobile/src/services/chat.service.ts` | create | `sendChatMessage(hiredAgentId: string, message: string)` → `cpApiClient.post('/cp/hired-agents/{id}/chat', { message })`. Returns `{ response: string, metadata?: Record<string, unknown> }`. |
-| `src/mobile/src/hooks/useChat.ts` | create | Manages chat state: `messages` array in local state, `sendMessage` mutation via React Query `useMutation`. On success, appends agent response to messages. `inputMode: 'text' | 'voice'` toggled by user. Persists `inputMode` preference via Zustand `uiStore` (create if not exists, or add to existing `authStore`). |
-| `src/mobile/src/navigation/types.ts` | modify | Add `VoiceChat: { hiredAgentId: string }` to `MyAgentsStackParamList` |
-| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `VoiceChatScreen` and add to `MyAgentsNavigator` stack |
-| `src/mobile/src/screens/agents/index.ts` | modify | Export `VoiceChatScreen` |
+| `src/mobile/src/hooks/useAgentVoiceOverlay.ts` | create | New hook: combines `useSpeechToText` + `useTextToSpeech` into a command-parsing layer. Accepts a `commands` map: `Record<string, (args: string) => void | Promise<void>>`. When `isListening` goes false and `transcript` is non-empty, match transcript against command map keys (case-insensitive prefix match). If match found, call the handler with the rest of the transcript as args, then TTS confirm: "Done: [command]". If no match, TTS: "Command not recognized. Try: [list available commands]." Returns `{ isListening, toggle, lastCommand, isAvailable }`. Persist `voiceEnabled` preference in Zustand (add to existing auth/ui store). |
+| `src/mobile/src/screens/agents/InboxScreen.tsx` | modify | Wire `useAgentVoiceOverlay` with commands `{ approve: (title) => matchAndApprove(title), reject: (title) => matchAndReject(title) }`. Add `VoiceFAB` positioned bottom-right, `onPress={toggle}`. |
+| `src/mobile/src/screens/agents/ContentAnalyticsScreen.tsx` | modify | Wire `useAgentVoiceOverlay` with command `{ "read insights": () => readInsights() }`. Add `VoiceFAB` positioned bottom-right. |
+| `src/mobile/src/screens/agents/AgentOperationsScreen.tsx` | modify | Wire `useAgentVoiceOverlay` with navigation commands: `{ "go to inbox": () => navigate('Inbox'), "go to analytics": (id) => navigate('ContentAnalytics', { hiredAgentId }), "go to connections": (id) => navigate('PlatformConnections', { hiredAgentId }) }`. Add `VoiceFAB`. |
 
 **Code patterns to copy exactly:**
 
 ```typescript
-// Voice-to-text input integration pattern:
-import { useSpeechToText } from '../../hooks/useSpeechToText';
-import { useTextToSpeech } from '../../hooks/useTextToSpeech';
+// Voice command overlay hook pattern:
+import { useEffect, useCallback, useRef } from 'react';
+import { useSpeechToText } from './useSpeechToText';
+import { useTextToSpeech } from './useTextToSpeech';
 
-// Inside VoiceChatScreen component:
-const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
-const [inputText, setInputText] = useState('');
-const { isListening, transcript, start, stop, isAvailable } = useSpeechToText();
-const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
-const [autoRead, setAutoRead] = useState(false);
+type CommandMap = Record<string, (args: string) => void | Promise<void>>;
 
-// Sync voice transcript to input field:
-useEffect(() => {
-  if (transcript && inputMode === 'voice') {
-    setInputText(transcript);
-  }
-}, [transcript, inputMode]);
+interface UseAgentVoiceOverlayResult {
+  isListening: boolean;
+  toggle: () => void;
+  lastCommand: string | null;
+  isAvailable: boolean;
+}
 
-// Auto-send when speech finalizes:
-useEffect(() => {
-  if (!isListening && inputText && inputMode === 'voice') {
-    handleSend();
-  }
-}, [isListening]);
+export function useAgentVoiceOverlay(commands: CommandMap): UseAgentVoiceOverlayResult {
+  const { isListening, transcript, start, stop, isAvailable } = useSpeechToText();
+  const { speak } = useTextToSpeech();
+  const [lastCommand, setLastCommand] = useState<string | null>(null);
 
-// Auto-read agent response:
-const handleAgentResponse = (response: string) => {
-  appendMessage({ role: 'agent', text: response });
-  if (autoRead) { speak(response); }
-};
+  const toggle = useCallback(() => {
+    if (isListening) { stop(); } else { start({ language: 'en-US' }); }
+  }, [isListening, start, stop]);
 
-// Toggle input mode:
-const toggleInputMode = () => {
-  if (inputMode === 'text') {
-    setInputMode('voice');
-    start({ language: 'en-US' });
-  } else {
-    stop();
-    setInputMode('text');
-  }
-};
+  useEffect(() => {
+    if (!isListening && transcript) {
+      const lower = transcript.toLowerCase().trim();
+      const match = Object.entries(commands).find(([key]) => lower.startsWith(key.toLowerCase()));
+      if (match) {
+        const [key, handler] = match;
+        const args = lower.slice(key.length).trim();
+        setLastCommand(key);
+        handler(args);
+        speak(`Done: ${key}`);
+      } else {
+        speak(`Command not recognized. Try: ${Object.keys(commands).join(', ')}`);
+      }
+    }
+  }, [isListening, transcript]);
+
+  return { isListening, toggle, lastCommand, isAvailable };
+}
 ```
 
 ```typescript
-// Chat message bubble pattern:
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'agent';
-  text: string;
-  timestamp: string;
-}
+// Wiring VoiceFAB on a screen:
+import { VoiceFAB } from '../../components/voice/VoiceFAB';
+import { useAgentVoiceOverlay } from '../../hooks/useAgentVoiceOverlay';
 
-const MessageBubble = ({ message }: { message: ChatMessage }) => {
-  const { colors } = useTheme();
-  const isUser = message.role === 'user';
+// Inside InboxScreen:
+const { isListening, toggle, isAvailable } = useAgentVoiceOverlay({
+  approve: (titleFragment) => {
+    const match = deliverables.find(d => d.title?.toLowerCase().includes(titleFragment));
+    if (match) approve(match.id);
+  },
+  reject: (titleFragment) => {
+    const match = deliverables.find(d => d.title?.toLowerCase().includes(titleFragment));
+    if (match) reject(match.id);
+  },
+});
 
-  return (
-    <View
-      testID={`chat-message-${message.id}`}
-      style={{
-        alignSelf: isUser ? 'flex-end' : 'flex-start',
-        backgroundColor: isUser ? colors.neonCyan + '20' : colors.gray900,
-        borderRadius: 16,
-        padding: 12,
-        maxWidth: '80%',
-        marginVertical: 4,
-      }}
-    >
-      <Text style={{ color: colors.textPrimary }}>{message.text}</Text>
-    </View>
-  );
-};
+// In JSX:
+{isAvailable && <VoiceFAB isListening={isListening} onPress={toggle} testID="voice-fab" />}
 ```
 
 **Acceptance criteria (binary pass/fail only):**
-1. `VoiceChatScreen` renders a message list and text input bar
-2. Typing text and pressing send calls `sendChatMessage` API and shows user + agent message bubbles
-3. Voice toggle switches input mode; mic icon animates when listening
-4. In voice mode, speech transcript appears in input field in real-time
-5. When speech finalizes, message auto-sends
-6. Agent response bubbles have speaker icon — tapping reads response aloud via TTS
-7. "Auto-read" toggle in header enables automatic TTS for all agent responses
-8. Loading/error states handled (send button disabled during API call, error toast on failure)
-9. Screen is navigable from `AgentOperationsScreen`
-10. All interactive elements have `testID` props
+1. `useAgentVoiceOverlay` hook exists and parses voice transcript against a command map
+2. `InboxScreen` has `VoiceFAB`; saying "approve [title]" triggers the approve API for the matched deliverable
+3. `ContentAnalyticsScreen` has `VoiceFAB`; saying "read insights" triggers TTS readback
+4. `AgentOperationsScreen` has `VoiceFAB`; saying "go to inbox" navigates to InboxScreen
+5. Unrecognized commands produce a TTS error message listing available commands
+6. VoiceFAB only renders when speech recognition is available (`isAvailable`)
+7. Default input mode is text; voice activates on FAB tap
+8. All interactive elements have `testID` props
 
 **Tests to write:**
 
 | Test ID | File | Test setup | Assert |
 |---|---|---|---|
-| E5-S1-T1 | `src/mobile/__tests__/VoiceChatScreen.test.tsx` | Render screen with mocked hooks | Input bar, send button, and voice toggle visible |
-| E5-S1-T2 | same | Type message and press send, mock `sendChatMessage` resolves | User message bubble and agent response bubble appear |
-| E5-S1-T3 | same | Toggle to voice mode | `start()` called on `useSpeechToText`; mic icon shows listening state |
-| E5-S1-T4 | same | Mock transcript update | Input field shows transcript text |
-| E5-S1-T5 | same | Tap speaker icon on agent message | `speak()` called with message text |
-| E5-S1-T6 | same | Enable auto-read, receive agent message | `speak()` called automatically |
-| E5-S1-T7 | `src/mobile/__tests__/chat.service.test.ts` | Mock cpApiClient for chat endpoint | `sendChatMessage` returns `{ response }` |
+| E5-S1-T1 | `src/mobile/__tests__/useAgentVoiceOverlay.test.ts` | Mock `useSpeechToText` with transcript "approve monthly report" | Matching command handler called with "monthly report" as args |
+| E5-S1-T2 | same | Mock transcript "unknown command" | `speak` called with "Command not recognized" message |
+| E5-S1-T3 | same | Call `toggle()` when not listening | `start()` called on STT hook |
+| E5-S1-T4 | `src/mobile/__tests__/InboxScreen.test.tsx` | Render InboxScreen with voice mocks | `VoiceFAB` component rendered with `testID="voice-fab"` |
+| E5-S1-T5 | `src/mobile/__tests__/ContentAnalyticsScreen.test.tsx` | Render ContentAnalyticsScreen with voice mocks | `VoiceFAB` component rendered |
+| E5-S1-T6 | `src/mobile/__tests__/AgentOperationsVoice.test.tsx` | Mock voice command "go to inbox" on AgentOperationsScreen | Navigation `navigate('Inbox')` called |
 
 **Test command:**
 ```bash
-cd src/mobile && npx jest __tests__/VoiceChatScreen.test.tsx __tests__/chat.service.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+cd src/mobile && npx jest __tests__/useAgentVoiceOverlay.test.ts __tests__/InboxScreen.test.tsx __tests__/ContentAnalyticsScreen.test.tsx __tests__/AgentOperationsVoice.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
 ```
 
 ---
@@ -947,8 +973,8 @@ cd src/mobile && npx jest __tests__/VoiceChatScreen.test.tsx __tests__/chat.serv
 
 | File | Action | Precise instruction |
 |---|---|---|
-| `src/mobile/__tests__/mobileCpParity.test.tsx` | create | Parity test suite with 5 sections: (1) Navigation parity — import `MyAgentsStackParamList` and `ProfileStackParamList` types, assert `Inbox`, `ContentAnalytics`, `PlatformConnections`, `VoiceChat` are keys of `MyAgentsStackParamList` and `UsageBilling` is key of `ProfileStackParamList`. (2) Service contract parity — import each new service file, assert each exported function exists and is callable. (3) Screen render parity — render each new screen with mocked dependencies, assert `LoadingSpinner` renders during loading, `ErrorView` during error, `EmptyState` when empty. (4) Voice integration parity — render `InboxScreen` and `VoiceChatScreen`, assert `useSpeechToText` mock was accessed. (5) TestID coverage — render each screen, assert `testID` prop exists on root element. |
-| `src/mobile/__tests__/navigation.test.ts` | modify | Add test cases for new screens: `Inbox`, `UsageBilling`, `ContentAnalytics`, `PlatformConnections`, `VoiceChat` — validate they are reachable from their parent navigators |
+| `src/mobile/__tests__/mobileCpParity.test.tsx` | create | Parity test suite with 5 sections: (1) Navigation parity — import `MyAgentsStackParamList` and `ProfileStackParamList` types, assert `Inbox`, `ContentAnalytics`, `PlatformConnections` are keys of `MyAgentsStackParamList` and `UsageBilling` is key of `ProfileStackParamList`. (2) Service contract parity — import each new service file, assert each exported function exists and is callable. (3) Screen render parity — render each new screen with mocked dependencies, assert `LoadingSpinner` renders during loading, `ErrorView` during error, `EmptyState` when empty. (4) Voice integration parity — render `InboxScreen` and `ContentAnalyticsScreen`, assert `useAgentVoiceOverlay` mock was accessed and `VoiceFAB` is rendered. (5) TestID coverage — render each screen, assert `testID` prop exists on root element. |
+| `src/mobile/__tests__/navigation.test.ts` | modify | Add test cases for new screens: `Inbox`, `UsageBilling`, `ContentAnalytics`, `PlatformConnections` — validate they are reachable from their parent navigators |
 
 **Code patterns to copy exactly:**
 
@@ -963,9 +989,9 @@ describe('Mobile-CP Parity: Navigation', () => {
       'MyAgents', 'AgentDetail', 'TrialDashboard', 'ActiveTrialsList',
       'HiredAgentsList', 'AgentOperations',
       // New parity screens:
-      'Inbox', 'ContentAnalytics', 'PlatformConnections', 'VoiceChat',
+      'Inbox', 'ContentAnalytics', 'PlatformConnections',
     ];
-    expect(myAgentsScreens).toHaveLength(10);
+    expect(myAgentsScreens).toHaveLength(9);
   });
 
   it('Profile stack includes UsageBilling', () => {
@@ -986,8 +1012,7 @@ describe('Mobile-CP Parity: Navigation', () => {
 import { listInvoices, getInvoiceHtml } from '../src/services/invoices.service';
 import { listReceipts, getReceiptHtml } from '../src/services/receipts.service';
 import { getContentRecommendations } from '../src/services/contentAnalytics.service';
-import { listPlatformConnections, startPlatformOAuth } from '../src/services/platformConnections.service';
-import { sendChatMessage } from '../src/services/chat.service';
+import { listPlatformConnections, createPlatformConnection, deletePlatformConnection, startYouTubeOAuth } from '../src/services/platformConnections.service';
 
 describe('Mobile-CP Parity: Service Contracts', () => {
   it('all parity services are importable and callable', () => {
@@ -997,8 +1022,9 @@ describe('Mobile-CP Parity: Service Contracts', () => {
     expect(typeof getReceiptHtml).toBe('function');
     expect(typeof getContentRecommendations).toBe('function');
     expect(typeof listPlatformConnections).toBe('function');
-    expect(typeof startPlatformOAuth).toBe('function');
-    expect(typeof sendChatMessage).toBe('function');
+    expect(typeof createPlatformConnection).toBe('function');
+    expect(typeof deletePlatformConnection).toBe('function');
+    expect(typeof startYouTubeOAuth).toBe('function');
   });
 });
 ```
@@ -1037,8 +1063,8 @@ it('InboxScreen shows LoadingSpinner while loading', () => {
 | E6-S1-T2 | same | Import service functions | All functions are `typeof 'function'` |
 | E6-S1-T3 | same | Render each screen with loading mock | `LoadingSpinner` component present |
 | E6-S1-T4 | same | Render each screen with error mock | `ErrorView` component present |
-| E6-S1-T5 | same | Render `InboxScreen` with voice mock | `useSpeechToText` accessed |
-| E6-S1-T6 | same | Render `VoiceChatScreen` with voice mock | `useSpeechToText` and `useTextToSpeech` accessed |
+| E6-S1-T5 | same | Render `InboxScreen` with voice mock | `useAgentVoiceOverlay` accessed and `VoiceFAB` rendered |
+| E6-S1-T6 | same | Render `ContentAnalyticsScreen` with voice mock | `useAgentVoiceOverlay` accessed and `VoiceFAB` rendered |
 | E6-S1-T7 | `src/mobile/__tests__/navigation.test.ts` | Render navigators | New screens navigable from parent stacks |
 
 **Test command:**
@@ -1063,15 +1089,15 @@ cd src/mobile && npx jest \
   __tests__/contentAnalytics.service.test.ts \
   __tests__/PlatformConnectionsScreen.test.tsx \
   __tests__/platformConnections.service.test.ts \
-  __tests__/VoiceChatScreen.test.tsx \
-  __tests__/chat.service.test.ts \
+  __tests__/useAgentVoiceOverlay.test.ts \
+  __tests__/AgentOperationsVoice.test.tsx \
   __tests__/mobileCpParity.test.tsx \
   __tests__/navigation.test.ts \
   --coverage \
   --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
 ```
 
-**Expected new/modified test files (13 total):**
+**Expected new/modified test files (12 total):**
 
 | File | Covers |
 |---|---|
@@ -1083,8 +1109,8 @@ cd src/mobile && npx jest \
 | `__tests__/contentAnalytics.service.test.ts` | E3 — analytics service |
 | `__tests__/PlatformConnectionsScreen.test.tsx` | E4 — connections screen render + OAuth flow |
 | `__tests__/platformConnections.service.test.ts` | E4 — platform connections service |
-| `__tests__/VoiceChatScreen.test.tsx` | E5 — chat screen render + voice toggle + auto-send |
-| `__tests__/chat.service.test.ts` | E5 — chat service |
+| `__tests__/useAgentVoiceOverlay.test.ts` | E5 — voice command overlay hook |
+| `__tests__/AgentOperationsVoice.test.tsx` | E5 — voice commands on AgentOperationsScreen |
 | `__tests__/mobileCpParity.test.tsx` | E6 — navigation, service contract, shared component, voice parity |
 | `__tests__/navigation.test.ts` | E6 — updated with new screen reachability |
 
