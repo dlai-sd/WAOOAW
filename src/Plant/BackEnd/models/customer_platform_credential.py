@@ -21,6 +21,10 @@ class CustomerPlatformCredentialModel(Base):
     verification_status = Column(String(50), nullable=False, default="pending")
     connection_status = Column(String(50), nullable=False, default="pending")
     secret_ref = Column(Text, nullable=False)
+    credential_ref = Column(String(255), nullable=True, unique=True, index=True)
+    secret_manager_ref = Column(Text, nullable=True)
+    posting_identity = Column(String(255), nullable=True)
+    metadata_ = Column("metadata", JSONB, nullable=False, default=dict)
     token_expires_at = Column(DateTime(timezone=True), nullable=True)
     last_verified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(

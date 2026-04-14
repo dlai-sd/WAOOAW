@@ -18,7 +18,7 @@ from integrations.social.youtube_client import YouTubeClient
 from models.customer_platform_credential import CustomerPlatformCredentialModel
 from models.oauth_connection_session import OAuthConnectionSessionModel
 from models.platform_connection import PlatformConnectionModel
-from services.social_credential_resolver import CPSocialCredentialResolver, CredentialResolutionError, get_default_resolver
+from services.social_credential_resolver import CPSocialCredentialResolver, CredentialResolutionError, DatabaseCredentialResolver, get_default_resolver
 
 
 class YouTubeConnectionError(Exception):
@@ -78,10 +78,10 @@ class YouTubeConnectionService:
         self,
         *,
         db: AsyncSession,
-        credential_resolver: CPSocialCredentialResolver | None = None,
+        credential_resolver: CPSocialCredentialResolver | DatabaseCredentialResolver | None = None,
     ) -> None:
         self._db = db
-        self._credential_resolver = credential_resolver or get_default_resolver()
+        self._credential_resolver = credential_resolver or DatabaseCredentialResolver(db)
 
     def _oauth_client_id(self) -> str:
         return str(settings.google_client_id or "").strip()
@@ -192,7 +192,7 @@ class YouTubeConnectionService:
         )
         existing_ref = None
         if existing_credential is not None:
-            candidate_ref = str(existing_credential.secret_ref or "").strip()
+            candidate_ref = str(getattr(existing_credential, "credential_ref", "") or existing_credential.secret_ref or "").strip()
             if candidate_ref.startswith("CRED-"):
                 existing_ref = candidate_ref
 
@@ -204,6 +204,7 @@ class YouTubeConnectionService:
                 access_token=access_token,
                 refresh_token=refresh_token,
                 credential_ref=existing_ref,
+                provider_account_id=provider_account_id,
                 metadata={
                     "provider_account_id": provider_account_id,
                     "token_expires_at": token_expires_at.isoformat(),

@@ -1,7 +1,8 @@
 """Social platform credential resolver (Plant).
 
-Plant resolves opaque credential_ref values via CP Backend at execution time.
-CP Backend holds the encrypted secrets (access_token, refresh_token).
+Phase 1 (legacy): Plant resolves opaque credential_ref via CP Backend HTTP API.
+Phase 2 (current): Plant resolves directly from its own DB + Secret Manager,
+    eliminating the dependency on CP's ephemeral JSONL file store.
 
 SECURITY: Plant never receives raw credentials from browser traffic.
 """
@@ -248,3 +249,146 @@ def get_default_resolver() -> CPSocialCredentialResolver:
     """
     cp_base_url = os.getenv("CP_BACKEND_URL", "http://localhost:8001")
     return CPSocialCredentialResolver(cp_base_url=cp_base_url)
+
+
+class DatabaseCredentialResolver:
+    """Resolve credentials directly from Plant DB + Secret Manager.
+
+    Replaces the CP HTTP round-trip with a direct DB lookup + Secret Manager read.
+    This eliminates the dependency on CP's ephemeral JSONL file store.
+    """
+
+    def __init__(self, db: "AsyncSession") -> None:  # noqa: F821
+        self._db = db
+
+    async def resolve(
+        self,
+        *,
+        customer_id: str,
+        credential_ref: str,
+        correlation_id: Optional[str] = None,
+    ) -> ResolvedSocialCredentials:
+        from services.database_credential_store import DatabaseCredentialStore
+
+        store = DatabaseCredentialStore(self._db)
+        record = await store.get_by_credential_ref(
+            customer_id=customer_id, credential_ref=credential_ref
+        )
+        if record is None:
+            raise CredentialResolutionError(
+                f"Credential not found in Plant DB: {credential_ref} for customer {customer_id}"
+            )
+
+        if not record.secret_manager_ref:
+            raise CredentialResolutionError(
+                f"No secret_manager_ref for credential {credential_ref}"
+            )
+
+        from services.secret_manager_adapter import get_secret_manager_adapter
+
+        adapter = get_secret_manager_adapter()
+        secrets = await adapter.read_secret(record.secret_manager_ref)
+        if not secrets:
+            raise CredentialResolutionError(
+                f"Secret Manager returned empty payload for {credential_ref}"
+            )
+
+        access_token = str(secrets.get("access_token") or "").strip()
+        if not access_token:
+            raise CredentialResolutionError(
+                f"No access_token in Secret Manager for {credential_ref}"
+            )
+
+        return ResolvedSocialCredentials(
+            credential_ref=record.credential_ref,
+            customer_id=record.customer_id,
+            platform=record.platform,
+            posting_identity=record.posting_identity,
+            access_token=access_token,
+            refresh_token=secrets.get("refresh_token"),
+            created_at=record.created_at.isoformat() if record.created_at else "",
+            updated_at=record.updated_at.isoformat() if record.updated_at else "",
+        )
+
+    async def update_access_token(
+        self,
+        *,
+        customer_id: str,
+        credential_ref: str,
+        new_access_token: str,
+        correlation_id: Optional[str] = None,
+    ) -> None:
+        from services.database_credential_store import DatabaseCredentialStore
+        from services.secret_manager_adapter import get_secret_manager_adapter
+
+        store = DatabaseCredentialStore(self._db)
+        record = await store.get_by_credential_ref(
+            customer_id=customer_id, credential_ref=credential_ref
+        )
+        if record is None or not record.secret_manager_ref:
+            raise CredentialResolutionError(
+                f"Credential not found for token update: {credential_ref}"
+            )
+
+        adapter = get_secret_manager_adapter()
+        secrets = await adapter.read_secret(record.secret_manager_ref)
+        secrets["access_token"] = new_access_token
+        new_ref = await adapter.update_secret(record.secret_manager_ref, secrets)
+        await store.update_secret_manager_ref(
+            credential_ref=credential_ref, secret_manager_ref=new_ref
+        )
+
+    async def upsert(
+        self,
+        *,
+        customer_id: str,
+        platform: str,
+        posting_identity: Optional[str],
+        access_token: str,
+        refresh_token: Optional[str],
+        credential_ref: Optional[str] = None,
+        metadata: Optional[Dict[str, str]] = None,
+        provider_account_id: Optional[str] = None,
+        correlation_id: Optional[str] = None,
+    ) -> StoredSocialCredentials:
+        from services.database_credential_store import DatabaseCredentialStore
+        from services.secret_manager_adapter import get_secret_manager_adapter
+
+        store = DatabaseCredentialStore(self._db)
+        adapter = get_secret_manager_adapter()
+
+        cred_ref = credential_ref or ""
+        secret_id = _build_secret_id(customer_id, platform, cred_ref)
+
+        secrets_payload = {"access_token": access_token}
+        if refresh_token:
+            secrets_payload["refresh_token"] = refresh_token
+
+        secret_manager_ref = await adapter.write_secret(secret_id, secrets_payload)
+
+        record = await store.upsert(
+            customer_id=customer_id,
+            platform=platform,
+            posting_identity=posting_identity,
+            secret_manager_ref=secret_manager_ref,
+            credential_ref=credential_ref,
+            metadata=metadata,
+            provider_account_id=provider_account_id,
+        )
+
+        return StoredSocialCredentials(
+            credential_ref=record.credential_ref,
+            customer_id=record.customer_id,
+            platform=record.platform,
+            posting_identity=record.posting_identity,
+            created_at=record.created_at.isoformat() if record.created_at else "",
+            updated_at=record.updated_at.isoformat() if record.updated_at else "",
+        )
+
+
+def _build_secret_id(customer_id: str, platform: str, credential_ref: str) -> str:
+    import re
+
+    raw = f"cp-social-{customer_id}-{platform}-{credential_ref}".lower()
+    normalised = re.sub(r"[^a-z0-9_-]", "-", raw)
+    return normalised[:255]
