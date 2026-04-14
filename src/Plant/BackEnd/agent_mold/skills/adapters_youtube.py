@@ -30,8 +30,20 @@ class YouTubeAdapter(DestinationAdapter):
         customer_id = metadata.get("customer_id", "")
         credential_ref = inp.credential_ref or metadata.get("credential_ref", "")
 
-        client = YouTubeClient(customer_id=customer_id)
+        # Use DatabaseCredentialResolver with a fresh DB session so the publish
+        # path resolves credentials from Plant DB + Secret Manager instead of
+        # the old CP HTTP round-trip (which relied on an ephemeral JSONL file).
+        from core.database import _connector as db_connector
+        from services.social_credential_resolver import DatabaseCredentialResolver
+
+        resolver = None
+        db_session = None
         try:
+            await db_connector.initialize()
+            db_session = db_connector.async_session_factory()
+            resolver = DatabaseCredentialResolver(db_session)
+
+            client = YouTubeClient(customer_id=customer_id, credential_resolver=resolver)
             result = await client.post_text(
                 credential_ref=credential_ref,
                 text=inp.post.content_text,
@@ -55,3 +67,6 @@ class YouTubeAdapter(DestinationAdapter):
                 success=False,
                 error=str(exc),
             )
+        finally:
+            if db_session is not None:
+                await db_session.close()
