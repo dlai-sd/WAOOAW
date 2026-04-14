@@ -649,3 +649,442 @@ const readInsights = async () => {
 cd src/mobile && npx jest __tests__/ContentAnalyticsScreen.test.tsx __tests__/contentAnalytics.service.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
 ```
 
+---
+
+### Epic E4: Customer manages YouTube and platform connections on mobile
+
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**User story:** As a DMA customer, I can set up, view, and manage my YouTube and social platform connections on mobile, so that the marketing agent can publish approved content without me needing to use the desktop portal.
+
+---
+
+#### Story E4-S1: Platform Connections setup and management screen
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 60 min
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**CP BackEnd pattern:** N/A — mobile calls Plant Gateway directly
+**Objective alignment:** DMA enablement — YouTube/platform connections are a prerequisite for DMA content publish pipeline; without mobile setup, customers are blocked from activating their DMA agent on-the-go
+
+**What to do (self-contained — read this card, then act):**
+> The mobile app currently shows YouTube publish status inside `MyAgentsScreen` but has no dedicated screen for connecting or managing platform connections. The CP Frontend has `PlatformConnectionsPanel.tsx` component and services (`youtubeConnections.service.ts`, `platformConnections.service.ts`) for OAuth connections.
+>
+> Create a new `PlatformConnectionsScreen.tsx` in `src/mobile/src/screens/agents/` that shows: (a) connected platforms list with status badges (Connected ✅ / Disconnected ❌ / Expired ⚠️), (b) "Connect" button for each platform that opens the OAuth URL in device browser via `WebBrowser.openBrowserAsync()` from `expo-web-browser`, (c) connection health check — shows last-verified date and a "Refresh" button. Create `platformConnections.service.ts` in services. The YouTube callback is already handled by `YouTubeConnectionCallback.tsx` page in the CP Frontend — on mobile this returns via deep link which is already configured in `app.json` scheme. Register the screen in navigation.
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/screens/agents/AgentOperationsScreen.tsx` | 1–60 | Where platform status is shown; where to add "Manage Connections" link |
+| `src/mobile/src/lib/cpApiClient.ts` | 1–20 | Import pattern for service files |
+| `src/mobile/src/components/ConnectorSetupCard.tsx` | 1–60 | Existing card pattern for connector/platform setup display |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/agents/PlatformConnectionsScreen.tsx` | create | New screen: list of platforms (YouTube, Instagram, Facebook, LinkedIn, X, WhatsApp) each rendered as a card showing: platform icon/name, connection status badge (Connected/Disconnected/Expired), last verified timestamp, "Connect"/"Reconnect"/"Disconnect" action button. "Connect" opens OAuth URL via `WebBrowser.openBrowserAsync()`. Show a summary header: "X of Y platforms connected". Loading/error/empty states. Dark theme, `testID` on all interactive elements. |
+| `src/mobile/src/services/platformConnections.service.ts` | create | `listPlatformConnections(hiredAgentId: string)` → `cpApiClient.get('/cp/hired-agents/{id}/platform-connections')`. `startPlatformOAuth(hiredAgentId: string, platform: string)` → `cpApiClient.post('/cp/hired-agents/{id}/platform-connections/{platform}/connect')` returns `{ oauth_url: string }`. `disconnectPlatform(hiredAgentId: string, platform: string)` → `cpApiClient.delete(...)`. Types: `PlatformConnection { platform, status, connected_at, last_verified_at, display_name }`. |
+| `src/mobile/src/hooks/usePlatformConnections.ts` | create | React Query hook wrapping `listPlatformConnections`. Returns `{ connections, isLoading, error, refetch, connect, disconnect }`. `connect` and `disconnect` are `useMutation` wrappers that invalidate the query on success. |
+| `src/mobile/src/navigation/types.ts` | modify | Add `PlatformConnections: { hiredAgentId: string }` to `MyAgentsStackParamList` |
+| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `PlatformConnectionsScreen` and add to `MyAgentsNavigator` stack |
+| `src/mobile/src/screens/agents/index.ts` | modify | Export `PlatformConnectionsScreen` |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Platform connections service pattern:
+import cpApiClient from '../lib/cpApiClient';
+
+export interface PlatformConnection {
+  platform: string; // 'youtube' | 'instagram' | 'facebook' | 'linkedin' | 'x' | 'whatsapp'
+  status: 'connected' | 'disconnected' | 'expired';
+  connected_at?: string;
+  last_verified_at?: string;
+  display_name?: string;
+}
+
+export async function listPlatformConnections(hiredAgentId: string): Promise<PlatformConnection[]> {
+  const response = await cpApiClient.get<PlatformConnection[]>(
+    `/cp/hired-agents/${hiredAgentId}/platform-connections`
+  );
+  return response.data;
+}
+
+export async function startPlatformOAuth(
+  hiredAgentId: string,
+  platform: string
+): Promise<{ oauth_url: string }> {
+  const response = await cpApiClient.post<{ oauth_url: string }>(
+    `/cp/hired-agents/${hiredAgentId}/platform-connections/${platform}/connect`
+  );
+  return response.data;
+}
+```
+
+```typescript
+// OAuth flow on mobile — open in system browser:
+import * as WebBrowser from 'expo-web-browser';
+
+const handleConnect = async (platform: string) => {
+  const { oauth_url } = await startPlatformOAuth(hiredAgentId, platform);
+  await WebBrowser.openBrowserAsync(oauth_url);
+  // After OAuth completes, deep link returns to app — refetch connections
+  refetch();
+};
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. `PlatformConnectionsScreen` renders a list of platform cards with status badges
+2. Summary header shows "X of Y platforms connected"
+3. Tapping "Connect" on a disconnected platform calls `startPlatformOAuth` and opens browser
+4. Connected platforms show "Disconnect" button; tapping it calls disconnect API
+5. Loading/error/empty states use shared components
+6. Screen is navigable from `AgentOperationsScreen`
+7. All interactive elements have `testID` props
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E4-S1-T1 | `src/mobile/__tests__/PlatformConnectionsScreen.test.tsx` | Mock `usePlatformConnections` returns 3 connections (1 connected, 1 disconnected, 1 expired) | 3 cards rendered with correct status badges; summary shows "1 of 3" |
+| E4-S1-T2 | same | Mock returns empty array | `EmptyState` shown |
+| E4-S1-T3 | same | Mock loading=true | `LoadingSpinner` shown |
+| E4-S1-T4 | same | Press "Connect" on disconnected platform | `startPlatformOAuth` called, `WebBrowser.openBrowserAsync` called |
+| E4-S1-T5 | `src/mobile/__tests__/platformConnections.service.test.ts` | Mock cpApiClient returns connections | `listPlatformConnections` returns typed array |
+| E4-S1-T6 | same | Mock cpApiClient for OAuth start | `startPlatformOAuth` returns `{ oauth_url }` |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest __tests__/PlatformConnectionsScreen.test.tsx __tests__/platformConnections.service.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+```
+
+---
+
+### Epic E5: Customer uses voice or text to interact with agent chat
+
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**User story:** As a customer, I can toggle between voice and text input when interacting with my agent, so that I can give instructions hands-free (e.g., while driving) or type when in a quiet environment, with the agent responding via text and optional voice readback.
+
+---
+
+#### Story E5-S1: Voice Chat toggle integrated into agent interaction surfaces
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 60 min
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**CP BackEnd pattern:** N/A — voice is a client-side input mode; no backend changes
+**Objective alignment:** DMA enablement — voice chat lets DMA customers brief their marketing agent, review content, and approve deliverables hands-free, reducing friction and increasing engagement
+
+**What to do (self-contained — read this card, then act):**
+> The mobile app has full voice infrastructure: `useSpeechToText` hook (speech-to-text), `useTextToSpeech` hook (text-to-speech), `useVoiceCommands` hook (command parsing), `VoiceFAB` component (floating mic button), and `VoiceControl` component. However, these are not wired into any chat or agent interaction surface. There is no chat screen yet in the mobile app.
+>
+> Create a `VoiceChatScreen.tsx` in `src/mobile/src/screens/agents/` that provides a conversational interface for interacting with hired agents. Features: (a) message list (FlashList) showing user messages and agent responses, (b) text input bar at bottom with send button, (c) voice toggle — mic button next to text input; when toggled to voice mode, `useSpeechToText` captures speech and auto-sends as a text message (same API call), (d) agent responses can be read aloud via `useTextToSpeech` (toggleable "auto-read" setting), (e) input mode preference persisted in Zustand store. The chat calls the DMA activation endpoint (same as CP Frontend's `digitalMarketingActivation.service.ts` chat endpoint). Create a `chat.service.ts` for the API call. Register in navigation.
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/hooks/useVoiceCommands.ts` | 1–60 | Full voice command flow: STT → parse → TTS feedback. `UseVoiceCommandsResult` interface |
+| `src/mobile/src/components/voice/VoiceFAB.tsx` | 1–40 | Existing FAB component: props, pulsing animation, haptic feedback pattern |
+| `src/mobile/src/hooks/useSpeechToText.ts` | 1–30 | `start`, `stop`, `transcript`, `isListening` — how to capture voice input |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/agents/VoiceChatScreen.tsx` | create | New screen: message list (FlashList) with user/agent message bubbles, text input bar at bottom with send button, voice toggle icon (mic) next to text input. When voice mode active: mic button shows pulsing animation (use `VoiceFAB` styling), speech captured via `useSpeechToText`, transcript shown in input field in real-time, auto-sent when speech finalizes. Agent response bubbles have a speaker icon — tap to read aloud via `useTextToSpeech`. "Auto-read" toggle in header. Dark theme with neon cyan user bubbles and gray-900 agent bubbles. All elements with `testID`. |
+| `src/mobile/src/services/chat.service.ts` | create | `sendChatMessage(hiredAgentId: string, message: string)` → `cpApiClient.post('/cp/hired-agents/{id}/chat', { message })`. Returns `{ response: string, metadata?: Record<string, unknown> }`. |
+| `src/mobile/src/hooks/useChat.ts` | create | Manages chat state: `messages` array in local state, `sendMessage` mutation via React Query `useMutation`. On success, appends agent response to messages. `inputMode: 'text' | 'voice'` toggled by user. Persists `inputMode` preference via Zustand `uiStore` (create if not exists, or add to existing `authStore`). |
+| `src/mobile/src/navigation/types.ts` | modify | Add `VoiceChat: { hiredAgentId: string }` to `MyAgentsStackParamList` |
+| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `VoiceChatScreen` and add to `MyAgentsNavigator` stack |
+| `src/mobile/src/screens/agents/index.ts` | modify | Export `VoiceChatScreen` |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Voice-to-text input integration pattern:
+import { useSpeechToText } from '../../hooks/useSpeechToText';
+import { useTextToSpeech } from '../../hooks/useTextToSpeech';
+
+// Inside VoiceChatScreen component:
+const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
+const [inputText, setInputText] = useState('');
+const { isListening, transcript, start, stop, isAvailable } = useSpeechToText();
+const { speak, isSpeaking, stop: stopSpeaking } = useTextToSpeech();
+const [autoRead, setAutoRead] = useState(false);
+
+// Sync voice transcript to input field:
+useEffect(() => {
+  if (transcript && inputMode === 'voice') {
+    setInputText(transcript);
+  }
+}, [transcript, inputMode]);
+
+// Auto-send when speech finalizes:
+useEffect(() => {
+  if (!isListening && inputText && inputMode === 'voice') {
+    handleSend();
+  }
+}, [isListening]);
+
+// Auto-read agent response:
+const handleAgentResponse = (response: string) => {
+  appendMessage({ role: 'agent', text: response });
+  if (autoRead) { speak(response); }
+};
+
+// Toggle input mode:
+const toggleInputMode = () => {
+  if (inputMode === 'text') {
+    setInputMode('voice');
+    start({ language: 'en-US' });
+  } else {
+    stop();
+    setInputMode('text');
+  }
+};
+```
+
+```typescript
+// Chat message bubble pattern:
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'agent';
+  text: string;
+  timestamp: string;
+}
+
+const MessageBubble = ({ message }: { message: ChatMessage }) => {
+  const { colors } = useTheme();
+  const isUser = message.role === 'user';
+
+  return (
+    <View
+      testID={`chat-message-${message.id}`}
+      style={{
+        alignSelf: isUser ? 'flex-end' : 'flex-start',
+        backgroundColor: isUser ? colors.neonCyan + '20' : colors.gray900,
+        borderRadius: 16,
+        padding: 12,
+        maxWidth: '80%',
+        marginVertical: 4,
+      }}
+    >
+      <Text style={{ color: colors.textPrimary }}>{message.text}</Text>
+    </View>
+  );
+};
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. `VoiceChatScreen` renders a message list and text input bar
+2. Typing text and pressing send calls `sendChatMessage` API and shows user + agent message bubbles
+3. Voice toggle switches input mode; mic icon animates when listening
+4. In voice mode, speech transcript appears in input field in real-time
+5. When speech finalizes, message auto-sends
+6. Agent response bubbles have speaker icon — tapping reads response aloud via TTS
+7. "Auto-read" toggle in header enables automatic TTS for all agent responses
+8. Loading/error states handled (send button disabled during API call, error toast on failure)
+9. Screen is navigable from `AgentOperationsScreen`
+10. All interactive elements have `testID` props
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E5-S1-T1 | `src/mobile/__tests__/VoiceChatScreen.test.tsx` | Render screen with mocked hooks | Input bar, send button, and voice toggle visible |
+| E5-S1-T2 | same | Type message and press send, mock `sendChatMessage` resolves | User message bubble and agent response bubble appear |
+| E5-S1-T3 | same | Toggle to voice mode | `start()` called on `useSpeechToText`; mic icon shows listening state |
+| E5-S1-T4 | same | Mock transcript update | Input field shows transcript text |
+| E5-S1-T5 | same | Tap speaker icon on agent message | `speak()` called with message text |
+| E5-S1-T6 | same | Enable auto-read, receive agent message | `speak()` called automatically |
+| E5-S1-T7 | `src/mobile/__tests__/chat.service.test.ts` | Mock cpApiClient for chat endpoint | `sendChatMessage` returns `{ response }` |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest __tests__/VoiceChatScreen.test.tsx __tests__/chat.service.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+```
+
+---
+
+### Epic E6: Drift prevention — parity test suite validates mobile matches CP
+
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**User story:** As a platform engineer, I have a parity test suite that verifies mobile screens match CP Frontend functionality, so that future changes to either surface are caught by CI before they drift apart.
+
+---
+
+#### Story E6-S1: Parity test suite covering all new screens and navigation
+
+**BLOCKED UNTIL:** E1-S1, E2-S1, E3-S1, E4-S1, E5-S1 (runs last — validates all preceding screens)
+**Estimated time:** 60 min
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**CP BackEnd pattern:** N/A — test-only story
+**Objective alignment:** DMA enablement — drift prevention ensures mobile DMA features remain aligned with CP Frontend as both evolve, preventing customer confusion and support overhead
+
+**What to do (self-contained — read this card, then act):**
+> After E1–E5 are complete, the mobile app has 5 new screens. This story creates a dedicated parity test suite that validates: (a) all new screens are registered in navigation and reachable, (b) each screen's data-fetching pattern matches the equivalent CP service call signature, (c) every screen renders loading/error/empty states correctly, (d) voice integration is functional across applicable screens. This test suite runs in CI and serves as a drift-detection gate — if a CP service adds a field that mobile doesn't handle, or mobile drops a screen from navigation, these tests fail.
+>
+> Create a `mobileCpParity.test.tsx` integration test file that:
+> 1. Validates navigation: all 5 new screens are registered in `MyAgentsStackParamList` and `ProfileStackParamList`
+> 2. Validates service API contract alignment: each mobile service function signature matches the expected Plant Gateway endpoint path and HTTP method
+> 3. Validates shared component usage: each new screen uses `LoadingSpinner`, `ErrorView`, `EmptyState` (not inline alternatives)
+> 4. Validates voice integration: screens that support voice have `useSpeechToText` or `useTextToSpeech` wired
+> 5. Validates `testID` coverage: every new screen has at least one root `testID` prop
+>
+> Additionally, update the existing navigation test (`src/mobile/__tests__/navigation.test.ts`) to include the new screens.
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/__tests__/navigation.test.ts` | 1–60 | Existing navigation test pattern — how screens are validated as registered |
+| `src/mobile/src/navigation/types.ts` | 1–150 | Full param list types — verify all new screens are in their stack types |
+| `src/mobile/__tests__/coreScreens.test.tsx` | 1–60 | Existing pattern for testing multiple screens render correctly |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/__tests__/mobileCpParity.test.tsx` | create | Parity test suite with 5 sections: (1) Navigation parity — import `MyAgentsStackParamList` and `ProfileStackParamList` types, assert `Inbox`, `ContentAnalytics`, `PlatformConnections`, `VoiceChat` are keys of `MyAgentsStackParamList` and `UsageBilling` is key of `ProfileStackParamList`. (2) Service contract parity — import each new service file, assert each exported function exists and is callable. (3) Screen render parity — render each new screen with mocked dependencies, assert `LoadingSpinner` renders during loading, `ErrorView` during error, `EmptyState` when empty. (4) Voice integration parity — render `InboxScreen` and `VoiceChatScreen`, assert `useSpeechToText` mock was accessed. (5) TestID coverage — render each screen, assert `testID` prop exists on root element. |
+| `src/mobile/__tests__/navigation.test.ts` | modify | Add test cases for new screens: `Inbox`, `UsageBilling`, `ContentAnalytics`, `PlatformConnections`, `VoiceChat` — validate they are reachable from their parent navigators |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Navigation parity test pattern:
+import type { MyAgentsStackParamList, ProfileStackParamList } from '../src/navigation/types';
+
+describe('Mobile-CP Parity: Navigation', () => {
+  it('MyAgents stack includes all parity screens', () => {
+    // TypeScript compile-time check — if these types exist, the screens are registered
+    const myAgentsScreens: (keyof MyAgentsStackParamList)[] = [
+      'MyAgents', 'AgentDetail', 'TrialDashboard', 'ActiveTrialsList',
+      'HiredAgentsList', 'AgentOperations',
+      // New parity screens:
+      'Inbox', 'ContentAnalytics', 'PlatformConnections', 'VoiceChat',
+    ];
+    expect(myAgentsScreens).toHaveLength(10);
+  });
+
+  it('Profile stack includes UsageBilling', () => {
+    const profileScreens: (keyof ProfileStackParamList)[] = [
+      'Profile', 'EditProfile', 'Settings', 'Notifications',
+      'PaymentMethods', 'SubscriptionManagement', 'HelpCenter',
+      'PrivacyPolicy', 'TermsOfService',
+      // New parity screen:
+      'UsageBilling',
+    ];
+    expect(profileScreens).toHaveLength(10);
+  });
+});
+```
+
+```typescript
+// Service contract parity test pattern:
+import { listInvoices, getInvoiceHtml } from '../src/services/invoices.service';
+import { listReceipts, getReceiptHtml } from '../src/services/receipts.service';
+import { getContentRecommendations } from '../src/services/contentAnalytics.service';
+import { listPlatformConnections, startPlatformOAuth } from '../src/services/platformConnections.service';
+import { sendChatMessage } from '../src/services/chat.service';
+
+describe('Mobile-CP Parity: Service Contracts', () => {
+  it('all parity services are importable and callable', () => {
+    expect(typeof listInvoices).toBe('function');
+    expect(typeof getInvoiceHtml).toBe('function');
+    expect(typeof listReceipts).toBe('function');
+    expect(typeof getReceiptHtml).toBe('function');
+    expect(typeof getContentRecommendations).toBe('function');
+    expect(typeof listPlatformConnections).toBe('function');
+    expect(typeof startPlatformOAuth).toBe('function');
+    expect(typeof sendChatMessage).toBe('function');
+  });
+});
+```
+
+```typescript
+// Shared component usage parity test pattern:
+// For each new screen, render with loading mock and verify LoadingSpinner:
+import { render } from '@testing-library/react-native';
+import { LoadingSpinner } from '../src/components/LoadingSpinner';
+
+// Mock the hook to return loading state:
+jest.mock('../src/hooks/useAllDeliverables', () => ({
+  useAllDeliverables: () => ({ deliverables: [], isLoading: true, error: null }),
+}));
+
+it('InboxScreen shows LoadingSpinner while loading', () => {
+  const { getByTestId } = render(<InboxScreen />);
+  // Verify LoadingSpinner is present, not a custom inline spinner
+});
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. `mobileCpParity.test.tsx` exists and contains 5 test sections (navigation, service contracts, screen render, voice integration, testID coverage)
+2. All 5 new screens are validated as registered in their navigation stacks
+3. All new service functions are validated as importable and callable
+4. Each screen's loading/error/empty state tests pass using shared components
+5. Voice integration tests confirm `useSpeechToText`/`useTextToSpeech` are used in applicable screens
+6. Navigation test file updated to include new screens
+7. Entire parity suite passes: `npx jest __tests__/mobileCpParity.test.tsx` exits 0
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E6-S1-T1 | `src/mobile/__tests__/mobileCpParity.test.tsx` | Import navigation types | All new screen names are keys of correct stack param lists |
+| E6-S1-T2 | same | Import service functions | All functions are `typeof 'function'` |
+| E6-S1-T3 | same | Render each screen with loading mock | `LoadingSpinner` component present |
+| E6-S1-T4 | same | Render each screen with error mock | `ErrorView` component present |
+| E6-S1-T5 | same | Render `InboxScreen` with voice mock | `useSpeechToText` accessed |
+| E6-S1-T6 | same | Render `VoiceChatScreen` with voice mock | `useSpeechToText` and `useTextToSpeech` accessed |
+| E6-S1-T7 | `src/mobile/__tests__/navigation.test.ts` | Render navigators | New screens navigable from parent stacks |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest __tests__/mobileCpParity.test.tsx __tests__/navigation.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+```
+
+---
+
+## Full Test Coverage Summary
+
+> CI coverage gate: ≥80% on all new files. The following test commands validate the full iteration.
+
+**Full iteration test command (run after all epics):**
+```bash
+cd src/mobile && npx jest \
+  __tests__/InboxScreen.test.tsx \
+  __tests__/useAllDeliverables.test.ts \
+  __tests__/UsageBillingScreen.test.tsx \
+  __tests__/billingServices.test.ts \
+  __tests__/ContentAnalyticsScreen.test.tsx \
+  __tests__/contentAnalytics.service.test.ts \
+  __tests__/PlatformConnectionsScreen.test.tsx \
+  __tests__/platformConnections.service.test.ts \
+  __tests__/VoiceChatScreen.test.tsx \
+  __tests__/chat.service.test.ts \
+  __tests__/mobileCpParity.test.tsx \
+  __tests__/navigation.test.ts \
+  --coverage \
+  --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+```
+
+**Expected new/modified test files (13 total):**
+
+| File | Covers |
+|---|---|
+| `__tests__/InboxScreen.test.tsx` | E1 — deliverables screen render + approve/reject + voice |
+| `__tests__/useAllDeliverables.test.ts` | E1 — aggregation hook |
+| `__tests__/UsageBillingScreen.test.tsx` | E2 — billing screen render + download |
+| `__tests__/billingServices.test.ts` | E2 — invoice/receipt services |
+| `__tests__/ContentAnalyticsScreen.test.tsx` | E3 — analytics screen render + TTS readout |
+| `__tests__/contentAnalytics.service.test.ts` | E3 — analytics service |
+| `__tests__/PlatformConnectionsScreen.test.tsx` | E4 — connections screen render + OAuth flow |
+| `__tests__/platformConnections.service.test.ts` | E4 — platform connections service |
+| `__tests__/VoiceChatScreen.test.tsx` | E5 — chat screen render + voice toggle + auto-send |
+| `__tests__/chat.service.test.ts` | E5 — chat service |
+| `__tests__/mobileCpParity.test.tsx` | E6 — navigation, service contract, shared component, voice parity |
+| `__tests__/navigation.test.ts` | E6 — updated with new screen reachability |
+
