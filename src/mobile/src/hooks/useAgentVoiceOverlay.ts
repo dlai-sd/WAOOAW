@@ -48,8 +48,7 @@ export function useAgentVoiceOverlay(commands: CommandMap): UseAgentVoiceOverlay
         speak(`Command not recognized. Try: ${available}`).catch(() => {});
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isListening, transcript]);
+  }, [isListening, transcript, commands, speak]);
 
   return { isListening, toggle, lastCommand, isAvailable };
 }
