@@ -31,6 +31,7 @@ from integrations.social.base import (
 )
 from services.social_credential_resolver import (
     CPSocialCredentialResolver,
+    DatabaseCredentialResolver,
     get_default_resolver,
     CredentialResolutionError,
 )
@@ -75,8 +76,8 @@ class YouTubeClient(SocialPlatformClient):
         self.quota_limit = quota_limit
         self.quota_used = 0
         
-        # Credential resolver (Plant → CP Backend)
-        self._resolver = credential_resolver or get_default_resolver()
+        # Credential resolver (Plant → DB + Secret Manager, or legacy CP HTTP)
+        self._resolver: CPSocialCredentialResolver | DatabaseCredentialResolver = credential_resolver or get_default_resolver()
         self._customer_id = customer_id  # Set by service layer from context
     
     async def post_text(

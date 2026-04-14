@@ -238,6 +238,7 @@ def in_memory_marketing_draft_store(monkeypatch: pytest.MonkeyPatch):
     from main import app
     import api.v1.marketing_drafts as marketing_drafts_module
     import services.marketing_scheduler as marketing_scheduler_module
+    import services.content_creator_service as content_creator_service_module
     from core.database import get_db_session, get_read_db_session
 
     store = _InMemoryDraftBatchStore()
@@ -266,6 +267,7 @@ def in_memory_marketing_draft_store(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(marketing_drafts_module, "DatabaseDraftBatchStore", FakeDraftBatchStore)
     monkeypatch.setattr(marketing_scheduler_module, "DatabaseDraftBatchStore", FakeDraftBatchStore)
+    monkeypatch.setattr(content_creator_service_module, "DatabaseDraftBatchStore", FakeDraftBatchStore)
     app.dependency_overrides[get_db_session] = _fake_db_session
     app.dependency_overrides[get_read_db_session] = _fake_db_session
 
