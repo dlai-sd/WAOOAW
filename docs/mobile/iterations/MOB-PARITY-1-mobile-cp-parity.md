@@ -308,5 +308,344 @@ All stories E1–E5 are independent vertical slices. E6 (parity tests) runs last
 
 ---
 
-<!-- STORY CARDS FOLLOW — each epic section will be committed incrementally -->
+### Epic E1: Customer reviews and approves deliverables from mobile
+
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**User story:** As a customer, I can view all my agent deliverables in a dedicated Inbox screen on mobile, filter by status (pending/approved/rejected), and approve or reject them with voice or tap, so that I never miss an approval action while away from my desktop.
+
+---
+
+#### Story E1-S1: Deliverables & Inbox screen with voice-enabled approval actions
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 90 min
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**CP BackEnd pattern:** N/A — mobile calls Plant Gateway directly via `cpApiClient`
+**Objective alignment:** DMA value — customers approve DMA content drafts from mobile, unblocking the publish pipeline
+
+**What to do (self-contained — read this card, then act):**
+> The mobile app currently shows deliverables only inside `AgentOperationsScreen.tsx` in a collapsed section. There is no standalone Inbox/Deliverables screen. The CP Frontend has `Inbox.tsx` (approval queue with pending/approved/rejected counts) and `Deliverables.tsx` (deliverable list with review status, preview, approval workflow).
+>
+> Create a new `InboxScreen.tsx` in `src/mobile/src/screens/agents/` that shows all deliverables across all hired agents. Use the existing `useApprovalQueue` hook (in `src/mobile/src/hooks/useApprovalQueue.ts`) as the data source for per-agent queues. Create a new `useAllDeliverables` hook that aggregates deliverables from all hired agents (fetch hired agents list first via `hiredAgents.service.ts`, then fetch approval queue for each). Add a status filter bar (All / Pending / Approved / Rejected). Add a voice input toggle — tapping the mic icon lets the customer say "approve" or "reject" followed by the deliverable title, parsed via the existing `useSpeechToText` hook. Register the new screen in `MyAgentsStackParamList` in `types.ts` and add it to `MyAgentsNavigator` in `MainNavigator.tsx`. Add a tab-bar badge on "Ops" tab showing pending count (already partially implemented — enhance with inbox count).
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/hooks/useApprovalQueue.ts` | 1–100 | `DeliverableItem` interface, `fetchApprovalQueue`, `approveDeliverable`, `rejectDeliverable` functions |
+| `src/mobile/src/services/hiredAgents/hiredAgents.service.ts` | 1–80 | `getHiredAgents()` or equivalent function to list all hired agents for the customer |
+| `src/mobile/src/hooks/useSpeechToText.ts` | 1–30 | `UseSpeechToTextResult` interface: `start`, `stop`, `transcript`, `isListening` |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/agents/InboxScreen.tsx` | create | New screen: FlashList of `DeliverableItem` cards, status filter chips (All/Pending/Approved/Rejected), approve/reject swipe or button actions, voice mic FAB using `useSpeechToText`, loading/error/empty states via shared components. Use `useTheme()` for all colors. Dark theme `#0a0a0a` background. Each card shows: title, type badge, content preview (truncated), created_at, approve/reject buttons. Voice command parsing: when transcript contains "approve" + deliverable title fragment → auto-select and approve; when "reject" → auto-select and reject. |
+| `src/mobile/src/hooks/useAllDeliverables.ts` | create | New hook: calls `hiredAgentsService.getHiredAgents()` to get all hired agent IDs, then fetches `cpApiClient.get(/cp/hired-agents/{id}/approval-queue)` for each. Returns `{ deliverables: DeliverableItem[], isLoading, error, approve, reject, refetch }`. Uses React Query `useQueries` for parallel fetching. Merges results into single sorted array (newest first). Adds `status` field derived from deliverable state. |
+| `src/mobile/src/navigation/types.ts` | modify | Add `Inbox: undefined` to `MyAgentsStackParamList` type |
+| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `InboxScreen` and add `<MyAgentsStack.Screen name="Inbox" component={InboxScreen} />` inside `MyAgentsNavigator`. Add an "Inbox" button/link in the MyAgents tab header or as a FAB on MyAgentsScreen. |
+| `src/mobile/src/screens/agents/index.ts` | modify | Export `InboxScreen` from the barrel file |
+
+**Code patterns to copy exactly** (no other file reads needed for these):
+
+```typescript
+// React Native screen with 3-state data fetching (mandatory pattern):
+import React, { useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useTheme } from '../../hooks/useTheme';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { ErrorView } from '../../components/ErrorView';
+import { EmptyState } from '../../components/EmptyState';
+
+export const InboxScreen = () => {
+  const { colors, spacing } = useTheme();
+  const { deliverables, isLoading, error, approve, reject, refetch } = useAllDeliverables();
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
+  if (isLoading) return <LoadingSpinner />;
+  if (error) return <ErrorView message="Failed to load deliverables" onRetry={refetch} />;
+  if (!deliverables?.length) return <EmptyState message="No deliverables yet" icon="📭" />;
+
+  const filtered = filter === 'all' ? deliverables : deliverables.filter(d => d.status === filter);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.black }} testID="inbox-screen">
+      {/* Filter chips + FlashList + Voice FAB */}
+    </View>
+  );
+};
+```
+
+```typescript
+// Voice-enabled approval pattern (use existing hooks):
+import { useSpeechToText } from '../../hooks/useSpeechToText';
+
+// Inside component:
+const { isListening, transcript, start, stop, isAvailable } = useSpeechToText();
+
+// Parse voice command from transcript:
+const parseVoiceApproval = (text: string): { action: 'approve' | 'reject'; query: string } | null => {
+  const lower = text.toLowerCase().trim();
+  if (lower.startsWith('approve')) return { action: 'approve', query: lower.replace('approve', '').trim() };
+  if (lower.startsWith('reject')) return { action: 'reject', query: lower.replace('reject', '').trim() };
+  return null;
+};
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. New `InboxScreen` renders with a FlashList of deliverable cards from all hired agents
+2. Status filter chips (All/Pending/Approved/Rejected) filter the displayed list
+3. Tapping "Approve" on a deliverable card calls the approve API and removes it from pending
+4. Tapping "Reject" on a deliverable card calls the reject API and removes it from pending
+5. Voice mic FAB is visible (if speech recognition available); tapping it starts listening; saying "approve [title]" triggers approval
+6. Loading state shows `LoadingSpinner`, error state shows `ErrorView` with retry, empty state shows `EmptyState`
+7. Screen is navigable from the MyAgents/Ops tab
+8. All interactive elements have `testID` props
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E1-S1-T1 | `src/mobile/__tests__/InboxScreen.test.tsx` | Mock `useAllDeliverables` returns 3 deliverables (1 pending, 1 approved, 1 rejected) | All 3 cards rendered; filter "Pending" shows 1 card |
+| E1-S1-T2 | same | Mock `useAllDeliverables` returns empty array | `EmptyState` component rendered with "No deliverables yet" |
+| E1-S1-T3 | same | Mock `useAllDeliverables` returns loading=true | `LoadingSpinner` component rendered |
+| E1-S1-T4 | same | Mock `useAllDeliverables` returns error | `ErrorView` component rendered with retry button |
+| E1-S1-T5 | same | Mock approve mutation, press "Approve" on a pending card | `approve` function called with correct deliverable ID |
+| E1-S1-T6 | `src/mobile/__tests__/useAllDeliverables.test.ts` | Mock cpApiClient to return deliverables for 2 agents | Hook returns merged, sorted array of all deliverables |
+| E1-S1-T7 | same | Mock cpApiClient to reject for one agent | Hook returns partial results + error state |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest __tests__/InboxScreen.test.tsx __tests__/useAllDeliverables.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+```
+
+---
+
+### Epic E2: Customer views usage, invoices, and receipts on mobile
+
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**User story:** As a customer, I can view my subscription usage, download invoices, and view receipts on mobile, so that I have full billing transparency without needing the desktop portal.
+
+---
+
+#### Story E2-S1: Usage & Billing screen with invoice/receipt download
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 60 min
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**CP BackEnd pattern:** N/A — mobile calls Plant Gateway directly
+**Objective alignment:** DMA enablement — billing transparency drives trial-to-paid conversion and retention for DMA customers
+
+**What to do (self-contained — read this card, then act):**
+> The mobile app has `SubscriptionManagementScreen.tsx` and `PaymentMethodsScreen.tsx` in the Profile stack, but neither shows invoices, receipts, or usage history. The CP Frontend has `UsageBilling.tsx` which shows subscriptions, invoices (with download), receipts (with download), and next billing date.
+>
+> Create a new `UsageBillingScreen.tsx` in `src/mobile/src/screens/profile/` that shows: (a) active subscriptions summary (reuse data from existing `SubscriptionManagementScreen`), (b) invoices list with "Download" button that opens the invoice HTML in the device browser, (c) receipts list with "Download" button. Create two new service files: `invoices.service.ts` and `receipts.service.ts` in `src/mobile/src/services/` that call the Plant Gateway endpoints (same as CP Frontend's invoice/receipt services). Create a `useInvoices` and `useReceipts` hook or combine into `useBillingData`. Register the screen in `ProfileStackParamList` and `ProfileNavigator`. Add a "Usage & Billing" menu item in the existing `ProfileScreen`.
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/screens/profile/SubscriptionManagementScreen.tsx` | 1–80 | Existing subscription data pattern, how it fetches/renders subscriptions |
+| `src/mobile/src/screens/profile/ProfileScreen.tsx` | 1–60 | Menu item pattern — how profile menu items navigate to sub-screens |
+| `src/mobile/src/lib/cpApiClient.ts` | 1–40 | Base URL resolution for CP API calls (invoices/receipts use CP backend routes) |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/profile/UsageBillingScreen.tsx` | create | New screen with 3 sections: Subscriptions Summary (card with plan name, status, next billing date), Invoices (FlashList of invoice rows: date, amount, status, "Download" button), Receipts (FlashList of receipt rows: date, amount, "View" button). Use `useTheme()` for styling, dark theme. Each section has independent loading state. Download buttons open invoice/receipt HTML URL in device browser via `Linking.openURL()`. |
+| `src/mobile/src/services/invoices.service.ts` | create | `listInvoices()` → `cpApiClient.get('/cp/invoices')`, `getInvoiceHtml(invoiceId: string)` → `cpApiClient.get('/cp/invoices/{id}/html')`. Types: `Invoice { id, amount, currency, status, created_at, pdf_url? }`. |
+| `src/mobile/src/services/receipts.service.ts` | create | `listReceipts()` → `cpApiClient.get('/cp/receipts')`, `getReceiptHtml(receiptId: string)` → `cpApiClient.get('/cp/receipts/{id}/html')`. Types: `Receipt { id, amount, currency, created_at, order_id }`. |
+| `src/mobile/src/hooks/useBillingData.ts` | create | Combines `useQuery` for invoices and receipts. Returns `{ invoices, receipts, isLoading, error, refetch }`. |
+| `src/mobile/src/navigation/types.ts` | modify | Add `UsageBilling: undefined` to `ProfileStackParamList` type |
+| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `UsageBillingScreen` and add `<ProfileStack.Screen name="UsageBilling" component={UsageBillingScreen} />` inside `ProfileNavigator` |
+| `src/mobile/src/screens/profile/ProfileScreen.tsx` | modify | Add a "Usage & Billing" menu item that navigates to `UsageBilling` screen (follow same pattern as existing menu items) |
+| `src/mobile/src/screens/profile/index.ts` | modify | Export `UsageBillingScreen` from barrel file |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Service file pattern (matches existing mobile services):
+import cpApiClient from '../lib/cpApiClient';
+
+export interface Invoice {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'paid' | 'pending' | 'overdue';
+  created_at: string;
+  pdf_url?: string;
+}
+
+export async function listInvoices(): Promise<Invoice[]> {
+  const response = await cpApiClient.get<Invoice[]>('/cp/invoices');
+  return response.data;
+}
+
+export async function getInvoiceHtml(invoiceId: string): Promise<string> {
+  const response = await cpApiClient.get<string>(`/cp/invoices/${invoiceId}/html`);
+  return response.data;
+}
+```
+
+```typescript
+// React Query hook pattern (matches existing hooks):
+import { useQuery } from '@tanstack/react-query';
+import { listInvoices, Invoice } from '../services/invoices.service';
+import { listReceipts, Receipt } from '../services/receipts.service';
+
+export function useBillingData() {
+  const invoicesQuery = useQuery<Invoice[]>({ queryKey: ['invoices'], queryFn: listInvoices });
+  const receiptsQuery = useQuery<Receipt[]>({ queryKey: ['receipts'], queryFn: listReceipts });
+
+  return {
+    invoices: invoicesQuery.data ?? [],
+    receipts: receiptsQuery.data ?? [],
+    isLoading: invoicesQuery.isLoading || receiptsQuery.isLoading,
+    error: invoicesQuery.error || receiptsQuery.error,
+    refetch: () => { invoicesQuery.refetch(); receiptsQuery.refetch(); },
+  };
+}
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. `UsageBillingScreen` renders with sections for Subscriptions, Invoices, and Receipts
+2. Invoices list shows date, amount, status, and a "Download" button per row
+3. Receipts list shows date, amount, and a "View" button per row
+4. Tapping "Download" on an invoice opens the invoice URL in device browser
+5. Loading state shows `LoadingSpinner`, error shows `ErrorView`, empty shows `EmptyState`
+6. Screen is navigable from Profile menu
+7. All interactive elements have `testID` props
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E2-S1-T1 | `src/mobile/__tests__/UsageBillingScreen.test.tsx` | Mock `useBillingData` returns 2 invoices, 1 receipt | Invoice rows and receipt rows rendered correctly |
+| E2-S1-T2 | same | Mock `useBillingData` returns empty arrays | `EmptyState` shown for invoices and receipts sections |
+| E2-S1-T3 | same | Mock `useBillingData` returns loading=true | `LoadingSpinner` rendered |
+| E2-S1-T4 | same | Mock `useBillingData` returns error | `ErrorView` rendered with retry |
+| E2-S1-T5 | `src/mobile/__tests__/billingServices.test.ts` | Mock cpApiClient to return invoice list | `listInvoices()` returns correct typed data |
+| E2-S1-T6 | same | Mock cpApiClient to return receipts | `listReceipts()` returns correct typed data |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest __tests__/UsageBillingScreen.test.tsx __tests__/billingServices.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+```
+
+---
+
+### Epic E3: Customer sees DMA content performance insights on mobile
+
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**User story:** As a DMA customer, I can view content performance analytics and AI-generated improvement recommendations on my phone, so that I can make data-driven decisions about my marketing content anywhere.
+
+---
+
+#### Story E3-S1: Content Analytics dashboard with recommendations
+
+**BLOCKED UNTIL:** none
+**Estimated time:** 60 min
+**Branch:** `feat/MOB-PARITY-1-it1-mobile-cp-parity`
+**CP BackEnd pattern:** N/A — mobile calls Plant Gateway directly
+**Objective alignment:** DMA value — content analytics enable customers to see ROI from agent work, directly driving retention and trial-to-paid conversion
+
+**What to do (self-contained — read this card, then act):**
+> The CP Frontend has `contentAnalytics.service.ts` which calls `getContentRecommendations()` and displays performance insights for DMA agents. The mobile app has no equivalent.
+>
+> Create a new `ContentAnalyticsScreen.tsx` in `src/mobile/src/screens/agents/` that shows: (a) performance summary cards (views, engagement rate, top-performing content type), (b) AI-generated recommendations list (each recommendation has title, description, confidence score), (c) time period selector (7d / 30d / 90d). Create a `contentAnalytics.service.ts` calling the Plant Gateway endpoint for content recommendations. Create a `useContentAnalytics` hook. Register the screen in `MyAgentsStackParamList` and add it as a navigation option from `AgentOperationsScreen` (in the performance section). Include voice readout — customer can tap a "Read insights" button that uses `useTextToSpeech` to speak the top recommendations aloud.
+
+**Files to read first (max 3 — read only these, nothing else):**
+
+| File | Lines | What to look for |
+|---|---|---|
+| `src/mobile/src/screens/agents/AgentOperationsScreen.tsx` | 1–80 | How the screen is structured with collapsible sections; where to add "View Analytics" navigation |
+| `src/mobile/src/hooks/useTextToSpeech.ts` | 1–40 | `UseTextToSpeechResult` interface: `speak`, `isSpeaking`, `stop` |
+| `src/mobile/src/lib/cpApiClient.ts` | 1–20 | Import pattern and base URL for CP API calls |
+
+**Files to create / modify:**
+
+| File | Action | Precise instruction |
+|---|---|---|
+| `src/mobile/src/screens/agents/ContentAnalyticsScreen.tsx` | create | New screen: performance summary cards at top (3 stat cards: total views, avg engagement %, top content type), time period filter chips (7d/30d/90d), recommendations FlashList below (each card: title, description, confidence badge, category tag). "Read Insights" FAB uses `useTextToSpeech` to speak top 3 recommendations. Loading/error/empty states. Dark theme. All elements with `testID`. |
+| `src/mobile/src/services/contentAnalytics.service.ts` | create | `getContentRecommendations(hiredAgentId: string, period?: string)` → `cpApiClient.get('/cp/hired-agents/{id}/content-analytics', { params: { period } })`. Types: `ContentAnalytics { summary: { views, engagement_rate, top_content_type }, recommendations: Recommendation[] }`, `Recommendation { title, description, confidence, category }`. |
+| `src/mobile/src/hooks/useContentAnalytics.ts` | create | React Query hook wrapping `getContentRecommendations`. Accepts `hiredAgentId` and `period` params. Returns `{ data, isLoading, error, refetch }`. |
+| `src/mobile/src/navigation/types.ts` | modify | Add `ContentAnalytics: { hiredAgentId: string }` to `MyAgentsStackParamList` |
+| `src/mobile/src/navigation/MainNavigator.tsx` | modify | Import `ContentAnalyticsScreen` and add to `MyAgentsNavigator` stack |
+| `src/mobile/src/screens/agents/index.ts` | modify | Export `ContentAnalyticsScreen` |
+
+**Code patterns to copy exactly:**
+
+```typescript
+// Content analytics service pattern:
+import cpApiClient from '../lib/cpApiClient';
+
+export interface Recommendation {
+  title: string;
+  description: string;
+  confidence: number; // 0.0 - 1.0
+  category: string;
+}
+
+export interface ContentAnalytics {
+  summary: {
+    views: number;
+    engagement_rate: number;
+    top_content_type: string;
+  };
+  recommendations: Recommendation[];
+}
+
+export async function getContentRecommendations(
+  hiredAgentId: string,
+  period: string = '30d'
+): Promise<ContentAnalytics> {
+  const response = await cpApiClient.get<ContentAnalytics>(
+    `/cp/hired-agents/${hiredAgentId}/content-analytics`,
+    { params: { period } }
+  );
+  return response.data;
+}
+```
+
+```typescript
+// Voice readout pattern (use existing TTS infrastructure):
+import { useTextToSpeech } from '../../hooks/useTextToSpeech';
+
+// Inside component:
+const { speak, isSpeaking, stop } = useTextToSpeech();
+
+const readInsights = async () => {
+  if (isSpeaking) { await stop(); return; }
+  const topRecs = data?.recommendations.slice(0, 3) ?? [];
+  const script = topRecs.map((r, i) => `Recommendation ${i + 1}: ${r.title}. ${r.description}`).join('. ');
+  await speak(script);
+};
+```
+
+**Acceptance criteria (binary pass/fail only):**
+1. `ContentAnalyticsScreen` renders 3 summary stat cards (views, engagement rate, top content type)
+2. Time period filter chips switch between 7d / 30d / 90d and refetch data
+3. Recommendations list shows title, description, and confidence badge per item
+4. "Read Insights" button uses TTS to speak top 3 recommendations aloud
+5. Loading/error/empty states use shared components
+6. Screen is navigable from `AgentOperationsScreen` performance section
+7. All interactive elements have `testID` props
+
+**Tests to write:**
+
+| Test ID | File | Test setup | Assert |
+|---|---|---|---|
+| E3-S1-T1 | `src/mobile/__tests__/ContentAnalyticsScreen.test.tsx` | Mock `useContentAnalytics` returns summary + 3 recommendations | Summary cards rendered, 3 recommendation cards rendered |
+| E3-S1-T2 | same | Mock returns empty recommendations | `EmptyState` component shown |
+| E3-S1-T3 | same | Mock loading=true | `LoadingSpinner` shown |
+| E3-S1-T4 | same | Mock error | `ErrorView` shown with retry |
+| E3-S1-T5 | same | Press "Read Insights" button | `speak` function called with recommendation text |
+| E3-S1-T6 | `src/mobile/__tests__/contentAnalytics.service.test.ts` | Mock cpApiClient returns analytics data | Service function returns typed `ContentAnalytics` object |
+
+**Test command:**
+```bash
+cd src/mobile && npx jest __tests__/ContentAnalyticsScreen.test.tsx __tests__/contentAnalytics.service.test.ts --coverage --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
+```
 
