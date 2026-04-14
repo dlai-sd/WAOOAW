@@ -70,6 +70,14 @@ jest.mock('../src/hooks/useAgentVoiceOverlay', () => ({
   }),
 }));
 
+jest.mock('../src/components/voice/VoiceFAB', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    VoiceFAB: (props: any) => React.createElement(View, { testID: props.testID }),
+  };
+});
+
 import { ContentAnalyticsScreen } from '../src/screens/agents/ContentAnalyticsScreen';
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

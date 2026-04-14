@@ -15,12 +15,13 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import { useTheme } from '../../hooks/useTheme';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorView } from '../../components/ErrorView';
 import { EmptyState } from '../../components/EmptyState';
 import { useBillingData } from '../../hooks/useBillingData';
+import { useHiredAgents } from '../../hooks/useHiredAgents';
+import cpApiClient from '../../lib/cpApiClient';
 import type { Invoice } from '../../services/invoices.service';
 import type { Receipt } from '../../services/receipts.service';
 
@@ -37,7 +38,8 @@ function InvoiceRow({ invoice }: { invoice: Invoice }) {
       : colors.warning ?? '#f59e0b';
 
   const handleDownload = async () => {
-    const url = invoice.pdf_url ?? `${invoice.id}/html`;
+    const baseUrl = cpApiClient.defaults.baseURL ?? '';
+    const url = invoice.pdf_url ?? `${baseUrl}/cp/invoices/${invoice.id}/html`;
     try {
       await Linking.openURL(url);
     } catch {
@@ -110,8 +112,9 @@ function ReceiptRow({ receipt }: { receipt: Receipt }) {
   const { colors, spacing, typography } = useTheme();
 
   const handleView = async () => {
+    const baseUrl = cpApiClient.defaults.baseURL ?? '';
     try {
-      await Linking.openURL(`/cp/receipts/${receipt.id}/html`);
+      await Linking.openURL(`${baseUrl}/cp/receipts/${receipt.id}/html`);
     } catch {
       // ignore
     }
@@ -170,6 +173,11 @@ function ReceiptRow({ receipt }: { receipt: Receipt }) {
 export function UsageBillingScreen() {
   const { colors, spacing, typography } = useTheme();
   const { invoices, receipts, isLoading, error, refetch } = useBillingData();
+  const { data: hiredAgents } = useHiredAgents();
+
+  const activeSub = hiredAgents?.find(
+    (a) => a.status === 'active' || a.status === 'past_due',
+  ) ?? null;
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorView message="Failed to load billing data" onRetry={refetch} />;
@@ -209,6 +217,51 @@ export function UsageBillingScreen() {
         >
           Usage & Billing
         </Text>
+
+        {/* Subscriptions Summary */}
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontSize: 18,
+            fontFamily: typography.fontFamily.bodyBold,
+            marginBottom: spacing.md,
+          }}
+        >
+          Subscription
+        </Text>
+
+        {activeSub ? (
+          <View
+            testID="subscription-summary-card"
+            style={{
+              backgroundColor: colors.card,
+              borderRadius: spacing.sm,
+              padding: spacing.md,
+              marginBottom: spacing.xl,
+              borderWidth: 1,
+              borderColor: colors.neonCyan + '30',
+            }}
+          >
+            <Text style={{ color: colors.neonCyan, fontSize: 15, fontFamily: typography.fontFamily.bodyBold }}>
+              {activeSub.nickname ?? activeSub.agent_id ?? 'Agent'}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.body, marginTop: 4 }}>
+              Status: {activeSub.status} • {activeSub.duration ?? 'monthly'}
+            </Text>
+            {activeSub.trial_end_at && (
+              <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, marginTop: 2 }}>
+                Trial ends: {new Date(activeSub.trial_end_at).toLocaleDateString()}
+              </Text>
+            )}
+          </View>
+        ) : (
+          <View
+            testID="subscription-empty"
+            style={{ marginBottom: spacing.xl }}
+          >
+            <EmptyState message="No active subscriptions" icon="📦" />
+          </View>
+        )}
 
         {/* Invoices Section */}
         <Text

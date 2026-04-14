@@ -67,6 +67,14 @@ jest.mock('@shopify/flash-list', () => {
   return { FlashList: FlatList };
 });
 
+jest.mock('../src/components/voice/VoiceFAB', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    VoiceFAB: (props: any) => React.createElement(View, { testID: props.testID }),
+  };
+});
+
 import { InboxScreen } from '../src/screens/agents/InboxScreen';
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

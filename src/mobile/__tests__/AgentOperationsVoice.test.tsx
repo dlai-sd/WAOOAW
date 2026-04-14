@@ -78,6 +78,14 @@ jest.mock('@/lib/cpApiClient', () => ({
   },
 }));
 
+jest.mock('@/components/voice/VoiceFAB', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    VoiceFAB: (props: any) => React.createElement(View, { testID: props.testID }),
+  };
+});
+
 import { AgentOperationsScreen } from '@/screens/agents/AgentOperationsScreen';
 import { useAgentVoiceOverlay } from '@/hooks/useAgentVoiceOverlay';
 

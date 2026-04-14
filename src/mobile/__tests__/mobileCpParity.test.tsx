@@ -128,6 +128,29 @@ jest.mock('react-native/Libraries/Linking/Linking', () => ({
   createURL: jest.fn((path: string) => `waooaw://${path}`),
 }));
 
+jest.mock('../src/hooks/useHiredAgents', () => ({
+  useHiredAgents: () => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
+jest.mock('../src/components/voice/VoiceFAB', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    VoiceFAB: (props: any) => React.createElement(View, { testID: props.testID }),
+  };
+});
+jest.mock('@/components/voice/VoiceFAB', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    VoiceFAB: (props: any) => React.createElement(View, { testID: props.testID }),
+  };
+});
+
 // ─── Section 1: Navigation Parity ────────────────────────────────────────────
 
 describe('Mobile-CP Parity: Navigation', () => {
@@ -215,34 +238,6 @@ describe('Mobile-CP Parity: Screen Render (loading states)', () => {
 // ─── Section 4: Voice Integration Parity ─────────────────────────────────────
 
 describe('Mobile-CP Parity: Voice Integration', () => {
-  beforeEach(() => {
-    // Reset to non-loading state with data for voice tests
-    jest.resetModules();
-    jest.mock('../src/hooks/useAllDeliverables', () => ({
-      useAllDeliverables: () => ({
-        deliverables: [],
-        isLoading: false,
-        error: null,
-        approve: jest.fn(),
-        reject: jest.fn(),
-        refetch: jest.fn(),
-      }),
-    }));
-    jest.mock('../src/hooks/useContentAnalytics', () => ({
-      useContentAnalytics: () => ({
-        data: {
-          top_dimensions: ['educational'],
-          best_posting_hours: [9],
-          avg_engagement_rate: 5.0,
-          total_posts_analyzed: 10,
-          recommendation_text: 'Post more content.',
-        },
-        isLoading: false,
-        error: null,
-        refetch: jest.fn(),
-      }),
-    }));
-  });
 
   it('useAgentVoiceOverlay is imported by InboxScreen', async () => {
     const inboxModule = await import('../src/screens/agents/InboxScreen');

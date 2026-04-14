@@ -51,6 +51,16 @@ jest.mock('react-native/Libraries/Linking/Linking', () => ({
   createURL: jest.fn((path: string) => `waooaw://${path}`),
 }));
 
+jest.mock('../src/hooks/useHiredAgents', () => ({
+  useHiredAgents: () => ({
+    data: [
+      { hired_instance_id: 'ha1', nickname: 'Marketing Agent', status: 'active', trial_end_at: '2026-02-01T00:00:00Z' },
+    ],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 import { UsageBillingScreen } from '../src/screens/profile/UsageBillingScreen';
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
