@@ -110,6 +110,9 @@ export type MyAgentsStackParamList = {
     hiredAgentId: string;
     focusSection?: AgentOperationsFocusSection;
   };
+  Inbox: undefined;
+  ContentAnalytics: { hiredAgentId: string };
+  PlatformConnections: { hiredAgentId: string };
 };
 
 export type AgentOperationsFocusSection =
@@ -139,6 +142,7 @@ export type ProfileStackParamList = {
   HelpCenter: undefined;
   PrivacyPolicy: undefined;
   TermsOfService: undefined;
+  UsageBilling: undefined;
 };
 
 export type ProfileStackScreenProps<T extends keyof ProfileStackParamList> =
@@ -234,6 +238,9 @@ export const linking: any = {
               ActiveTrialsList: 'trials/active',
               HiredAgentsList: 'agents/hired',
               AgentOperations: 'my-agents/operations/:hiredAgentId/:focusSection?',
+              Inbox: 'inbox',
+              ContentAnalytics: 'my-agents/analytics/:hiredAgentId',
+              PlatformConnections: 'my-agents/connections/:hiredAgentId',
             },
           },
           ProfileTab: {
@@ -247,6 +254,7 @@ export const linking: any = {
               HelpCenter: 'help',
               PrivacyPolicy: 'privacy',
               TermsOfService: 'terms',
+              UsageBilling: 'usage-billing',
             },
           },
         },

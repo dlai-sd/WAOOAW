@@ -30,6 +30,7 @@ export interface VoiceFABProps {
   style?: ViewStyle;
   size?: 'small' | 'medium' | 'large';
   position?: 'bottom-right' | 'bottom-center' | 'bottom-left';
+  testID?: string;
 }
 
 export function VoiceFAB({
@@ -41,6 +42,7 @@ export function VoiceFAB({
   style,
   size = 'large',
   position = 'bottom-right',
+  testID,
 }: VoiceFABProps): React.JSX.Element {
   const theme = useTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -157,6 +159,7 @@ export function VoiceFAB({
           onPress={onPress}
           disabled={disabled}
           activeOpacity={0.8}
+          testID={testID}
           accessibilityLabel="Voice command button"
           accessibilityHint="Tap to start voice command"
           accessibilityRole="button"

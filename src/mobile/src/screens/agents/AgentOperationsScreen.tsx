@@ -19,7 +19,9 @@ import {
 import { useTheme } from '@/hooks/useTheme';
 import { useHiredAgentById } from '@/hooks/useHiredAgents';
 import { useApprovalQueue } from '@/hooks/useApprovalQueue';
+import { useAgentVoiceOverlay } from '@/hooks/useAgentVoiceOverlay';
 import { ContentDraftApprovalCard } from '@/components/ContentDraftApprovalCard';
+import { VoiceFAB } from '@/components/voice/VoiceFAB';
 import cpApiClient from '@/lib/cpApiClient';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
 import { DigitalMarketingBriefStepCard } from '@/components/DigitalMarketingBriefStepCard';
@@ -452,6 +454,13 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
 
   const agentName = agent?.nickname || agent?.agent_id || hiredAgentId;
 
+  const { isListening: voiceListening, toggle: voiceToggle, isAvailable: voiceAvailable } =
+    useAgentVoiceOverlay({
+      'go to inbox': () => navigation.navigate('Inbox'),
+      'go to analytics': () => navigation.navigate('ContentAnalytics', { hiredAgentId }),
+      'go to connections': () => navigation.navigate('PlatformConnections', { hiredAgentId }),
+    });
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.black }} testID="mobile-agent-operations-screen">
       {/* Header */}
@@ -699,6 +708,15 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
             </View>
           ))}
         </ScrollView>
+      )}
+      {/* Voice FAB */}
+      {voiceAvailable && (
+        <VoiceFAB
+          isListening={voiceListening}
+          onPress={voiceToggle}
+          testID="voice-fab-agent-ops"
+          position="bottom-right"
+        />
       )}
     </SafeAreaView>
   );
