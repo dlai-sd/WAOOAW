@@ -13,12 +13,12 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Linking,
   TextInput,
   Modal,
 } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useTheme } from '../../hooks/useTheme';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { ErrorView } from '../../components/ErrorView';
@@ -306,7 +306,7 @@ export function PlatformConnectionsScreen() {
   };
 
   const handleConnectYouTube = async () => {
-    const redirectUri = Linking.createURL('/youtube-callback');
+    const redirectUri = makeRedirectUri({ path: 'youtube-callback' });
     const { authorization_url } = await connectYouTube(redirectUri);
     await WebBrowser.openBrowserAsync(authorization_url);
     refetch();

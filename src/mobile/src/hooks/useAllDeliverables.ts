@@ -47,7 +47,7 @@ async function rejectDeliverable(hiredAgentId: string, deliverableId: string): P
 }
 
 function deriveStatus(item: DeliverableItem): 'pending' | 'approved' | 'rejected' {
-  const raw = String((item as Record<string, unknown>).review_status ?? '').toLowerCase();
+  const raw = String((item as unknown as Record<string, unknown>).review_status ?? '').toLowerCase();
   if (raw === 'approved') return 'approved';
   if (raw === 'rejected') return 'rejected';
   return 'pending';
@@ -59,7 +59,7 @@ export function useAllDeliverables(): UseAllDeliverablesResult {
   const { data: hiredAgents = [], isLoading: agentsLoading, error: agentsError } = useHiredAgents();
 
   const hiredAgentIds: string[] = hiredAgents
-    .map((a: Record<string, unknown>) => String(a.hired_instance_id ?? a.id ?? ''))
+    .map((a) => String(a.hired_instance_id ?? a.subscription_id ?? ''))
     .filter(Boolean);
 
   const queueQueries = useQueries({

@@ -43,9 +43,8 @@ jest.mock('expo-web-browser', () => ({
   openBrowserAsync: (...args: unknown[]) => mockOpenBrowserAsync(...args),
 }));
 
-jest.mock('react-native/Libraries/Linking/Linking', () => ({
-  openURL: jest.fn(() => Promise.resolve()),
-  createURL: jest.fn((path: string) => `waooaw://${path}`),
+jest.mock('expo-auth-session', () => ({
+  makeRedirectUri: jest.fn(({ path }: { path: string }) => `waooaw://${path}`),
 }));
 
 // ─── Mock hook ────────────────────────────────────────────────────────────────
@@ -155,8 +154,7 @@ describe('PlatformConnectionsScreen', () => {
     expect(UNSAFE_getByType(LoadingSpinner)).toBeTruthy();
   });
 
-  // Linking.createURL is an Expo-native API not available in node test env
-  it.skip('calls connectYouTube and opens browser when YouTube connect tapped', async () => {
+  it('calls connectYouTube and opens browser when YouTube connect tapped', async () => {
     // Make youtube disconnected
     mockUsePlatformConnections.mockReturnValue({
       connections: [],
