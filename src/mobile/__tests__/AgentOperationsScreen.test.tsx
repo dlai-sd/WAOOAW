@@ -371,4 +371,29 @@ describe('AgentOperationsScreen', () => {
       expect(getByText('Theme Discovery saved')).toBeTruthy();
     });
   });
+
+  // ─── E5-S1 tests ─────────────────────────────────────────────────────────────
+
+  it('E5-S1-T1: activity section shows "coming soon" text, not "data will appear here"', async () => {
+    const { getByText, queryByText } = render(
+      <AgentOperationsScreen navigation={mockNavigation} route={mockRoute as any} />
+    );
+    fireEvent.press(getByText("Today's Activity"));
+    await waitFor(() => {
+      expect(queryByText(/data will appear here/)).toBeNull();
+      expect(getByText(/coming soon/i)).toBeTruthy();
+    });
+  });
+
+  it('E5-S1-T2: health section shows section-placeholder-health testID with "coming soon" text', async () => {
+    const { getByText, getByTestId } = render(
+      <AgentOperationsScreen navigation={mockNavigation} route={mockRoute as any} />
+    );
+    fireEvent.press(getByText('Connection Health'));
+    await waitFor(() => {
+      const placeholder = getByTestId('section-placeholder-health');
+      expect(placeholder).toBeTruthy();
+      expect(placeholder.props.children).toMatch(/coming soon/i);
+    });
+  });
 });

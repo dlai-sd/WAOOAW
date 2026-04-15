@@ -193,6 +193,14 @@ const SECTIONS = [
   { id: 'history',    title: 'Performance History',    icon: '📈' },
 ] as const;
 
+const SECTION_DESCRIPTIONS: Record<string, string> = {
+  activity: "Today's agent activity — posts published, tasks run — coming soon.",
+  health: 'Platform connection health and credential status — coming soon.',
+  spend: 'Trial usage and spend breakdown — available after first billing cycle.',
+  recent: 'Recently published posts and their live URLs — coming soon.',
+  history: 'Performance history and engagement trends — available after first week of posting.',
+};
+
 type SectionId = typeof SECTIONS[number]['id'];
 
 // ─── Collapsible section card ─────────────────────────────────────────────────
@@ -709,9 +717,11 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
                 )}
 
                 {section.id !== 'approvals' && section.id !== 'scheduler' && !(section.id === 'goals' && isDigitalMarketing) && (
-                  <Text style={{ color: colors.textSecondary,
-                    fontFamily: typography.fontFamily.body }}>
-                    {section.title} data will appear here.
+                  <Text
+                    style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13 }}
+                    testID={`section-placeholder-${section.id}`}
+                  >
+                    {SECTION_DESCRIPTIONS[section.id] ?? `${section.title} — coming soon.`}
                   </Text>
                 )}
               </SectionCard>

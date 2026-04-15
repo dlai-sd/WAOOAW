@@ -25,10 +25,22 @@ jest.mock('@/hooks/useTheme', () => ({
 
 const mockGetWorkspace = jest.fn()
 const mockPatchWorkspace = jest.fn()
+const mockListBatches = jest.fn()
+const mockCreateContentBatch = jest.fn()
+const mockListPlatformConnections = jest.fn()
 
 jest.mock('@/services/digitalMarketingActivation.service', () => ({
   getDigitalMarketingActivationWorkspace: (...args: unknown[]) => mockGetWorkspace(...args),
   patchDigitalMarketingActivationWorkspace: (...args: unknown[]) => mockPatchWorkspace(...args),
+}))
+
+jest.mock('@/services/marketingReview.service', () => ({
+  listCustomerDraftBatches: (...args: unknown[]) => mockListBatches(...args),
+  createContentBatchFromTheme: (...args: unknown[]) => mockCreateContentBatch(...args),
+}))
+
+jest.mock('@/services/platformConnections.service', () => ({
+  listPlatformConnections: (...args: unknown[]) => mockListPlatformConnections(...args),
 }))
 
 const mockToggle = jest.fn()
@@ -75,6 +87,18 @@ const makeWorkspaceResp = (messages: { role: string; content: string }[] = []) =
   updated_at: '2026-01-01T00:00:00Z',
 })
 
+const makeBatch = (overrides: Record<string, unknown> = {}) => ({
+  batch_id: 'b1',
+  batch_type: 'theme',
+  status: 'pending',
+  theme: 'HomeDecor',
+  brand_name: 'Test Brand',
+  agent_id: 'AGT-MKT-DMA-001',
+  posts: [],
+  created_at: '2026-01-01T00:00:00Z',
+  ...overrides,
+})
+
 import { DMAConversationScreen } from '@/screens/agents/DMAConversationScreen'
 import { useAgentVoiceOverlay } from '@/hooks/useAgentVoiceOverlay'
 
@@ -83,6 +107,8 @@ import { useAgentVoiceOverlay } from '@/hooks/useAgentVoiceOverlay'
 describe('DMAConversationScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockListBatches.mockResolvedValue([])
+    mockListPlatformConnections.mockResolvedValue([])
     ;(useAgentVoiceOverlay as jest.Mock).mockReturnValue({
       isListening: false,
       toggle: mockToggle,
@@ -221,5 +247,104 @@ describe('DMAConversationScreen', () => {
 
     await capturedCommands['send message']('')
     expect(mockPatchWorkspace).toHaveBeenCalled()
+  })
+
+  // ─── E4-S1 tests ─────────────────────────────────────────────────────────────
+
+  it('E4-S1-T1: shows generate-content-card when a pending theme batch exists', async () => {
+    mockGetWorkspace.mockResolvedValueOnce(makeWorkspaceResp([]))
+    mockListBatches.mockResolvedValueOnce([makeBatch()])
+    const { getByTestId } = render(
+      <DMAConversationScreen navigation={makeNavigation()} route={makeRoute()} />
+    )
+    await waitFor(() => {
+      expect(getByTestId('generate-content-card')).toBeTruthy()
+    })
+  })
+
+  it('E4-S1-T2: tapping generate-content-btn shows success bubble', async () => {
+    mockGetWorkspace.mockResolvedValueOnce(makeWorkspaceResp([]))
+    mockListBatches.mockResolvedValueOnce([makeBatch()])
+    const resultBatch = makeBatch({ batch_id: 'b1', status: 'content_generated', posts: [] })
+    mockCreateContentBatch.mockResolvedValueOnce(resultBatch)
+
+    const { getByTestId, getByText } = render(
+      <DMAConversationScreen navigation={makeNavigation()} route={makeRoute()} />
+    )
+    await waitFor(() => expect(getByTestId('generate-content-btn')).toBeTruthy())
+    fireEvent.press(getByTestId('generate-content-btn'))
+    await waitFor(() => {
+      expect(getByText('Content batch created. Your posts are ready for approval.')).toBeTruthy()
+    })
+  })
+
+  it('E4-S1-T3: does NOT show generate-content-card when batch_type === "theme" with status === "content_generated"', async () => {
+    mockGetWorkspace.mockResolvedValueOnce(makeWorkspaceResp([]))
+    mockListBatches.mockResolvedValueOnce([makeBatch({ status: 'content_generated' })])
+    const { queryByTestId } = render(
+      <DMAConversationScreen navigation={makeNavigation()} route={makeRoute()} />
+    )
+    await waitFor(() => {
+      expect(queryByTestId('generate-content-card')).toBeNull()
+    })
+  })
+
+  it('E4-S1-T4: shows error banner when createContentBatchFromTheme rejects', async () => {
+    mockGetWorkspace.mockResolvedValueOnce(makeWorkspaceResp([]))
+    mockListBatches.mockResolvedValueOnce([makeBatch()])
+    mockCreateContentBatch.mockRejectedValueOnce(new Error('500'))
+
+    const { getByTestId, getByText } = render(
+      <DMAConversationScreen navigation={makeNavigation()} route={makeRoute()} />
+    )
+    await waitFor(() => expect(getByTestId('generate-content-btn')).toBeTruthy())
+    fireEvent.press(getByTestId('generate-content-btn'))
+    await waitFor(() => {
+      expect(getByText(/Failed to create content batch/)).toBeTruthy()
+    })
+  })
+
+  // ─── E4-S2 tests ─────────────────────────────────────────────────────────────
+
+  it('E4-S2-T1: passes youtube_credential_ref from platform connection to createContentBatchFromTheme', async () => {
+    mockGetWorkspace.mockResolvedValueOnce(makeWorkspaceResp([]))
+    mockListBatches.mockResolvedValueOnce([makeBatch()])
+    mockListPlatformConnections.mockResolvedValueOnce([
+      { platform_key: 'youtube', credential_ref: 'cred-123', status: 'active' },
+    ])
+    const resultBatch = makeBatch({ status: 'content_generated', posts: [] })
+    mockCreateContentBatch.mockResolvedValueOnce(resultBatch)
+
+    const { getByTestId } = render(
+      <DMAConversationScreen navigation={makeNavigation()} route={makeRoute()} />
+    )
+    await waitFor(() => expect(getByTestId('generate-content-btn')).toBeTruthy())
+    fireEvent.press(getByTestId('generate-content-btn'))
+    await waitFor(() => {
+      expect(mockCreateContentBatch).toHaveBeenCalledWith(
+        'b1',
+        expect.objectContaining({ youtube_credential_ref: 'cred-123' })
+      )
+    })
+  })
+
+  it('E4-S2-T2: passes youtube_credential_ref: null when no YouTube connection exists', async () => {
+    mockGetWorkspace.mockResolvedValueOnce(makeWorkspaceResp([]))
+    mockListBatches.mockResolvedValueOnce([makeBatch()])
+    mockListPlatformConnections.mockResolvedValueOnce([])
+    const resultBatch = makeBatch({ status: 'content_generated', posts: [] })
+    mockCreateContentBatch.mockResolvedValueOnce(resultBatch)
+
+    const { getByTestId } = render(
+      <DMAConversationScreen navigation={makeNavigation()} route={makeRoute()} />
+    )
+    await waitFor(() => expect(getByTestId('generate-content-btn')).toBeTruthy())
+    fireEvent.press(getByTestId('generate-content-btn'))
+    await waitFor(() => {
+      expect(mockCreateContentBatch).toHaveBeenCalledWith(
+        'b1',
+        expect.objectContaining({ youtube_credential_ref: null })
+      )
+    })
   })
 })

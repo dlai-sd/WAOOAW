@@ -17,11 +17,17 @@ import {
   patchDigitalMarketingActivationWorkspace,
   type DigitalMarketingStrategyWorkshopMessage,
 } from '@/services/digitalMarketingActivation.service'
+import {
+  listCustomerDraftBatches,
+  createContentBatchFromTheme,
+  type DraftBatch,
+  type DraftPost,
+} from '@/services/marketingReview.service'
+import { listPlatformConnections } from '@/services/platformConnections.service'
 import { ArtifactRenderer } from '@/components/ArtifactRenderer'
 import { VoiceFAB } from '@/components/voice/VoiceFAB'
 import { useAgentVoiceOverlay } from '@/hooks/useAgentVoiceOverlay'
 import type { MyAgentsStackScreenProps } from '@/navigation/types'
-import type { DraftPost } from '@/services/marketingReview.service'
 
 type Props = MyAgentsStackScreenProps<'DMAConversation'>
 
@@ -35,13 +41,20 @@ export const DMAConversationScreen = ({ navigation, route }: Props) => {
   const [error, setError] = useState<string | null>(null)
   const [inputText, setInputText] = useState('')
   const [sending, setSending] = useState(false)
+  const [batches, setBatches] = useState<DraftBatch[]>([])
+  const [createBatchLoading, setCreateBatchLoading] = useState(false)
+  const [platformConnections, setPlatformConnections] = useState<any[]>([])
 
   useEffect(() => {
-    getDigitalMarketingActivationWorkspace(hiredAgentId)
-      .then((resp) => {
-        setMessages(resp.workspace?.campaign_setup?.strategy_workshop?.messages ?? [])
-      })
-      .catch(() => setError('Failed to load conversation. Please try again.'))
+    Promise.all([
+      getDigitalMarketingActivationWorkspace(hiredAgentId),
+      listCustomerDraftBatches(),
+      listPlatformConnections(hiredAgentId),
+    ]).then(([resp, batchList, connections]) => {
+      setMessages(resp.workspace?.campaign_setup?.strategy_workshop?.messages ?? [])
+      setBatches(batchList)
+      setPlatformConnections(Array.isArray(connections) ? connections : (connections as any)?.connections ?? [])
+    }).catch(() => setError('Failed to load conversation. Please try again.'))
       .finally(() => setLoading(false))
   }, [hiredAgentId])
 
@@ -68,8 +81,37 @@ export const DMAConversationScreen = ({ navigation, route }: Props) => {
   const { isListening: voiceListening, toggle: voiceToggle, isAvailable: voiceAvailable } =
     useAgentVoiceOverlay({ 'send message': handleSend })
 
-  // Placeholder post stub until E4-S1 wires real batch data
+  // Derive pending theme batch (batch_type === 'theme' with status not yet content_generated)
+  const pendingThemeBatch = batches.find(
+    (b) => b.batch_type === 'theme' && b.status !== 'content_generated'
+  ) ?? null
+
+  // Derive YouTube credential ref from platform connections
+  const youtubeConn = platformConnections.find((c: any) => (c.platform_key ?? c.platform) === 'youtube') as any
+  const youtubeCredentialRef: string | null = youtubeConn?.credential_ref ?? youtubeConn?.customer_platform_credential_id ?? null
+
+  const handleGenerateContent = useCallback(async () => {
+    if (!pendingThemeBatch || createBatchLoading) return
+    setCreateBatchLoading(true)
+    try {
+      const result = await createContentBatchFromTheme(pendingThemeBatch.batch_id, {
+        youtube_credential_ref: youtubeCredentialRef,
+      })
+      setBatches((prev) => [...prev.filter((b) => b.batch_id !== pendingThemeBatch.batch_id), result])
+      setMessages((prev) => [...prev, {
+        role: 'assistant' as const,
+        content: 'Content batch created. Your posts are ready for approval.',
+      }])
+    } catch {
+      setError('Failed to create content batch. Please try again.')
+    } finally {
+      setCreateBatchLoading(false)
+    }
+  }, [pendingThemeBatch, createBatchLoading, youtubeCredentialRef])
+
+  // Placeholder post stub; replaced by real post when batches are loaded
   const mockPost = { artifact_type: undefined } as unknown as DraftPost
+  const artifactPost: DraftPost = batches.flatMap((b) => b.posts)[0] ?? mockPost
 
   if (loading) {
     return (
@@ -151,7 +193,28 @@ export const DMAConversationScreen = ({ navigation, route }: Props) => {
               style={{ alignSelf: 'flex-start', marginLeft: 16 }}
             />
           ) : null}
-          {messages.length > 0 ? <ArtifactRenderer post={mockPost} /> : null}
+          {messages.length > 0 ? <ArtifactRenderer post={artifactPost} /> : null}
+          {pendingThemeBatch && (
+            <View
+              style={[s.themeCard, { borderColor: colors.neonCyan + '44', backgroundColor: '#0a0a0a' }]}
+              testID="generate-content-card"
+            >
+              <Text style={{ color: colors.neonCyan, fontSize: 12, marginBottom: 4 }}>Theme ready</Text>
+              <Text style={{ color: colors.textPrimary, fontWeight: '700', marginBottom: 12 }}>
+                {pendingThemeBatch.theme}
+              </Text>
+              <TouchableOpacity
+                style={[s.sendBtn, { backgroundColor: createBatchLoading ? colors.textSecondary + '40' : colors.neonCyan }]}
+                onPress={handleGenerateContent}
+                disabled={createBatchLoading}
+                testID="generate-content-btn"
+              >
+                {createBatchLoading
+                  ? <ActivityIndicator size="small" color="#0a0a0a" />
+                  : <Text style={{ color: '#0a0a0a', fontWeight: '700' }}>Generate Content</Text>}
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
 
         <View
@@ -218,6 +281,7 @@ const s = StyleSheet.create({
   title: { flex: 1, fontSize: 18, fontWeight: 'bold' },
   errorBanner: { margin: 12, padding: 12, borderRadius: 8, borderWidth: 1 },
   bubble: { maxWidth: '80%', borderRadius: 12, borderWidth: 1, padding: 12 },
+  themeCard: { borderWidth: 1, borderRadius: 12, padding: 16, marginTop: 8 },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',

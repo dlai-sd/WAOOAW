@@ -273,10 +273,10 @@ Do this BEFORE starting the next epic.
 | E2-S1 | 1 | Customer sees DMA chat | DMAConversationScreen + navigation wiring | ✅ | — | 🟢 Done | — |
 | E2-S2 | 1 | Customer sees DMA chat | ArtifactRenderer component (table/image/mp4) | ✅ | — | 🟢 Done | — |
 | E3-S1 | 1 | Voice as alt input | Wire voice toggle into DMAConversationScreen | ✅ | — | 🟢 Done | — |
-| E4-S1 | 2 | Staged DMA workflow | Theme-to-content batch staging in DMAConversationScreen | ⬜ | — | 🔴 Not Started | — |
-| E4-S2 | 2 | Staged DMA workflow | YouTube credential ref passed to createContentBatch | ⬜ | — | 🔴 Not Started | — |
-| E5-S1 | 2 | Clean mobile ops hub | Strip placeholder sections in AgentOperationsScreen | ⬜ | — | 🔴 Not Started | — |
-| E5-S2 | 2 | DMA parity tests | BDD parity test suite | — | ⬜ | 🔴 Not Started | — |
+| E4-S1 | 2 | Staged DMA workflow | Theme-to-content batch staging in DMAConversationScreen | ✅ | — | 🟢 Done | — |
+| E4-S2 | 2 | Staged DMA workflow | YouTube credential ref passed to createContentBatch | ✅ | — | 🟢 Done | — |
+| E5-S1 | 2 | Clean mobile ops hub | Strip placeholder sections in AgentOperationsScreen | ✅ | — | 🟢 Done | — |
+| E5-S2 | 2 | DMA parity tests | BDD parity test suite | — | ✅ | 🟢 Done | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked  
 **TDD/BDD key:** ⬜ todo | ✅ passing | — not applicable
@@ -979,10 +979,10 @@ cd src/mobile && node_modules/.bin/jest src/__tests__/screens/DMAConversationScr
 
 ### Prerequisite evidence
 
-- Iteration 1 merge status: `[PENDING HUMAN UPDATE BEFORE LAUNCH]`
-- Iteration 1 PR: `[PR URL or #NUMBER]`
-- Merge commit on `main`: `[FULL SHA]`
-- Merged at: `[UTC TIMESTAMP]`
+- Iteration 1 merge status: `MERGED ✅`
+- Iteration 1 PR: `https://github.com/dlai-sd/WAOOAW/pull/1068`
+- Merge commit on `main`: `0549ca6fc752d41e4973d5ded930d8bbd420bdaf`
+- Merged at: `2026-04-15T11:03:55Z`
 
 ### Dependency Map (Iteration 2)
 
