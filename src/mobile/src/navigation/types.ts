@@ -113,6 +113,7 @@ export type MyAgentsStackParamList = {
   Inbox: undefined;
   ContentAnalytics: { hiredAgentId: string };
   PlatformConnections: { hiredAgentId: string };
+  DMAConversation: { hiredAgentId: string };
 };
 
 export type AgentOperationsFocusSection =

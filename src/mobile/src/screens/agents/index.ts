@@ -9,4 +9,4 @@ export { HiredAgentsListScreen } from './HiredAgentsListScreen';
 export { AgentOperationsScreen } from './AgentOperationsScreen';
 export { InboxScreen } from './InboxScreen';
 export { ContentAnalyticsScreen } from './ContentAnalyticsScreen';
-export { PlatformConnectionsScreen } from './PlatformConnectionsScreen';
+export { DMAConversationScreen } from './DMAConversationScreen';

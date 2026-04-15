@@ -693,6 +693,16 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
                           fields={visibleBriefFields}
                           values={briefValues}
                         />
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: colors.neonCyan + '22', marginTop: 12 }]}
+                          onPress={() => navigation.navigate('DMAConversation', { hiredAgentId })}
+                          testID="chat-with-agent-btn"
+                          accessibilityLabel="Chat with Agent"
+                        >
+                          <Text style={{ color: colors.neonCyan, fontSize: 14, fontWeight: '600' }}>
+                            💬 Chat with Agent
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     ) : null}
                   </View>

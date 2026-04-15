@@ -268,11 +268,11 @@ Do this BEFORE starting the next epic.
 
 | ID | Iteration | Epic | Story | TDD | BDD | Status | PR |
 |---|---|---|---|---|---|---|---|
-| E1-S1 | 1 | DMA services | Mirror DMA activation service | ⬜ | — | 🔴 Not Started | — |
-| E1-S2 | 1 | DMA services | Mirror marketing review service | ⬜ | — | 🔴 Not Started | — |
-| E2-S1 | 1 | Customer sees DMA chat | DMAConversationScreen + navigation wiring | ⬜ | — | 🔴 Not Started | — |
-| E2-S2 | 1 | Customer sees DMA chat | ArtifactRenderer component (table/image/mp4) | ⬜ | — | 🔴 Not Started | — |
-| E3-S1 | 1 | Voice as alt input | Wire voice toggle into DMAConversationScreen | ⬜ | — | 🔴 Not Started | — |
+| E1-S1 | 1 | DMA services | Mirror DMA activation service | ✅ | — | 🟢 Done | — |
+| E1-S2 | 1 | DMA services | Mirror marketing review service | ✅ | — | 🟢 Done | — |
+| E2-S1 | 1 | Customer sees DMA chat | DMAConversationScreen + navigation wiring | ✅ | — | 🟢 Done | — |
+| E2-S2 | 1 | Customer sees DMA chat | ArtifactRenderer component (table/image/mp4) | ✅ | — | 🟢 Done | — |
+| E3-S1 | 1 | Voice as alt input | Wire voice toggle into DMAConversationScreen | ✅ | — | 🟢 Done | — |
 | E4-S1 | 2 | Staged DMA workflow | Theme-to-content batch staging in DMAConversationScreen | ⬜ | — | 🔴 Not Started | — |
 | E4-S2 | 2 | Staged DMA workflow | YouTube credential ref passed to createContentBatch | ⬜ | — | 🔴 Not Started | — |
 | E5-S1 | 2 | Clean mobile ops hub | Strip placeholder sections in AgentOperationsScreen | ⬜ | — | 🔴 Not Started | — |

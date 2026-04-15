@@ -25,7 +25,7 @@ import { HomeScreen } from "../screens/home/HomeScreen";
 import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
 import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
 import { HireWizardScreen } from "../screens/hire/HireWizardScreen";
-import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen, InboxScreen, ContentAnalyticsScreen, PlatformConnectionsScreen } from "../screens/agents";
+import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen, InboxScreen, ContentAnalyticsScreen, PlatformConnectionsScreen, DMAConversationScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
 import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen, PaymentMethodsScreen, SubscriptionManagementScreen, UsageBillingScreen } from "../screens/profile";
@@ -102,6 +102,7 @@ const MyAgentsNavigator = () => {
       <MyAgentsStack.Screen name="Inbox" component={InboxScreen} />
       <MyAgentsStack.Screen name="ContentAnalytics" component={ContentAnalyticsScreen} />
       <MyAgentsStack.Screen name="PlatformConnections" component={PlatformConnectionsScreen} />
+      <MyAgentsStack.Screen name="DMAConversation" component={DMAConversationScreen} />
     </MyAgentsStack.Navigator>
   );
 };
