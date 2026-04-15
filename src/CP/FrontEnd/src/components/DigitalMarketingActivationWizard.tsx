@@ -27,6 +27,7 @@ import {
 } from '../services/digitalMarketingActivation.service'
 import {
   createDraftBatch,
+  listCustomerDraftBatches,
   executeDraftPost,
   approveDraftPost,
   rejectDraftPost,
@@ -86,10 +87,10 @@ const SUPPORTED_PLATFORM_OPTIONS = PLATFORM_OPTIONS.filter((platform) => platfor
 
 const ARTIFACT_OPTIONS: Array<{ type: Exclude<DraftArtifactType, 'text'>; label: string; description: string }> = [
   { type: 'table', label: 'Table', description: 'Structured plan, checklist, or comparison table.' },
-  { type: 'image', label: 'Image', description: 'Static visual concept for the draft.' },
-  { type: 'audio', label: 'Audio', description: 'Voice-first or narration asset request.' },
-  { type: 'video', label: 'Video', description: 'Short-form video asset request.' },
-  { type: 'video_audio', label: 'Video + audio', description: 'Narrated video asset request.' },
+  { type: 'image', label: 'Image', description: 'AI-generated static image for the post.' },
+  { type: 'audio', label: 'Audio script', description: 'AI writes a narration script — you record the audio.' },
+  { type: 'video', label: 'Video script', description: 'AI writes a video script — you record the video.' },
+  { type: 'video_audio', label: 'Video + audio script', description: 'AI writes a narrated video script — you produce the video.' },
 ]
 
 
@@ -670,6 +671,30 @@ export function DigitalMarketingActivationWizard({
       return
     }
     void loadState()
+  }, [activeInstance?.subscription_id])
+
+  // Reload the most recent draft batch from the server so the customer's approved
+  // drafts don't disappear after sign-out/sign-in or a page refresh.
+  useEffect(() => {
+    if (!activeInstance?.subscription_id) return
+    listCustomerDraftBatches()
+      .then((batches) => {
+        if (!batches || batches.length === 0) return
+        // Most recent batch first — restore the last one the customer was working on
+        const latest = batches[0]
+        const ytPosts = (latest.posts || []).filter((p) => p.channel === 'youtube')
+        if (ytPosts.length === 0) return
+        setGeneratedBatch((current) => current ?? latest)
+        setDraftPosts((current) => (current.length === 0 ? ytPosts : current))
+        setOutputItems((prev) => {
+          const existingIds = new Set(prev.map((p) => p.post_id))
+          const fresh = ytPosts.filter((p) => !existingIds.has(p.post_id))
+          return fresh.length > 0 ? [...prev, ...fresh] : prev
+        })
+      })
+      .catch(() => {
+        // Non-fatal: draft history unavailable, user starts fresh
+      })
   }, [activeInstance?.subscription_id])
 
   useEffect(() => {
@@ -1564,7 +1589,7 @@ export function DigitalMarketingActivationWizard({
                 <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
                   Post {idx + 1}
                   {post.channel ? ` · ${post.channel}` : ''}
-                  {post.artifact_type && post.artifact_type !== 'text' ? ` · ${post.artifact_type}` : ''}
+                  {post.artifact_type && post.artifact_type !== 'text' ? ` · ${['video', 'audio', 'video_audio'].includes(post.artifact_type) && effectiveMime?.includes('markdown') ? `${post.artifact_type} script` : post.artifact_type}` : ''}
                 </span>
                 <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0 }}>
                   <Badge
@@ -1838,7 +1863,7 @@ export function DigitalMarketingActivationWizard({
                   >
                     <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
                       Post {idx + 1} · {post.channel}
-                      {post.artifact_type && post.artifact_type !== 'text' ? ` · ${post.artifact_type}` : ''}
+                      {post.artifact_type && post.artifact_type !== 'text' ? ` · ${['video', 'audio', 'video_audio'].includes(post.artifact_type) && post.artifact_mime_type?.includes('markdown') ? `${post.artifact_type} script` : post.artifact_type}` : ''}
                     </span>
                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
                       <Badge appearance="outline" color={isApproved ? 'success' : isRejected ? 'danger' : 'warning'}>

@@ -98,6 +98,13 @@ module "plant_backend" {
     LOG_LEVEL                 = "info"
     DEBUG_VERBOSE             = "false"
 
+    # Secret Manager backend — "gcp" on Cloud Run, "local" in local dev/CI.
+    # Plant Backend reads YouTube OAuth tokens from GCP Secret Manager at publish time.
+    # This MUST be "gcp" or publish will silently fall back to the in-memory local store
+    # and reject all real GCP secret paths with "Unsupported local secret ref".
+    SECRET_MANAGER_BACKEND = "gcp"
+    GCP_PROJECT_ID         = var.project_id
+
     # DB Updates are break-glass admin tooling.
     # Demo/UAT: enabled for testing and controlled operations.
     # Prod: disabled for safety.
