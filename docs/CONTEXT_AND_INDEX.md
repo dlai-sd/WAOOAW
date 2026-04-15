@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.8  
-**Date**: 2026-03-30  
+**Version**: 2.9  
+**Date**: 2026-04-15  
 **Purpose**: Single-source operating manual for handing WAOOAW work to AI agents, especially zero-cost and small-context agents, so they can navigate, understand, plan, and execute complex platform tasks with minimal drift.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
@@ -1137,7 +1137,7 @@ psql -h 127.0.0.1 -p 15432 -U plant_app plant -c "SELECT version_num FROM alembi
 | `src/Plant/BackEnd/database/init_db.py` | Table creation script |
 | `src/Plant/BackEnd/database/seed_data.py` | Seed data loader |
 | `src/Plant/BackEnd/database/seeds/` | Seed definitions (agent types) |
-| `src/Plant/BackEnd/database/migrations/` | Alembic migrations — latest: `038_add_brand_voices.py` (DMA-CONV-1 It2 #1048, adds `brand_voices` table), `037_dma_media_artifact_persistence.py` (DMA-MEDIA-1 plan, adds media artifact columns to marketing drafts) |
+| `src/Plant/BackEnd/database/migrations/` | Alembic migrations — latest applied to demo: `040_dma_batch_type_workflow.py` (PR #1065, adds `batch_type` ENUM + `parent_batch_id` FK on `marketing_draft_batches` — applied 2026-04-15). Also: `039_credential_ref_and_secret_manager_ref.py` (PR #1061, `credential_ref` + `secret_manager_ref` on posts), `038_add_brand_voices.py` (DMA-CONV-1 It2 #1048, `brand_voices` table), `037_dma_media_artifact_persistence.py` (media artifact columns on draft posts) |
 | `src/Plant/BackEnd/alembic.ini` | Alembic config |
 | `src/Plant/BackEnd/create_tables.py` | Direct table creation |
 | `src/Plant/BackEnd/Dockerfile.migrations` | Migration runner Docker image |
@@ -1609,6 +1609,20 @@ docker compose -f docker-compose.test.yml run --rm cp-frontend-test npx vitest r
 
 > **⚠️ UPDATE THIS SECTION DAILY**
 
+### Recently merged — 2026-04-13 to 2026-04-15
+
+| PR | Branch | Summary | Key files |
+|----|--------|---------|----------|
+| **#1065** | `fix/credential-resolver-publish-path` | **DMA staged theme→content workflow + migration 040 + BDD/TDD tests** — adds `batch_type` ENUM (`theme`/`content`) and `parent_batch_id` FK on `marketing_draft_batches` (migration 040, applied to demo 2026-04-15); Plant API exposes `POST /api/v1/marketing-drafts/batches/{id}/create-content-batch`; CP proxy `POST /cp/marketing-review/batches/{id}/create-content-batch`; two-stage DMA wizard UI (approve themes → generate content); BDD scenarios in `dma_staged_workflow.feature`; 8 bootstrap TDD tests; CI fixes. | `src/Plant/BackEnd/database/migrations/versions/040_dma_batch_type_workflow.py` (new), `src/Plant/BackEnd/api/v1/marketing_drafts.py`, `src/CP/BackEnd/api/marketing_review.py`, `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`, `src/Plant/BackEnd/tests/bdd/features/dma_staged_workflow.feature` (new), `src/Plant/BackEnd/tests/bdd/test_dma_staged_workflow.py` (new), `src/Plant/BackEnd/tests/unit/test_dma_dependency_bootstrap.py` (new), `src/Plant/BackEnd/tests/unit/test_dma_schema_integrity.py` (new) |
+| **#1064** | `fix/dma-labels-draft-reload` | **Honest DMA labels + draft reload + SECRET_MANAGER_BACKEND + workflow tests** — video post type now labelled "Video Script" instead of generic "Post"; draft batches reload after approval so stale UI state is eliminated; Plant Backend Terraform adds `SECRET_MANAGER_BACKEND=gcp` env var so `GcpSecretManagerAdapter` is selected in Cloud Run; frontend error detail surfaced on publish failure; 3 new workflow-level tests. | `src/Plant/BackEnd/api/v1/marketing_drafts.py`, `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`, `cloud/terraform/stacks/plant/main.tf`, `src/Plant/BackEnd/tests/unit/test_dma_full_workflow.py` |
+| **#1063** | `fix/credential-resolver-publish-path` | **Wire DatabaseCredentialResolver into all YouTube publish paths** — `SocialCredentialResolver` now uses `DatabaseCredentialResolver` (reads `CustomerPlatformCredential` rows from Plant DB) on the YouTube adapter's live publish path; removes the stub/in-memory fallback for prod-bound code; integration tests added. | `src/Plant/BackEnd/services/social_credential_resolver.py`, `src/Plant/BackEnd/integrations/social/youtube_client.py`, `src/Plant/BackEnd/agent_mold/skills/adapters_youtube.py` |
+| **#1062** | `docs/mob-parity-1-api-audit` | **Mobile API redundancy audit** — documents which CP backend proxy routes are truly needed vs. which the mobile app bypasses (calls Plant Gateway directly). Findings captured as a structured table in `docs/mobile/api-redundancy-audit.md`. | `docs/mobile/api-redundancy-audit.md` (new) |
+| **#1061** | `feat/plant-db-credential-store` | **Move credential records to Plant DB + add ContentCreatorService** — introduces `DatabaseCredentialStore` (reads/writes `customer_platform_credentials` table); `ContentCreatorService` wraps the existing `ContentCreatorProcessor` skill with a service-layer facade for use in the staged workflow; migration 039 adds `credential_ref` + `secret_manager_ref` columns on `marketing_draft_posts`; CP `api/v1/content_creator.py` route registered. | `src/Plant/BackEnd/services/database_credential_store.py` (new), `src/Plant/BackEnd/services/content_creator_service.py` (new), `src/Plant/BackEnd/api/v1/content_creator.py` (new), `src/Plant/BackEnd/database/migrations/versions/039_credential_ref_and_secret_manager_ref.py` (new) |
+| **#1060** | `feat/mob-parity-1-it1` | **MOB-PARITY-1 Iteration 1: E1–E6 new screens, hooks, services, tests** — adds `InboxScreen`, `ContentAnalyticsScreen`, `PlatformConnectionsScreen`; `AgentOperationsScreen` updated with voice overlay integration; `UsageBillingScreen` updated with subscriptions section; 5 new hooks (`useAgentVoiceOverlay`, `useAllDeliverables`, `useBillingData`, `useContentAnalytics`, `usePlatformConnections`) and 4 new services (`contentAnalytics.service.ts`, `invoices.service.ts`, `platformConnections.service.ts`, `receipts.service.ts`); `VoiceFAB` component; 12 new Jest tests. | `src/mobile/src/screens/agents/InboxScreen.tsx` (new), `src/mobile/src/screens/agents/ContentAnalyticsScreen.tsx` (new), `src/mobile/src/screens/agents/PlatformConnectionsScreen.tsx` (new), `src/mobile/src/components/voice/VoiceFAB.tsx` (new), `src/mobile/src/hooks/useAgentVoiceOverlay.ts` (new), `src/mobile/src/hooks/useAllDeliverables.ts` (new), `src/mobile/src/hooks/useBillingData.ts` (new), `src/mobile/src/hooks/useContentAnalytics.ts` (new), `src/mobile/src/hooks/usePlatformConnections.ts` (new) |
+| **#1059** | `docs/MOB-PARITY-1` | **MOB-PARITY-1 plan document** — iteration plan with 6 story cards covering E1–E6 screens. Planning only. | `docs/mobile/iterations/MOB-PARITY-1-cp-screen-parity.md` (new) |
+| **#1058** | `feat/cp-rendering-components` | **Reusable CP content-rendering components** — `AgentContentRenderer.tsx` (structured render for any content-calendar artifact with markdown fallback), `AgentThinkingIndicator.tsx` (animated thinking dots), `ArtifactPreviewRegistry.tsx` (registry mapping artifact_type → preview card), plus `index.ts` re-export barrel; `DigitalMarketingArtifactPreviewCard.tsx` now uses the registry; `PlatformPreviewCards.tsx` updated to integrate. | `src/CP/FrontEnd/src/components/rendering/AgentContentRenderer.tsx` (new), `src/CP/FrontEnd/src/components/rendering/AgentThinkingIndicator.tsx` (new), `src/CP/FrontEnd/src/components/rendering/ArtifactPreviewRegistry.tsx` (new), `src/CP/FrontEnd/src/components/rendering/index.ts` (new) |
+| **#1057** | `fix/cp-fe-dma-deduplicate` | **Deduplicate DMA message + surface publish error details** — prevents the DMA wizard from appending duplicate assistant messages when the backend returns the same content; publish failures now surface the actual error message (not a generic "failed" banner). | `src/CP/FrontEnd/src/components/DigitalMarketingActivationWizard.tsx`, `src/CP/FrontEnd/src/services/marketingReview.service.ts` |
+
 ### Recently merged — 2026-04-12
 
 | PR | Branch | Summary | Key files |
@@ -1884,8 +1898,9 @@ Use this shortlist when the task is broader than runtime routes.
 | `skill_configs.py` | Customer-editable hired-agent skill config routes — legacy `/skill-configs/{hired_instance_id}/{skill_id}` plus canonical `/hired-agents/{hired_instance_id}/skills/{skill_id}/customer-config` |
 | `flow_runs.py` | Flow-run backing store plus public runtime aliases — `/flow-runs`, `/skill-runs`, `/component-runs` |
 | `campaigns.py` | Campaign management — DB-backed by default; persists campaign runtime rollups (`workflow_state`, `brief_summary`, `approval_state`, `draft_deliverables`) and YouTube publish-gating metadata on `content_posts`. Legacy in-memory fallback is test-only and must be explicitly opted into. |
-| `marketing_drafts.py` | Marketing content drafts — persisted in PostgreSQL (`marketing_draft_batches`, `marketing_draft_posts`), not JSONL |
-| `digital_marketing_activation.py` | DMA conversation loop — chat endpoint, required-fields validation gate (`CORE_REQUIRED_FIELDS`), strategy workshop with lock-and-confirm rules, derived theme generation (targeted second LLM call when themes empty), gated deliverable rule (produce table only when all fields present), two-tier readiness gate (`draft_ready` / `approval_ready`), auto-draft creation with status guard. ~1600 lines. (DMA-CONV-1 #1046–#1050, PR #1052) |
+| `marketing_drafts.py` | Marketing content drafts — persisted in PostgreSQL (`marketing_draft_batches`, `marketing_draft_posts`); `batch_type` ENUM (`theme`/`content`) and `parent_batch_id` FK added (migration 040, PR #1065); `POST .../batches/{id}/create-content-batch` creates a content batch from an approved theme batch; rejected-post guard prevents re-processing. |
+| `digital_marketing_activation.py` | DMA conversation loop — chat endpoint, required-fields validation gate (`CORE_REQUIRED_FIELDS`), strategy workshop with lock-and-confirm rules, derived theme generation (targeted second LLM call when themes empty), gated deliverable rule (produce table only when all fields present), two-tier readiness gate (`draft_ready` / `approval_ready`), auto-draft creation with status guard. ~1600 lines. (DMA-CONV-1 #1046–#1050, PR #1052; staged workflow PR #1065) |
+| `content_creator.py` | Content creator API routes — exposes the `ContentCreatorService` facade; registered in `router.py` (PR #1061) |
 | `notifications.py` | Notification endpoints |
 | `usage_events.py` | Usage event tracking |
 | `reference_agents.py` | Reference agent catalog |
@@ -1914,6 +1929,8 @@ Use this shortlist when the task is broader than runtime routes.
 | `job_role.py` | JobRole model |
 | `skill.py` | Skill model |
 | `agent_skill.py` | AgentSkillModel — join table `agent_skills` (agent_id, skill_id, is_primary, ordinal, `goal_config` JSONB nullable — migration 025) |
+| `marketing_draft.py` | `MarketingDraftBatch` + `MarketingDraftPost` SQLAlchemy models; `batch_type` ENUM column and `parent_batch_id` FK added in migration 040; `posts` relationship on batch (PR #1065) |
+| `customer_platform_credential.py` | `CustomerPlatformCredential` model — stores OAuth tokens/credential_ref per customer+platform; used by `DatabaseCredentialStore` (PR #1061) |
 | `team.py` | Team model |
 | `schemas.py` | Pydantic schemas |
 
@@ -1957,6 +1974,11 @@ Use this shortlist when the task is broader than runtime routes.
 | `feature_flag_service.py` | Feature flag business logic — create, toggle, evaluate flags |
 | `idempotency.py` | Low-level idempotency utilities (key generation, TTL check) |
 | `notification_service.py` | Unified notification dispatch orchestrator (email + SMS) |
+| `content_creator_service.py` | `ContentCreatorService` — service-layer facade wrapping `ContentCreatorProcessor`; called from the staged-workflow API to generate content-batch posts from an approved theme batch (PR #1061) |
+| `database_credential_store.py` | `DatabaseCredentialStore` — reads and writes `CustomerPlatformCredential` rows from Plant DB; used by `SocialCredentialResolver` to resolve live OAuth tokens without Secret Manager round-trips (PR #1061) |
+| `media_artifact_store.py` | `MediaArtifactStore` — persists media artifact metadata (image/audio/video URLs, file sizes, durations) against `marketing_draft_posts`; migration 037 added the columns |
+| `secret_manager_adapter.py` | Plant Backend Secret Manager adapter (mirrors CP pattern) — `GcpSecretManagerAdapter` selected when `SECRET_MANAGER_BACKEND=gcp` (wired via Terraform PR #1064); `LocalSecretManagerAdapter` for dev/CI |
+| `social_credential_resolver.py` | `SocialCredentialResolver` — resolves platform OAuth tokens for social publishing; now delegates to `DatabaseCredentialResolver` (backed by `DatabaseCredentialStore`) for the live YouTube publish path (PR #1063); removes the in-memory stub from the prod code path |
 
 #### Core (`core/`)
 | File | Purpose |
@@ -1996,6 +2018,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `publisher_engine.py` | `DestinationAdapter` ABC (abstract `publish(PublishInput) → PublishReceipt`); `DestinationRegistry` plug-and-play dict; `PublisherEngine`; `build_default_registry()` with `SimulatedAdapter`. Registered as `content.publisher.v1` (PLANT-CONTENT-1 It3+It4 #871, #872). |
 | `adapters_publish.py` | `SimulatedAdapter(DestinationAdapter)` — Phase 1 publisher. **Extension point**: add `DeltaTradeAdapter`, `LinkedInAdapter` etc. and register in `build_default_registry()` (PLANT-CONTENT-1 #871). |
 | `adapters.py` | Channel adapters for social posting: LinkedIn, Instagram, YouTube, Facebook, WhatsApp |
+| `adapters_youtube.py` | YouTube-specific `DestinationAdapter` implementation — live YouTube publish path; reads credentials via `SocialCredentialResolver` → `DatabaseCredentialResolver` (PR #1063) |
 
 #### Repositories (`repositories/`)
 | File | Purpose |
@@ -2048,7 +2071,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `api/receipts.py` | Receipt endpoints |
 | `api/hired_agents_proxy.py` | Proxy hired-agent queries to Plant Gateway |
 | `api/my_agents_summary.py` | Customer "my agents" summary (active agents, status, metrics) |
-| `api/marketing_review.py` | Marketing content review/approval endpoints |
+| `api/marketing_review.py` | Marketing content review/approval endpoints; `POST /cp/marketing-review/batches/{id}/create-content-batch` proxy added (PR #1065); `ExecuteDraftPostInput` restored (PR #1064) |
 | `api/platform_credentials.py` | Platform credential management (social, exchange) |
 | `api/feature_flags_proxy.py` | Proxy feature flag queries to Plant Backend |
 | `api/internal_plant_credential_resolver.py` | Internal credential resolution for Plant → CP calls |
@@ -2117,9 +2140,13 @@ Use this shortlist when the task is broader than runtime routes.
 | `components/FeedbackIndicators.tsx` | Loading/success/error feedback indicators |
 | `components/HelpTooltip.tsx` | Contextual help tooltips |
 | `components/TrialStatusBanner.tsx` | Trial status banner |
-| `components/DigitalMarketingActivationWizard.tsx` | DMA setup wizard — multi-step conversation flow for marketing agent activation; embeds chat, strategy workshop, content-calendar preview with structured table rendering and markdown fallback; wired to `digitalMarketingActivation.service.ts`. (DMA-CONV-1 #1046–#1050) |
-| `components/DigitalMarketingArtifactPreviewCard.tsx` | Artifact preview card for DMA deliverables — renders content-calendar table artifacts with inline preview |
+| `components/DigitalMarketingActivationWizard.tsx` | DMA setup wizard — two-stage conversation flow (theme approval → content generation); embeds chat, strategy workshop, content-calendar preview with structured table rendering and markdown fallback; `handleCreateContentFromApprovedTheme()` wired to `create-content-batch` proxy; wired to `digitalMarketingActivation.service.ts`. (DMA-CONV-1 #1046–#1050; staged workflow PR #1065) |
+| `components/DigitalMarketingArtifactPreviewCard.tsx` | Artifact preview card for DMA deliverables — renders content-calendar table artifacts with inline preview; now uses `ArtifactPreviewRegistry` (PR #1058) |
 | `components/PlatformPreviewCards.tsx` | Platform-accurate preview cards (YouTube, LinkedIn, Instagram) showing how a content post will look on each platform. (DMA-CONV-1 It3 #1050) |
+| `components/rendering/AgentContentRenderer.tsx` | Structured renderer for any content-calendar artifact; markdown fallback when structured preview unavailable (PR #1058) |
+| `components/rendering/AgentThinkingIndicator.tsx` | Animated typing/thinking dots indicator for agent response loading states (PR #1058) |
+| `components/rendering/ArtifactPreviewRegistry.tsx` | Registry mapping `artifact_type` string to the correct React preview card component; decouples artifact rendering from the wizard (PR #1058) |
+| `components/rendering/index.ts` | Barrel re-export for the `rendering/` directory (PR #1058) |
 | `components/auth/AuthModal.tsx` | Auth modal (sign-in/sign-up overlay) |
 | `components/auth/AuthPanel.tsx` | Auth form container panel |
 | `components/auth/CaptchaWidget.tsx` | Cloudflare Turnstile CAPTCHA integration |
@@ -2145,7 +2172,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `services/receipts.service.ts` | Receipt API calls |
 | `services/subscriptions.service.ts` | Subscription management API calls |
 | `services/trialStatus.service.ts` | Trial status polling |
-| `services/marketingReview.service.ts` | Marketing content review API calls |
+| `services/marketingReview.service.ts` | Marketing content review API calls; `DraftBatch` type updated with `batch_type?` and `parent_batch_id?`; `createContentBatchFromTheme(batchId)` added for staged workflow (PR #1065) |
 | `services/digitalMarketingActivation.service.ts` | DMA activation API — chat message send, strategy workshop state, theme generation trigger, content-calendar retrieval; wired to `DigitalMarketingActivationWizard.tsx`. (DMA-CONV-1 #1046) |
 | `services/myAgentsSummary.service.ts` | My agents summary API calls |
 | `services/paymentsConfig.service.ts` | Payment gateway config API calls |
@@ -2237,6 +2264,33 @@ Use this shortlist when the task is broader than runtime routes.
 | `app.config.js` | Expo app config per environment/build |
 | `__tests__/`, `e2e/` | Unit and device/e2e tests |
 | `CODESPACE_DEV.md`, `QUICKSTART.md`, `BUILD_INSTRUCTIONS.md`, `DEPLOYMENT_GUIDE.md` | Mobile developer/operator docs |
+
+#### New screens (MOB-PARITY-1 PR #1060)
+| File | Purpose |
+|------|---------|
+| `src/screens/agents/InboxScreen.tsx` | Inbox — shows agent messages and notifications for hired agents (NEW) |
+| `src/screens/agents/ContentAnalyticsScreen.tsx` | Content analytics — charts and tables of post performance per hired agent (NEW) |
+| `src/screens/agents/PlatformConnectionsScreen.tsx` | Platform connections — list/add/remove social platform OAuth connections (NEW) |
+| `src/screens/agents/AgentOperationsScreen.tsx` | Hired-agent operations — updated with voice overlay integration |
+| `src/screens/profile/UsageBillingScreen.tsx` | Usage & billing — updated with subscriptions section |
+| `src/components/voice/VoiceFAB.tsx` | Floating action button for voice input overlay (NEW) |
+
+#### New hooks (MOB-PARITY-1 PR #1060)
+| File | Purpose |
+|------|---------|
+| `src/hooks/useAgentVoiceOverlay.ts` | Manages voice overlay open/close state and speech-to-text binding (NEW) |
+| `src/hooks/useAllDeliverables.ts` | React Query hook — fetches deliverables across all hired agents (NEW) |
+| `src/hooks/useBillingData.ts` | React Query hook — fetches invoices + active subscription info (NEW) |
+| `src/hooks/useContentAnalytics.ts` | React Query hook — fetches content analytics for a hired agent (NEW) |
+| `src/hooks/usePlatformConnections.ts` | React Query hook — list/create/delete platform connections (NEW) |
+
+#### New services (MOB-PARITY-1 PR #1060)
+| File | Purpose |
+|------|---------|
+| `src/services/contentAnalytics.service.ts` | API calls for content performance analytics via Plant Gateway (NEW) |
+| `src/services/invoices.service.ts` | API calls for customer invoices via Plant Gateway (NEW) |
+| `src/services/platformConnections.service.ts` | API calls for platform connection CRUD via Plant Gateway (NEW) |
+| `src/services/receipts.service.ts` | API calls for payment receipts via Plant Gateway (NEW) |
 
 ### .github/ — CI/CD & ALM
 
@@ -3469,7 +3523,7 @@ START: User reports an issue
 > **Live reference set in this branch**: `src/mobile/package.json`, `src/mobile/src/navigation/MainNavigator.tsx`, `src/mobile/src/config/api.config.ts`, `src/mobile/src/services/`, `src/mobile/src/screens/`  
 > **Current status**: Active React Native / Expo app with direct Plant Gateway usage for most runtime flows.  
 > **Current focus**: `demo` environment unless the task explicitly needs `uat` or `prod`.  
-> **Last updated**: 2026-04-06
+> **Last updated**: 2026-04-15
 
 ---
 
@@ -3503,7 +3557,7 @@ Historical mobile iteration docs are gone in this branch. Start with the live so
 
 > **Testing rule (mobile)**: All tests are executed in Docker/Codespace (no local venv/virtualenv assumption for backend parity). Mobile unit tests run via `cd src/mobile && npm test` in the devcontainer environment.
 >
-> **Release-readiness test lane (2026-03-11)**: Fast mobile smoke = `cd src/mobile && npm run typecheck && npm test -- --runTestsByPath src/screens/agents/__tests__/MyAgentsScreen.test.tsx __tests__/NotificationsScreen.test.tsx --maxWorkers=2`. Full coverage was revalidated green at 38 suites / 497 tests after moving `isolatedModules` into `tsconfig.json` and filtering only known non-signal logs in `jest.setup.js`.
+> **Release-readiness test lane (2026-04-15)**: Fast mobile smoke = `cd src/mobile && npm run typecheck && npm test -- --runTestsByPath src/screens/agents/__tests__/MyAgentsScreen.test.tsx __tests__/NotificationsScreen.test.tsx --maxWorkers=2`. Full coverage expanded to 50+ suites / 509+ tests after MOB-PARITY-1 (PR #1060) added 12 new Jest tests for Inbox, ContentAnalytics, PlatformConnections, UsageBilling, voice overlay, billing services, content analytics service, platform connections service, navigation, and hooks.
 
 ---
 
@@ -3999,7 +4053,11 @@ RootNavigator (NativeStack)
     │   ├── AgentDetail  { agentId }
     │   ├── TrialDashboard  { trialId }
     │   ├── ActiveTrialsList
-    │   └── HiredAgentsList
+    │   ├── HiredAgentsList
+    │   ├── AgentOperations  { hiredAgentId }   ← voice overlay wired
+    │   ├── Inbox  { hiredAgentId? }            ← NEW (MOB-PARITY-1)
+    │   ├── ContentAnalytics  { hiredAgentId }  ← NEW (MOB-PARITY-1)
+    │   └── PlatformConnections  { hiredAgentId } ← NEW (MOB-PARITY-1)
     └── ProfileTab (NativeStack)
         ├── Profile
         ├── EditProfile
@@ -4030,6 +4088,10 @@ RootNavigator (NativeStack)
 | Active Trials | `src/screens/agents/ActiveTrialsListScreen.tsx` | Yes |
 | Hired Agents List | `src/screens/agents/HiredAgentsListScreen.tsx` | Yes |
 | Trial Dashboard | `src/screens/agents/TrialDashboardScreen.tsx` | Yes |
+| Agent Operations | `src/screens/agents/AgentOperationsScreen.tsx` | Yes |
+| Inbox | `src/screens/agents/InboxScreen.tsx` | Yes |
+| Content Analytics | `src/screens/agents/ContentAnalyticsScreen.tsx` | Yes |
+| Platform Connections | `src/screens/agents/PlatformConnectionsScreen.tsx` | Yes |
 | Profile | `src/screens/profile/ProfileScreen.tsx` | Yes |
 | Settings | `src/screens/profile/SettingsScreen.tsx` | Yes |
 | Notifications | `src/screens/profile/NotificationsScreen.tsx` | Yes |
@@ -4058,7 +4120,7 @@ Navigation guard: `RootNavigator.tsx` reads `isAuthenticated` from `useAuthStore
 | `AnalyticsConsentModal` | `components/analytics/AnalyticsConsentModal.tsx` | GDPR consent prompt for Firebase Analytics |
 | `AppRatingPrompt` | `components/feedback/AppRatingPrompt.tsx` | Play Store rating prompt |
 | `VoiceControl` | `components/voice/VoiceControl.tsx` | Voice command trigger UI |
-| `VoiceFAB` | `components/voice/VoiceFAB.tsx` | Floating action button for voice input |
+| `VoiceFAB` | `components/voice/VoiceFAB.tsx` | Floating action button for voice input — used in `AgentOperationsScreen` to trigger voice overlay (MOB-PARITY-1 PR #1060) |
 | `VoiceHelpModal` | `components/voice/VoiceHelpModal.tsx` | Help overlay listing available voice commands |
 
 ---
@@ -4117,6 +4179,15 @@ Manages access/refresh token lifecycle: reads from `secureStorage`, handles auto
 #### Push Notifications (`src/mobile/src/services/notifications/pushNotifications.service.ts`)
 
 Registers device FCM token with Plant Backend after sign-in. On sign-in success, calls `POST /api/v1/customers/fcm-token` (authenticated) to store the token against the customer record. Required for agent status + deliverable ready push notifications (MOBILE-FUNC-1 #866, #867).
+
+#### MOB-PARITY-1 Services (PR #1060)
+
+| Service | File | Plant Gateway Path |
+|---|---|---|
+| Content Analytics | `src/services/contentAnalytics.service.ts` | `GET /api/v1/hired-agents/{id}/content-analytics` |
+| Invoices | `src/services/invoices.service.ts` | `GET /api/v1/invoices` |
+| Platform Connections | `src/services/platformConnections.service.ts` | `GET/POST/DELETE /api/v1/hired-agents/{id}/platform-connections` |
+| Receipts | `src/services/receipts.service.ts` | `GET /api/v1/receipts/{id}` |
 
 ---
 
