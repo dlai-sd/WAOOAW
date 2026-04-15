@@ -132,10 +132,10 @@ EXECUTION ORDER:
 > ⚠️ Do NOT launch until Iteration 1 PR is merged to `main`.
 
 **Prerequisite evidence:**
-- Iteration 1 merge status: `[PENDING HUMAN UPDATE BEFORE LAUNCH]`
-- Iteration 1 PR: `[PR URL or #NUMBER]`
-- Merge commit on `main`: `[FULL SHA]`
-- Merged at: `[UTC TIMESTAMP]`
+- Iteration 1 merge status: `MERGED ✅`
+- Iteration 1 PR: `https://github.com/dlai-sd/WAOOAW/pull/1068`
+- Merge commit on `main`: `0549ca6fc752d41e4973d5ded930d8bbd420bdaf`
+- Merged at: `2026-04-15T11:03:55Z`
 
 **Verify merge first:** use the Prerequisite evidence block above as the source of truth. If it is still marked pending or missing a merged PR number and merge commit, do not launch Iteration 2.
 
