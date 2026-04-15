@@ -56,6 +56,11 @@ class CreateDraftBatchRequest(BaseModel):
     campaign_id: Optional[str] = None
     customer_id: Optional[str] = None
 
+    # Workflow stage: 'theme' = content-plan/table batch, 'content' = actual post batch, 'direct' = single-step
+    batch_type: str = "direct"
+    # Links a content batch back to the theme batch that it was derived from
+    parent_batch_id: Optional[str] = None
+
     theme: str
     brand_name: str
     brief_summary: Optional[str] = None
@@ -181,6 +186,8 @@ async def create_draft_batch(
 
     batch = materialize_batch_record(DraftBatchRecord(
         batch_id=batch_id,
+        batch_type=body.batch_type,
+        parent_batch_id=body.parent_batch_id,
         agent_id=body.agent_id,
         hired_instance_id=body.hired_instance_id,
         campaign_id=body.campaign_id,
@@ -195,6 +202,143 @@ async def create_draft_batch(
     await store.save_batch(batch)
     await db.commit()
     return CreateDraftBatchResponse(**batch.model_dump())
+
+
+class CreateContentBatchFromThemeRequest(BaseModel):
+    """Request to create a content batch from an approved theme batch.
+
+    The caller specifies what content artifacts to generate. The new batch inherits
+    the hired_instance_id, campaign_id, customer_id, brand_name, and approved theme
+    from the parent theme batch.
+    """
+    youtube_credential_ref: Optional[str] = None
+    youtube_visibility: str = "private"
+    public_release_requested: bool = False
+    requested_artifacts: Optional[List[ArtifactRequest]] = None
+
+
+@router.post("/draft-batches/{batch_id}/create-content-batch", response_model=CreateDraftBatchResponse)
+async def create_content_batch_from_theme(
+    batch_id: str,
+    body: CreateContentBatchFromThemeRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+) -> CreateDraftBatchResponse:
+    """Create a content batch from an approved theme batch.
+
+    All posts in the theme batch must be approved. The new content batch is linked
+    to the theme batch via parent_batch_id and is tagged batch_type='content'.
+    """
+    from core.exceptions import PolicyEnforcementError
+
+    store = DatabaseDraftBatchStore(db)
+    theme_batch = await store.get_batch(batch_id)
+    if theme_batch is None:
+        raise PolicyEnforcementError(
+            "Unknown theme batch",
+            reason="unknown_batch_id",
+            details={"batch_id": batch_id},
+        )
+
+    if theme_batch.batch_type not in ("theme", "direct"):
+        raise PolicyEnforcementError(
+            "Only a theme batch can spawn a content batch",
+            reason="invalid_batch_type",
+            details={"batch_id": batch_id, "batch_type": theme_batch.batch_type},
+        )
+
+    unapproved = [p for p in theme_batch.posts if p.review_status != "approved"]
+    if unapproved:
+        raise PolicyEnforcementError(
+            "All theme posts must be approved before creating a content batch",
+            reason="theme_not_fully_approved",
+            details={"unapproved_post_ids": [p.post_id for p in unapproved]},
+        )
+
+    # Use the theme text from approved posts as the content brief
+    approved_theme_text = " | ".join(
+        p.text[:200] for p in theme_batch.posts if p.review_status == "approved"
+    )
+    content_theme = approved_theme_text or theme_batch.theme
+
+    youtube_secret_ref = await resolve_youtube_secret_ref(
+        db,
+        hired_instance_id=theme_batch.hired_instance_id,
+        supplied_ref=body.youtube_credential_ref,
+    )
+    correlation_id = request.headers.get("x-correlation-id") or str(uuid4())
+
+    playbook = _marketing_multichannel_playbook()
+    media_store = get_media_artifact_store()
+    channels: List[ChannelName] = list({p.channel for p in theme_batch.posts})
+
+    result = execute_marketing_multichannel_v1(
+        playbook,
+        SkillExecutionInput(
+            theme=content_theme,
+            brand_name=theme_batch.brand_name,
+            channels=channels,
+            requested_artifacts=body.requested_artifacts,
+        ),
+    )
+
+    content_batch_id = str(uuid4())
+    posts: List[DraftPostRecord] = []
+    for variant in result.output.variants:
+        post_id = str(uuid4())
+        prepared = await _prepare_post_artifacts(
+            batch_id=content_batch_id,
+            post_id=post_id,
+            channel=variant.channel,
+            theme=content_theme,
+            brand_name=theme_batch.brand_name,
+            text=variant.text,
+            requested_artifacts=list(result.output.canonical.requested_artifacts or []),
+            pre_generated_artifacts=[
+                GeneratedArtifactReference.model_validate(artifact)
+                for artifact in (variant.generated_artifacts or [])
+            ],
+            media_store=media_store,
+            correlation_id=correlation_id,
+        )
+        posts.append(
+            DraftPostRecord(
+                post_id=post_id,
+                channel=variant.channel,
+                text=variant.text,
+                hashtags=variant.hashtags,
+                artifact_type=prepared["artifact_type"],
+                artifact_uri=prepared["artifact_uri"],
+                artifact_preview_uri=prepared["artifact_preview_uri"],
+                artifact_mime_type=prepared["artifact_mime_type"],
+                artifact_metadata=prepared["artifact_metadata"],
+                artifact_generation_status=prepared["artifact_generation_status"],
+                artifact_job_id=prepared["artifact_job_id"],
+                generated_artifacts=prepared["generated_artifacts"],
+                credential_ref=youtube_secret_ref if variant.channel == ChannelName.YOUTUBE else None,
+                visibility=body.youtube_visibility if variant.channel == ChannelName.YOUTUBE else "private",
+                public_release_requested=body.public_release_requested if variant.channel == ChannelName.YOUTUBE else False,
+            )
+        )
+
+    content_batch = materialize_batch_record(DraftBatchRecord(
+        batch_id=content_batch_id,
+        batch_type="content",
+        parent_batch_id=batch_id,
+        agent_id=theme_batch.agent_id,
+        hired_instance_id=theme_batch.hired_instance_id,
+        campaign_id=theme_batch.campaign_id,
+        customer_id=theme_batch.customer_id,
+        theme=content_theme,
+        brand_name=theme_batch.brand_name,
+        brief_summary=f"Content batch derived from approved theme batch {batch_id}",
+        created_at=datetime.utcnow(),
+        posts=posts,
+    ))
+
+    await store.save_batch(content_batch)
+    await db.commit()
+    return CreateDraftBatchResponse(**content_batch.model_dump())
 
 
 def _table_preview(theme: str, brand_name: str, channel: ChannelName, prompt: str) -> Dict[str, Any]:
@@ -542,6 +686,14 @@ async def execute_draft_post(
         )
 
     batch, post = found
+    # Reject execution of posts that have been explicitly rejected by the customer
+    if post.review_status == "rejected":
+        raise PolicyEnforcementError(
+            "Draft post has been rejected and cannot be published",
+            reason="post_rejected",
+            details={"post_id": post_id, "review_status": post.review_status},
+        )
+
     correlation_id = body.correlation_id or str(uuid4())
     requested_approval_id = (body.approval_id or "").strip() or None
     stored_approval_id = (post.approval_id or "").strip() or None

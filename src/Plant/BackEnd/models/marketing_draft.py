@@ -13,6 +13,13 @@ class MarketingDraftBatchModel(Base):
     __tablename__ = "marketing_draft_batches"
 
     batch_id = Column(String, primary_key=True, nullable=False)
+    batch_type = Column(String(32), nullable=False, default="direct", index=True)
+    parent_batch_id = Column(
+        String,
+        ForeignKey("marketing_draft_batches.batch_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     agent_id = Column(String, nullable=False, index=True)
     hired_instance_id = Column(
         String,
@@ -36,6 +43,12 @@ class MarketingDraftBatchModel(Base):
         back_populates="batch",
         cascade="all, delete-orphan",
         order_by="MarketingDraftPostModel.created_at",
+    )
+    child_batches = relationship(
+        "MarketingDraftBatchModel",
+        foreign_keys="MarketingDraftBatchModel.parent_batch_id",
+        primaryjoin="MarketingDraftBatchModel.batch_id == foreign(MarketingDraftBatchModel.parent_batch_id)",
+        lazy="select",
     )
 
     __table_args__ = (

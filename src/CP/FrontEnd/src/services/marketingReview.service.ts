@@ -42,6 +42,8 @@ export type DraftPost = {
 
 export type DraftBatch = {
   batch_id: string
+  batch_type?: string  // 'theme' | 'content' | 'direct'
+  parent_batch_id?: string | null
   agent_id: string
   hired_instance_id?: string | null
   customer_id?: string | null
@@ -56,6 +58,8 @@ export type CreateDraftBatchInput = {
   agent_id: string
   hired_instance_id?: string | null
   campaign_id?: string | null
+  batch_type?: string  // 'theme' | 'content' | 'direct'
+  parent_batch_id?: string | null
   theme: string
   brand_name: string
   brief_summary?: string | null
@@ -68,6 +72,13 @@ export type CreateDraftBatchInput = {
   youtube_visibility?: string
   public_release_requested?: boolean
   channels?: string[] | null
+  requested_artifacts?: DraftArtifactRequest[] | null
+}
+
+export type CreateContentFromThemeInput = {
+  youtube_credential_ref?: string | null
+  youtube_visibility?: string
+  public_release_requested?: boolean
   requested_artifacts?: DraftArtifactRequest[] | null
 }
 
@@ -148,4 +159,18 @@ export type ArtifactStatus = {
 
 export async function pollDraftPostArtifactStatus(postId: string): Promise<ArtifactStatus> {
   return gatewayRequestJson<ArtifactStatus>(`/cp/marketing/draft-posts/${postId}/artifact-status`)
+}
+
+export async function createContentBatchFromTheme(
+  themeBatchId: string,
+  input: CreateContentFromThemeInput
+): Promise<DraftBatch> {
+  return gatewayRequestJson<DraftBatch>(
+    `/cp/marketing/draft-batches/${themeBatchId}/create-content-batch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }
+  )
 }

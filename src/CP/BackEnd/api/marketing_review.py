@@ -189,6 +189,8 @@ class CreateDraftBatchInput(BaseModel):
     agent_id: str = Field(..., min_length=1)
     hired_instance_id: Optional[str] = None
     campaign_id: Optional[str] = None
+    batch_type: str = "direct"
+    parent_batch_id: Optional[str] = None
     theme: str
     brand_name: str
     brief_summary: Optional[str] = None
@@ -221,6 +223,39 @@ async def create_draft_batch(
         path="api/v1/marketing/draft-batches",
         headers=_forward_headers(request),
         json_body=json_body,
+    )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+    if resp.status_code not in (200, 201):
+        raise HTTPException(status_code=resp.status_code, detail=resp.json)
+    return resp.json if isinstance(resp.json, dict) else {}
+
+
+class CreateContentFromThemeInput(BaseModel):
+    class ArtifactRequestInput(BaseModel):
+        artifact_type: str = Field(..., min_length=1)
+        prompt: str = Field(..., min_length=1)
+        metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    youtube_credential_ref: Optional[str] = None
+    youtube_visibility: str = "private"
+    public_release_requested: bool = False
+    requested_artifacts: Optional[List[ArtifactRequestInput]] = None
+
+
+@router.post("/draft-batches/{batch_id}/create-content-batch", response_model=Dict[str, Any])
+async def create_content_batch_from_theme(
+    batch_id: str,
+    body: CreateContentFromThemeInput,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(get_plant_gateway_client),
+) -> Dict[str, Any]:
+    resp = await plant.request_json(
+        method="POST",
+        path=f"api/v1/marketing/draft-batches/{batch_id}/create-content-batch",
+        headers=_forward_headers(request),
+        json_body=body.model_dump(exclude_none=True),
     )
     if resp.status_code >= 500:
         raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")

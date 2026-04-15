@@ -304,3 +304,33 @@ def test_marketing_execute_draft_post_proxy(client, auth_headers, monkeypatch, t
 
     app.dependency_overrides.clear()
 
+
+# ---------------------------------------------------------------------------
+# Guard: ExecuteDraftPostInput class must be defined
+# (catches accidental deletion of the class header that caused 422 in CI)
+# ---------------------------------------------------------------------------
+
+def test_execute_draft_post_input_class_exists():
+    """ExecuteDraftPostInput must be importable and have the required fields.
+
+    If this class's header line is accidentally deleted, FastAPI can no longer
+    parse the request body and returns 422 for every /draft-posts/execute call.
+    """
+    from api.marketing_review import ExecuteDraftPostInput
+
+    fields = ExecuteDraftPostInput.model_fields
+    assert "post_id" in fields, "post_id missing from ExecuteDraftPostInput"
+    assert "agent_id" in fields, "agent_id missing from ExecuteDraftPostInput"
+    assert "intent_action" in fields, "intent_action missing from ExecuteDraftPostInput"
+    assert "approval_id" in fields, "approval_id missing from ExecuteDraftPostInput"
+
+
+def test_create_content_from_theme_input_class_exists():
+    """CreateContentFromThemeInput must exist for the staged workflow proxy endpoint."""
+    from api.marketing_review import CreateContentFromThemeInput, CreateDraftBatchInput
+
+    # CreateDraftBatchInput must carry batch_type and parent_batch_id
+    batch_fields = CreateDraftBatchInput.model_fields
+    assert "batch_type" in batch_fields
+    assert "parent_batch_id" in batch_fields
+

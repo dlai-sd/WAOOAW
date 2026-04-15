@@ -27,6 +27,7 @@ import {
 } from '../services/digitalMarketingActivation.service'
 import {
   createDraftBatch,
+  createContentBatchFromTheme,
   listCustomerDraftBatches,
   executeDraftPost,
   approveDraftPost,
@@ -430,6 +431,10 @@ export function DigitalMarketingActivationWizard({
   const [youtubeValidationResult, setYoutubeValidationResult] = useState<ValidateYouTubeConnectionResponse | null>(null)
 
   const [generatedBatch, setGeneratedBatch] = useState<DraftBatch | null>(null)
+  // themeBatch: the most recently generated theme (table) batch awaiting approval
+  const [themeBatch, setThemeBatch] = useState<DraftBatch | null>(null)
+  const [contentCreating, setContentCreating] = useState(false)
+  const [contentCreateError, setContentCreateError] = useState<string | null>(null)
   const [draftPosts, setDraftPosts] = useState<DraftPost[]>([])
   const [draftGenerating, setDraftGenerating] = useState(false)
   const [draftGenerateError, setDraftGenerateError] = useState<string | null>(null)
@@ -1342,10 +1347,14 @@ export function DigitalMarketingActivationWizard({
     try {
       const agentId = String(draft?.agent_id || activeInstance?.agent_id || '').trim()
       const campaignId = activation?.workspace?.campaign_setup?.campaign_id || undefined
+      // If the only artifact requested is 'table', tag this as a theme batch (content plan for approval).
+      // Any other artifact combination is a direct content batch.
+      const isThemeBatch = selectedArtifactTypes.length > 0 && selectedArtifactTypes.every((t) => t === 'table')
       const batch = await createDraftBatch({
         agent_id: agentId,
         hired_instance_id: hiredInstanceId,
         campaign_id: campaignId ?? null,
+        batch_type: isThemeBatch ? 'theme' : 'direct',
         theme: masterTheme.trim() || brandName.trim(),
         brand_name: brandName.trim(),
         brief_summary: businessContext.trim() || undefined,
@@ -1359,6 +1368,9 @@ export function DigitalMarketingActivationWizard({
         channels: ['youtube'],
         requested_artifacts: requestedArtifacts,
       })
+      if (isThemeBatch) {
+        setThemeBatch(batch)
+      }
       setGeneratedBatch(batch)
       const ytPosts = batch.posts.filter((p) => p.channel === 'youtube')
       setDraftPosts(ytPosts)
@@ -1373,7 +1385,9 @@ export function DigitalMarketingActivationWizard({
       // Inject draft post cards into the chat thread
       if (ytPosts.length > 0) {
         const queuedCount = ytPosts.filter((p) => p.artifact_generation_status === 'queued').length
-        let msg = `Here ${ytPosts.length === 1 ? 'is your YouTube draft' : `are your ${ytPosts.length} YouTube drafts`}.`
+        const batchLabel = isThemeBatch ? 'theme plan' : 'YouTube draft'
+        let msg = `Here ${ytPosts.length === 1 ? `is your ${batchLabel}` : `are your ${ytPosts.length} ${batchLabel}s`}.`
+        if (isThemeBatch) msg += ' Approve the theme plan to unlock content creation.'
         if (queuedCount > 0) msg += ` ${queuedCount} media asset${queuedCount > 1 ? 's are' : ' is'} generating.`
         msg += `\n[DRAFT_POSTS:${ytPosts.map((p) => p.post_id).join(',')}]`
         setStrategyWorkshop((prev) => ({
@@ -1388,6 +1402,53 @@ export function DigitalMarketingActivationWizard({
       setDraftGenerateError(e?.message || 'Failed to generate YouTube draft.')
     } finally {
       setDraftGenerating(false)
+    }
+  }
+
+  // Whether the current theme batch has all posts approved — unlocks "Create Content" button
+  const isThemeBatchFullyApproved = Boolean(
+    themeBatch &&
+    themeBatch.posts.length > 0 &&
+    themeBatch.posts.every((p) => p.review_status === 'approved')
+  )
+
+  const handleCreateContentFromApprovedTheme = async () => {
+    if (!themeBatch || !isThemeBatchFullyApproved) return
+    setContentCreating(true)
+    setContentCreateError(null)
+    try {
+      const contentArtifacts = selectedArtifactTypes
+        .filter((t) => t !== 'table')
+        .map((artifactType) => ({
+          artifact_type: artifactType,
+          prompt: `Create a ${artifactType.replace('_', ' ')} asset for ${masterTheme.trim() || brandName.trim()}`,
+          metadata: { source: 'cp_dma_wizard', channel: 'youtube' },
+        }))
+      const contentBatch = await createContentBatchFromTheme(themeBatch.batch_id, {
+        youtube_credential_ref: youtubeCredentialRef,
+        youtube_visibility: 'private',
+        public_release_requested: false,
+        requested_artifacts: contentArtifacts.length > 0 ? contentArtifacts : undefined,
+      })
+      setGeneratedBatch(contentBatch)
+      const ytPosts = contentBatch.posts.filter((p) => p.channel === 'youtube')
+      setDraftPosts(ytPosts)
+      setPostActionStatus({})
+      setPostPublishReceipts({})
+      setOutputItems((prev) => {
+        const existingIds = new Set(prev.map((p) => p.post_id))
+        const fresh = ytPosts.filter((p) => !existingIds.has(p.post_id))
+        return fresh.length > 0 ? [...prev, ...fresh] : prev
+      })
+      const msg = `Content batch created from your approved theme. ${ytPosts.length} post${ytPosts.length !== 1 ? 's are' : ' is'} ready for review.\n[DRAFT_POSTS:${ytPosts.map((p) => p.post_id).join(',')}]`
+      setStrategyWorkshop((prev) => ({
+        ...prev,
+        messages: [...(prev.messages || []), { role: 'assistant' as const, content: msg }],
+      }))
+    } catch (e: any) {
+      setContentCreateError(e?.message || 'Failed to create content batch.')
+    } finally {
+      setContentCreating(false)
     }
   }
 
@@ -1970,21 +2031,36 @@ export function DigitalMarketingActivationWizard({
                 ))}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
                 appearance="primary"
                 onClick={() => void handleGenerateYouTubeDraft()}
                 disabled={!canGenerateYouTubeDraft || readOnly}
                 data-testid="generate-youtube-draft-btn"
               >
-                {draftGenerating ? 'Generating…' : 'Generate YouTube Draft'}
+                {draftGenerating ? 'Generating…' : 'Generate Theme Plan'}
               </Button>
               {draftGenerating ? <Spinner size="tiny" /> : null}
+              {/* Show "Create Content" only after the theme batch is fully approved */}
+              {isThemeBatchFullyApproved && (
+                <Button
+                  appearance="primary"
+                  onClick={() => void handleCreateContentFromApprovedTheme()}
+                  disabled={contentCreating || readOnly}
+                  data-testid="create-content-from-theme-btn"
+                >
+                  {contentCreating ? 'Creating content…' : 'Create Content from Approved Theme'}
+                </Button>
+              )}
+              {contentCreating ? <Spinner size="tiny" /> : null}
             </div>
           </div>
         )}
         {draftGenerateError ? (
           <FeedbackMessage intent="error" title="Draft generation failed" message={draftGenerateError} />
+        ) : null}
+        {contentCreateError ? (
+          <FeedbackMessage intent="error" title="Content creation failed" message={contentCreateError} />
         ) : null}
 
         {draftPosts.length > 0 && (
