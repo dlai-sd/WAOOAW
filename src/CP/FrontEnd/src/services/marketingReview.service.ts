@@ -42,7 +42,7 @@ export type DraftPost = {
 
 export type DraftBatch = {
   batch_id: string
-  batch_type: string  // 'theme' | 'content' | 'direct'
+  batch_type?: string  // 'theme' | 'content' | 'direct'
   parent_batch_id?: string | null
   agent_id: string
   hired_instance_id?: string | null

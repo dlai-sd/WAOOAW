@@ -264,7 +264,7 @@ async def create_content_batch_from_theme(
     return resp.json if isinstance(resp.json, dict) else {}
 
 
-
+class ExecuteDraftPostInput(BaseModel):
     post_id: str = Field(..., min_length=1)
     agent_id: str = Field(..., min_length=1)
     purpose: Optional[str] = None

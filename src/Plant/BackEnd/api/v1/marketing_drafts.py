@@ -686,6 +686,14 @@ async def execute_draft_post(
         )
 
     batch, post = found
+    # Reject execution of posts that have been explicitly rejected by the customer
+    if post.review_status == "rejected":
+        raise PolicyEnforcementError(
+            "Draft post has been rejected and cannot be published",
+            reason="post_rejected",
+            details={"post_id": post_id, "review_status": post.review_status},
+        )
+
     correlation_id = body.correlation_id or str(uuid4())
     requested_approval_id = (body.approval_id or "").strip() or None
     stored_approval_id = (post.approval_id or "").strip() or None
