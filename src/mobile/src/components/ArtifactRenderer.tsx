@@ -97,7 +97,7 @@ export const ArtifactRenderer = ({ post }: Props) => {
       )
     }
     return (
-      <View style={[s.table, { borderColor: colors.textSecondary + '30' }]}>
+      <View style={[s.table, { borderColor: colors.textSecondary + '30' }]} testID="artifact-table">
         <View style={[s.trow, { backgroundColor: '#27272a' }]}>
           {headers.map((h) => (
             <Text key={h} style={[s.th, { color: colors.textPrimary }]}>
@@ -109,7 +109,6 @@ export const ArtifactRenderer = ({ post }: Props) => {
           data={rows}
           keyExtractor={(_, i) => String(i)}
           scrollEnabled={false}
-          testID="artifact-table"
           renderItem={({ item, index }) => (
             <View
               style={[
