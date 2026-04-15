@@ -1,6 +1,41 @@
 
 ---
 
+## [2026-04-15 UTC] MOB-DMA-1 — Mobile DMA Chat & Content Parity Plan
+
+**Branch**: `docs/mob-dma-1-dma-chat-content` (to create)
+**Plan file**: `docs/mobile/iterations/MOB-DMA-1-dma-chat-content.md` (to create)
+**Status**: Vision intake — presenting to user for confirmation
+
+### Goal
+Make the mobile app a first-class DMA client: DMA activation wizard, DMA strategy workshop chat, content artifact viewer (table/image/mp4), staged DMA workflow (theme → content batch), YouTube credential DB persistence, voice input as alternative, and strip developer-only placeholder UI.
+
+### Checkpoint list
+- [x] Read platform context (CONTEXT_AND_INDEX.md §1, §3, §5, §13)
+- [x] Read iteration-plan-template.md
+- [x] Read existing mobile screens (AgentOperationsScreen, PlatformConnectionsScreen)
+- [x] Read CP DMA services (digitalMarketingActivation.service.ts, marketingReview.service.ts)
+- [x] Gap analysis complete — no DMA services in mobile; placeholder sections in AgentOperationsScreen
+- [ ] Vision intake confirmed with user
+- [ ] Plan branch created
+- [ ] Plan skeleton committed
+- [ ] Story cards committed
+- [ ] Push & PR created
+
+### Key gaps identified
+1. No `digitalMarketingActivation.service.ts` in mobile
+2. No `marketingReview.service.ts` in mobile
+3. No DMA strategy workshop chat screen on mobile
+4. No content artifact viewer (table/image/mp4) on mobile
+5. YouTube connection uses local state — not DB-backed `CustomerPlatformCredential`
+6. `AgentOperationsScreen` sections 'activity', 'health', 'spend', 'recent', 'history' show placeholder text only
+7. Voice overlay not wired to DMA chat input
+
+### Next save point
+After user confirms vision intake, create branch and write plan.
+
+---
+
 ## [2026-04-14 UTC] MOB-PARITY-1 — Mobile CP Feature Parity Plan
 
 **Branch**: `docs/MOB-PARITY-1-mobile-cp-parity`
