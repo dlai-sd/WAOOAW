@@ -60,6 +60,8 @@ class DraftPostRecord(BaseModel):
 
 class DraftBatchRecord(BaseModel):
     batch_id: str = Field(..., min_length=1)
+    batch_type: str = "direct"  # theme | content | direct
+    parent_batch_id: Optional[str] = None
     agent_id: str = Field(..., min_length=1)
     hired_instance_id: Optional[str] = None
     campaign_id: Optional[str] = None
@@ -83,6 +85,8 @@ class DatabaseDraftBatchStore:
     async def save_batch(self, batch: DraftBatchRecord) -> None:
         batch_model = MarketingDraftBatchModel(
             batch_id=batch.batch_id,
+            batch_type=batch.batch_type,
+            parent_batch_id=batch.parent_batch_id,
             agent_id=batch.agent_id,
             hired_instance_id=batch.hired_instance_id,
             campaign_id=batch.campaign_id,
@@ -233,6 +237,8 @@ class DatabaseDraftBatchStore:
     def _batch_model_to_record(self, model: MarketingDraftBatchModel) -> DraftBatchRecord:
         return materialize_batch_record(DraftBatchRecord(
             batch_id=model.batch_id,
+            batch_type=getattr(model, 'batch_type', 'direct') or 'direct',
+            parent_batch_id=getattr(model, 'parent_batch_id', None),
             agent_id=model.agent_id,
             hired_instance_id=model.hired_instance_id,
             campaign_id=model.campaign_id,

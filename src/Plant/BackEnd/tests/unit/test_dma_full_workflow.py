@@ -426,3 +426,78 @@ def test_short_credential_ref_is_resolved_to_gcp_path_at_batch_creation(
     assert create.status_code == 200
     post = create.json()["posts"][0]
     assert post["credential_ref"] == "projects/waooaw-oauth/secrets/hired-wf-001-youtube/versions/latest"
+
+
+# ---------------------------------------------------------------------------
+# Stage 9: batch_type field preserved end-to-end
+# ---------------------------------------------------------------------------
+
+def test_theme_batch_carries_batch_type_theme(test_client, in_memory_marketing_draft_store):
+    """A batch created with batch_type='theme' is stored and returned with that type."""
+    resp = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={**_THEME_PAYLOAD, "batch_type": "theme"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["batch_type"] == "theme"
+
+    batch_id = resp.json()["batch_id"]
+    get_resp = test_client.get(f"/api/v1/marketing/draft-batches/{batch_id}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["batch_type"] == "theme"
+
+
+def test_create_content_batch_from_approved_theme_batch(
+    test_client, in_memory_marketing_draft_store, monkeypatch
+):
+    """POST /draft-batches/{id}/create-content-batch succeeds when all theme posts are approved.
+    The resulting batch has batch_type='content' and parent_batch_id pointing to the theme batch.
+    """
+    # Step 1: create theme batch
+    create_theme = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={**_THEME_PAYLOAD, "batch_type": "theme"},
+    )
+    assert create_theme.status_code == 200
+    theme_batch_id = create_theme.json()["batch_id"]
+    theme_post_id = create_theme.json()["posts"][0]["post_id"]
+
+    # Step 2: approve all theme posts
+    test_client.post(
+        f"/api/v1/marketing/draft-posts/{theme_post_id}/approve",
+        json={"approval_id": "APR-THEME-STAGE9"},
+    )
+
+    # Step 3: create content batch from approved theme
+    content_resp = test_client.post(
+        f"/api/v1/marketing/draft-batches/{theme_batch_id}/create-content-batch",
+        json={
+            "youtube_credential_ref": "projects/waooaw-oauth/secrets/hired-1-youtube/versions/latest",
+        },
+    )
+    assert content_resp.status_code == 200
+    content_data = content_resp.json()
+
+    assert content_data["batch_type"] == "content"
+    assert content_data["parent_batch_id"] == theme_batch_id
+    assert len(content_data["posts"]) > 0
+    assert all(p["review_status"] == "pending_review" for p in content_data["posts"])
+
+
+def test_create_content_batch_blocked_when_theme_not_fully_approved(
+    test_client, in_memory_marketing_draft_store
+):
+    """Content batch cannot be created if any theme post is still pending."""
+    create_theme = test_client.post(
+        "/api/v1/marketing/draft-batches",
+        json={**_THEME_PAYLOAD, "batch_type": "theme"},
+    )
+    theme_batch_id = create_theme.json()["batch_id"]
+
+    # Do NOT approve — attempt content creation immediately
+    content_resp = test_client.post(
+        f"/api/v1/marketing/draft-batches/{theme_batch_id}/create-content-batch",
+        json={},
+    )
+    assert content_resp.status_code == 403
+    assert content_resp.json()["reason"] == "theme_not_fully_approved"

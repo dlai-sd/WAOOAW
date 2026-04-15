@@ -42,6 +42,7 @@ python-dotenv==1.0.0
 httpx==0.26.0
 openai==2.26.0
 google-auth[requests]==2.37.0
+google-cloud-secret-manager==2.26.0
 pyyaml==6.0.1
 tenacity==8.2.3  # Retry logic with exponential backoff
 
