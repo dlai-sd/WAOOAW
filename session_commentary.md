@@ -16,11 +16,11 @@ Make the mobile app a first-class DMA client: DMA activation wizard, DMA strateg
 - [x] Read existing mobile screens (AgentOperationsScreen, PlatformConnectionsScreen)
 - [x] Read CP DMA services (digitalMarketingActivation.service.ts, marketingReview.service.ts)
 - [x] Gap analysis complete — no DMA services in mobile; placeholder sections in AgentOperationsScreen
-- [ ] Vision intake confirmed with user
-- [ ] Plan branch created
-- [ ] Plan skeleton committed
-- [ ] Story cards committed
-- [ ] Push & PR created
+- [x] Vision intake confirmed with user (agent made decisions: new DMAConversationScreen; honest "coming soon" placeholder replacement)
+- [x] Plan branch created: docs/mob-dma-1-dma-chat-content
+- [x] Plan skeleton committed
+- [x] Story cards committed (Iteration 1: E1-E3; Iteration 2: E4-E5)
+- [x] Push & PR created — PR #1067
 
 ### Key gaps identified
 1. No `digitalMarketingActivation.service.ts` in mobile
