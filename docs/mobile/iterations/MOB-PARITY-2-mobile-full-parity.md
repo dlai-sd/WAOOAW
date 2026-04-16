@@ -258,11 +258,11 @@ git add -A && git commit -m "feat(MOB-PARITY-2): [epic-id] — [epic title]" && 
 | E4-S2 | 2 | My Agents / Ops = live status + controls | Scheduled posts section in Ops (queued / published / failed) | � Done | PR #1072 |
 | E4-S3 | 2 | My Agents / Ops = live status + controls | Weekly output count tile in Ops header | � Done | PR #1072 |
 | E4-S4 | 2 | My Agents / Ops = live status + controls | Ops parity test suite | � Done | PR #1072 |
-| E5-S1 | 3 | Content Approval = reject with reason | ContentDraftApprovalCard gains reject-reason input | 🔴 Not Started | — |
-| E6-S1 | 3 | Content Approval = scheduled posts list | ScheduledPostsScreen — full list page | 🔴 Not Started | — |
-| E7-S1 | 3 | Deliverables = full content view | DeliverableDetailScreen — read full content | 🔴 Not Started | — |
-| E8-S1 | 3 | Inbox = badge count + notification types | Inbox badge on tab + notification type chips | 🔴 Not Started | — |
-| E9-S1 | 3 | Parity test suite | All Iteration 3 screens: snapshot + behaviour | 🔴 Not Started | — |
+| E5-S1 | 3 | Content Approval = reject with reason | ContentDraftApprovalCard gains reject-reason input | � Done | #1073 |
+| E6-S1 | 3 | Content Approval = scheduled posts list | ScheduledPostsScreen — full list page | 🟢 Done | #1073 |
+| E7-S1 | 3 | Deliverables = full content view | DeliverableDetailScreen — read full content | 🟢 Done | #1073 |
+| E8-S1 | 3 | Inbox = badge count + notification types | Inbox badge on tab + notification type chips | 🟢 Done | #1073 |
+| E9-S1 | 3 | Parity test suite | All Iteration 3 screens: snapshot + behaviour | 🟢 Done | #1073 |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
 
