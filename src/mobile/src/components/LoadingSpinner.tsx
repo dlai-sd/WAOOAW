@@ -10,13 +10,14 @@ import { useTheme } from '../hooks/useTheme';
 
 interface LoadingSpinnerProps {
   message?: string;
+  testID?: string;
 }
 
-export const LoadingSpinner = ({ message = 'Loading...' }: LoadingSpinnerProps) => {
+export const LoadingSpinner = ({ message = 'Loading...', testID }: LoadingSpinnerProps) => {
   const { colors, spacing, typography } = useTheme();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.black }]}>
+    <View testID={testID} style={[styles.container, { backgroundColor: colors.black }]}>
       <ActivityIndicator size="large" color={colors.neonCyan} />
       <Text
         style={[
