@@ -94,10 +94,12 @@ export interface Agent {
   // Computed fields for frontend display
   job_role?: JobRole; // Populated by join
   rating?: number; // Future: average rating
+  review_count?: number; // Number of reviews
   trial_days?: number;
   allowed_durations?: string[];
   price?: number; // Monthly price (INR)
   specialization?: string; // Future: agent specialty
+  total_deliverables?: number; // Total deliverables produced by this agent type
 }
 
 /**

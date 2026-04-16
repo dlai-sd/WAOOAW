@@ -54,7 +54,7 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('../src/store/authStore');
 
-// Mock useHiredAgents — HomeScreen now uses this for live state (MOBILE-COMP-1 E2-S2)
+// Mock useHiredAgents — HomeScreen uses this for live state
 jest.mock('../src/hooks/useHiredAgents', () => ({
   useHiredAgents: jest.fn(() => ({
     data: [],
@@ -62,6 +62,18 @@ jest.mock('../src/hooks/useHiredAgents', () => ({
     error: null,
     refetch: jest.fn(),
     isFetching: false,
+  })),
+}));
+
+// Mock useAllDeliverables — HomeScreen E1-S2 uses this for pending count
+jest.mock('../src/hooks/useAllDeliverables', () => ({
+  useAllDeliverables: jest.fn(() => ({
+    deliverables: [],
+    isLoading: false,
+    error: null,
+    approve: jest.fn(),
+    reject: jest.fn(),
+    refetch: jest.fn(),
   })),
 }));
 
@@ -94,8 +106,7 @@ describe('Core Screens', () => {
 
       expect(getByText(/Good (Morning|Afternoon|Evening)/)).toBeTruthy();
       expect(getByText('Test User')).toBeTruthy();
-      expect(getByText('WAOOAW')).toBeTruthy();
-      expect(getByText('Agents Earn Your Business')).toBeTruthy();
+      expect(getByText('WAOOAW · Agents Earn Your Business')).toBeTruthy();
     });
 
     it('should display user full name', () => {
@@ -107,7 +118,6 @@ describe('Core Screens', () => {
     it('should show correct greeting based on time', () => {
       const { getByText } = render(<HomeScreen />);
 
-      // Should show one of the greetings
       const hasGreeting =
         getByText(/Good Morning/i) ||
         getByText(/Good Afternoon/i) ||
@@ -116,33 +126,18 @@ describe('Core Screens', () => {
       expect(hasGreeting).toBeTruthy();
     });
 
-    it('should display quick action cards', () => {
-      const { getByText } = render(<HomeScreen />);
-
-      expect(getByText('Quick Actions')).toBeTruthy();
-      expect(getByText('Discover Agents')).toBeTruthy();
-      expect(getByText('Open Ops')).toBeTruthy();
+    it('should display stat tiles instead of old quick-action cards', () => {
+      const { getByTestId } = render(<HomeScreen />);
+      expect(getByTestId('stat-agents-active')).toBeTruthy();
+      expect(getByTestId('stat-trials-live')).toBeTruthy();
+      expect(getByTestId('stat-pending-approvals')).toBeTruthy();
+      expect(getByTestId('stat-billing-alerts')).toBeTruthy();
     });
 
-    it('should display activity stats with live counts', () => {
-      const { getByText } = render(<HomeScreen />);
-
-      expect(getByText('Your Activity')).toBeTruthy();
-      expect(getByText('Active hires')).toBeTruthy();
-      expect(getByText('Trials live')).toBeTruthy();
-    });
-
-    it('should display empty state with discover CTA when no hires', () => {
-      const { getByText } = render(<HomeScreen />);
-
-      expect(getByText('No active hires yet')).toBeTruthy();
-      expect(getByText('Browse agents →')).toBeTruthy();
-    });
-
-    it('should show today priorities section', () => {
-      const { getByText } = render(<HomeScreen />);
-
-      expect(getByText("Today's priorities")).toBeTruthy();
+    it('should display Browse Agents and My Agents action buttons', () => {
+      const { getByTestId } = render(<HomeScreen />);
+      expect(getByTestId('action-browse-agents')).toBeTruthy();
+      expect(getByTestId('action-my-agents')).toBeTruthy();
     });
   });
 

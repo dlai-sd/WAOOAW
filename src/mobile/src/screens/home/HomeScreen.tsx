@@ -1,8 +1,9 @@
 /**
- * Home Screen (MOBILE-COMP-1 E2-S2)
+ * Home Screen (MOB-PARITY-2 E1-S1 + E1-S2)
  *
- * Live mobile cockpit: derives priority pills and action items
- * from useHiredAgents data. Replaces static pills and setTimeout refresh.
+ * Single-screen no-scroll action dashboard. Shows 4 stat tiles
+ * (agents active, trials live, pending approvals, billing alerts)
+ * plus 2 action buttons — fits on screen without scrolling.
  */
 
 import React from 'react';
@@ -10,23 +11,27 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   SafeAreaView,
-  RefreshControl,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../hooks/useTheme';
 import { useCurrentUser } from '../../store/authStore';
 import { useHiredAgents } from '../../hooks/useHiredAgents';
+import { useAllDeliverables } from '../../hooks/useAllDeliverables';
+import { LoadingSpinner } from '../../components/LoadingSpinner';
+import { ErrorView } from '../../components/ErrorView';
 
 export const HomeScreen = () => {
   const { colors, spacing, typography } = useTheme();
   const user = useCurrentUser();
   const navigation = useNavigation<any>();
 
-  const { data: hiredAgents, isLoading, error, refetch, isFetching } = useHiredAgents();
+  const { data: hiredAgents, isLoading: agentsLoading, error: agentsError, refetch } = useHiredAgents();
+  const { deliverables, isLoading: delivLoading } = useAllDeliverables();
+
+  const isLoading = agentsLoading || delivLoading;
+  const error = agentsError;
 
   const navigateToTab = React.useCallback(
     (tabName: 'DiscoverTab' | 'MyAgentsTab', screen: 'Discover' | 'MyAgents') => {
@@ -35,9 +40,15 @@ export const HomeScreen = () => {
     [navigation]
   );
 
-  const onRefresh = React.useCallback(() => {
-    refetch();
-  }, [refetch]);
+  const handleApprovalsPress = React.useCallback(() => {
+    navigation.getParent()?.navigate('MyAgentsTab', { screen: 'Inbox' });
+  }, [navigation]);
+
+  // Stat derivations
+  const activeCount = (hiredAgents ?? []).filter((a) => a.subscription_status === 'active' || a.trial_status === 'active').length;
+  const trialsLive = (hiredAgents ?? []).filter((a) => a.trial_status === 'active').length;
+  const pendingCount = (deliverables ?? []).filter((d) => d.status === 'pending').length;
+  const billingAlerts = (hiredAgents ?? []).filter((a) => a.subscription_status === 'past_due').length;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -46,445 +57,184 @@ export const HomeScreen = () => {
     return 'Good Evening';
   };
 
-  // Derive live summary counts from hired agents
-  const totalHires = hiredAgents?.length ?? 0;
-  const activeTrials = hiredAgents?.filter((a) => a.trial_status === 'active').length ?? 0;
-  const needsSetup = hiredAgents?.filter((a) => a.configured === false || a.goals_completed === false).length ?? 0;
-  const pastDue = hiredAgents?.filter((a) => a.subscription_status === 'past_due').length ?? 0;
-
-  // Derive live priority pills
-  const livePills: string[] = [];
-  if (needsSetup > 0) livePills.push(`${needsSetup} setup needed`);
-  if (activeTrials > 0) livePills.push(`${activeTrials} trial${activeTrials > 1 ? 's' : ''} live`);
-  if (pastDue > 0) livePills.push(`${pastDue} billing action`);
-  if (livePills.length === 0 && totalHires > 0) livePills.push(`${totalHires} hire${totalHires > 1 ? 's' : ''} active`);
-
-  // Derive live priorities
-  const livePriorities: string[] = [];
-  if (needsSetup > 0) {
-    livePriorities.push('Complete agent setup so your hires can start working.');
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
+        <LoadingSpinner testID="home-loading" />
+      </SafeAreaView>
+    );
   }
-  if (pastDue > 0) {
-    livePriorities.push('Update your payment method — a subscription is past due.');
-  }
-  const trialEndingSoon = hiredAgents?.filter((a) => {
-    if (a.trial_status !== 'active' || !a.trial_end_at) return false;
-    const msLeft = new Date(a.trial_end_at).getTime() - Date.now();
-    return msLeft > 0 && msLeft <= 3 * 24 * 60 * 60 * 1000;
-  }) ?? [];
-  if (trialEndingSoon.length > 0) {
-    livePriorities.push('A trial is ending in 3 days — review spend before it closes.');
+
+  if (error) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
+        <ErrorView message="Could not load your agents" onRetry={refetch} testID="home-error" />
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.black }]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
+      <View
+        style={[
           styles.container,
           {
             paddingHorizontal: spacing.screenPadding.horizontal,
             paddingVertical: spacing.screenPadding.vertical,
           },
         ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={isFetching}
-            onRefresh={onRefresh}
-            tintColor={colors.neonCyan}
-            colors={[colors.neonCyan]}
-          />
-        }
       >
         {/* Header */}
-        <View style={[styles.header, { marginBottom: spacing.xl }]}>
+        <View style={styles.header}>
           <Text
-            style={[
-              styles.greeting,
-              {
-                color: colors.textSecondary,
-                fontSize: 16,
-                fontFamily: typography.fontFamily.body,
-                marginBottom: spacing.xs,
-              },
-            ]}
+            style={{
+              color: colors.textSecondary,
+              fontSize: 14,
+              fontFamily: typography.fontFamily.body,
+            }}
           >
             {getGreeting()}
           </Text>
           <Text
-            style={[
-              styles.userName,
-              {
-                color: colors.textPrimary,
-                fontSize: 28,
-                fontFamily: typography.fontFamily.display,
-              },
-            ]}
+            style={{
+              color: colors.textPrimary,
+              fontSize: 24,
+              fontFamily: typography.fontFamily.display,
+              marginTop: 2,
+            }}
           >
             {user?.full_name || 'Welcome'}
           </Text>
         </View>
 
-        {/* Hero Banner */}
-        <View
-          style={[
-            styles.heroBanner,
-            {
-              backgroundColor: colors.neonCyan + '15',
-              borderWidth: 1,
-              borderColor: colors.neonCyan + '40',
-              borderRadius: spacing.md,
-              padding: spacing.lg,
-              marginBottom: spacing.xl,
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.heroTitle,
-              {
-                color: colors.neonCyan,
-                fontSize: 32,
+        {/* Stat tiles — 2×2 grid */}
+        <View style={[styles.statsGrid, { marginTop: spacing.lg, gap: spacing.md }]}>
+          {/* Agents Active */}
+          <View
+            testID="stat-agents-active"
+            style={[styles.statTile, { backgroundColor: colors.card, borderRadius: spacing.md, padding: spacing.lg, flex: 1 }]}
+          >
+            <Text style={{ color: colors.neonCyan, fontSize: 28, fontFamily: typography.fontFamily.display }}>
+              {activeCount}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, marginTop: 4 }}>
+              Agents active
+            </Text>
+          </View>
+
+          {/* Trials Live */}
+          <View
+            testID="stat-trials-live"
+            style={[styles.statTile, { backgroundColor: colors.card, borderRadius: spacing.md, padding: spacing.lg, flex: 1 }]}
+          >
+            <Text style={{ color: colors.neonCyan, fontSize: 28, fontFamily: typography.fontFamily.display }}>
+              {trialsLive}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, marginTop: 4 }}>
+              Trials live
+            </Text>
+          </View>
+
+          {/* Pending Approvals — tappable, navigates to Inbox */}
+          <TouchableOpacity
+            testID="stat-pending-approvals"
+            onPress={handleApprovalsPress}
+            style={[styles.statTile, { backgroundColor: colors.card, borderRadius: spacing.md, padding: spacing.lg, flex: 1 }]}
+          >
+            <Text
+              style={{
+                color: pendingCount > 0 ? (colors as unknown as Record<string, string>).warning ?? '#f59e0b' : colors.textSecondary,
+                fontSize: 28,
                 fontFamily: typography.fontFamily.display,
-                marginBottom: spacing.sm,
-              },
-            ]}
-          >
-            WAOOAW
-          </Text>
-          <Text
-            style={[
-              styles.heroSubtitle,
-              {
-                color: colors.textPrimary,
-                fontSize: 18,
-                fontFamily: typography.fontFamily.bodyBold,
-                marginBottom: spacing.xs,
-              },
-            ]}
-          >
-            Agents Earn Your Business
-          </Text>
-          <Text
-            style={[
-              styles.heroDescription,
-              {
-                color: colors.textSecondary,
-                fontSize: 14,
-                fontFamily: typography.fontFamily.body,
-              },
-            ]}
-          >
-            Use mobile as your decision cockpit: what needs approval, what is running well, and where you should act next.
-          </Text>
-
-          {isLoading ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }} testID="mobile-home-pills-loading">
-              <ActivityIndicator size="small" color={colors.neonCyan} />
-              <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, marginLeft: spacing.sm }}>
-                Loading your agent status…
-              </Text>
-            </View>
-          ) : error ? null : livePills.length > 0 ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }} testID="mobile-home-pills">
-              {livePills.map((pill) => (
-                <View
-                  key={pill}
-                  style={{
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.xs,
-                    borderRadius: 999,
-                    borderWidth: 1,
-                    borderColor: colors.neonCyan + '40',
-                    backgroundColor: colors.black + '20',
-                  }}
-                >
-                  <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        <View style={[styles.section, { marginBottom: spacing.xl }]}> 
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color: colors.textPrimary,
-                fontSize: 20,
-                fontFamily: typography.fontFamily.bodyBold,
-                marginBottom: spacing.md,
-              },
-            ]}
-          >
-            Today&apos;s priorities
-          </Text>
-          {isLoading ? (
-            <View style={{ padding: spacing.lg, alignItems: 'center' }} testID="mobile-home-priorities-loading">
-              <ActivityIndicator color={colors.neonCyan} />
-            </View>
-          ) : error ? (
-            <View style={{ padding: spacing.lg }} testID="mobile-home-priorities-error">
-              <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 13 }}>
-                Could not load priorities. Pull to refresh.
-              </Text>
-            </View>
-          ) : livePriorities.length > 0 ? (
-            <View style={{ gap: spacing.md }} testID="mobile-home-priorities">
-              {livePriorities.map((item) => (
-                <View
-                  key={item}
-                  style={{
-                    backgroundColor: colors.card,
-                    borderRadius: spacing.md,
-                    padding: spacing.lg,
-                    borderWidth: 1,
-                    borderColor: colors.textSecondary + '20',
-                  }}
-                >
-                  <Text style={{ color: colors.textPrimary, fontSize: 14, fontFamily: typography.fontFamily.body }}>{item}</Text>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={{ padding: spacing.lg, alignItems: 'center' }} testID="mobile-home-priorities-empty">
-              <Text style={{ color: colors.textSecondary, fontFamily: typography.fontFamily.body, fontSize: 14 }}>
-                No action items right now. Discover agents or review your ops.
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Quick Actions */}
-        <View style={[styles.section, { marginBottom: spacing.xl }]}>
-          <Text
-            style={[
-              styles.sectionTitle,
-              {
-                color: colors.textPrimary,
-                fontSize: 20,
-                fontFamily: typography.fontFamily.bodyBold,
-                marginBottom: spacing.md,
-              },
-            ]}
-          >
-            Quick Actions
-          </Text>
-          <View style={[styles.quickActions, { gap: spacing.md }]}>
-            <TouchableOpacity
-              style={[
-                styles.actionCard,
-                {
-                  backgroundColor: colors.card,
-                  borderRadius: spacing.md,
-                  padding: spacing.lg,
-                  flex: 1,
-                },
-              ]}
-              onPress={() => navigateToTab('DiscoverTab', 'Discover')}
+              }}
             >
-              <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>🔍</Text>
-              <Text
-                style={[
-                  styles.actionTitle,
-                  {
-                    color: colors.textPrimary,
-                    fontSize: 16,
-                    fontFamily: typography.fontFamily.bodyBold,
-                  },
-                ]}
-              >
-                Discover Agents
-              </Text>
-              <Text
-                style={[
-                  styles.actionDescription,
-                  {
-                    color: colors.textSecondary,
-                    fontSize: 12,
-                    fontFamily: typography.fontFamily.body,
-                  },
-                ]}
-              >
-                Browse 19+ AI agents
-              </Text>
-            </TouchableOpacity>
+              {pendingCount}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, marginTop: 4 }}>
+              Pending approvals
+            </Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.actionCard,
-                {
-                  backgroundColor: colors.card,
-                  borderRadius: spacing.md,
-                  padding: spacing.lg,
-                  flex: 1,
-                },
-              ]}
-              onPress={() => navigateToTab('MyAgentsTab', 'MyAgents')}
+          {/* Billing Alerts */}
+          <View
+            testID="stat-billing-alerts"
+            style={[styles.statTile, { backgroundColor: colors.card, borderRadius: spacing.md, padding: spacing.lg, flex: 1 }]}
+          >
+            <Text
+              style={{
+                color: billingAlerts > 0 ? colors.error : colors.textSecondary,
+                fontSize: 28,
+                fontFamily: typography.fontFamily.display,
+              }}
             >
-              <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>🚀</Text>
-              <Text
-                style={[
-                  styles.actionTitle,
-                  {
-                    color: colors.textPrimary,
-                    fontSize: 16,
-                    fontFamily: typography.fontFamily.bodyBold,
-                  },
-                ]}
-              >
-                Open Ops
-              </Text>
-              <Text
-                style={[
-                  styles.actionDescription,
-                  {
-                    color: colors.textSecondary,
-                    fontSize: 12,
-                    fontFamily: typography.fontFamily.body,
-                  },
-                ]}
-              >
-                Review trials and hired agents
-              </Text>
-            </TouchableOpacity>
+              {billingAlerts}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body, marginTop: 4 }}>
+              Billing alerts
+            </Text>
           </View>
         </View>
 
-        {/* Stats Section */}
-        <View style={[styles.section, { marginBottom: spacing.xl }]}>
-          <Text
+        {/* Action buttons */}
+        <View style={[styles.actionsRow, { marginTop: spacing.xl, gap: spacing.md }]}>
+          <TouchableOpacity
+            testID="action-browse-agents"
+            onPress={() => navigateToTab('DiscoverTab', 'Discover')}
             style={[
-              styles.sectionTitle,
+              styles.actionBtn,
               {
-                color: colors.textPrimary,
-                fontSize: 20,
-                fontFamily: typography.fontFamily.bodyBold,
-                marginBottom: spacing.md,
+                backgroundColor: colors.neonCyan + '18',
+                borderWidth: 1,
+                borderColor: colors.neonCyan + '60',
+                borderRadius: spacing.md,
+                padding: spacing.lg,
+                flex: 1,
+                alignItems: 'center',
               },
             ]}
           >
-            Your Activity
-          </Text>
-          <View style={[styles.statsRow, { gap: spacing.md }]}>
-            <View
-              style={[
-                styles.statCard,
-                {
-                  backgroundColor: colors.card,
-                  borderRadius: spacing.md,
-                  padding: spacing.lg,
-                  flex: 1,
-                  alignItems: 'center',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statValue,
-                  {
-                    color: colors.neonCyan,
-                    fontSize: 32,
-                    fontFamily: typography.fontFamily.display,
-                    marginBottom: spacing.xs,
-                  },
-                ]}
-              >
-                {isLoading ? '…' : String(totalHires)}
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  {
-                    color: colors.textSecondary,
-                    fontSize: 14,
-                    fontFamily: typography.fontFamily.body,
-                  },
-                ]}
-              >
-                Active hires
-              </Text>
-            </View>
+            <Text style={{ fontSize: 24, marginBottom: 6 }}>🔍</Text>
+            <Text style={{ color: colors.neonCyan, fontSize: 14, fontFamily: typography.fontFamily.bodyBold }}>
+              Browse Agents
+            </Text>
+          </TouchableOpacity>
 
-            <View
-              style={[
-                styles.statCard,
-                {
-                  backgroundColor: colors.card,
-                  borderRadius: spacing.md,
-                  padding: spacing.lg,
-                  flex: 1,
-                  alignItems: 'center',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statValue,
-                  {
-                    color: colors.neonCyan,
-                    fontSize: 32,
-                    fontFamily: typography.fontFamily.display,
-                    marginBottom: spacing.xs,
-                  },
-                ]}
-              >
-                {isLoading ? '…' : String(activeTrials)}
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  {
-                    color: colors.textSecondary,
-                    fontSize: 14,
-                    fontFamily: typography.fontFamily.body,
-                  },
-                ]}
-              >
-                Trials live
-              </Text>
-            </View>
-          </View>
+          <TouchableOpacity
+            testID="action-my-agents"
+            onPress={() => navigateToTab('MyAgentsTab', 'MyAgents')}
+            style={[
+              styles.actionBtn,
+              {
+                backgroundColor: colors.card,
+                borderWidth: 1,
+                borderColor: colors.textSecondary + '30',
+                borderRadius: spacing.md,
+                padding: spacing.lg,
+                flex: 1,
+                alignItems: 'center',
+              },
+            ]}
+          >
+            <Text style={{ fontSize: 24, marginBottom: 6 }}>🚀</Text>
+            <Text style={{ color: colors.textPrimary, fontSize: 14, fontFamily: typography.fontFamily.bodyBold }}>
+              My Agents
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Discover CTA if no hires */}
-        {!isLoading && !error && totalHires === 0 && (
-          <View style={styles.section}>
-            <View
-              style={[
-                styles.placeholderCard,
-                {
-                  backgroundColor: colors.card,
-                  borderRadius: spacing.md,
-                  padding: spacing.xl,
-                  alignItems: 'center',
-                },
-              ]}
-            >
-              <Text style={{ fontSize: 48, marginBottom: spacing.md }}>🤖</Text>
-              <Text
-                style={[
-                  styles.placeholderText,
-                  {
-                    color: colors.textSecondary,
-                    fontSize: 14,
-                    fontFamily: typography.fontFamily.body,
-                    textAlign: 'center',
-                  },
-                ]}
-              >
-                No active hires yet
-              </Text>
-              <TouchableOpacity onPress={() => navigateToTab('DiscoverTab', 'Discover')} style={{ marginTop: spacing.md }}>
-                <Text style={{ color: colors.neonCyan, fontFamily: typography.fontFamily.bodyBold, fontSize: 14 }}>
-                  Browse agents →
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      </ScrollView>
+        {/* Greeting subtitle */}
+        <Text
+          style={{
+            color: colors.textSecondary,
+            fontSize: 12,
+            fontFamily: typography.fontFamily.body,
+            textAlign: 'center',
+            marginTop: spacing.xl,
+          }}
+        >
+          WAOOAW · Agents Earn Your Business
+        </Text>
+      </View>
     </SafeAreaView>
   );
 };
@@ -493,36 +243,17 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  scrollView: {
+  container: {
     flex: 1,
   },
-  container: {
-    paddingBottom: 40,
-  },
   header: {},
-  greeting: {},
-  userName: {},
-  heroBanner: {},
-  heroTitle: {},
-  heroSubtitle: {},
-  heroDescription: {},
-  section: {},
-  sectionTitle: {},
-  quickActions: {
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  statTile: {},
+  actionsRow: {
     flexDirection: 'row',
   },
-  actionCard: {},
-  actionTitle: {},
-  actionDescription: {
-    marginTop: 4,
-  },
-  statsRow: {
-    flexDirection: 'row',
-  },
-  statCard: {},
-  statValue: {},
-  statLabel: {},
-  placeholderCard: {},
-  placeholderText: {},
-  placeholderSubtext: {},
+  actionBtn: {},
 });

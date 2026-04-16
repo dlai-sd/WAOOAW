@@ -347,7 +347,34 @@ export const AgentDetailScreen = () => {
           </View>
 
           {/* Rating */}
-          <RatingStars rating={agent.rating} />
+          <View testID="agent-detail-rating" style={{ alignItems: 'center', marginBottom: spacing.sm }}>
+            <RatingStars rating={agent.rating} reviewCount={agent.review_count} />
+          </View>
+
+          {/* Price badge */}
+          <View
+            testID="agent-detail-price"
+            style={{
+              backgroundColor: colors.card,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+              borderRadius: spacing.sm,
+              marginBottom: spacing.sm,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: colors.neonCyan, fontSize: 14, fontFamily: typography.fontFamily.bodyBold }}>
+              {agent.price ? `₹${agent.price.toLocaleString('en-IN')}/mo` : 'Free trial'}
+            </Text>
+          </View>
+
+          {/* Deliverables count */}
+          <Text
+            testID="agent-detail-deliverables-count"
+            style={{ color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.body, marginBottom: spacing.md }}
+          >
+            {(agent.total_deliverables ?? 0)} deliverables produced
+          </Text>
         </View>
 
         {/* Content Sections */}
@@ -598,6 +625,7 @@ export const AgentDetailScreen = () => {
           ]}
         >
           <TouchableOpacity
+            testID="agent-detail-cta"
             activeOpacity={0.8}
             onPress={handleStartTrial}
             style={[
