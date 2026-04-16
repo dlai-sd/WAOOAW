@@ -168,6 +168,14 @@ CUSTOMERS_ENDPOINT_PREFIX = "/api/v1/customers"
 NOTIFICATION_EVENTS_INGEST_PATH = "/api/v1/notifications/events"
 OTP_SESSIONS_ENDPOINT_PREFIX = "/api/v1/otp/sessions"
 
+# Mobile-accessible sub-paths under /api/v1/customers/ that authenticate via
+# user JWT rather than the X-CP-Registration-Key server-to-server header.
+# These must be exempt from the registration-key check so that mobile clients
+# can call them with a normal Bearer token.
+_CUSTOMERS_JWT_PATHS = frozenset({
+    "/api/v1/customers/fcm-token",
+})
+
 # Anti-abuse header for CP→Plant registration calls.
 CP_REGISTRATION_KEY_HEADER = "X-CP-Registration-Key"
 CP_REGISTRATION_KEY_ENV = "CP_REGISTRATION_KEY"
@@ -198,6 +206,17 @@ def _is_public_path(path: str) -> bool:
 def _is_customers_path(path: str) -> bool:
     normalized = (path or "").rstrip("/")
     return normalized == CUSTOMERS_ENDPOINT_PREFIX or normalized.startswith(CUSTOMERS_ENDPOINT_PREFIX + "/")
+
+
+def _is_customers_jwt_path(path: str) -> bool:
+    """Return True for /api/v1/customers sub-paths that use Bearer JWT auth.
+
+    These paths are NOT protected by X-CP-Registration-Key (which is for
+    server-to-server CP→Plant calls). Mobile clients send a normal Bearer
+    token; they fall through to the standard JWT-validation branch.
+    """
+    normalized = (path or "").rstrip("/")
+    return normalized in _CUSTOMERS_JWT_PATHS
 
 
 def _is_otp_sessions_path(path: str) -> bool:
@@ -614,7 +633,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method.upper() == "OPTIONS":
             return await call_next(request)
 
-        if _is_customers_path(request.url.path) or _is_otp_sessions_path(request.url.path):
+        if (_is_customers_path(request.url.path) and not _is_customers_jwt_path(request.url.path)) or _is_otp_sessions_path(request.url.path):
             denial = _validate_registration_key(request)
             if denial is not None:
                 return denial

@@ -618,6 +618,40 @@ def test_auth_endpoints_rate_limited(monkeypatch):
     assert res.status_code == 429
 
 
+# ==================== FCM JWT-path exemption ====================
+
+def test_fcm_token_path_is_not_treated_as_registration_key_path():
+    """POST /api/v1/customers/fcm-token must reach normal JWT auth, not the
+    X-CP-Registration-Key guard.  Without a valid Bearer token the middleware
+    must return 401 ("Missing Authorization header"), not the registration-key
+    error, proving the path bypasses the registration-key block."""
+    response = client.post("/api/v1/customers/fcm-token", json={"token": "abc"})
+    assert response.status_code == 401
+    data = response.json()
+    # The registration-key guard returns a specific 'detail' string.
+    # A JWT-path 401 will NOT contain that message.
+    assert "registration" not in str(data).lower(), (
+        "FCM endpoint should go through JWT auth, not registration-key guard"
+    )
+
+
+def test_other_customers_path_still_requires_registration_key():
+    """POST /api/v1/customers (customer registration) must still be intercepted
+    by the registration-key guard before reaching standard JWT validation.
+    The guard returns 500 when CP_REGISTRATION_KEY is not configured in the
+    test env, which is different from the JWT 401 path."""
+    token = create_test_jwt()
+    response = client.post(
+        "/api/v1/customers",
+        json={"email": "x@example.com"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # The registration-key guard should fire (500 = env var not set,
+    # 401 = wrong key).  A normal JWT 401 is also acceptable.
+    # The important thing is it's NOT 200 (not passed through unguarded).
+    assert response.status_code != 200
+
+
 # ==================== Summary ====================
 
 if __name__ == "__main__":

@@ -8,12 +8,26 @@
  *  - Dev-mode request logging never prints the request body (PII risk).
  *  - Retryable errors (429, 5xx, network drop) are retried up to 3 times with
  *    exponential back-off + jitter before surfacing to the caller.
+ *  - 401 responses trigger a silent token refresh (via refresh token) before
+ *    propagating the error. Tokens are only cleared when the refresh itself
+ *    fails, preventing post-login token wipe from unrelated 401s (e.g. the
+ *    FCM registration-key check on /api/v1/customers/fcm-token).
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 import { getAPIConfig } from '../config/api.config';
 import { handleAPIError, logError } from './errorHandler';
 import secureStorage from './secureStorage';
+
+// ---------------------------------------------------------------------------
+// Token-response shape expected from /auth/refresh
+// ---------------------------------------------------------------------------
+interface RefreshTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  token_type: string;
+  expires_in: number;
+}
 
 // ---------------------------------------------------------------------------
 // Correlation ID — RFC 4122 UUID v4, generated per-request
@@ -72,7 +86,18 @@ class APIClient {
     // Request interceptor - add Authorization header + Correlation ID
     this.axiosInstance.interceptors.request.use(
       async (config) => {
-        const token = await this.getAccessToken();
+        let token = await this.getAccessToken();
+
+        // Proactively refresh if the token expires within 60 seconds.
+        if (token) {
+          const isAboutToExpire = await secureStorage.isTokenExpired(60);
+          if (isAboutToExpire && !this.isRefreshing) {
+            const refreshed = await this.refreshAuthToken();
+            if (refreshed) {
+              token = refreshed;
+            }
+          }
+        }
 
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
@@ -128,15 +153,52 @@ class APIClient {
           return this.axiosInstance(originalRequest);
         }
 
-        // Handle 401 Unauthorized — clear tokens and let caller redirect to login
+        // Handle 401 Unauthorized — attempt silent token refresh before giving up.
+        // IMPORTANT: do NOT wipe tokens here. An unrelated 401 (e.g. missing
+        // X-CP-Registration-Key on /api/v1/customers/fcm-token) would otherwise
+        // destroy the session token and break every subsequent authenticated request.
         if (status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
-          try {
-            await this.clearTokens();
-            // TODO: Trigger navigation to login screen (AuthContext Story 1.8)
-          } catch (refreshError) {
-            await this.clearTokens();
-            return Promise.reject(refreshError);
+
+          if (!this.isRefreshing) {
+            this.isRefreshing = true;
+            let newToken: string | null = null;
+
+            try {
+              newToken = await this.refreshAuthToken();
+            } catch {
+              // refreshAuthToken already cleared tokens on failure
+            }
+
+            this.isRefreshing = false;
+
+            if (newToken) {
+              // Replay all queued requests with the fresh token.
+              this.refreshSubscribers.forEach((cb) => cb(newToken!));
+              this.refreshSubscribers = [];
+              // Retry the original request.
+              if (originalRequest.headers) {
+                originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+              }
+              return this.axiosInstance(originalRequest);
+            } else {
+              // Refresh failed — signal all queued requests to fail.
+              this.refreshSubscribers.forEach((cb) => cb(''));
+              this.refreshSubscribers = [];
+              // Fall through to propagate the error.
+            }
+          } else {
+            // Another refresh is already in flight — queue this retry.
+            return new Promise<AxiosResponse>((resolve, reject) => {
+              this.refreshSubscribers.push((token: string) => {
+                if (token && originalRequest.headers) {
+                  originalRequest.headers['Authorization'] = `Bearer ${token}`;
+                  resolve(this.axiosInstance(originalRequest));
+                } else {
+                  reject(error);
+                }
+              });
+            });
           }
         }
 
@@ -157,6 +219,51 @@ class APIClient {
       return await secureStorage.getAccessToken();
     } catch (error) {
       console.error('[APIClient] Failed to get access token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Silently refresh the access token using the stored refresh token.
+   * Uses a raw axios call (no interceptors) to avoid circular 401 handling.
+   * Clears all tokens and returns null when the refresh endpoint itself fails.
+   */
+  private async refreshAuthToken(): Promise<string | null> {
+    try {
+      const refreshToken = await secureStorage.getRefreshToken();
+      if (!refreshToken) {
+        await this.clearTokens();
+        return null;
+      }
+
+      const config = getAPIConfig();
+      const response = await axios.post<RefreshTokenResponse>(
+        `${config.apiBaseUrl}/auth/refresh`,
+        { refresh_token: refreshToken },
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: config.timeout,
+        }
+      );
+
+      const { access_token, refresh_token, expires_in } = response.data;
+
+      await secureStorage.setTokens({
+        accessToken: access_token,
+        refreshToken: refresh_token ?? refreshToken,
+        expiresAt: Math.floor(Date.now() / 1000) + expires_in,
+      });
+
+      if (__DEV__) {
+        console.log('[APIClient] Token refreshed successfully');
+      }
+
+      return access_token;
+    } catch (err) {
+      if (__DEV__) {
+        console.warn('[APIClient] Silent token refresh failed — clearing session', err);
+      }
+      await this.clearTokens();
       return null;
     }
   }
