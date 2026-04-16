@@ -23,6 +23,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { VoiceFAB } from '../../components/voice/VoiceFAB';
 import { useAllDeliverables, DeliverableWithStatus } from '../../hooks/useAllDeliverables';
 import { useAgentVoiceOverlay } from '../../hooks/useAgentVoiceOverlay';
+import type { MyAgentsStackScreenProps } from '../../navigation/types';
 
 type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -39,9 +40,10 @@ interface DeliverableCardProps {
   item: DeliverableWithStatus;
   onApprove: (hiredAgentId: string, id: string) => void;
   onReject: (hiredAgentId: string, id: string) => void;
+  onPress?: (item: DeliverableWithStatus) => void;
 }
 
-function DeliverableCard({ item, onApprove, onReject }: DeliverableCardProps) {
+function DeliverableCard({ item, onApprove, onReject, onPress }: DeliverableCardProps) {
   const { colors, spacing, typography } = useTheme();
 
   const statusColor =
@@ -51,9 +53,20 @@ function DeliverableCard({ item, onApprove, onReject }: DeliverableCardProps) {
       ? colors.error
       : colors.warning ?? '#f59e0b';
 
+  function getTypeChipConfig(type: string): { label: string; color: string } {
+    if (type === 'content_draft') return { label: 'Approval needed', color: colors.warning ?? '#f59e0b' };
+    if (type === 'agent_update')  return { label: 'Agent update',     color: colors.neonCyan };
+    if (type === 'billing_alert') return { label: 'Billing alert',    color: colors.error };
+    return { label: 'Notification', color: colors.textSecondary };
+  }
+
+  const typeChip = getTypeChipConfig(item.type ?? '');
+
   return (
-    <View
+    <TouchableOpacity
       testID={`deliverable-card-${item.id}`}
+      onPress={() => onPress?.(item)}
+      activeOpacity={0.7}
       style={[
         styles.card,
         {
@@ -209,13 +222,32 @@ function DeliverableCard({ item, onApprove, onReject }: DeliverableCardProps) {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+      {/* Type chip */}
+      <View
+        testID={`chip-${typeChip.label.toLowerCase().replace(/ /g, '-')}`}
+        style={{
+          marginTop: 8,
+          alignSelf: 'flex-start',
+          borderWidth: 1,
+          borderColor: typeChip.color,
+          backgroundColor: typeChip.color + '18',
+          borderRadius: 4,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+        }}
+      >
+        <Text style={{ color: typeChip.color, fontSize: 10,
+          fontFamily: typography.fontFamily.bodyBold }}>
+          {typeChip.label}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
 // ─── InboxScreen ─────────────────────────────────────────────────────────────
 
-export function InboxScreen() {
+export function InboxScreen({ navigation }: MyAgentsStackScreenProps<'Inbox'>) {
   const { colors, spacing, typography } = useTheme();
   const [filter, setFilter] = useState<FilterStatus>('all');
 
@@ -233,6 +265,16 @@ export function InboxScreen() {
       reject(hiredAgentId, id);
     },
     [reject]
+  );
+
+  const handleCardPress = useCallback(
+    (item: DeliverableWithStatus) => {
+      navigation.navigate('DeliverableDetail', {
+        deliverableId: item.id,
+        hiredAgentId: item.hired_agent_id,
+      });
+    },
+    [navigation]
   );
 
   const matchAndApprove = useCallback(
@@ -365,6 +407,7 @@ export function InboxScreen() {
                 item={item}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onPress={handleCardPress}
               />
             )}
           />

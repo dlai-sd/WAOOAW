@@ -635,6 +635,13 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
                       )}
                     </View>
                     <ScheduledPostsSection hiredAgentId={hiredAgentId} />
+                    <TouchableOpacity
+                      testID="ops-see-all-posts"
+                      onPress={() => navigation.navigate('ScheduledPosts', { hiredAgentId })}
+                      style={{ marginTop: 8, alignSelf: 'flex-end' }}
+                    >
+                      <Text style={{ color: colors.neonCyan, fontSize: 13 }}>See all posts →</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
 

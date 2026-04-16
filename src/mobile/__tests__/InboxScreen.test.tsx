@@ -1,5 +1,5 @@
 /**
- * InboxScreen Tests (MOB-PARITY-1 E1-S1)
+ * InboxScreen Tests (MOB-PARITY-1 E1-S1 + MOB-PARITY-2 E7-S1 AC6 + E8-S1 ACs)
  */
 
 import React from 'react';
@@ -77,6 +77,12 @@ jest.mock('../src/components/voice/VoiceFAB', () => {
 
 import { InboxScreen } from '../src/screens/agents/InboxScreen';
 
+// ─── Navigation mock ──────────────────────────────────────────────────────────
+
+const mockNavigate = jest.fn();
+const mockGoBack = jest.fn();
+const mockNavigation = { navigate: mockNavigate, goBack: mockGoBack } as any;
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('InboxScreen', () => {
@@ -120,7 +126,7 @@ describe('InboxScreen', () => {
   });
 
   it('renders all deliverable cards', () => {
-    const { getByTestId } = render(<InboxScreen />);
+    const { getByTestId } = render(<InboxScreen navigation={mockNavigation} />);
     expect(getByTestId('inbox-screen')).toBeTruthy();
     expect(getByTestId('deliverable-card-d1')).toBeTruthy();
     expect(getByTestId('deliverable-card-d2')).toBeTruthy();
@@ -128,7 +134,7 @@ describe('InboxScreen', () => {
   });
 
   it('filters deliverables to Pending only', () => {
-    const { getByTestId, queryByTestId } = render(<InboxScreen />);
+    const { getByTestId, queryByTestId } = render(<InboxScreen navigation={mockNavigation} />);
     fireEvent.press(getByTestId('filter-chip-pending'));
     // Only pending card should be visible
     expect(getByTestId('deliverable-card-d1')).toBeTruthy();
@@ -145,7 +151,7 @@ describe('InboxScreen', () => {
       reject: mockReject,
       refetch: mockRefetch,
     });
-    const { UNSAFE_getByType } = render(<InboxScreen />);
+    const { UNSAFE_getByType } = render(<InboxScreen navigation={mockNavigation} />);
     const { LoadingSpinner } = require('../src/components/LoadingSpinner');
     expect(UNSAFE_getByType(LoadingSpinner)).toBeTruthy();
   });
@@ -159,7 +165,7 @@ describe('InboxScreen', () => {
       reject: mockReject,
       refetch: mockRefetch,
     });
-    const { UNSAFE_getByType } = render(<InboxScreen />);
+    const { UNSAFE_getByType } = render(<InboxScreen navigation={mockNavigation} />);
     const { ErrorView } = require('../src/components/ErrorView');
     expect(UNSAFE_getByType(ErrorView)).toBeTruthy();
   });
@@ -173,19 +179,45 @@ describe('InboxScreen', () => {
       reject: mockReject,
       refetch: mockRefetch,
     });
-    const { UNSAFE_getByType } = render(<InboxScreen />);
+    const { UNSAFE_getByType } = render(<InboxScreen navigation={mockNavigation} />);
     const { EmptyState } = require('../src/components/EmptyState');
     expect(UNSAFE_getByType(EmptyState)).toBeTruthy();
   });
 
   it('calls approve when Approve button is pressed', () => {
-    const { getByTestId } = render(<InboxScreen />);
+    const { getByTestId } = render(<InboxScreen navigation={mockNavigation} />);
     fireEvent.press(getByTestId('approve-btn-d1'));
     expect(mockApprove).toHaveBeenCalledWith('ha1', 'd1');
   });
 
   it('renders VoiceFAB when voice is available', () => {
-    const { getByTestId } = render(<InboxScreen />);
+    const { getByTestId } = render(<InboxScreen navigation={mockNavigation} />);
     expect(getByTestId('voice-fab')).toBeTruthy();
+  });
+
+  // ── E7-S1 AC6 ──────────────────────────────────────────────────────────────
+
+  it('E7-S1 AC6 — tapping a deliverable card navigates to DeliverableDetail', () => {
+    const { getByTestId } = render(<InboxScreen navigation={mockNavigation} />);
+    fireEvent.press(getByTestId('deliverable-card-d1'));
+    expect(mockNavigate).toHaveBeenCalledWith('DeliverableDetail', {
+      deliverableId: 'd1',
+      hiredAgentId: 'ha1',
+    });
+  });
+
+  // ── E8-S1 AC3/AC4/AC5 — type chips ─────────────────────────────────────────
+
+  it('E8-S1 AC3 — content_draft card shows "approval-needed" type chip', () => {
+    const { getAllByTestId } = render(<InboxScreen navigation={mockNavigation} />);
+    const chips = getAllByTestId('chip-approval-needed');
+    expect(chips.length).toBeGreaterThan(0);
+  });
+
+  it('E8-S1 AC4 — chip testID follows pattern chip-{type-kebab}', () => {
+    const { getAllByTestId } = render(<InboxScreen navigation={mockNavigation} />);
+    // d1 and d2 are both content_draft → 'Approval needed' → testID='chip-approval-needed'
+    const chips = getAllByTestId('chip-approval-needed');
+    expect(chips.length).toBeGreaterThan(0);
   });
 });
