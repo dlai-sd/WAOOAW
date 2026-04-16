@@ -44,6 +44,19 @@ export type DeliverableReviewStatus =
   | 'revision_requested';
 
 /**
+ * Scheduled post created by an agent for a campaign
+ */
+export interface ScheduledPost {
+  id: string;
+  title?: string;
+  content_preview?: string;
+  target_platform?: string;
+  status: 'queued' | 'published' | 'failed';
+  scheduled_at?: string;
+  published_at?: string;
+}
+
+/**
  * Deliverable from agent execution
  * Represents work output from hired agents
  */

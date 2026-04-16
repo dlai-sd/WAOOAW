@@ -69,9 +69,22 @@ export const HireConfirmationScreen = () => {
     });
   };
 
+  // Countdown auto-navigate to MyAgents
+  const [countdown, setCountdown] = React.useState(3);
+
+  React.useEffect(() => {
+    if (!agent) return;
+    if (countdown <= 0) {
+      (navigation as any).getParent()?.navigate('MyAgentsTab', { screen: 'MyAgents' });
+      return;
+    }
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown, navigation, agent]);
+
   // Handle navigation
   const handleGoToMyAgents = () => {
-    (navigation.navigate as any)('MyAgents');
+    (navigation as any).getParent()?.navigate('MyAgentsTab', { screen: 'MyAgents' });
   };
 
   const handleGoToTrialDashboard = () => {
@@ -253,21 +266,27 @@ export const HireConfirmationScreen = () => {
 
         {/* Action Buttons */}
         <View style={{ marginTop: spacing.xl, paddingBottom: spacing.xl }}>
+          {/* Countdown auto-navigate */}
+          <Text testID="hire-confirm-countdown" style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md, fontSize: 13 }}>
+            Taking you to My Agents in {countdown}s…
+          </Text>
+
           <TouchableOpacity
+            testID="hire-confirm-go-my-agents"
             style={[styles.primaryButton, { backgroundColor: colors.neonCyan }]}
-            onPress={handleGoToTrialDashboard}
+            onPress={handleGoToMyAgents}
           >
             <Text style={[styles.primaryButtonText, { color: colors.black }]}>
-              Go to Trial Dashboard
+              Go to My Agents
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.secondaryButton, { marginTop: spacing.md }]}
-            onPress={handleGoToMyAgents}
+            onPress={handleGoToTrialDashboard}
           >
             <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
-              View My Agents
+              Go to Trial Dashboard
             </Text>
           </TouchableOpacity>
 

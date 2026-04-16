@@ -14,6 +14,7 @@ import type {
   TrialStatusRecord,
   TrialStatusListResponse,
   HiredAgentsListParams,
+  ScheduledPost,
 } from '../../types/hiredAgents.types';
 
 export interface PlatformConnection {
@@ -327,6 +328,14 @@ class HiredAgentsService {
       `/cp/hired-agents/${encodeURIComponent(hiredAgentId)}/deliverables`
     );
     return response.data.deliverables || [];
+  }
+
+  async listScheduledPosts(hiredAgentId: string): Promise<ScheduledPost[]> {
+    const response = await cpApiClient.get<{ posts?: ScheduledPost[] } | ScheduledPost[]>(
+      `/cp/campaigns/${encodeURIComponent(hiredAgentId)}/posts`
+    );
+    if (Array.isArray(response.data)) return response.data;
+    return (response.data as { posts?: ScheduledPost[] }).posts || [];
   }
 
   async listPlatformConnections(hiredAgentId: string): Promise<PlatformConnection[]> {

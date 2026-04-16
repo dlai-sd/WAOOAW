@@ -41,6 +41,7 @@ jest.mock('@/hooks/useHiredAgents', () => ({
     isLoading: false,
     error: null,
   })),
+  useDeliverables: jest.fn(() => ({ data: [] })),
 }))
 
 jest.mock('@/hooks/useApprovalQueue', () => ({

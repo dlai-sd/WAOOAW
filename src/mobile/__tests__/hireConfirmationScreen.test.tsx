@@ -59,10 +59,12 @@ jest.mock('@/hooks/useTheme', () => ({
 // Mock navigation
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
+const mockParentNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: mockNavigate,
     goBack: mockGoBack,
+    getParent: () => ({ navigate: mockParentNavigate }),
   }),
   useRoute: () => ({
     params: {
@@ -273,14 +275,14 @@ describe('HireConfirmationScreen Component', () => {
       refetch: jest.fn(),
     });
 
-    const { getByText } = render(<HireConfirmationScreen />, {
+    const { getByTestId } = render(<HireConfirmationScreen />, {
       wrapper: createWrapper(),
     });
 
-    const myAgentsButton = getByText('View My Agents');
+    const myAgentsButton = getByTestId('hire-confirm-go-my-agents');
     fireEvent.press(myAgentsButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('MyAgents');
+    expect(mockParentNavigate).toHaveBeenCalledWith('MyAgentsTab', { screen: 'MyAgents' });
   });
 
   it('should navigate to Discover when back button pressed', () => {
