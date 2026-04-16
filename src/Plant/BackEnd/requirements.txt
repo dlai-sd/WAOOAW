@@ -11,7 +11,7 @@ watchfiles==0.21.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 email-validator==2.1.0
-python-multipart==0.0.22
+python-multipart==0.0.26
 
 # Database + ORM
 sqlalchemy==2.0.25
