@@ -40,6 +40,10 @@ jest.mock('../../hooks/useHiredAgents', () => ({
   useAgentsNeedingSetup: jest.fn(),
 }));
 
+jest.mock('../../hooks/useAllDeliverables', () => ({
+  useAllDeliverables: jest.fn(() => ({ deliverables: [], isLoading: false, error: null })),
+}));
+
 jest.mock('../../screens/home/HomeScreen', () => ({ HomeScreen: () => null }));
 jest.mock('../../screens/discover/DiscoverScreen', () => ({ DiscoverScreen: () => null }));
 jest.mock('../../screens/discover/AgentDetailScreen', () => ({ AgentDetailScreen: () => null }));
