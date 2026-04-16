@@ -552,3 +552,75 @@ describe('AgentDetailScreen Component', () => {
     expect(queryByText('Content Marketing & SEO Specialist')).toBeNull();
   });
 });
+
+// ── MOB-PARITY-2 E2-S2: rating / price / deliverables count ─────────────────
+describe('AgentDetailScreen MOB-PARITY-2 E2-S2', () => {
+  const baseAgent: Agent = {
+    id: 'agent-777',
+    name: 'DMA Agent',
+    description: 'A powerful marketing agent.',
+    specialization: 'DMA',
+    job_role_id: 'role-1',
+    industry: 'marketing',
+    entity_type: 'agent',
+    status: 'active',
+    created_at: '2024-01-01T00:00:00Z',
+    rating: 4.9,
+    review_count: 22,
+    price: 15000,
+    trial_days: 7,
+    total_deliverables: 128,
+  };
+
+  const createWrapper = () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useAgentDetail as jest.Mock).mockReturnValue({
+      data: baseAgent,
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+      isRefetching: false,
+    });
+  });
+
+  it('AC1: rating testID present and shows rating value', () => {
+    const { getByTestId, getByText } = render(<AgentDetailScreen />, { wrapper: createWrapper() });
+    expect(getByTestId('agent-detail-rating')).toBeTruthy();
+    expect(getByText('4.9')).toBeTruthy();
+  });
+
+  it('AC2: price badge testID present and shows formatted price', () => {
+    const { getByTestId, getByText } = render(<AgentDetailScreen />, { wrapper: createWrapper() });
+    expect(getByTestId('agent-detail-price')).toBeTruthy();
+    expect(getByText('₹15,000/mo')).toBeTruthy();
+  });
+
+  it('AC3: deliverables count testID present and shows count', () => {
+    const { getByTestId, getByText } = render(<AgentDetailScreen />, { wrapper: createWrapper() });
+    expect(getByTestId('agent-detail-deliverables-count')).toBeTruthy();
+    expect(getByText('128 deliverables produced')).toBeTruthy();
+  });
+
+  it('AC4: trial CTA button has testID and is present', () => {
+    const { getByTestId } = render(<AgentDetailScreen />, { wrapper: createWrapper() });
+    expect(getByTestId('agent-detail-cta')).toBeTruthy();
+  });
+
+  it('AC5: renders gracefully when rating/price/total_deliverables are undefined', () => {
+    const agentNulls: Agent = { ...baseAgent, rating: undefined, price: undefined, total_deliverables: undefined };
+    (useAgentDetail as jest.Mock).mockReturnValue({
+      data: agentNulls, isLoading: false, error: null, refetch: jest.fn(), isRefetching: false,
+    });
+    const { getByTestId } = render(<AgentDetailScreen />, { wrapper: createWrapper() });
+    // Should render without crashing
+    expect(getByTestId('agent-detail-deliverables-count')).toBeTruthy();
+    expect(getByTestId('agent-detail-price')).toBeTruthy();
+  });
+});

@@ -34,12 +34,19 @@ type Props = DiscoverStackScreenProps<'Discover'>;
 export const DiscoverScreen = ({ route, navigation }: Props) => {
   const { colors, spacing, typography } = useTheme();
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [selectedIndustry, setSelectedIndustry] = React.useState<Industry | null>(
     (route.params?.industry as Industry | undefined) ?? null
   );
   const [minRating, setMinRating] = React.useState(route.params?.minRating ?? 0);
   const [maxPrice, setMaxPrice] = React.useState(route.params?.maxPrice ?? 0);
   const [showVoiceHelp, setShowVoiceHelp] = React.useState(false);
+
+  // 400ms debounce on search query
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const navigateToMainTab = React.useCallback(
     (tabName: 'HomeTab' | 'MyAgentsTab' | 'ProfileTab', screen: 'Home' | 'MyAgents' | 'Profile') => {
@@ -52,17 +59,17 @@ export const DiscoverScreen = ({ route, navigation }: Props) => {
   // Performance monitoring
   usePerformanceMonitoring('Discover');
 
-  // Build filter params
+  // Build filter params — use debouncedSearch so API isn't hammered on every keystroke
   const filterParams = React.useMemo<AgentListParams>(() => {
     const params: AgentListParams = {};
     if (selectedIndustry) {
       params.industry = selectedIndustry.toLowerCase() as Industry;
     }
-    if (searchQuery.trim()) {
-      params.q = searchQuery.trim();
+    if (debouncedSearch.trim()) {
+      params.q = debouncedSearch.trim();
     }
     return params;
-  }, [selectedIndustry, searchQuery]);
+  }, [selectedIndustry, debouncedSearch]);
 
   // Fetch agents with filters
   const {
@@ -113,6 +120,8 @@ export const DiscoverScreen = ({ route, navigation }: Props) => {
   const handleVoiceSearch = React.useCallback(
     (query: string, industry?: string) => {
       setSearchQuery(query);
+      // Voice search fires immediately (no debounce needed)
+      setDebouncedSearch(query);
       if (industry) {
         const validIndustry = industry.toLowerCase();
         if (industries.includes(validIndustry as Industry)) {

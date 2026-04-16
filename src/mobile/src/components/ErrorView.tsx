@@ -11,16 +11,18 @@ import { useTheme } from '../hooks/useTheme';
 interface ErrorViewProps {
   message?: string;
   onRetry?: () => void;
+  testID?: string;
 }
 
 export const ErrorView = ({ 
   message = 'Something went wrong', 
-  onRetry 
+  onRetry,
+  testID,
 }: ErrorViewProps) => {
   const { colors, spacing, typography } = useTheme();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.black }]}>
+    <View testID={testID} style={[styles.container, { backgroundColor: colors.black }]}>
       <Text style={{ fontSize: 64, marginBottom: spacing.lg }}>⚠️</Text>
       
       <Text
