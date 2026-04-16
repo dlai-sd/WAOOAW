@@ -249,10 +249,10 @@ git add -A && git commit -m "feat(MOB-PARITY-2): [epic-id] — [epic title]" && 
 
 | ID | Iter | Epic | Story | Status | PR |
 |---|---|---|---|---|---|
-| E1-S1 | 1 | Home = single-screen action dashboard | Remove scroll / redesign to fixed-height tiles | 🔴 Not Started | — |
-| E1-S2 | 1 | Home = single-screen action dashboard | Pending approvals count tile with deep-link | 🔴 Not Started | — |
-| E2-S1 | 1 | Discover = full-fidelity browse experience | Search debounce + filter persistence | 🔴 Not Started | — |
-| E2-S2 | 1 | Discover = full-fidelity browse experience | Agent Detail shows rating, price, deliver count | 🔴 Not Started | — |
+| E1-S1 | 1 | Home = single-screen action dashboard | Remove scroll / redesign to fixed-height tiles | � Done | #1071 |
+| E1-S2 | 1 | Home = single-screen action dashboard | Pending approvals count tile with deep-link | 🟢 Done | #1071 |
+| E2-S1 | 1 | Discover = full-fidelity browse experience | Search debounce + filter persistence | 🟢 Done | #1071 |
+| E2-S2 | 1 | Discover = full-fidelity browse experience | Agent Detail shows rating, price, deliver count | 🟢 Done | #1071 |
 | E3-S1 | 2 | Hire = end-to-end with receipt | HireConfirmationScreen navigates to MyAgents | 🔴 Not Started | — |
 | E4-S1 | 2 | My Agents / Ops = live status + controls | Pause / Resume agent controls in Ops screen | 🔴 Not Started | — |
 | E4-S2 | 2 | My Agents / Ops = live status + controls | Scheduled posts section in Ops (queued / published / failed) | 🔴 Not Started | — |
@@ -285,7 +285,7 @@ E2-S2 (Agent Detail full data)      — independent
 
 ---
 
-### Epic E1: Customer sees a single-screen action dashboard on Home
+### Epic E1: Customer sees a single-screen action dashboard on Home ✅
 
 **Branch:** `feat/MOB-PARITY-2-it1-home-discover`
 
@@ -429,7 +429,7 @@ docker-compose -f docker-compose.test.yml run --rm mobile-test jest --testPathPa
 
 ---
 
-### Epic E2: Customer browses and searches agents with full quality data
+### Epic E2: Customer browses and searches agents with full quality data ✅
 
 **Branch:** `feat/MOB-PARITY-2-it1-home-discover`
 
