@@ -146,9 +146,24 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       set({ isLoading: true });
 
-      // Check if tokens exist
-      const hasTokens = await TokenManagerService.getAccessToken();
-      
+      // Check whether a valid (non-expired) access token exists.
+      // TokenManagerService.getAccessToken() clears expired tokens and returns null.
+      let hasTokens = await TokenManagerService.getAccessToken();
+
+      // If the access token is gone but a refresh token exists, try a silent
+      // refresh so the user doesn't need to re-authenticate after a cold start.
+      if (!hasTokens) {
+        const refreshToken = await secureStorage.getRefreshToken();
+        if (refreshToken) {
+          // apiClient.refreshAuthToken is private — use TokenManagerService instead.
+          try {
+            hasTokens = await TokenManagerService.refreshAccessToken();
+          } catch {
+            hasTokens = null;
+          }
+        }
+      }
+
       if (!hasTokens) {
         set({
           isAuthenticated: false,
