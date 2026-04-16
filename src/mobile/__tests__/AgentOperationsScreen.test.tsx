@@ -53,11 +53,13 @@ jest.mock('@/hooks/useHiredAgents', () => ({
       agent_id: 'AGT-MKT-DMA-001',
       agent_type_id: 'marketing.digital_marketing.v1',
       nickname: 'My Agent',
-      hired_instance_id: 'hi-1'
+      hired_instance_id: 'hi-1',
+      status: 'active',
     },
     isLoading: false,
     error: null,
   })),
+  useDeliverables: jest.fn(() => ({ data: [] })),
 }));
 
 jest.mock('@/hooks/useApprovalQueue', () => ({
@@ -77,6 +79,10 @@ jest.mock('@/lib/cpApiClient', () => ({
     patch: (...args: unknown[]) => mockCpPatch(...args),
     post: (...args: unknown[]) => mockCpPost(...args),
   },
+}));
+
+jest.mock('@/components/ScheduledPostsSection', () => ({
+  ScheduledPostsSection: () => null,
 }));
 
 const mockNavigate = jest.fn();
@@ -154,9 +160,8 @@ describe('AgentOperationsScreen', () => {
     expect(queryByText('⏸ Pause')).toBeNull();
     // Tap the scheduler section header
     fireEvent.press(getByText('Schedule Controls'));
-    // Now Pause/Resume buttons are visible
+    // With status=active, Pause button is visible; Resume is not
     expect(getByText('⏸ Pause')).toBeTruthy();
-    expect(getByText('▶ Resume')).toBeTruthy();
   });
 
   it('collapses a section when tapped again', () => {

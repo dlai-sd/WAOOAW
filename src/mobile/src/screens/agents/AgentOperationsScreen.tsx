@@ -17,10 +17,11 @@ import {
   TextInput,
 } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
-import { useHiredAgentById } from '@/hooks/useHiredAgents';
+import { useHiredAgentById, useDeliverables } from '@/hooks/useHiredAgents';
 import { useApprovalQueue } from '@/hooks/useApprovalQueue';
 import { useAgentVoiceOverlay } from '@/hooks/useAgentVoiceOverlay';
 import { ContentDraftApprovalCard } from '@/components/ContentDraftApprovalCard';
+import { ScheduledPostsSection } from '@/components/ScheduledPostsSection';
 import { VoiceFAB } from '@/components/voice/VoiceFAB';
 import cpApiClient from '@/lib/cpApiClient';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
@@ -285,6 +286,18 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
 
   const { data: agent, isLoading } = useHiredAgentById(hiredAgentId);
   const { deliverables: pendingApprovals, approve, reject } = useApprovalQueue(hiredAgentId);
+  const { data: allDeliverables = [] } = useDeliverables(hiredAgentId);
+
+  // Weekly output count — deliverables created since start of current week
+  const weeklyCount = React.useMemo(() => {
+    const now = new Date();
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    return allDeliverables.filter((d) => {
+      if (!d.created_at) return false;
+      return new Date(d.created_at) >= startOfWeek;
+    }).length;
+  }, [allDeliverables]);
 
   // Expanded sections state — focusSection is pre-expanded on mount
   const [expanded, setExpanded] = useState<Record<SectionId, boolean>>(() => {
@@ -499,6 +512,29 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
             </View>
           ))}
         </View>
+        {/* Weekly output tile (E4-S3) */}
+        <View
+          testID="ops-weekly-output"
+          style={{
+            marginTop: 12,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.neonCyan + '30',
+            backgroundColor: colors.card,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <Text style={{ color: colors.neonCyan, fontSize: 20, fontFamily: typography.fontFamily.display, fontWeight: 'bold' }}>
+            {weeklyCount}
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, fontFamily: typography.fontFamily.body }}>
+            deliverable{weeklyCount !== 1 ? 's' : ''} this week
+          </Text>
+        </View>
       </View>
 
       {isLoading ? (
@@ -572,29 +608,33 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
                       Manage your agent's execution schedule.
                     </Text>
                     <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#f59e0b22' }]}
-                        onPress={handlePause}
-                        disabled={pauseLoading}
-                        accessibilityLabel="Pause agent"
-                        testID="pause-button"
-                      >
-                        {pauseLoading
-                          ? <ActivityIndicator size="small" color="#f59e0b" />
-                          : <Text style={{ color: '#f59e0b', fontSize: 13 }}>⏸ Pause</Text>}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#10b98122' }]}
-                        onPress={handleResume}
-                        disabled={resumeLoading}
-                        accessibilityLabel="Resume agent"
-                        testID="resume-button"
-                      >
-                        {resumeLoading
-                          ? <ActivityIndicator size="small" color="#10b981" />
-                          : <Text style={{ color: '#10b981', fontSize: 13 }}>▶ Resume</Text>}
-                      </TouchableOpacity>
+                      {agent?.status === 'active' ? (
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: '#f59e0b22' }]}
+                          onPress={handlePause}
+                          disabled={pauseLoading}
+                          accessibilityLabel="Pause agent"
+                          testID="ops-pause-btn"
+                        >
+                          {pauseLoading
+                            ? <ActivityIndicator size="small" color="#f59e0b" />
+                            : <Text style={{ color: '#f59e0b', fontSize: 13 }}>⏸ Pause</Text>}
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.actionBtn, { backgroundColor: '#10b98122' }]}
+                          onPress={handleResume}
+                          disabled={resumeLoading}
+                          accessibilityLabel="Resume agent"
+                          testID="ops-resume-btn"
+                        >
+                          {resumeLoading
+                            ? <ActivityIndicator size="small" color="#10b981" />
+                            : <Text style={{ color: '#10b981', fontSize: 13 }}>▶ Resume</Text>}
+                        </TouchableOpacity>
+                      )}
                     </View>
+                    <ScheduledPostsSection hiredAgentId={hiredAgentId} />
                   </View>
                 )}
 
