@@ -18,6 +18,7 @@ import type {
 } from "./types";
 import { useTheme } from "../hooks/useTheme";
 import { useAgentsNeedingSetup } from "../hooks/useHiredAgents";
+import { useAllDeliverables } from "../hooks/useAllDeliverables";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Import real screens
@@ -25,7 +26,7 @@ import { HomeScreen } from "../screens/home/HomeScreen";
 import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
 import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
 import { HireWizardScreen } from "../screens/hire/HireWizardScreen";
-import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen, InboxScreen, ContentAnalyticsScreen, PlatformConnectionsScreen, DMAConversationScreen } from "../screens/agents";
+import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen, InboxScreen, ContentAnalyticsScreen, PlatformConnectionsScreen, DMAConversationScreen, ScheduledPostsScreen, DeliverableDetailScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
 import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen, PaymentMethodsScreen, SubscriptionManagementScreen, UsageBillingScreen } from "../screens/profile";
@@ -103,6 +104,8 @@ const MyAgentsNavigator = () => {
       <MyAgentsStack.Screen name="ContentAnalytics" component={ContentAnalyticsScreen} />
       <MyAgentsStack.Screen name="PlatformConnections" component={PlatformConnectionsScreen} />
       <MyAgentsStack.Screen name="DMAConversation" component={DMAConversationScreen} />
+      <MyAgentsStack.Screen name="ScheduledPosts" component={ScheduledPostsScreen} />
+      <MyAgentsStack.Screen name="DeliverableDetail" component={DeliverableDetailScreen} />
     </MyAgentsStack.Navigator>
   );
 };
@@ -141,6 +144,8 @@ export const MainNavigator = () => {
   const insets = useSafeAreaInsets();
   const { data: agentsNeedingSetup } = useAgentsNeedingSetup();
   const needsSetupCount = agentsNeedingSetup?.length ?? 0;
+  const { deliverables: allDeliverables } = useAllDeliverables();
+  const pendingInboxCount = allDeliverables.filter(d => d.status === 'pending').length;
 
   return (
     <Tab.Navigator
@@ -190,9 +195,9 @@ export const MainNavigator = () => {
         options={{
           title: "Ops",
           tabBarButtonTestID: 'mobile-my-agents-tab',
-          tabBarBadge: needsSetupCount > 0 ? needsSetupCount : undefined,
+          tabBarBadge: pendingInboxCount > 0 ? pendingInboxCount : needsSetupCount > 0 ? needsSetupCount : undefined,
           tabBarBadgeStyle: {
-            backgroundColor: "#ef4444",
+            backgroundColor: pendingInboxCount > 0 ? "#f59e0b" : "#ef4444",
             fontSize: 10,
             fontWeight: "700",
           },

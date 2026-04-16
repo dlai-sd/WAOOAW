@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
 import type { DeliverableItem } from '@/hooks/useApprovalQueue';
 
@@ -14,6 +14,7 @@ interface ContentDraftApprovalCardProps {
   deliverable: DeliverableItem;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  onRejectWithReason?: (id: string, reason: string) => void;
   readinessLabel?: string | null;
   readinessMessage?: string | null;
   channelStatusLabel?: string | null;
@@ -34,12 +35,15 @@ export function ContentDraftApprovalCard({
   deliverable,
   onApprove,
   onReject,
+  onRejectWithReason,
   readinessLabel,
   readinessMessage,
   channelStatusLabel,
   approvalReference,
 }: ContentDraftApprovalCardProps) {
   const { colors, typography } = useTheme();
+  const [rejectMode, setRejectMode] = React.useState(false);
+  const [rejectReason, setRejectReason] = React.useState('');
   const isYouTube = String(deliverable.target_platform || '').trim().toLowerCase().includes('youtube');
 
   const preview = (deliverable.content_preview ?? deliverable.description ?? '')
@@ -119,14 +123,60 @@ export function ContentDraftApprovalCard({
         >
           <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '600' }}>✓ Approve exact deliverable</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.btn, { backgroundColor: '#ef444422' }]}
-          onPress={() => onReject(deliverable.id)}
-          accessibilityLabel={`Reject content draft ${deliverable.title ?? deliverable.id}`}
-        >
-          <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>✕ Reject and request revision</Text>
-        </TouchableOpacity>
+        {!rejectMode ? (
+          <TouchableOpacity
+            testID="reject-btn"
+            style={[styles.btn, { backgroundColor: '#ef444422' }]}
+            onPress={() => setRejectMode(true)}
+            accessibilityLabel={`Reject content draft ${deliverable.title ?? deliverable.id}`}
+          >
+            <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '600' }}>✕ Reject and request revision</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
+
+      {/* Reject-with-reason expansion */}
+      {rejectMode && (
+        <View style={{ marginTop: 10 }}>
+          <TextInput
+            testID="reject-reason-input"
+            value={rejectReason}
+            onChangeText={setRejectReason}
+            placeholder="Reason for rejection…"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            style={[styles.reasonInput, { borderColor: '#ef4444', color: colors.textPrimary,
+              fontFamily: typography.fontFamily.body }]}
+          />
+          <View style={styles.rejectActions}>
+            <TouchableOpacity
+              testID="reject-reason-cancel"
+              style={[styles.btn, { backgroundColor: '#27272a' }]}
+              onPress={() => { setRejectMode(false); setRejectReason(''); }}
+            >
+              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="reject-reason-confirm"
+              disabled={rejectReason.trim().length === 0}
+              style={[styles.btn, { backgroundColor: rejectReason.trim().length === 0 ? '#ef444411' : '#ef444422' }]}
+              onPress={() => {
+                if (onRejectWithReason) {
+                  onRejectWithReason(deliverable.id, rejectReason.trim());
+                } else {
+                  onReject(deliverable.id);
+                }
+                setRejectMode(false);
+                setRejectReason('');
+              }}
+            >
+              <Text style={{ color: rejectReason.trim().length === 0 ? '#ef444466' : '#ef4444', fontSize: 13, fontWeight: '600' }}>
+                Confirm Rejection
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -162,4 +212,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reasonInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    minHeight: 64,
+    backgroundColor: '#18181b',
+    textAlignVertical: 'top',
+    marginBottom: 8,
+  },
+  rejectActions: { flexDirection: 'row', gap: 10 },
 });

@@ -114,6 +114,8 @@ export type MyAgentsStackParamList = {
   ContentAnalytics: { hiredAgentId: string };
   PlatformConnections: { hiredAgentId: string };
   DMAConversation: { hiredAgentId: string };
+  ScheduledPosts: { hiredAgentId: string };
+  DeliverableDetail: { deliverableId: string; hiredAgentId: string };
 };
 
 export type AgentOperationsFocusSection =

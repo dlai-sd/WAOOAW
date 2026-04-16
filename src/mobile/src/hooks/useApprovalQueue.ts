@@ -33,6 +33,7 @@ interface ApprovalQueueResult {
   error: Error | null;
   approve: (deliverableId: string) => Promise<void>;
   reject: (deliverableId: string) => Promise<void>;
+  rejectWithReason: (deliverableId: string, reason: string) => Promise<void>;
 }
 
 async function fetchApprovalQueue(hiredAgentId: string): Promise<DeliverableItem[]> {
@@ -51,6 +52,13 @@ async function approveDeliverable(hiredAgentId: string, deliverableId: string): 
 async function rejectDeliverable(hiredAgentId: string, deliverableId: string): Promise<void> {
   await cpApiClient.post(
     `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/reject`
+  );
+}
+
+async function rejectDeliverableWithReason(hiredAgentId: string, deliverableId: string, reason: string): Promise<void> {
+  await cpApiClient.post(
+    `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/reject`,
+    { reason }
   );
 }
 
@@ -109,11 +117,34 @@ export function useApprovalQueue(hiredAgentId: string | undefined): ApprovalQueu
     },
   });
 
+  const rejectWithReasonMutation = useMutation({
+    mutationFn: ({ deliverableId, reason }: { deliverableId: string; reason: string }) =>
+      rejectDeliverableWithReason(hiredAgentId!, deliverableId, reason),
+    onMutate: async ({ deliverableId }) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<DeliverableItem[]>(queryKey);
+      queryClient.setQueryData<DeliverableItem[]>(queryKey, (old = []) =>
+        old.filter((d) => d.id !== deliverableId)
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
   return {
     deliverables: data,
     isLoading,
     error: error as Error | null,
     approve: (deliverableId: string) => approveMutation.mutateAsync(deliverableId),
     reject: (deliverableId: string) => rejectMutation.mutateAsync(deliverableId),
+    rejectWithReason: (deliverableId: string, reason: string) =>
+      rejectWithReasonMutation.mutateAsync({ deliverableId, reason }),
   };
 }

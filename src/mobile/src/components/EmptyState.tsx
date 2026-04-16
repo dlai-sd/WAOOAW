@@ -12,17 +12,19 @@ interface EmptyStateProps {
   message?: string;
   icon?: string;
   subtitle?: string;
+  testID?: string;
 }
 
 export const EmptyState = ({ 
   message = 'No data available',
   icon = '📭',
-  subtitle 
+  subtitle,
+  testID,
 }: EmptyStateProps) => {
   const { colors, spacing, typography } = useTheme();
 
   return (
-    <View style={styles.container}>
+    <View testID={testID} style={styles.container}>
       <Text style={{ fontSize: 64, marginBottom: spacing.lg }}>{icon}</Text>
       
       <Text
