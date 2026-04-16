@@ -54,7 +54,7 @@ jest.mock('@/hooks/useHiredAgents', () => ({
       agent_type_id: 'marketing.digital_marketing.v1',
       nickname: 'My Agent',
       hired_instance_id: 'hi-1',
-      status: 'active',
+      subscription_status: 'active',
     },
     isLoading: false,
     error: null,

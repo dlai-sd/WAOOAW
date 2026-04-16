@@ -608,7 +608,7 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
                       Manage your agent's execution schedule.
                     </Text>
                     <View style={{ flexDirection: 'row', gap: 12 }}>
-                      {agent?.status === 'active' ? (
+                      {agent?.subscription_status === 'active' ? (
                         <TouchableOpacity
                           style={[styles.actionBtn, { backgroundColor: '#f59e0b22' }]}
                           onPress={handlePause}

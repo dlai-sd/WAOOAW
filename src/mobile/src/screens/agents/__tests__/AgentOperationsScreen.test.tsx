@@ -151,7 +151,7 @@ function setupHooks({
       agent_id: 'AGT-001',
       agent_type_id: 'ops.v1',
       nickname: 'Test Ops Agent',
-      status,
+      subscription_status: status,
     },
     isLoading: false,
     error: null,
