@@ -164,5 +164,24 @@ jobs:
         with:
           args: --severity-threshold=high --file=src/mobile/package.json
 
+  smoke-routes:
+    name: Mobile Route Smoke Test
+    runs-on: ubuntu-latest
+    # Only run on PRs (demo env must be reachable) and only when mobile source changes.
+    if: github.event_name == 'pull_request'
+    needs: [lint-and-typecheck]
+    # Routes not yet deployed to demo Plant Gateway use probe_tracked() in the script
+    # (non-blocking). Only REQUIRED routes that regress to 404 cause exit 1.
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run mobile route smoke test
+        env:
+          DEMO_PLANT_URL: ${{ vars.DEMO_PLANT_URL || 'https://plant.demo.waooaw.com' }}
+          SMOKE_TIMEOUT: '20'
+        run: bash scripts/smoke-mobile-routes.sh
+
   # NOTE: Build Preview job removed - builds should be triggered manually via mobile-cd.yml workflow
   # to maintain control over build frequency and costs. Use workflow_dispatch or tag triggers instead.

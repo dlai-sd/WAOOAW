@@ -110,14 +110,60 @@ State your answers to the user as bullet points before proceeding. Allow the use
 ### Step 2 — Context Gathering (read these files; do not skip)
 
 ```
-docs/CONTEXT_AND_INDEX.md       §1, §3, §5, §13 — architecture + file map
-docs/CP/iterations/NFRReusable.md §3, §6         — interface patterns + image promotion
-docs/templates/iteration-plan-template.md        — output format (mandatory)
+docs/CONTEXT_AND_INDEX.md  §1, §3, §5, §13  — architecture + file map
+docs/CONTEXT_AND_INDEX.md  §11              — testing strategy: Pact/BDD/E2E/mobile lanes
+docs/CONTEXT_AND_INDEX.md  §17              — gotchas: every known production failure pattern
+docs/CONTEXT_AND_INDEX.md  §23              — mobile: route layout, auth paths, smoke-test curls
+docs/templates/iteration-plan-template.md   — output format (mandatory)
 ```
 
 Also read any UX analysis doc the user references.
 Identify the exact file paths for every route, component, and service that will change.
 You MUST list real file paths from §13 of CONTEXT_AND_INDEX.md — never invent paths.
+
+**Mobile plans additionally require:**
+- Read `src/mobile/src/config/api.config.ts` — confirm the `apiBaseUrl` carries NO path prefix.
+  Every service file call MUST supply the full path starting with `/api/v1/` or `/auth/`.
+- Read `src/mobile/src/navigation/MainNavigator.tsx` — confirm screen names before adding routes.
+- Cross-check every API path you write in story cards against the Route Ownership table in §5.2.
+  Mismatch = story is wrong before the agent starts.
+
+---
+
+### Step 2.5 — Route Baseline Verification (mandatory for ANY plan touching mobile or CP FrontEnd)
+
+Before writing the first story card, produce this table:
+
+| Story | API path written in story card | §5.2 canonical path | Match? |
+|---|---|---|---|
+| E1-S1 | `/api/v1/agents` | `GET /api/v1/agents` | ✅ |
+| E2-S1 | `/auth/refresh` | verify in §23 mobile auth table | ✅/❌ |
+
+If any row is ❌, correct the story card path before publishing the plan.
+Also verify the **token refresh path** explicitly — list the exact refresh endpoint the mobile
+api client calls and confirm it exists in the Plant Gateway route inventory.
+
+**Smoke-test stub (embed in the plan's integration baseline gate section):**
+
+> **Preferred: run `bash scripts/smoke-mobile-routes.sh`** (probes all mobile routes, checks `/api/v1/`
+> prefix trap, and validates `/auth/refresh` in one command). Requires network access to demo.
+> Fall back to individual curls below if the script is unavailable.
+
+```bash
+# Preferred — runs all mobile route checks automatically
+bash scripts/smoke-mobile-routes.sh
+
+# OR individual curls:
+# Verify /api/v1/ prefix is correct (expects 401, NOT 404)
+curl -sS -o /dev/null -w "%{http_code}\n" https://plant.demo.waooaw.com/api/v1/agents
+# Verify public auth route (expects 422, NOT 404)
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST https://plant.demo.waooaw.com/auth/register \
+  -H "Content-Type: application/json" -d '{"email":"test@test.com"}'
+# CRITICAL — verify token refresh path (expects 422, NOT 404)
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST https://plant.demo.waooaw.com/auth/refresh \
+  -H "Content-Type: application/json" -d '{"refresh_token":"invalid"}'
+```
+A 404 on any of these means the plan's service files will call a non-existent path.
 
 ---
 
@@ -147,6 +193,16 @@ Apply these rules when splitting work into iterations:
 | **Coverage** | Every Python story must include tests to keep coverage ≥ 80 %. Frontend stories have unit tests for new logic only |
 | **Max stories per iteration** | 6 — more than 6 makes the iteration PR unreviable |
 
+**PR-Overhead Optimization Rules (apply before publishing any plan):**
+
+| Rule | Detail |
+|---|---|
+| **Default 2 iterations max** | Start with 2 iterations. Only add a 3rd if the user explicitly accepts the overhead or if the work genuinely exceeds 12 atomic stories after aggressive splitting |
+| **Vertical slices preferred** | Keep related backend + frontend work in the same iteration rather than adding extra merge gates — one PR per product slice |
+| **Iteration size** | Target 4–6 stories and 4–6 hours of agent work per iteration. Size each iteration so one merge delivers a meaningful, testable product slice |
+| **Deployment timing** | Assume `waooaw deploy` fires after the FINAL merged iteration — not after every iteration. Do not model Terraform deploys as a per-iteration dependency unless a Cloud Run config change is strictly required |
+| **Challenge your own output** | Before publishing, count iterations, count stories per iteration, and ask: could any two iterations be merged by moving all their work onto one branch without creating unresolvable file conflicts? If yes, merge them |
+
 ---
 
 ### Step 5 — Story Card Rules
@@ -159,15 +215,53 @@ Every story card MUST contain:
 - `Files to read first` — exact paths from CONTEXT_AND_INDEX.md §13
 - `Files to create/modify` — exact paths + what to do
 - `Acceptance criteria` — numbered, testable, unambiguous
-- `Test cases` — table with test ID, type, description, assert
+- `Test cases` — table with test ID, **type** (Unit / Integration / Pact / BDD / E2E), description, assert
 - `Test commands` — copy-paste docker commands
 - `Done signal` — exact text agent puts in commit message
+- `Pre-push gate` — story card MUST end with this verbatim block:
+
+  ```bash
+  # Run before every push — catches CVEs and type errors without Docker
+  bash scripts/agent-pre-push.sh
+  # Any failure = fix before pushing. Do NOT skip security checks.
+  ```
+
+**TDD/BDD MANDATE — every story card must include:**
+
+1. **TDD order**: tests table written FIRST in the story card, before acceptance criteria.
+   The agent writes tests before implementation. If the execution surface can run tests,
+   the red→green cycle is mandatory. If not, tests are scaffolded and deferred to CI.
+
+2. **BDD scenario** (mandatory if the story touches any customer-facing flow):
+   ```gherkin
+   Feature: [customer capability from epic title]
+     Scenario: [happy path]
+       Given [initial state]
+       When  [customer action]
+       Then  [observable outcome]
+     Scenario: [error path]
+       Given [initial state]
+       When  [action that fails]
+       Then  [error state visible to customer]
+   ```
+   For Python: place in `src/[service]/tests/bdd/features/[story-slug].feature`.
+   For mobile: embed the scenario as a Jest describe/it block that mirrors Gherkin semantics.
+
+3. **Pact contract stub** (mandatory for any story where mobile or CP FrontEnd calls Plant Gateway):
+   The story card must include or reference a Pact interaction definition describing
+   the exact request+response contract. Place in `src/mobile/pact/` or
+   `src/CP/BackEnd/tests/pact/consumer/`. This catches path-prefix bugs before runtime.
+
+4. **Integration baseline gate**: every story with a new API call must include one
+   integration-level test that hits the actual endpoint (mocked at the HTTP layer, not
+   at the service layer) and asserts the full URL path — including the `/api/v1/` prefix.
 
 **NEVER write:**
 - "find the file that handles X" — you must find it and name it
 - "similar to how Y works" — each story is self-contained
 - "refactor while you're there" — strictly in-scope only
 - "use best practices" — cite the specific rule number from NFRReusable.md
+- A service file call with a relative path like `/v1/agents` — always write the full `/api/v1/agents`
 
 ---
 
@@ -178,11 +272,47 @@ Every story card MUST contain:
    - e.g. `docs/CP/iterations/cp-billing-it1.md`
 3. Fill every `[PLACEHOLDER]` — no placeholders should remain in the published file
 4. Tick every box in the PM Review Checklist before telling the user the plan is ready
-5. Report to the user:
+5. Complete the PM Critique Round (Step 6.5) BEFORE reporting to the user
+6. Report to the user:
    - Plan file path
    - Iteration summary table (copy from the plan)
    - One copy-paste Agent Launch Prompt per iteration
    - Total estimated time per iteration (so user knows when to return)
+
+---
+
+### Step 6.5 — PM Critique Round (MANDATORY — do before reporting to user)
+
+After the full plan is written, perform a self-audit. Answer every question below.
+If ANY answer is NO or UNKNOWN, fix the plan before proceeding.
+
+**Objective alignment audit:**
+| Question | Answer | Fix needed? |
+|---|---|---|
+| Does every epic title directly name a customer outcome from the plan's stated objective? | YES/NO | |
+| Is every story traceable back to a specific line in the plan objective? | YES/NO | |
+| Are there any stories that a developer could execute without the customer noticing the difference? | NO = good | |
+| Does every iteration deliver a testable product slice, not a "setup" step? | YES/NO | |
+
+**Drift prevention audit:**
+| Question | Answer | Fix needed? |
+|---|---|---|
+| For every service call in every story card: is the full `/api/v1/` prefixed path written explicitly? | YES/NO | |
+| For mobile plans: is the token refresh path verified against §23 and present in the smoke-test stub? | YES/NO | |
+| Does every story have at least one Pact/integration test that asserts the full URL (not a mocked service layer)? | YES/NO | |
+| Does every story have a BDD scenario for customer-facing behaviour? | YES/NO | |
+| Is the Integration Baseline Gate section populated with demo-runnable curl commands? | YES/NO | |
+
+**Completeness audit:**
+| Question | Answer | Fix needed? |
+|---|---|---|
+| Does the PM Review Checklist have every box ticked? | YES/NO | |
+| Are all `BLOCKED UNTIL` dependencies correctly sequenced? | YES/NO | |
+| Does each iteration have a come-back time and a done signal for the executing agent? | YES/NO | |
+| Is the Execution Agent Audit Round instruction present in the Agent Execution Rules section? | YES/NO | |
+
+Post your critique table as a comment in the plan file under a `## PM Critique Round` section
+before saving the final version.
 
 ---
 
@@ -224,6 +354,39 @@ File: docs/[path/to/plan.md]
 
 [agent launch prompt block for iteration 2]
 ```
+
+---
+
+## Execution Agent Audit Round (embed this in every plan's Agent Execution Rules)
+
+Every plan's "Agent Execution Rules" section MUST include the following verbatim as the final rule:
+
+> **PRE-PUSH RULE (run before EVERY push, not just the final one):**
+>
+> ```bash
+> bash scripts/agent-pre-push.sh
+> ```
+> If any check fails: fix it before pushing. Do NOT use `--skip-audit` for security failures.
+> The script checks (without Docker): dep pinning, pip-audit CVEs, TypeScript types, ESLint, YAML syntax.
+> Checks that need Docker (coverage gate, smoke routes) will be caught by CI — add a note in the PR body.
+>
+> **EXECUTION AUDIT RULE (run after ALL epics in the iteration are complete, before opening the PR):**
+>
+> Perform this self-audit. Post the results table in the PR description.
+>
+> | Audit question | Result |
+> |---|---|
+> | Does every story's merged output match the epic's stated customer outcome (not just its technical spec)? | ✅/❌ |
+> | For every service call you wrote or modified: is the full `/api/v1/` prefix present (not `/v1/` or relative)? | ✅/❌ |
+> | For mobile/CP FrontEnd: did you verify the token refresh path exists at the Gateway (non-404)? | ✅/N/A |
+> | Does every new API call have at least one Pact or integration-level test that asserts the full URL? | ✅/❌ |
+> | Does every customer-facing story have a passing (or scaffolded+deferred) BDD scenario? | ✅/❌ |
+> | Are there files you modified outside the story cards' "Files to create/modify" tables? | ✅=none/⚠️=list |
+> | Did the Integration Baseline Gate curls return non-404 for all paths this iteration introduces? | ✅/⚠️ |
+> | Did the full test suite pass, or are deferrals explicitly recorded with reasons? | ✅/⚠️ |
+>
+> **Blocker rule**: any ❌ in rows 1–5 must be fixed before the PR is opened.
+> An ⚠️ in rows 6–8 must be explained in the PR description — it is not a hard blocker but triggers PM review.
 
 ---
 
