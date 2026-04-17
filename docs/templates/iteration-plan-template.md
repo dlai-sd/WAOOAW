@@ -1,8 +1,11 @@
 # [PLAN-ID] — [Feature Area] Iteration Plan
 
-> **Template version**: 2.0
+> **Template version**: 3.0
 > **How to use**: Fill every `[PLACEHOLDER]`. Zero placeholders in the published file.
 > PM: remove this callout block before saving.
+> **New in v3.0**: Integration Baseline Gate, TDD/BDD mandate per story, Pact contract stubs,
+> PM Critique Round, Execution Agent Audit Round, NFR rules 15–18 (mobile path prefix, token
+> refresh verification, Pact, BDD).
 
 ---
 
@@ -60,6 +63,11 @@ with limited context windows. Every structural decision in this plan exists to p
 - [ ] Iteration count minimized for PR-only delivery (default 1-2; Iteration 3 only if explicitly justified)
 - [ ] Related backend/frontend work kept in the same iteration unless merge-to-main is a hard dependency
 - [ ] No placeholders remain
+- [ ] **TDD/BDD** — every story card has a test table (type column: Unit/Integration/Pact/BDD), a BDD scenario for every customer-facing flow, and a Pact stub for every mobile/CP→Gateway call
+- [ ] **Route Baseline table** — PM has cross-checked every API path in every story card against §5.2 route ownership table and §23 (mobile); all paths written with full `/api/v1/` prefix
+- [ ] **Integration Baseline Gate section** is populated with demo smoke-test curl commands
+- [ ] **PM Critique Round** — PM has completed the self-audit table and it is committed in the plan
+- [ ] **Execution Agent Audit Round** instruction is present verbatim in Agent Execution Rules
 
 ---
 
@@ -79,6 +87,31 @@ with limited context windows. Every structural decision in this plan exists to p
 - Prefer vertical slices within the same iteration over extra merge gates.
 - Only add Iteration 3 if the user explicitly accepts the overhead or if the scoped work still exceeds 12 atomic stories after aggressive splitting.
 - Assume deployment happens through the `waooaw deploy` workflow after the final merged iteration, not after every iteration.
+
+---
+
+## Integration Baseline Gate
+
+> **Agent: run these commands BEFORE writing any code in Iteration 1. If any returns 404, the plan's service file paths are wrong — HALT and post the result.**
+>
+> PM: populate this section from §23 verification curls + §5.2 route table before publishing the plan.
+
+```bash
+# 1. Authenticated route reachable (expects 401/403, NOT 404)
+curl -sS -o /dev/null -w "%{http_code}\n" https://plant.demo.waooaw.com/api/v1/agents
+
+# 2. Public auth route reachable (expects 422, NOT 404)
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST https://plant.demo.waooaw.com/auth/register \
+  -H "Content-Type: application/json" -d '{"email":"test@test.com"}'
+
+# 3. Token refresh path (expects 405/422, NOT 404) — [PM: fill exact path from §23]
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST https://plant.demo.waooaw.com/[TOKEN_REFRESH_PATH]
+
+# [Add one line per new route this plan introduces]
+```
+
+**Failure criteria:** any `404` = the service-file path in the story card is wrong before the agent starts.
+**Pass criteria:** all return non-404 HTTP status codes.
 
 ---
 
@@ -299,6 +332,24 @@ git add -A && git commit -m "feat([plan-id]): [epic-id] — [epic title]" && git
 ```
 Do this BEFORE starting the next epic. If interrupted, completed epics are already saved.
 
+### Rule 8 — Execution Agent Audit Round (run AFTER all epics complete, BEFORE opening the PR)
+
+Answer every row. Post this table in the PR description.
+
+| Audit question | Result |
+|---|---|
+| Does every story's merged output match the epic's stated customer outcome (not just its technical spec)? | ✅/❌ |
+| For every service call you wrote or modified: is the full `/api/v1/` prefix present (not `/v1/` or relative)? | ✅/❌ |
+| For mobile/CP FrontEnd: did you verify the token refresh path exists at the Gateway (non-404)? | ✅/N/A |
+| Does every new API call have at least one Pact or integration-level test that asserts the full URL? | ✅/❌ |
+| Does every customer-facing story have a passing (or scaffolded+deferred) BDD scenario? | ✅/❌ |
+| Are there files you modified outside the story cards' "Files to create/modify" tables? | ✅=none/⚠️=list |
+| Did the Integration Baseline Gate curls return non-404 for all paths this iteration introduces? | ✅/⚠️ |
+| Did the full test suite pass, or are deferrals explicitly recorded with reasons? | ✅/⚠️ |
+
+**Blocker rule**: any ❌ in rows 1–5 must be fixed before the PR is opened.
+An ⚠️ in rows 6–8 must be explained in the PR description — it is not a hard blocker but triggers PM review.
+
 ---
 
 ## NFR Quick Reference
@@ -325,6 +376,10 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 |    | Pattern B: missing `/cp/*` route → new `api/cp_<resource>.py` with `waooaw_router` + `PlantGatewayClient` | |
 |    | Pattern C: existing `/v1/*` Plant endpoint → call via `gatewayRequestJson` from FE — no new BE file | |
 | 14 | If adding a new `core/` package in Gateway: add `COPY core/ ./core/` in Dockerfile | `ModuleNotFoundError` on Cloud Run |
+| 15 | **Mobile/CP FrontEnd service files: always write full `/api/v1/<path>`** — `apiBaseUrl` carries NO path prefix. Writing `/v1/agents` instead of `/api/v1/agents` silently produces 404 in production. Same rule applies to all CP FrontEnd `gatewayRequestJson` calls. | All authenticated calls return 404 |
+| 16 | **Token refresh path for mobile**: verify the exact path in §23 of CONTEXT_AND_INDEX.md before writing any service file. As of 2026-04-17 the mobile `apiClient.ts` sends refresh to `${apiBaseUrl}/auth/refresh` — confirm this path is mounted on the Plant Gateway before building any screen that uses silent token refresh. A wrong path makes EVERY authenticated screen immediately fail after token expiry. | Cascading 401 across all post-login screens |
+| 17 | **Pact contract tests for every mobile→Gateway and CP→Gateway call**: place consumer stubs in `src/mobile/pact/` or `src/CP/BackEnd/tests/pact/consumer/`. Pact catches path-prefix bugs, response-shape mismatches, and missing fields before any runtime deployment. | Path-prefix and schema bugs ship undetected |
+| 18 | **BDD scenario for every customer-facing story**: place `.feature` files in `src/[service]/tests/bdd/features/`. Stories without BDD scenarios drift from their stated customer outcome silently during agent execution. | Agents implement technical behaviour without validating customer outcome |
 
 ---
 
@@ -339,6 +394,40 @@ Do this BEFORE starting the next epic. If interrupted, completed epics are alrea
 | [E3-S2] | 2 | [Epic name] | [Story title] | 🔴 Not Started | — |
 
 **Status key:** 🔴 Not Started | 🟡 In Progress | 🟢 Done | 🚫 Blocked
+
+---
+
+## PM Critique Round
+
+> **PM: complete this section BEFORE sharing the plan with the user. Commit it into the plan file.**
+> If any row is NO, fix the plan and re-run the check.
+
+### Objective alignment
+
+| Question | Answer |
+|---|---|
+| Does every epic title directly name a customer outcome from the plan's stated objective? | YES/NO |
+| Is every story traceable back to a specific line in the plan objective? | YES/NO |
+| Are there any stories a developer could execute without the customer noticing the difference? | NO=pass |
+| Does every iteration deliver a testable product slice (not a setup-only step)? | YES/NO |
+
+### Drift prevention
+
+| Question | Answer |
+|---|---|
+| For every service call in every story card: is the full `/api/v1/` prefix written explicitly? | YES/NO |
+| For mobile plans: is the token refresh path verified against §23 and in the smoke-test stub? | YES/NO |
+| Does every story with a Gateway call have a Pact/integration test asserting the full URL? | YES/NO |
+| Does every customer-facing story have a BDD scenario? | YES/NO |
+| Is the Integration Baseline Gate populated with runnable curl commands? | YES/NO |
+
+### Completeness
+
+| Question | Answer |
+|---|---|
+| Does the PM Review Checklist have every box ticked? | YES/NO |
+| Are all `BLOCKED UNTIL` dependencies correctly sequenced (backend before frontend)? | YES/NO |
+| Does each iteration have a come-back time and an Execution Agent Audit Round instruction? | YES/NO |
 
 ---
 
@@ -486,12 +575,27 @@ if (![dataVar]) return <div className="empty-state">No [resource] yet.</div>
 
 **Tests to write:**
 
-| Test ID | File | Test setup | Assert |
-|---|---|---|---|
-| [E1-S1-T1] | `src/CP/FrontEnd/src/__tests__/[Component].test.tsx` | Mock service returns `{active_agents: 5}` | StatCard shows "5" in DOM |
-| [E1-S1-T2] | same | Mock service rejects | Error banner text in DOM |
-| [E1-S1-T3] | same | Mock service: loading state | SkeletonLoaders in DOM |
-| [E1-S1-T4] | `src/CP/BackEnd/tests/test_cp_[resource].py` | Auth token, mock PlantGatewayClient returns 200 | Response 200, correct fields |
+| Test ID | Type | File | Test setup | Assert |
+|---|---|---|---|---|
+| [E1-S1-T1] | Unit | `src/CP/FrontEnd/src/__tests__/[Component].test.tsx` | Mock service returns `{active_agents: 5}` | StatCard shows "5" in DOM |
+| [E1-S1-T2] | Unit | same | Mock service rejects | Error banner text in DOM |
+| [E1-S1-T3] | Unit | same | Mock service: loading state | SkeletonLoaders in DOM |
+| [E1-S1-T4] | Integration | `src/CP/BackEnd/tests/test_cp_[resource].py` | Auth token, mock PlantGatewayClient returns 200 | Response 200, correct fields |
+| [E1-S1-T5] | Pact | `src/mobile/pact/[story-slug].pact.ts` OR `src/CP/BackEnd/tests/pact/consumer/[story-slug].py` | Consumer stub: `GET /api/v1/[resource]` → 200 | Full `/api/v1/` path in interaction; response shape matches TypeScript type |
+
+**BDD scenario** (for every story touching a customer-facing flow):
+```gherkin
+Feature: [customer capability — copy from epic title]
+  Scenario: [happy path]
+    Given [customer is authenticated and on the [screen] screen]
+    When  [customer performs the action]
+    Then  [observable result visible to customer]
+  Scenario: [error path]
+    Given [customer is authenticated and on the [screen] screen]
+    When  [action fails / API returns error]
+    Then  [error state is displayed; customer can recover]
+```
+File: `src/[service]/tests/bdd/features/[story-slug].feature`
 
 **Test command:**
 ```bash
@@ -504,7 +608,7 @@ docker compose -f docker-compose.test.yml run cp-test pytest src/CP/BackEnd/test
 **Commit message:** `feat([plan-id]): [story title]`
 
 **Done signal (post as a comment then continue to E1-S2):**
-`"E1-S1 done. Changed: [list files]. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅"`
+`"E1-S1 done. Changed: [list files]. Tests: T1 ✅ T2 ✅ T3 ✅ T4 ✅ T5-Pact ✅"`
 
 ---
 
