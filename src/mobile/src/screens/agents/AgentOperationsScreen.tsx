@@ -44,6 +44,7 @@ type AgentSkill = {
   skill_id: string;
   name?: string;
   display_name?: string;
+  skill_name?: string;   // returned by /agents/{id}/skills as Skill.name
   goal_schema?: { fields?: GoalSchemaField[] };
   goal_config?: Record<string, unknown>;
 };
@@ -146,7 +147,7 @@ function buildBriefSteps(fields: GoalSchemaField[]) {
 function getThemeDiscoverySkill(skills: AgentSkill[]): AgentSkill | null {
   return (
     skills.find((skill) => {
-      const names = [skill.display_name, skill.name]
+      const names = [skill.display_name, skill.name, skill.skill_name]
         .map((value) => String(value || '').trim().toLowerCase())
         .filter(Boolean);
       return names.some((value) => value === 'theme discovery' || value === 'theme_discovery');
