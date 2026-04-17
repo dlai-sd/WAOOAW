@@ -1,7 +1,7 @@
 # WAOOAW — Context & Indexing Reference
 
-**Version**: 2.9  
-**Date**: 2026-04-15  
+**Version**: 2.10  
+**Date**: 2026-04-17  
 **Purpose**: Single-source operating manual for handing WAOOAW work to AI agents, especially zero-cost and small-context agents, so they can navigate, understand, plan, and execute complex platform tasks with minimal drift.  
 **Update cadence**: Section 12 ("Latest Changes") should be refreshed daily.  
 **Key design doc**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — full low-level design of the Agent Construct system (v2, 2179 lines). Read §§1–8 before touching `agent_mold/` or any construct pipeline.
@@ -16,6 +16,11 @@
 2. [Solution Hypothesis](#2-solution-hypothesis)
 3. [Constitutional Design Pattern](#3-constitutional-design-pattern)
 4. [Four Major Components](#4-four-major-components)
+  - [4.1 Plant (Core Agent Platform)](#41-plant-core-agent-platform)
+  - [4.2 Plant Gateway](#42-plant-gateway)
+  - [4.3 CP (Customer Portal)](#43-cp-customer-portal)
+  - [4.4 PP (Platform Portal)](#44-pp-platform-portal)
+  - [4.5 Plant OPA (Policy Engine)](#45-plant-opa-policy-engine)
   - [4.6 Agent Construct Architecture](#46-agent-construct-architecture)
   - [4.7 Canonical Runtime Vocabulary](#47-canonical-runtime-vocabulary)
 5. [Architecture & Technical Stack](#5-architecture--technical-stack)
@@ -99,6 +104,7 @@ If you are handing work to a lower-cost or small-context agent, this document is
 | Add temporary findings to §12 or §17, not to core architecture sections, unless the architecture actually changed | Keeps the bible durable instead of noisy |
 | When a route or workflow changes, update both the ownership map and the file index in the same PR | Prevents navigation drift |
 | If a concept has one canonical term, use it everywhere here even if code still carries a legacy name | Keeps public/runtime language converged |
+| Bump version number (e.g. 2.9 → 2.10) and update `**Date**` whenever §17 or §12 is edited — or any structural section changes — in the same PR | Prevents stale version headers from misleading agents about document freshness |
 
 ## 1. Problem Statement & Vision
 
@@ -227,6 +233,8 @@ Section 7 — RELATIONSHIPS:            parent_id, child_ids, governance_agent_i
 ---
 
 ## 4. Four Major Components
+
+> **Navigation note**: This section covers all four major components. The subsections appear in document order as 4.1, 4.2, 4.6, 4.7, 4.5, 4.3, 4.4 due to historical grouping. For clearest conceptual flow, read §4.3 (CP) and §4.4 (PP) before §4.6 (Agent Construct). The TOC above is alphabetically corrected and links directly to each subsection.
 
 ### 4.1 Plant (Core Agent Platform)
 
@@ -606,9 +614,11 @@ Start with these files when the problem is observability, production diagnosis, 
 > **Active source of truth in this branch**: this section plus the live routing/dependency implementations in `src/CP/BackEnd/core/`, `src/Plant/BackEnd/core/`, and `src/PP/BackEnd/core/`.  
 > Older iteration-plan references were removed during doc cleanup; keep the next agent on the live source files above.
 
-### What is implemented (as of PRs #809, #810, #811 — 2026-02-27)
+### What is implemented
 
-All NFR corrective (C1–C7) and preventive (P1–P4) gaps are closed. PP Backend baseline (P5) is in progress (PR #811). C8 (PII field-level DB encryption) is **permanently parked** — see rationale below.
+All NFR corrective (C1–C7) and preventive (P1–P4) gaps are closed. PP Backend baseline (P5) is also closed. C8 (PII field-level DB encryption) is **permanently parked** — see rationale below.
+
+> Historical note: this work was completed in the NFR sprint of 2026-02-27. PR history is in §12 if needed.
 
 ### Mandatory: `waooaw_router()` — never bare `APIRouter()`
 
@@ -788,7 +798,7 @@ CP BackEnd ──── PlantGatewayClient ────► Plant Gateway
 | Auth flow | Google OAuth2 → JWT issued by CP/PP → CP FrontEnd keeps access token in memory and restores via `POST /auth/refresh` using the httpOnly refresh cookie → Gateway validates and forwards to Plant |
 | Connected-platform OAuth callbacks | Full-page redirects for external platform connections should complete on a public callback surface, restore session there, then resume the protected wizard. Protected routes alone are not safe callback targets when CP web auth is memory-only. |
 | Registration flow (web/CP) | CP Backend `/api/register` → creates customer in local DB → calls Plant Gateway `/api/v1/customers` to create in Plant DB |
-| Registration flow (mobile) | Mobile app → Plant Gateway **directly** (no CP Backend). Three steps: `POST /auth/register` (upsert customer) → `POST /auth/otp/start` (issue OTP challenge) → `POST /auth/otp/verify` (verify code, receive JWT). All three paths are in `PUBLIC_ENDPOINTS` — no prior JWT needed. |
+| Registration flow (mobile) | Mobile app → Plant Gateway **directly** (no CP Backend). Three steps: `POST /auth/register` (upsert customer) → `POST /auth/otp/start` (issue OTP challenge) → `POST /auth/otp/verify` (verify code, receive JWT). All three paths are in `PUBLIC_ENDPOINTS` — no prior JWT needed. ⚠️ As of 2026-04-17, `/auth/register`, `/auth/otp/start`, and `/auth/otp/verify` are **not yet deployed on demo**; `smoke-mobile-routes.sh` uses `probe_tracked()` (informational, non-blocking) for these paths. See §17 for the `probe_tracked()` vs `probe()` distinction. |
 | CP registration key | Shared secret (`CP_REGISTRATION_KEY`) used between CP → Gateway to authorize customer upsert calls |
 
 ### Database ownership
@@ -833,7 +843,7 @@ Epic created → Auto-Triage → Vision Guardian (7-part analysis)
 
 1. Create feature branch from `main` (e.g., `feat/skills-sk-1-1-skill-key`)
 2. Implement changes, push branch
-3. CI runs automatically on PR (`waooaw-ci.yml`)
+3. CI runs automatically on PR (`waooaw-ci.yml` for platform services; `mobile-ci.yml` for mobile Jest + smoke-mobile-routes.sh probe)
 4. Review, approve, merge to `main`
 5. Deploy via `waooaw-deploy.yml` (manual dispatch)
 
@@ -888,6 +898,7 @@ debug/<description>           # Investigation branches
 | Plant OPA | `src/Plant/Gateway/opa/Dockerfile` | `plant-opa` |
 | CP Combined | `src/CP/Dockerfile.combined` | (BE+FE in one) |
 | PP Combined | `src/PP/Dockerfile.combined` | (BE+FE in one) |
+| Mobile | N/A — distributed via EAS Build / Play Store | N/A — see §23 for EAS build profiles (`development`, `demo`, `uat`, `prod`) |
 
 ### Environments
 
@@ -1232,19 +1243,20 @@ pgrep -fa cloud-sql-proxy             # empty means proxy not running
 
 ### How to test database locally
 
+> **Docker-only rule**: `alembic` is not installed in the default Codespace shell environment — always run via Docker. Do not run `alembic upgrade head` directly on the host.
+
 ```bash
 # 1. Start Postgres via Docker Compose
-docker-compose -f docker-compose.local.yml up postgres -d
+docker-compose -f docker-compose.local.yml up db -d
 
-# 2. Run migrations
-cd src/Plant/BackEnd
-alembic upgrade head
+# 2. Run migrations (Docker-only — no host alembic)
+docker compose -f docker-compose.test.yml run --rm plant-backend-test alembic upgrade head
 
 # 3. Seed data
-python -m database.seed_data
+docker compose -f docker-compose.test.yml run --rm plant-backend-test python -m database.seed_data
 
-# 4. Run Plant backend (will auto-initialize DB)
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+# 4. Run Plant backend via Docker (will auto-initialize DB)
+docker compose -f docker-compose.local.yml up plant-backend -d
 ```
 
 ### How to run migrations on GCP
@@ -1433,7 +1445,7 @@ Steps:
 | `trials` | `idx_trials_start_date` | INDEX | `start_date` |
 | `trials` | `idx_trials_status` | INDEX | `status` |
 
-> Last verified: 2026-02-26 against demo DB. Re-run the query in section "DB changes" to refresh this table after any DDL change.
+> Last verified: 2026-02-26. ⚠️ **STALE** — migrations 038–040 (PRs #1048, #1061, #1065) added `brand_voices`, `marketing_draft_batches`, `marketing_draft_posts`, `customer_platform_credentials` tables and new columns (`batch_type`, `parent_batch_id`, `credential_ref`, `secret_manager_ref`). Re-run the schema query in the PP portal DB Management screen after any DDL PR and update this table. Maintenance rule: update this table in the same PR as any Alembic migration.
 
 ---
 
@@ -1441,7 +1453,7 @@ Steps:
 
 ### ⚠️ MANDATORY RULE: Codespace or Docker only — NO venv
 
-> **All tests MUST run inside Docker containers or Codespace (devcontainer).** Virtual environments (`venv`, `virtualenv`, `conda`) are **strictly prohibited**. Docker regression remains mandatory, but persistence stories also require a Cloud SQL demo migration/apply plus a live smoke query before the work is considered complete.
+> **All tests MUST run inside Docker containers or the Codespace devcontainer (which is itself a container — running `pytest` directly in a Codespace terminal is fully compliant).** Local-host virtual environments (`venv`, `virtualenv`, `conda`, `pip install` outside Docker/devcontainer) are **strictly prohibited** and will produce environment drift not reproducible in CI. Docker regression remains mandatory, but persistence stories also require a Cloud SQL demo migration/apply plus a live smoke query before the work is considered complete.
 
 ### Test suite locations (detailed)
 
@@ -1463,7 +1475,7 @@ Steps:
 | **Shared fixtures** | All | `tests/conftest.py` | pytest | — | Common test utilities |
 | **Property-based** | Plant Backend | `src/Plant/BackEnd/tests/property/` | pytest + Hypothesis | `plant-backend-test` | Invariant proofs: usage ledger, trial billing, hash chain |
 | **BDD** | Plant BackEnd, CP BackEnd | `src/Plant/BackEnd/tests/bdd/`, `src/CP/BackEnd/tests/bdd/` | pytest-bdd | `plant-backend-test`, `cp-backend-test` | Gherkin feature specs (trial lifecycle, hire wizard) |
-| **Contract (Pact)** | CP→Gateway, PP→Gateway, Mobile→Gateway | `src/CP/BackEnd/tests/pact/consumer/`, `src/Plant/Gateway/tests/pact/provider/` | pact-python | `cp-backend-test`, `plant-gateway-test` | Consumer/provider contract tests |
+| **Contract (Pact)** | CP→Gateway, PP→Gateway, Mobile→Gateway | `src/CP/BackEnd/tests/pact/consumer/`, `src/Plant/Gateway/tests/pact/provider/`, `src/mobile/pact/` | pact-python / pact-js | `cp-backend-test`, `plant-gateway-test` | Consumer/provider contract tests — **mobile must have at least one Pact consumer stub per new Gateway call** (catches path-prefix bugs unit mocks cannot) |
 | **Web E2E** | CP + PP frontends | `src/CP/FrontEnd/e2e/`, `src/PP/FrontEnd/e2e/` | Playwright | local frontend Playwright containers | CP hire journey and PP operator smoke |
 | **Mobile E2E** | Mobile | `tests/e2e/mobile/` | Maestro | device-backed opt-in lane | OTP auth, hire flow, and checkpointed notification runtime re-entry YAML |
 | **Performance** | Plant Gateway | `tests/performance/` | Locust | `locust` | p95 < 500 ms @ 50 rps, trial concurrency |
@@ -1529,6 +1541,13 @@ bash scripts/test-mobile.sh
 
 # --- Quick regression (skip perf + mutation) ---
 bash scripts/test-web.sh --quick
+
+# --- Mobile unit tests (run from devcontainer or Codespace terminal) ---
+cd src/mobile && npm test
+cd src/mobile && npm run test:coverage
+
+# --- Mobile Pact consumer contract tests ---
+cd src/mobile && npm run test:pact   # or via: docker compose -f docker-compose.test.yml run mobile-test npm run test:pact
 
 # --- Legacy Codespace shortcuts (still work) ---
 cd src/Plant/BackEnd && pytest tests/unit/ -v
@@ -1858,6 +1877,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `.env.gateway` | Gateway-specific env vars |
 | `start-local-no-docker.sh` | Run services without Docker |
 | `coverage.xml` | Test coverage report |
+| `session_commentary.md` | Append-only agent context journal — run `tail -120 session_commentary.md` at every session start (§25); never edit or delete past entries |
 
 ### src/Plant/BackEnd/ — Core Platform
 
@@ -1963,7 +1983,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `marketing_providers.py` | Social media providers |
 | `marketing_scheduler.py` | Marketing post scheduling |
 | `draft_batches.py` | Draft batch management |
-| `content_analytics.py` | Content analytics — reads `performance_stats` for a hired agent (last 30 days), identifies top-performing dimensions and posting times, returns structured recommendations for DMA content generation. (DMA-CONV-1 It3 #1050) |
+| `content_analytics.py` | Content analytics — reads `performance_stats` for a hired agent (last 30 days), identifies top-performing dimensions and posting times, returns structured recommendations for DMA content generation. (DMA-CONV-1 It3 #1050) ⚠️ `services/content_analytics.py` exists and is wired into the DMA conversation prompt, but the HTTP route `GET /api/v1/hired-agents/{id}/content-analytics` has not been confirmed in `src/Plant/BackEnd/api/v1/router.py`. Verify the route is registered before building mobile or CP features that call it directly. |
 | `credential_resolver.py` | Credential resolution |
 | `social_credential_resolver.py` | Social media credentials |
 | `security_audit.py` | Security audit logging |
@@ -2057,7 +2077,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `models/user_db.py` | User DB operations |
 | `api/auth/` | Auth routes (Google OAuth) — `google_oauth.py`, `routes.py`, `dependencies.py`, `user_store.py` |
 | `api/cp_registration.py` | Customer registration endpoint |
-| `api/cp_registration_otp.py` | Pre-registration OTP: verify email ownership before full registration (added PR #822) |
+| `api/cp_registration_otp.py` | Pre-registration OTP for **CP web only** — verify email ownership before full registration (added PR #822). ⚠️ Mobile does **NOT** use this path; mobile calls Plant Gateway `/auth/register` + `/auth/otp/start` + `/auth/otp/verify` directly (see §23). |
 | `api/cp_otp.py` | OTP verification (post-registration 2FA) |
 | `api/hire_wizard.py` | Agent hiring flow |
 | `api/payments_razorpay.py` | Razorpay payment integration |
@@ -2405,6 +2425,7 @@ Use this shortlist when the task is broader than runtime routes.
 | 8181 | Plant OPA | Internal — OPA policy engine (Cloud Run service-to-service only) |
 | 8020 | CP Backend | Internal |
 | 8081 | Adminer | DB admin UI |
+| 15432 | Cloud SQL Auth Proxy (Codespace) | Proxy listener started by `.devcontainer/gcp-auth.sh`; connect via `source /root/.env.db && psql`; see §9, §10 |
 
 ---
 
@@ -2506,6 +2527,7 @@ http://localhost:8020/docs   # CP Backend Swagger
 | **PII masking is automatic** | `PIIMaskingFilter` is wired at the root logger. Don't try to mask fields manually in route code. Debug by correlation ID or user_id — not by email (masked in logs). |
 | **C8 (PII DB encryption) is PARKED** | Decision: never implement application-layer field encryption for `email`/`phone`/`full_name`. CMEK + masking + email_hash + GDPR erasure cover the compliance requirement. See Section 5.6. |
 | **GCP auth is permanent in Codespace** | `waooaw-codespace-reader` SA activates automatically via `gcp-auth.sh` on every Codespace start. Run `gcloud auth list` to verify. Cloud SQL Proxy starts on port 15432 automatically. No user action needed. |
+| **`smoke-mobile-routes.sh`: `probe()` vs `probe_tracked()`** | `probe()` calls `curl` and exits 1 on 404 — use for routes that **must** exist on demo (breaks CI if absent). `probe_tracked()` is informational-only — use for routes that are **known-undeployed** on demo (e.g. `/auth/register` as of 2026-04-17) so the script logs the miss without failing the CI job. Never switch a known-404 route from `probe_tracked()` to `probe()` without first confirming it is deployed; doing so will fail CI for every PR. |
 | **Cloud SQL Auth Proxy required** | Always connect to `plant-sql-demo` via Cloud SQL Auth Proxy on `127.0.0.1:15432` for IAM auth. Never connect directly on port 5432. If you get `connection refused` on 15432, proxy is not running — restart with `bash .devcontainer/gcp-auth.sh`. If proxy startup or first connect fails with `instance does not have IP of type "PUBLIC"`, run `gcloud sql instances patch plant-sql-demo --assign-ip --project=waooaw-oauth --quiet`, wait for the operation to finish, then rerun the auth script. On cleaned-up devcontainer branches, gcloud comes from the devcontainer feature rather than the old shell bootstrap; `source /root/.env.db && psql` is still the canonical connect path after the proxy starts. For persistence work, this demo DB is the canonical validation target before Docker regression. |
 | **SA role scope** | `waooaw-codespace-reader` has `cloudsql.admin` — can patch Cloud SQL settings (e.g. `gcloud sql instances patch plant-sql-demo --assign-ip`). Has `secretmanager.secretAccessor` — can read all secret values. |
 | **Image promotion — no env baking** | **ONE image built once, promoted unchanged through demo → uat → prod.** All env-specific config MUST come from env vars (non-sensitive) or GCP Secret Manager (sensitive) — injected by terraform at deploy time. See §8.1 for the full checklist and §19 for code examples. **Terraform template anti-pattern that is BANNED**: `SOME_VAR = var.x != "" ? var.x : (var.environment == "demo" ? "value_a" : "value_b")` — this bakes environment-conditional logic into the template. Defaults belong in `variables.tf default =`, not in `main.tf` ternaries. Violations are reverted on review. This was found and fixed in PR #851 for CP Backend `PAYMENTS_MODE` and `OTP_DELIVERY_MODE`. |
@@ -2540,7 +2562,7 @@ This section exists to make handoff to zero-cost agents practical. Model choice 
 | Model | Access | Context window | Strengths | Monthly free limit |
 |-------|--------|----------------|-----------|-------------------|
 | **GPT-4o-mini** | GitHub Copilot Free tier (default) | 128K tokens | Fast, good at single-file edits, tests, small refactors, Q&A | 2,000 completions/month |
-| **Claude 3.5 Sonnet** | GitHub Copilot Free tier (premium) | 200K tokens | Complex reasoning, multi-file changes, large context analysis, architecture decisions | 50 requests/month |
+| **Claude Sonnet 4 (latest)** | GitHub Copilot Free tier (premium) | 200K tokens | Complex reasoning, multi-file changes, large context analysis, architecture decisions | 50 requests/month |
 | **GitHub Models API** | `GITHUB_TOKEN` in Codespaces/Actions | Varies | Script-based automation, ALM agent tasks | Rate-limited (free) |
 
 ### Task → Model decision matrix
@@ -2554,14 +2576,14 @@ This section exists to make handoff to zero-cost agents practical. Model choice 
 | Fix environment/config issues | GPT-4o-mini | Lookup-based, reference env vars | 14 + 15 + 17 |
 | Docker/compose changes | GPT-4o-mini | Focused, pattern-following | 5 + 15 |
 | Multi-file refactor (2-5 files, same component) | GPT-4o-mini | If files are in the same component, mini handles it | 4 (component) + 13 (all affected files) |
-| **Multi-component change** (CP + Gateway + Plant) | **Claude 3.5 Sonnet** | Needs to reason across service boundaries and communication flow | 4 + 5 + 6 + 13 (all affected) |
-| **Architecture decision** | **Claude 3.5 Sonnet** | Requires deep understanding of trade-offs, constitutional compliance | 1-6 + 17 |
-| **New feature spanning multiple services** | **Claude 3.5 Sonnet** | Cross-cutting concerns, needs full context | Full doc (fits in 200K) |
-| **Debugging cross-service auth/JWT issues** | **Claude 3.5 Sonnet** | Must understand Gateway middleware stack, JWT flow, secret sync | 6 + 9 + 14 + 17 |
-| **Terraform/GCP infrastructure changes** | **Claude 3.5 Sonnet** | Complex module dependencies, secret wiring, LB routing | 8 + 9 + 13 (terraform) |
-| **Database migration + model change** | **Claude 3.5 Sonnet** | Must understand BaseEntity, constitutional validators, Alembic | 3 + 10 + 13 (models + DB) |
-| **ALM workflow changes** | **Claude 3.5 Sonnet** | 2200+ line workflow, complex job chaining, concurrency | 7 + 13 (scripts + workflows) |
-| **Constitutional validator changes** | **Claude 3.5 Sonnet** | Core design pattern, affects all entities | 3 + 13 (validators + models) |
+| **Multi-component change** (CP + Gateway + Plant) | **Claude Sonnet 4 (latest)** | Needs to reason across service boundaries and communication flow | 4 + 5 + 6 + 13 (all affected) |
+| **Architecture decision** | **Claude Sonnet 4 (latest)** | Requires deep understanding of trade-offs, constitutional compliance | 1-6 + 17 |
+| **New feature spanning multiple services** | **Claude Sonnet 4 (latest)** | Cross-cutting concerns, needs full context | Full doc (fits in 200K) |
+| **Debugging cross-service auth/JWT issues** | **Claude Sonnet 4 (latest)** | Must understand Gateway middleware stack, JWT flow, secret sync | 6 + 9 + 14 + 17 |
+| **Terraform/GCP infrastructure changes** | **Claude Sonnet 4 (latest)** | Complex module dependencies, secret wiring, LB routing | 8 + 9 + 13 (terraform) |
+| **Database migration + model change** | **Claude Sonnet 4 (latest)** | Must understand BaseEntity, constitutional validators, Alembic | 3 + 10 + 13 (models + DB) |
+| **ALM workflow changes** | **Claude Sonnet 4 (latest)** | 2200+ line workflow, complex job chaining, concurrency | 7 + 13 (scripts + workflows) |
+| **Constitutional validator changes** | **Claude Sonnet 4 (latest)** | Core design pattern, affects all entities | 3 + 13 (validators + models) |
 | CI/CD pipeline tweaks | GPT-4o-mini | Usually single-file YAML edits | 7 + 8 |
 | README/docs updates | GPT-4o-mini | Text editing, low complexity | Relevant section |
 | Script automation | GitHub Models API | For ALM-triggered agent scripts | 7 + 13 (scripts) |
@@ -2571,9 +2593,9 @@ This section exists to make handoff to zero-cost agents practical. Model choice 
 1. **Default to GPT-4o-mini** — it handles 85% of tasks at zero marginal cost
 2. **Use Claude 3.5 Sonnet only when**: task touches 3+ files across 2+ components, OR requires architectural reasoning, OR involves the constitutional design pattern
 3. **Never paste the full document into GPT-4o-mini** — only paste the sections listed in the "Context sections" column above
-4. **Paste the full document into Claude 3.5 Sonnet** when doing cross-component work — it fits easily in 200K context
+4. **Paste the full document into Claude Sonnet 4 (latest)** when doing cross-component work — it fits easily in 200K context
 5. **Budget your 50 Claude requests/month**: ~2 per working day. Save them for complex tasks, use mini for everything else
-6. **For repetitive similar tasks** (e.g., adding 5 similar endpoints): use Claude for the first one to establish the pattern, then GPT-4o-mini for the remaining 4
+6. **For repetitive similar tasks** (e.g., adding 5 similar endpoints): use Claude Sonnet 4 (latest) for the first one to establish the pattern, then GPT-4o-mini for the remaining 4
 
 ### How to use this guide (agent instruction)
 
@@ -2669,7 +2691,7 @@ If any answer is `no`, the story is `Dev Complete` at best, not `customer-comple
 
 Before writing any code, **ask the user** to confirm the feature scope, then create a planning document.
 
-**Document location**: `docs/epics/EPIC_<NUMBER>_<SHORT_NAME>.md`
+**Document location**: `docs/<component>/iterations/<EPIC-ID>-<short-name>.md` (component = `CP`, `plant`, `mobile`, `PP`, or `infra`). Example: `docs/mobile/iterations/MOB-PARITY-2-mobile-full-parity.md`. This matches pm-planner agent output conventions.
 
 **Document structure**:
 
@@ -2930,6 +2952,19 @@ code ──► image:v1 ──┤  demo  (env vars from demo.tfvars)  │
 | Turnstile server key | `TURNSTILE_SECRET_KEY` | `TURNSTILE_SECRET_KEY` | CP Backend | YES |
 | Platform connection credentials | (runtime-written) | `hired-{hired_instance_id}-{platform_key}` | CP Backend (write), Plant Backend (read via `secret_ref`) | NO — different secret per connection; written at POST time by `GcpSecretManagerAdapter` |
 
+#### Mobile Build Secrets (EAS + GitHub Actions)
+
+> Full details in §23 (“Secrets — GitHub Secrets vs EAS Secrets”). Listed here for completeness so §20 remains a complete secret inventory.
+
+| Secret | GitHub Secret name | Used by | Sync critical? |
+|--------|-------------------|---------|---------------|
+| Expo access token | `EXPO_TOKEN` | `mobile-playstore-deploy.yml` | YES — EAS CLI auth |
+| Play Store SA key | `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` | `mobile-playstore-deploy.yml` | YES — Play Store submission |
+| Android OAuth client | `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID_DEMO` | EAS build (demo) | YES |
+| Web OAuth client | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID_DEMO` | EAS build (demo) | YES |
+| Plant API URL | `EXPO_PUBLIC_API_URL_DEMO` | EAS build (demo) | YES |
+| OAuth redirect scheme | `EXPO_PUBLIC_OAUTH_REDIRECT_SCHEME_DEMO` | EAS build (demo) | YES |
+
 ### How to update a secret
 
 ```bash
@@ -3044,9 +3079,11 @@ bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
 Replace `{SERVICE}` with a service name from the table above (e.g., `waooaw-cp-backend-demo`):
 
 ```bash
-# --- Authentication (must do first) ---
-gcloud auth login
-gcloud config set project waooaw-oauth
+# --- Authentication — SA is pre-configured in Codespace ---
+# DO NOT run 'gcloud auth login' — it overwrites the SA context with your personal Google account.
+# Instead, re-run the auth script if the SA shows as inactive:
+bash /workspaces/WAOOAW/.devcontainer/gcp-auth.sh
+gcloud auth list  # should show waooaw-codespace-reader\@waooaw-oauth.iam.gserviceaccount.com ACTIVE
 
 # --- Secrets ---
 gcloud secrets list                                         # List all secrets
@@ -3112,7 +3149,7 @@ terraform plan -var-file=environments/demo.tfvars            # Plan changes
 | App won't start locally | `docker-compose -f docker-compose.local.yml logs plant-backend --tail=50` |
 | 401 errors across services | Check JWT_SECRET matches: `echo $JWT_SECRET` in each container |
 | CP can't reach Gateway | `docker-compose -f docker-compose.local.yml exec cp-backend curl http://plant-gateway:8000/health` |
-| DB connection failing | `docker-compose -f docker-compose.local.yml exec postgres pg_isready -U waooaw` |
+| DB connection failing | `docker-compose -f docker-compose.local.yml exec db pg_isready -U waooaw` |
 | Check running containers | `docker-compose -f docker-compose.local.yml ps` |
 | GCP service unhealthy | `gcloud run services describe <service> --region=asia-south1 --format='get(status.conditions)'` |
 | GCP deployment failed | `gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR' --limit=10 --freshness=30m` |
@@ -3457,7 +3494,7 @@ gh run list --workflow=waooaw-deploy.yml --limit=5
 | Method | How |
 |--------|-----|
 | **Local (Docker)** | `docker compose -f docker-compose.local.yml exec db psql -U waooaw -d waooaw_db` |
-| **GCP Cloud SQL** | `gcloud sql connect waooaw-db --user=waooaw` (requires GCP auth + Cloud SQL Admin API) |
+| **GCP Cloud SQL (Codespace)** | `source /root/.env.db && psql` — Cloud SQL Auth Proxy on port 15432 (started by `gcp-auth.sh`); see §10 first-attempt checklist |
 | **Adminer UI (local)** | `http://localhost:8081` — server: `db`, user: `waooaw`, db: `waooaw_db` |
 
 **Common queries:**
@@ -3780,6 +3817,8 @@ When using EAS Build + Play Store App Signing, there are **two separate certific
 | Algorithm | Fingerprint | Source | Last Verified |
 |-----------|-------------|--------|---------------|
 | **SHA-1** | `3A:E5:69:D6:03:65:C3:FF:26:56:55:66:24:F6:DB:5C:C4:37:64:07` | Play Console → App Integrity | 2026-02-23 |
+
+> ⚠️ **SHA-1 conflict**: PR #755 (2026-02-24) registered Play App Signing key `8F:D5:89:B1:20:14:85:E3:73:E8:0C:C0:B0:1B:56:74:E5:2F:5F:FA` in GCP OAuth, Firebase, and `google-services.json`. The `3A:E5:69:D6…` fingerprint above was recorded on 2026-02-23 and likely refers to the **EAS upload certificate**, not the Play App Signing certificate. These are different keys. **Before any release**, re-verify the current SHA-1 in Play Console → Setup → App integrity → App signing key certificate and update the "Last Verified" date above.
 
 **Where this SHA-1 is used**:
 - GCP OAuth 2.0 Android Client: `270293855600-2shlgotsrqhv8doda15kr8noh74jjpcu.apps.googleusercontent.com`
@@ -4607,6 +4646,20 @@ Then immediately append the first entry for the current task.
 5. Confirm CI state if a PR exists: `gh pr checks <N> --repo dlai-sd/WAOOAW`
 6. Resume and append a new entry: "Resumed session — continuing from <previous title>"
 
+### 25.8b Enforcement gate (agent-pre-push.sh)
+
+`scripts/agent-pre-push.sh` emits a **WARNING** (non-blocking) when `session_commentary.md` has not been modified in the current branch:
+
+```bash
+# In scripts/agent-pre-push.sh — session commentary staleness check
+if ! git diff --name-only origin/main...HEAD 2>/dev/null | grep -q "session_commentary.md"; then
+  echo "⚠️  WARNING: session_commentary.md has no new entries in this branch."
+  echo "   Append a session entry per §25 before pushing to main."
+fi
+```
+
+This is a warning, not a hard exit. Any PR review that finds `session_commentary.md` unchanged should treat it as a process gap.
+
 ### 25.9 Example entry
 
 ```markdown
@@ -4647,6 +4700,8 @@ PR #852 was all CI-green. User confirmed intent to merge.
 ## 26. Agent Construct Design — Quick Reference
 
 > **Full document**: [`docs/PP/AGENT-CONSTRUCT-DESIGN.md`](PP/AGENT-CONSTRUCT-DESIGN.md) — v2, 2179 lines, 2026-03-07.
+
+> **§ number disambiguation**: The `§N` references in this quick-reference table (e.g. `§4`, `§13`, `§14`) refer to section numbers **within `docs/PP/AGENT-CONSTRUCT-DESIGN.md`**, NOT to sections of this document (`CONTEXT_AND_INDEX.md`). Both documents use `§` numbering. When cross-referencing, always write the full form **`AGENT-CONSTRUCT-DESIGN.md §N`** to avoid ambiguity.
 
 This document is the **single source of truth** for all construct-pipeline design decisions. Read it in full before modifying `agent_mold/`, any Scheduler/Pump/Processor/Connector/Publisher code, or the HookBus.
 
