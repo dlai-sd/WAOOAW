@@ -170,11 +170,8 @@ jobs:
     # Only run on PRs (demo env must be reachable) and only when mobile source changes.
     if: github.event_name == 'pull_request'
     needs: [lint-and-typecheck]
-    # continue-on-error: /auth/register, /auth/otp/start, /auth/otp/verify, /auth/refresh
-    # are pre-existing Plant Gateway gaps (not mounted on demo yet). Smoke test RUNS and
-    # reports results but does not block merging until those routes are deployed.
-    # Tracking: these routes will be unblocked in the Plant auth iteration.
-    continue-on-error: true
+    # Routes not yet deployed to demo Plant Gateway use probe_tracked() in the script
+    # (non-blocking). Only REQUIRED routes that regress to 404 cause exit 1.
 
     steps:
       - name: Checkout code
