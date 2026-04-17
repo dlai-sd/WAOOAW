@@ -19,7 +19,7 @@ import { DeliverableDetailScreen } from '@/screens/agents/DeliverableDetailScree
 const mockCpGet = jest.fn();
 const mockCpPost = jest.fn();
 
-jest.mock('@/lib/cpApiClient', () => ({
+jest.mock('@/lib/apiClient', () => ({
   __esModule: true,
   default: {
     get: (...args: unknown[]) => mockCpGet(...args),
@@ -101,7 +101,7 @@ function renderWithQuery(overrides: { navigation?: any; route?: any } = {}) {
 describe('DeliverableDetailScreen (E7-S1)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCpGet.mockResolvedValue({ data: MOCK_DELIVERABLE });
+    mockCpGet.mockResolvedValue({ data: [MOCK_DELIVERABLE] });
     mockCpPost.mockResolvedValue({ data: {} });
   });
 
@@ -134,7 +134,8 @@ describe('DeliverableDetailScreen (E7-S1)', () => {
     fireEvent.press(screen.getByTestId('detail-approve-btn'));
     await waitFor(() => {
       expect(mockCpPost).toHaveBeenCalledWith(
-        expect.stringContaining('/approve')
+        '/api/v1/deliverables/DEL-001/review',
+        { decision: 'approved' }
       );
     });
   });
@@ -155,8 +156,8 @@ describe('DeliverableDetailScreen (E7-S1)', () => {
     fireEvent.press(screen.getByTestId('reject-reason-confirm'));
     await waitFor(() => {
       expect(mockCpPost).toHaveBeenCalledWith(
-        expect.stringContaining('/reject'),
-        { reason: 'Wrong platform' }
+        '/api/v1/deliverables/DEL-001/review',
+        { decision: 'rejected', reason: 'Wrong platform' }
       );
     });
   });

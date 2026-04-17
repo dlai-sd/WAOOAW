@@ -44,6 +44,9 @@ module.exports = {
   collectCoverageFrom: [
     "src/services/**/*.{ts,tsx}",
     "src/lib/apiClient.ts",
+    "src/hooks/**/*.{ts,tsx}",
+    "src/screens/**/*.{ts,tsx}",
+    "src/components/**/*.{ts,tsx}",
     "!src/**/*.d.ts",
     "!src/**/*.stories.tsx",
     "!src/**/__tests__/**",
@@ -54,13 +57,38 @@ module.exports = {
     "!src/services/payment/**",
     "!src/services/analytics/**",
     "!src/services/monitoring/**",
+    "!src/services/notifications/**",
+    "!src/screens/**/__tests__/**",
+    "!src/components/**/__tests__/**",
+    "!src/hooks/**/__tests__/**",
+    // Voice components — require native audio APIs
+    "!src/components/voice/**",
+    "!src/hooks/useVoiceCommands.ts",
+    "!src/hooks/useSpeechToText.ts",
+    "!src/hooks/useTextToSpeech.ts",
+    "!src/hooks/useAgentVoiceOverlay.ts",
+    "!src/hooks/usePerformanceMonitoring.ts",
+    "!src/hooks/useRazorpay.ts",
+    // Legal/static screens — no business logic
+    "!src/screens/legal/**",
+    "!src/screens/profile/PrivacyPolicyScreen.tsx",
+    "!src/screens/profile/TermsOfServiceScreen.tsx",
+    // Analytics/feedback widgets — require native SDKs
+    "!src/components/analytics/**",
+    "!src/components/feedback/**",
+    // OTP Input — complex native component
+    "!src/components/OTPInput.tsx",
+    // Push notifications — native SDK
+    "!src/services/pushNotifications.service.ts",
+    // index re-export files — no logic to cover
+    "!src/**\/index.ts",
   ],
   coverageThreshold: {
     global: {
-      statements: 80,
-      branches: 80,
-      functions: 80,
-      lines: 80,
+      statements: 85,
+      branches: 85,
+      functions: 85,
+      lines: 85,
     },
   },
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],

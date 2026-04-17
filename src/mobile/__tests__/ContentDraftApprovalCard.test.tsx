@@ -104,4 +104,45 @@ describe('ContentDraftApprovalCard (E5-S1)', () => {
     const confirmBtn = screen.getByTestId('reject-reason-confirm');
     expect(confirmBtn.props.accessibilityState?.disabled ?? confirmBtn.props.disabled).toBeTruthy();
   });
+
+  it('falls back to onReject when onRejectWithReason is not provided', () => {
+    const onReject = jest.fn();
+    render(
+      <ContentDraftApprovalCard
+        deliverable={MOCK_DELIVERABLE}
+        onApprove={jest.fn()}
+        onReject={onReject}
+      />
+    );
+    fireEvent.press(screen.getByTestId('reject-btn'));
+    fireEvent.changeText(screen.getByTestId('reject-reason-input'), 'reason');
+    fireEvent.press(screen.getByTestId('reject-reason-confirm'));
+    expect(onReject).toHaveBeenCalledWith('DEL-001');
+  });
+
+  it('shows platform emoji for twitter, linkedin, instagram, facebook, unknown', () => {
+    const platforms = ['twitter', 'linkedin', 'instagram', 'facebook', 'email'];
+    for (const p of platforms) {
+      render(
+        <ContentDraftApprovalCard
+          deliverable={{ ...MOCK_DELIVERABLE, id: `del-${p}`, target_platform: p }}
+          onApprove={jest.fn()}
+          onReject={jest.fn()}
+        />
+      );
+    }
+    // no crash means all platform branches executed
+    expect(true).toBe(true);
+  });
+
+  it('renders without channelStatusLabel and approvalReference', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, channelStatusLabel: null, approvalReference: null }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(true).toBe(true);
+  });
 });

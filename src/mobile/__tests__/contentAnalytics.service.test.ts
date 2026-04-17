@@ -4,7 +4,7 @@
 
 const mockCpGet = jest.fn();
 
-jest.mock('../src/lib/cpApiClient', () => ({
+jest.mock('../src/lib/apiClient', () => ({
   __esModule: true,
   default: {
     get: (...args: unknown[]) => mockCpGet(...args),
@@ -30,6 +30,6 @@ describe('contentAnalytics.service', () => {
     const result = await getContentRecommendations('ha1');
 
     expect(result).toEqual(mockData);
-    expect(mockCpGet).toHaveBeenCalledWith('/cp/content-recommendations/ha1');
+    expect(mockCpGet).toHaveBeenCalledWith('/api/v1/hired-agents/ha1/content-recommendations');
   });
 });

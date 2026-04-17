@@ -1,4 +1,4 @@
-import cpApiClient from '@/lib/cpApiClient'
+import apiClient from '@/lib/apiClient'
 import {
   listCustomerDraftBatches,
   createDraftBatch,
@@ -7,7 +7,7 @@ import {
   createContentBatchFromTheme,
 } from '@/services/marketingReview.service'
 
-jest.mock('@/lib/cpApiClient', () => ({
+jest.mock('@/lib/apiClient', () => ({
   __esModule: true,
   default: {
     get: jest.fn(),
@@ -15,8 +15,8 @@ jest.mock('@/lib/cpApiClient', () => ({
   },
 }))
 
-const mockGet = (cpApiClient.get as jest.Mock)
-const mockPost = (cpApiClient.post as jest.Mock)
+const mockGet = (apiClient.get as jest.Mock)
+const mockPost = (apiClient.post as jest.Mock)
 
 const mockBatch = {
   batch_id: 'b1',
@@ -58,7 +58,7 @@ describe('marketingReview.service', () => {
     mockPost.mockResolvedValueOnce({ data: { post_id: 'p1', decision: 'rejected' } })
     await rejectDraftPost('p1', 'off-brand')
     const callArgs = mockPost.mock.calls[0]
-    expect(callArgs[0]).toBe('/cp/marketing/draft-posts/reject')
-    expect(callArgs[1]).toEqual({ post_id: 'p1', reason: 'off-brand' })
+    expect(callArgs[0]).toBe('/api/v1/marketing/draft-posts/p1/reject')
+    expect(callArgs[1]).toEqual({ reason: 'off-brand' })
   })
 })

@@ -45,8 +45,24 @@ jest.mock("expo-secure-store", () => ({
 }));
 
 jest.mock("expo-auth-session", () => ({
-  useAuthRequest: jest.fn(),
-  makeRedirectUri: jest.fn(),
+  useAuthRequest: jest.fn(() => [null, null, jest.fn()]),
+  makeRedirectUri: jest.fn(() => 'https://mock-redirect-uri'),
+  ResponseType: {
+    IdToken: 'id_token',
+    Token: 'token',
+    Code: 'code',
+  },
+  AuthSession: {
+    ResponseType: {
+      IdToken: 'id_token',
+      Token: 'token',
+      Code: 'code',
+    },
+  },
+}));
+
+jest.mock("expo-auth-session/providers/google", () => ({
+  useAuthRequest: jest.fn(() => [null, null, jest.fn()]),
 }));
 
 jest.mock("expo-crypto", () => ({
@@ -265,6 +281,12 @@ jest.mock("react-native", () => {
     Dimensions: {
       get: jest.fn(() => ({ width: 375, height: 812 })),
     },
+    Switch: 'Switch',
+    Linking: {
+      openURL: jest.fn().mockResolvedValue(undefined),
+      canOpenURL: jest.fn().mockResolvedValue(true),
+    },
+    Pressable: 'Pressable',
   };
 });
 

@@ -81,6 +81,18 @@ jest.mock('@/lib/cpApiClient', () => ({
   },
 }));
 
+// Screen now calls apiClient for skills (GET /api/v1/agents/{id}/skills)
+// and for pause/resume (POST /api/v1/hired-agents/{id}/pause|resume)
+// and for brief save PATCH /api/v1/hired-agents/{id}/skills/{skillId}/customer-config
+jest.mock('@/lib/apiClient', () => ({
+  __esModule: true,
+  default: {
+    get: (...args: unknown[]) => mockCpGet(...args),
+    patch: (...args: unknown[]) => mockCpPatch(...args),
+    post: (...args: unknown[]) => mockCpPost(...args),
+  },
+}));
+
 jest.mock('@/components/ScheduledPostsSection', () => ({
   ScheduledPostsSection: () => null,
 }));
@@ -362,9 +374,9 @@ describe('AgentOperationsScreen', () => {
 
     await waitFor(() => {
       expect(mockCpPatch).toHaveBeenCalledWith(
-        '/cp/hired-agents/hi-1/skills/skill-theme-discovery/goal-config',
+        '/api/v1/hired-agents/hi-1/skills/skill-theme-discovery/customer-config',
         expect.objectContaining({
-          goal_config: expect.objectContaining({
+          customer_fields: expect.objectContaining({
             objective: 'Drive qualified appointment requests',
             success_metrics: 'Consult bookings and watch-through rate',
           }),

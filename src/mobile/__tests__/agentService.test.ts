@@ -1,6 +1,8 @@
 /**
- * Agent Service Tests
- * Tests for agent service API calls
+ * Agent Service Tests — updated to match refactored API paths
+ * listAgents → /api/v1/catalog/agents (with catalogToAgent mapper)
+ * searchAgents → client-side filter on catalog results
+ * All other endpoints → /api/v1/...
  */
 
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
@@ -35,86 +37,72 @@ describe('AgentService', () => {
 
       const result = await agentService.listAgentTypes();
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agent-types');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/agent-types');
       expect(result).toEqual(mockAgentTypes);
     });
   });
 
   describe('listAgents', () => {
-    it('should fetch agents without filters', async () => {
-      const mockAgents: Agent[] = [
-        {
-          id: 'agent-1',
-          name: 'Content Marketing Agent',
-          description: 'Creates content',
-          job_role_id: 'role-1',
-          industry: 'marketing',
-          entity_type: 'agent',
-          status: 'active',
-          created_at: '2024-01-01T00:00:00Z',
-        },
-      ];
+    // listAgents now calls /api/v1/catalog/agents and maps via catalogToAgent
+    const mockCatalog = [
+      {
+        release_id: 'rel-1',
+        id: 'agent-1',
+        public_name: 'Content Marketing Agent',
+        short_description: 'Creates content',
+        industry_name: 'marketing',
+        job_role_label: 'Content Marketer',
+        monthly_price_inr: 12000,
+        trial_days: 7,
+        allowed_durations: ['monthly'],
+        supported_channels: ['youtube'],
+        agent_type_id: 'type-1',
+        lifecycle_state: 'live',
+        approved_for_new_hire: true,
+        retired_from_catalog_at: null,
+      },
+    ];
 
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgents });
+    it('should fetch agents from catalog endpoint', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCatalog });
 
       const result = await agentService.listAgents();
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents');
-      expect(result).toEqual(mockAgents);
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents');
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Content Marketing Agent');
+      expect(result[0].price).toBe(12000);
     });
 
-    it('should fetch agents with industry filter', async () => {
-      const mockAgents: Agent[] = [
-        {
-          id: 'agent-1',
-          name: 'Content Marketing Agent',
-          description: 'Creates content',
-          job_role_id: 'role-1',
-          industry: 'marketing',
-          entity_type: 'agent',
-          status: 'active',
-          created_at: '2024-01-01T00:00:00Z',
-        },
+    it('should filter agents by industry client-side', async () => {
+      const multiCatalog = [
+        { ...mockCatalog[0], id: 'a1', industry_name: 'marketing', lifecycle_state: 'live' },
+        { ...mockCatalog[0], id: 'a2', public_name: 'Edu Agent', industry_name: 'education', lifecycle_state: 'live' },
       ];
-
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgents });
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: multiCatalog });
 
       const result = await agentService.listAgents({ industry: 'marketing' });
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents?industry=marketing');
-      expect(result).toEqual(mockAgents);
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents');
+      expect(result).toHaveLength(1);
+      expect(result[0].industry).toBe('marketing');
     });
 
-    it('should fetch agents with multiple filters', async () => {
-      const mockAgents: Agent[] = [];
+    it('should map lifecycle_state=live to status=active', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCatalog });
 
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgents });
+      const result = await agentService.listAgents();
 
-      await agentService.listAgents({
-        industry: 'education',
-        status: 'active',
-        limit: 10,
-        offset: 0,
-      });
-
-      expect(apiClient.get).toHaveBeenCalledWith(
-        '/v1/agents?industry=education&status=active&limit=10&offset=0'
-      );
+      expect(result[0].status).toBe('active');
     });
 
-    it('should handle empty filter values', async () => {
-      const mockAgents: Agent[] = [];
+    it('should map non-live lifecycle_state to status=inactive', async () => {
+      const retired = [{ ...mockCatalog[0], lifecycle_state: 'retired' }];
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: retired });
 
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgents });
+      const result = await agentService.listAgents();
 
-      await agentService.listAgents({
-        industry: undefined,
-        status: 'active',
-        limit: null as any,
-      });
-
-      // Should only include status (not undefined/null values)
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents?status=active');
+      expect(result[0].status).toBe('inactive');
     });
   });
 
@@ -137,52 +125,54 @@ describe('AgentService', () => {
 
       const result = await agentService.getAgent('agent-123');
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents/agent-123');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/agents/agent-123');
       expect(result).toEqual(mockAgent);
     });
   });
 
   describe('searchAgents', () => {
-    it('should search agents with query', async () => {
-      const mockAgents: Agent[] = [
-        {
-          id: 'agent-1',
-          name: 'Marketing Agent',
-          description: 'Marketing specialist',
-          job_role_id: 'role-1',
-          industry: 'marketing',
-          entity_type: 'agent',
-          status: 'active',
-          created_at: '2024-01-01T00:00:00Z',
-        },
-      ];
+    // searchAgents does client-side filtering on top of catalog
+    const mockCatalog = [
+      {
+        release_id: 'rel-1', id: 'a1', public_name: 'Marketing Agent', short_description: 'Marketing',
+        industry_name: 'marketing', job_role_label: 'Marketer', monthly_price_inr: 12000, trial_days: 7,
+        allowed_durations: ['monthly'], supported_channels: ['youtube'], agent_type_id: 'type-1',
+        lifecycle_state: 'live', approved_for_new_hire: true, retired_from_catalog_at: null,
+      },
+      {
+        release_id: 'rel-2', id: 'a2', public_name: 'Sales Agent', short_description: 'Sales',
+        industry_name: 'sales', job_role_label: 'SDR', monthly_price_inr: 10000, trial_days: 7,
+        allowed_durations: ['monthly'], supported_channels: [], agent_type_id: 'type-2',
+        lifecycle_state: 'live', approved_for_new_hire: true, retired_from_catalog_at: null,
+      },
+    ];
 
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgents });
+    it('should filter agents by query string (name match)', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCatalog });
 
       const result = await agentService.searchAgents('marketing');
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents?q=marketing');
-      expect(result).toEqual(mockAgents);
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents');
+      expect(result.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('should search with query and filters', async () => {
-      const mockAgents: Agent[] = [];
+    it('should return all agents when query is empty/whitespace', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCatalog });
 
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgents });
+      const result = await agentService.searchAgents('   ');
 
-      await agentService.searchAgents('content', { industry: 'marketing', limit: 5 });
-
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents?industry=marketing&limit=5&q=content');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents');
+      expect(result).toHaveLength(2);
     });
 
-    it('should fallback to listAgents when query is empty', async () => {
-      const mockAgents: Agent[] = [];
+    it('should combine query and industry filter', async () => {
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCatalog });
 
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgents });
+      const result = await agentService.searchAgents('agent', { industry: 'sales' });
 
-      await agentService.searchAgents('   '); // Empty/whitespace query
-
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents');
+      // Only the sales agent should remain after industry filter
+      expect(result.every((a) => a.industry === 'sales')).toBe(true);
     });
   });
 
@@ -204,7 +194,7 @@ describe('AgentService', () => {
 
       const result = await agentService.listSkills();
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/skills');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/skills');
       expect(result).toEqual(mockSkills);
     });
 
@@ -215,7 +205,7 @@ describe('AgentService', () => {
 
       await agentService.listSkills({ category: 'domain_expertise', limit: 20 });
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/skills?category=domain_expertise&limit=20');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/skills?category=domain_expertise&limit=20');
     });
   });
 
@@ -235,7 +225,7 @@ describe('AgentService', () => {
 
       const result = await agentService.getSkill('skill-123');
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/skills/skill-123');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/skills/skill-123');
       expect(result).toEqual(mockSkill);
     });
   });
@@ -259,7 +249,7 @@ describe('AgentService', () => {
 
       const result = await agentService.listJobRoles({ limit: 10 });
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/job-roles?limit=10');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/job-roles?limit=10');
       expect(result).toEqual(mockJobRoles);
     });
   });
@@ -281,43 +271,34 @@ describe('AgentService', () => {
 
       const result = await agentService.getJobRole('role-123');
 
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/job-roles/role-123');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/job-roles/role-123');
       expect(result).toEqual(mockJobRole);
     });
   });
 
   describe('buildQueryString', () => {
-    it('should build query string with single param', async () => {
+    it('should always call catalog endpoint for listAgents', async () => {
       (apiClient.get as jest.Mock).mockResolvedValue({ data: [] });
-      
+
       await agentService.listAgents({ industry: 'marketing' });
-      
-      expect(apiClient.get).toHaveBeenCalledWith('/v1/agents?industry=marketing');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents');
     });
 
-    it('should build query string with multiple params', async () => {
+    it('should always call catalog endpoint for searchAgents', async () => {
       (apiClient.get as jest.Mock).mockResolvedValue({ data: [] });
-      
-      await agentService.listAgents({ 
-        industry: 'education',
-        status: 'active',
-        limit: 20,
-        offset: 10,
-      });
-      
-      expect(apiClient.get).toHaveBeenCalledWith(
-        '/v1/agents?industry=education&status=active&limit=20&offset=10'
-      );
+
+      await agentService.searchAgents('test');
+
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents');
     });
 
-    it('should handle special characters in query params', async () => {
+    it('should build query string for skills endpoint', async () => {
       (apiClient.get as jest.Mock).mockResolvedValue({ data: [] });
-      
-      await agentService.searchAgents('marketing & sales');
-      
-      expect(apiClient.get).toHaveBeenCalledWith(
-        '/v1/agents?q=marketing%20%26%20sales'
-      );
+
+      await agentService.listSkills({ category: 'technical', limit: 5 });
+
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/skills?category=technical&limit=5');
     });
   });
 });

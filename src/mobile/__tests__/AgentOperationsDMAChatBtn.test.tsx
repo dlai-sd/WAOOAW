@@ -67,6 +67,15 @@ jest.mock('@/lib/cpApiClient', () => ({
   },
 }))
 
+jest.mock('@/lib/apiClient', () => ({
+  __esModule: true,
+  default: {
+    get: (...args: unknown[]) => mockCpGet(...args),
+    patch: (...args: unknown[]) => mockCpPatch(...args),
+    post: (...args: unknown[]) => mockCpPost(...args),
+  },
+}))
+
 jest.mock('@/hooks/useAgentVoiceOverlay', () => ({
   useAgentVoiceOverlay: jest.fn(() => ({
     isListening: false,
