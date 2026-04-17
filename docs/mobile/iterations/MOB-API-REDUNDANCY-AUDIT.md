@@ -13,7 +13,7 @@
 | Audit ID | MOB-API-REDUNDANCY-AUDIT |
 | Date | 2026-04-14 |
 | Scope | `src/mobile/src/services/`, `src/mobile/src/hooks/`, `src/CP/FrontEnd/src/`, `src/CP/BackEnd/api/`, `src/Plant/BackEnd/api/` |
-| Status | Open — pending remediation |
+| Status | **Partially closed** — Wave 1+2 CP→Gateway migration complete (2026-04-xx); remaining items in §6 |
 
 ---
 
@@ -39,12 +39,12 @@
 | Get Agent | `/v1/agents/{id}` | Both via Plant |
 | Agent Types | `/v1/agent-types` | Both via Plant |
 | Trial Status | `/v1/trial-status` | Both via Plant |
-| My Agents Summary | `/cp/my-agents/summary` | Both via CP Backend |
-| Platform Connections (list/create/delete) | `/cp/hired-agents/{id}/platform-connections` | Both via CP Backend |
-| YouTube OAuth Start | `/cp/youtube-connections/connect/start` | Both via CP Backend |
-| Content Recommendations | `/cp/content-recommendations/{id}` | Both via CP Backend |
-| Invoices (list / HTML) | `/cp/invoices`, `/cp/invoices/{id}/html` | Both via CP Backend |
-| Receipts (list / HTML) | `/cp/receipts`, `/cp/receipts/{id}/html` | Both via CP Backend |
+| My Agents Summary | `/api/v1/hired-agents/by-customer/{customerId}` | Mobile → Plant Gateway ✅ migrated |
+| Platform Connections (list/create/delete) | `/api/v1/hired-agents/{id}/platform-connections` | Mobile → Plant Gateway ✅ migrated |
+| YouTube OAuth Start | `/api/v1/customer-platform-connections/youtube/connect/start` | Mobile → Plant Gateway ✅ migrated |
+| Content Recommendations | `/api/v1/hired-agents/{id}/content-recommendations` | Mobile → Plant Gateway ✅ migrated |
+| Invoices (list / HTML) | `/api/v1/invoices`, `/api/v1/invoices/{id}/html` | Mobile → Plant Gateway ✅ migrated |
+| Receipts (list / HTML) | `/api/v1/receipts`, `/api/v1/receipts/{id}/html` | Mobile → Plant Gateway ✅ migrated |
 
 ---
 
@@ -63,9 +63,9 @@
 | Feature Area | CP Endpoint(s) | Notes |
 |---|---|---|
 | Goal management | `/cp/hired-agents/{id}/goals` (GET/PUT/DELETE) | Mobile cannot list, create, or delete goals |
-| Deliverable review | `/cp/hired-agents/{id}/deliverables`, `.../review` | Mobile cannot review or approve deliverables |
+| Deliverable review | `/api/v1/hired-agents/{id}/deliverables`, `POST /api/v1/deliverables/{id}/review` | ✅ Implemented in Wave 2 — approve/reject via Plant Gateway |
 | Brand voice | `/cp/brand-voice` (GET/PATCH) | Mobile cannot view or update brand voice |
-| Digital marketing activation | `/cp/digital-marketing/activation`, `/themes/plan` | Mobile missing DMA setup |
+| Digital marketing activation | `/api/v1/hired-agents/{id}/digital-marketing-activation`, `/generate-theme-plan` | ✅ Implemented in Wave 1 — DMA flows via Plant Gateway |
 | Profile | `/cp/profile` (GET/PATCH) | Mobile cannot view or edit profile |
 | Platform credentials | `/cp/platform-credentials` (GET/POST) | Mobile cannot manage provider credentials |
 | Subscriptions | `/cp/subscriptions/`, `.../cancel` | Mobile cannot list or cancel subscriptions |
@@ -80,13 +80,13 @@
 
 ## 5. Architecture Observation
 
-The mobile app uses two API clients:
+The mobile app now uses a single API client:
 
-- **`apiClient`** → Plant Gateway (most calls)
-- **`cpApiClient`** → CP Backend (specific `/cp/*` routes)
+- **`apiClient`** → Plant Gateway (`/api/v1/...` and `/auth/...`)
+- ~~**`cpApiClient`** → CP Backend~~ — **removed in Wave 1+2 migration (2026-04-xx)**
 
-CP Frontend routes everything through the gateway, which proxies to CP Backend or Plant.
-This split creates a maintenance burden when endpoints drift between the two paths.
+CP Frontend still routes through the gateway which proxies to CP Backend or Plant.
+Mobile is now fully Plant Gateway-native; `cpApiClient` has zero production references remaining.
 
 ---
 
@@ -98,4 +98,31 @@ This split creates a maintenance burden when endpoints drift between the two pat
 | **P1** | Standardize skills/job-roles URL prefix (drop `/genesis/`) | 1 story |
 | **P1** | Consolidate Google Auth verify to single canonical endpoint | 1 story |
 | **P2** | Add mobile-only endpoints (refund, status) to CP if needed | 2 stories |
-| **P3** | Close mobile feature gaps (goals, deliverables, brand voice, etc.) | Multi-sprint |
+| **P3** | Close mobile feature gaps (goals, brand voice, etc.) | Multi-sprint |
+
+---
+
+## 7. CP → Plant Gateway Migration Log (Wave 1 + 2, 2026-04-xx)
+
+All `cpApiClient` calls have been removed from production mobile code. Every route now calls Plant Gateway directly via `apiClient`.
+
+| Route | Before (CP Backend) | After (Plant Gateway) |
+|---|---|---|
+| My agents list | `GET /cp/my-agents/summary` | `GET /api/v1/hired-agents/by-customer/{customerId}` |
+| By-subscription | `GET /cp/hired-agents/by-subscription/{id}` | `GET /api/v1/hired-agents/by-subscription/{id}` |
+| Deliverables / approval queue | `/cp/hired-agents/{id}/approval-queue` | `GET /api/v1/hired-agents/{id}/deliverables?status=pending_review` |
+| Approve / Reject | `/cp/.../approve\|reject` | `POST /api/v1/deliverables/{id}/review` with `{decision}` |
+| Skills, pause, resume | `/cp/hired-agents/{id}/...` | `/api/v1/hired-agents/{id}/...` |
+| Goal config PATCH | `/goal-config` body `{goal_config}` | `/customer-config` body `{customer_fields}` |
+| DMA activation | `/cp/digital-marketing-activation/{id}` | `/api/v1/hired-agents/{id}/digital-marketing-activation` |
+| Marketing drafts | `/cp/marketing/...` | `/api/v1/marketing/...` |
+| Platform connections / YouTube OAuth | `/cp/hired-agents/{id}/platform-connections`, `/cp/youtube-connections/connect/start` | `/api/v1/hired-agents/{id}/platform-connections`, `/api/v1/customer-platform-connections/youtube/connect/start` |
+| Invoices / Receipts | `/cp/invoices`, `/cp/receipts` | `/api/v1/invoices`, `/api/v1/receipts` (Gateway auto-injects `customer_id` from JWT) |
+| Content recommendations | `/cp/content-recommendations/{id}` | `/api/v1/hired-agents/{id}/content-recommendations` |
+
+### Bugs discovered and fixed during audit
+
+| Bug | Old behaviour | Fix |
+|---|---|---|
+| `fetchDeliverable` single GET | CP route `/cp/approval-queue/{deliverableId}` never existed in CP or Plant — would 404 | Replaced with Plant list `GET /api/v1/hired-agents/{id}/deliverables` + client-side `.find(d => d.id === deliverableId)` |
+| `rejectDraftPost` | CP wrote rejection to `FileCPApprovalStore` (local file) — invisible to Plant DB | Now calls Plant directly: `POST /api/v1/marketing/draft-posts/{postId}/reject` |

@@ -5,6 +5,7 @@
  */
 
 import apiClient from '../../lib/apiClient';
+import { getAPIConfig } from '../../config/api.config';
 import type {
   Agent,
   AgentListParams,
@@ -14,6 +15,46 @@ import type {
   JobRole,
   JobRoleListParams,
 } from '../../types/agent.types';
+
+/**
+ * Shape returned by Plant Backend /api/v1/catalog/agents
+ */
+interface CatalogAgentResponse {
+  release_id: string;
+  id: string;
+  public_name: string;
+  short_description: string;
+  industry_name: string;
+  job_role_label: string;
+  monthly_price_inr: number;
+  trial_days: number;
+  allowed_durations: string[];
+  supported_channels: string[];
+  agent_type_id: string;
+  lifecycle_state: string;
+  approved_for_new_hire: boolean;
+  retired_from_catalog_at: string | null;
+}
+
+/**
+ * Map a catalog release record → mobile Agent shape
+ */
+function catalogToAgent(c: CatalogAgentResponse): Agent {
+  return {
+    id: c.id,
+    name: c.public_name,
+    description: c.short_description,
+    industry: (c.industry_name || '').toLowerCase() as Agent['industry'],
+    job_role_id: '',          // not in catalog; not used by AgentCard
+    entity_type: 'agent',
+    status: c.lifecycle_state === 'live' ? 'active' : 'inactive',
+    specialization: c.job_role_label,
+    price: c.monthly_price_inr,
+    trial_days: c.trial_days,
+    allowed_durations: c.allowed_durations,
+    created_at: new Date().toISOString(),
+  };
+}
 
 /**
  * Agent Service - Type-safe client for Plant agent endpoints
@@ -39,7 +80,7 @@ class AgentService {
    * @returns Promise<AgentTypeDefinition[]>
    */
   async listAgentTypes(): Promise<AgentTypeDefinition[]> {
-    const response = await apiClient.get<AgentTypeDefinition[]>('/v1/agent-types');
+    const response = await apiClient.get<AgentTypeDefinition[]>('/api/v1/agent-types');
     return response.data;
   }
 
@@ -53,9 +94,25 @@ class AgentService {
    * @returns Promise<Agent[]>
    */
   async listAgents(params: AgentListParams = {}): Promise<Agent[]> {
-    const query = this.buildQueryString(params);
-    const response = await apiClient.get<Agent[]>(`/v1/agents${query}`);
-    return response.data;
+    // Use the catalog endpoint — it returns live marketplace releases with pricing,
+    // trial config, and display names. The raw /api/v1/agents table is for PP admin.
+    const response = await apiClient.get<CatalogAgentResponse[]>('/api/v1/catalog/agents');
+    const all = response.data.map(catalogToAgent);
+
+    // Apply client-side filters that the catalog endpoint doesn't support directly
+    return all.filter((agent) => {
+      if (params.industry && agent.industry !== params.industry) return false;
+      if (params.q) {
+        const needle = params.q.trim().toLowerCase();
+        if (needle && !(
+          agent.name.toLowerCase().includes(needle) ||
+          (agent.description || '').toLowerCase().includes(needle) ||
+          (agent.specialization || '').toLowerCase().includes(needle) ||
+          agent.industry.toLowerCase().includes(needle)
+        )) return false;
+      }
+      return true;
+    });
   }
 
   /**
@@ -66,7 +123,7 @@ class AgentService {
    * @returns Promise<Agent>
    */
   async getAgent(agentId: string): Promise<Agent> {
-    const response = await apiClient.get<Agent>(`/v1/agents/${agentId}`);
+    const response = await apiClient.get<Agent>(`/api/v1/agents/${agentId}`);
     return response.data;
   }
 
@@ -97,7 +154,7 @@ class AgentService {
    */
   async listSkills(params: SkillListParams = {}): Promise<Skill[]> {
     const query = this.buildQueryString(params);
-    const response = await apiClient.get<Skill[]>(`/v1/skills${query}`);
+    const response = await apiClient.get<Skill[]>(`/api/v1/skills${query}`);
     return response.data;
   }
 
@@ -108,7 +165,7 @@ class AgentService {
    * @returns Promise<Skill>
    */
   async getSkill(skillId: string): Promise<Skill> {
-    const response = await apiClient.get<Skill>(`/v1/skills/${skillId}`);
+    const response = await apiClient.get<Skill>(`/api/v1/skills/${skillId}`);
     return response.data;
   }
 
@@ -122,7 +179,7 @@ class AgentService {
    */
   async listJobRoles(params: JobRoleListParams = {}): Promise<JobRole[]> {
     const query = this.buildQueryString(params);
-    const response = await apiClient.get<JobRole[]>(`/v1/job-roles${query}`);
+    const response = await apiClient.get<JobRole[]>(`/api/v1/job-roles${query}`);
     return response.data;
   }
 
@@ -133,7 +190,7 @@ class AgentService {
    * @returns Promise<JobRole>
    */
   async getJobRole(jobRoleId: string): Promise<JobRole> {
-    const response = await apiClient.get<JobRole>(`/v1/job-roles/${jobRoleId}`);
+    const response = await apiClient.get<JobRole>(`/api/v1/job-roles/${jobRoleId}`);
     return response.data;
   }
 }

@@ -5,7 +5,7 @@
  * YouTube OAuth uses a separate endpoint from general platform connections.
  */
 
-import cpApiClient from '../lib/cpApiClient';
+import apiClient from '../lib/apiClient';
 
 export interface PlatformConnection {
   id: string;
@@ -27,8 +27,8 @@ export interface CreateConnectionBody {
 }
 
 export async function listPlatformConnections(hiredAgentId: string): Promise<PlatformConnection[]> {
-  const response = await cpApiClient.get<PlatformConnection[]>(
-    `/cp/hired-agents/${hiredAgentId}/platform-connections`
+  const response = await apiClient.get<PlatformConnection[]>(
+    `/api/v1/hired-agents/${hiredAgentId}/platform-connections`
   );
   const data = response.data;
   if (Array.isArray(data)) return data;
@@ -42,8 +42,8 @@ export async function createPlatformConnection(
   hiredAgentId: string,
   body: CreateConnectionBody
 ): Promise<PlatformConnection> {
-  const response = await cpApiClient.post<PlatformConnection>(
-    `/cp/hired-agents/${hiredAgentId}/platform-connections`,
+  const response = await apiClient.post<PlatformConnection>(
+    `/api/v1/hired-agents/${hiredAgentId}/platform-connections`,
     body
   );
   return response.data;
@@ -53,14 +53,14 @@ export async function deletePlatformConnection(
   hiredAgentId: string,
   connectionId: string
 ): Promise<void> {
-  await cpApiClient.delete(
-    `/cp/hired-agents/${hiredAgentId}/platform-connections/${connectionId}`
+  await apiClient.delete(
+    `/api/v1/hired-agents/${hiredAgentId}/platform-connections/${connectionId}`
   );
 }
 
 export async function startYouTubeOAuth(redirectUri: string): Promise<{ authorization_url: string }> {
-  const response = await cpApiClient.post<{ authorization_url: string }>(
-    '/cp/youtube-connections/connect/start',
+  const response = await apiClient.post<{ authorization_url: string }>(
+    '/api/v1/customer-platform-connections/youtube/connect/start',
     { redirect_uri: redirectUri }
   );
   return response.data;

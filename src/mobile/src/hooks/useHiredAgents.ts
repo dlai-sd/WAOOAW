@@ -5,6 +5,7 @@
 
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { hiredAgentsService } from '../services/hiredAgents/hiredAgents.service';
+import { useCurrentUser } from '../store/authStore';
 import type {
   Deliverable,
   MyAgentInstanceSummary,
@@ -30,9 +31,12 @@ import type {
  * ```
  */
 export function useHiredAgents(): UseQueryResult<MyAgentInstanceSummary[], Error> {
+  const user = useCurrentUser();
+  const customerId = user?.customer_id ?? '';
   return useQuery({
-    queryKey: ['hiredAgents'],
-    queryFn: () => hiredAgentsService.listMyAgents(),
+    queryKey: ['hiredAgents', customerId],
+    queryFn: () => hiredAgentsService.listMyAgents(customerId),
+    enabled: !!customerId,
     staleTime: 1000 * 60 * 2, // 2 minutes (shorter than agents list for freshness)
     gcTime: 1000 * 60 * 15, // 15 minutes
     refetchOnWindowFocus: true,

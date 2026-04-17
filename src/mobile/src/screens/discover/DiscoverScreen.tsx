@@ -15,8 +15,8 @@ import {
   RefreshControl,
   TouchableOpacity,
   TextInput,
+  FlatList,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import { useTheme } from '../../hooks/useTheme';
 import { useAgents } from '../../hooks/useAgents';
 import { AgentCard } from '../../components/AgentCard';
@@ -342,7 +342,7 @@ export const DiscoverScreen = ({ route, navigation }: Props) => {
       </View>
 
       {/* Agent List */}
-      <FlashList
+      <FlatList
         data={filteredAgents}
         renderItem={({ item }: { item: Agent }) => <AgentCard agent={item} />}
         keyExtractor={(item: Agent) => item.id}

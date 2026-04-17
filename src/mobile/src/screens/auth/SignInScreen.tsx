@@ -118,9 +118,11 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
         };
         login(authUser);
 
-        // Persist to AsyncStorage so authStore.initialize() finds user data
-        // on the next app start (it reads from userDataService, not secureStorage).
-        await userDataService.saveUserData(authUser);
+        // Persist to AsyncStorage for next app start — fire-and-forget so
+        // navigation to the dashboard is not blocked by storage write latency.
+        userDataService.saveUserData(authUser).catch((e) =>
+          console.warn('[SignInScreen] saveUserData failed (non-blocking):', e)
+        );
 
         // Navigate to main app
         if (onSignInSuccess) {
@@ -170,7 +172,9 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     }
   }, [oauthError]);
 
-  const isLoading = oauthLoading || isSigningIn;
+  // True while: OAuth redirect in flight, backend JWT exchange in flight,
+  // OR idToken received but useEffect not yet set isSigningIn (1 render gap).
+  const isLoading = oauthLoading || isSigningIn || !!idToken;
 
   return (
     <SafeAreaView

@@ -2277,7 +2277,7 @@ Use this shortlist when the task is broader than runtime routes.
 | `src/navigation/` | Main navigation graph and screen registration |
 | `src/screens/` | Customer-facing mobile screens |
 | `src/hooks/` | React Query and screen-level hooks |
-| `src/lib/cpApiClient.ts` | Mobile HTTP client — correlation ID propagation, retries, auth headers |
+| `src/lib/apiClient.ts` | Mobile HTTP client — correlation ID propagation, retries, auth headers. All production calls use `apiClient` → Plant Gateway; `cpApiClient` was removed in Wave 1+2 migration (see `docs/mobile/iterations/MOB-API-REDUNDANCY-AUDIT.md §7`) |
 | `src/stores/authStore.ts` | Auth/session state |
 | `src/config/sentry.config.ts` | Sentry and environment-aware mobile observability wiring |
 | `eas.json` | EAS build profiles |
@@ -3590,7 +3590,7 @@ Historical mobile iteration docs are gone in this branch. Start with the live so
 |---|---|---|---|
 | App entry and commands | `src/mobile/package.json` | `src/mobile/app.json`, `src/mobile/eas.json` | Confirms Expo scripts, test commands, and build targets |
 | Screen map / navigation | `src/mobile/src/navigation/MainNavigator.tsx` | `src/mobile/src/navigation/types.ts`, `src/mobile/src/screens/` | Shows the current tabs, stacks, and routed surfaces |
-| API base URL and environment wiring | `src/mobile/src/config/api.config.ts` | `src/mobile/src/config/environment.config.ts`, `src/mobile/src/lib/cpApiClient.ts` | First place to debug wrong backend targets or environment drift |
+| API base URL and environment wiring | `src/mobile/src/config/api.config.ts` | `src/mobile/src/config/environment.config.ts`, `src/mobile/src/lib/apiClient.ts` | First place to debug wrong backend targets or environment drift |
 | Auth and session recovery | `src/mobile/src/services/auth.service.ts` | `src/mobile/src/store/authStore.ts`, `src/mobile/src/screens/auth/` | Canonical mobile sign-in, OTP, and token handling path |
 | Hired-agent operations | `src/mobile/src/screens/agents/AgentOperationsScreen.tsx` | `src/mobile/src/services/hiredAgents/hiredAgents.service.ts`, `src/mobile/src/components/ContentDraftApprovalCard.tsx` | Best entry into approvals, operations, and customer action surfaces |
 | Push notifications | `src/mobile/src/services/notifications/pushNotifications.service.ts` | `src/mobile/src/config/sentry.config.ts`, `src/mobile/src/services/monitoring/` | Covers device registration, alerts, and runtime signal capture |

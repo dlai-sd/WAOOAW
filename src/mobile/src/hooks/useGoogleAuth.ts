@@ -1,8 +1,13 @@
 /**
  * Google Auth Hook
- * React hook for Google Sign-In using the native @react-native-google-signin/google-signin SDK.
+ * React hook for Google Sign-In.
  *
- * Why native SDK instead of expo-auth-session (browser-based):
+ * Platform behaviour:
+ *   - Android/iOS: uses @react-native-google-signin/google-signin (native Play Services SDK)
+ *   - Web (Codespace / browser preview): uses expo-auth-session OAuth2 redirect to Google's
+ *     token endpoint, which supports HTTPS redirect URIs.
+ *
+ * Why native SDK on mobile instead of expo-auth-session:
  *   - Android OAuth clients (type=1) block browser-based flows:
  *     "Custom URI scheme is not enabled for your Android client"
  *   - Web OAuth clients (type=3) reject custom URI schemes in GCP Console
@@ -14,7 +19,8 @@
  * with aud = webClientId, matching what the backend verifies.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import {
   GoogleSignin,
   statusCodes,
@@ -22,20 +28,21 @@ import {
   isCancelledResponse,
   isErrorWithCode,
 } from '@react-native-google-signin/google-signin';
+import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import GoogleAuthService, {
   GoogleAuthError,
   type GoogleUserInfo,
 } from '../services/googleAuth.service';
 import { GOOGLE_OAUTH_CONFIG, GOOGLE_OAUTH_SCOPES } from '../config/oauth.config';
 
-// Configure once at module load.
-// webClientId sets the `aud` claim in the returned idToken so the backend
-// can verify it. The Android client from google-services.json is used
-// automatically by the native SDK — no JS env var needed for it.
-GoogleSignin.configure({
-  webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
-  scopes: GOOGLE_OAUTH_SCOPES,
-});
+// Configure native SDK once at module load (no-op on web).
+if (Platform.OS !== 'web') {
+  GoogleSignin.configure({
+    webClientId: GOOGLE_OAUTH_CONFIG.webClientId,
+    scopes: GOOGLE_OAUTH_SCOPES,
+  });
+}
 
 /**
  * Google Auth Hook State
@@ -79,6 +86,33 @@ export interface GoogleAuthHook extends GoogleAuthState {
  * }, [idToken]);
  * ```
  */
+/**
+ * Web-only inner hook that uses expo-auth-session's Google provider.
+ * Uses ResponseType.IdToken so Google returns an id_token directly in
+ * the URL fragment (OpenID Connect implicit flow). A nonce is required.
+ */
+function useWebGoogleAuth() {
+  // Stable nonce per hook mount — used to bind the id_token to this request.
+  const nonce = useMemo(
+    () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+    []
+  );
+
+  // On web, makeRedirectUri() returns window.location.origin (no trailing slash).
+  const redirectUri = AuthSession.makeRedirectUri();
+  // eslint-disable-next-line no-console
+  console.log('[useGoogleAuth] web redirectUri:', redirectUri);
+
+  const [_request, response, promptAsync] = Google.useAuthRequest({
+    clientId: GOOGLE_OAUTH_CONFIG.webClientId,
+    scopes: GOOGLE_OAUTH_SCOPES,
+    redirectUri,
+    responseType: AuthSession.ResponseType.IdToken,
+    extraParams: { nonce },
+  });
+  return { webPromptAsync: promptAsync, webResponse: response };
+}
+
 export const useGoogleAuth = (): GoogleAuthHook => {
   const [state, setState] = useState<GoogleAuthState>({
     loading: false,
@@ -87,7 +121,115 @@ export const useGoogleAuth = (): GoogleAuthHook => {
     idToken: null,
   });
 
+  // Web OAuth session (only active on web platform).
+  const { webPromptAsync, webResponse } = useWebGoogleAuth();
+
+  // Handle web OAuth redirect response.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    if (!webResponse) return;
+
+    if (webResponse.type === 'cancel' || webResponse.type === 'dismiss') {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: new GoogleAuthError('User cancelled the sign-in flow', 'USER_CANCELLED'),
+      }));
+      return;
+    }
+
+    if (webResponse.type === 'error') {
+      setState((prev) => ({
+        ...prev,
+        loading: false,
+        error: new GoogleAuthError(
+          webResponse.error?.message ?? 'OAuth error',
+          'SIGN_IN_ERROR'
+        ),
+      }));
+      return;
+    }
+
+    if (webResponse.type === 'success') {
+      const idToken = (webResponse.params as any).id_token as string | undefined;
+      // DEBUG: decode JWT payload to expose aud/iss/exp in browser DevTools
+      if (idToken) {
+        try {
+          const parts = idToken.split('.');
+          const raw = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const pad = raw + '='.repeat((4 - (raw.length % 4)) % 4);
+          const decoded = JSON.parse(atob(pad));
+          // eslint-disable-next-line no-console
+          console.log('[useGoogleAuth] id_token claims:', {
+            aud: decoded.aud,
+            iss: decoded.iss,
+            exp: decoded.exp,
+            exp_utc: decoded.exp ? new Date(decoded.exp * 1000).toISOString() : null,
+            email: decoded.email,
+            sub: decoded.sub,
+          });
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.log('[useGoogleAuth] could not decode id_token:', e);
+        }
+      }
+      if (!idToken) {
+        // Authorization code flow — exchange for token using TokenResponse.
+        // expo-auth-session/providers/google returns tokens directly in the
+        // `authentication` field when using the implicit flow.
+        const authentication = (webResponse as any).authentication;
+        const fallbackToken = authentication?.idToken;
+        if (!fallbackToken) {
+          setState((prev) => ({
+            ...prev,
+            loading: false,
+            error: new GoogleAuthError(
+              'No ID token in Google response',
+              'MISSING_ID_TOKEN'
+            ),
+          }));
+          return;
+        }
+        const userInfo = GoogleAuthService.parseIdToken(fallbackToken);
+        setState({ loading: false, error: null, userInfo, idToken: fallbackToken });
+        return;
+      }
+      const userInfo = GoogleAuthService.parseIdToken(idToken);
+      setState({ loading: false, error: null, userInfo, idToken });
+    }
+  }, [webResponse]);
+
   const promptAsync = useCallback(async (): Promise<void> => {
+    // ── Web path ──────────────────────────────────────────────────────────
+    if (Platform.OS === 'web') {
+      if (!GOOGLE_OAUTH_CONFIG.webClientId) {
+        setState((prev) => ({
+          ...prev,
+          error: new GoogleAuthError(
+            'Google OAuth not configured. Ensure EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is set.',
+            'NOT_CONFIGURED'
+          ),
+        }));
+        return;
+      }
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        await webPromptAsync();
+      } catch (err) {
+        setState((prev) => ({
+          ...prev,
+          loading: false,
+          error: new GoogleAuthError(
+            'Failed to open Google sign-in',
+            'SIGN_IN_ERROR',
+            err as Error
+          ),
+        }));
+      }
+      return;
+    }
+
+    // ── Native (Android / iOS) path ───────────────────────────────────────
     if (!GoogleAuthService.isConfigured() && !__DEV__) {
       setState((prev) => ({
         ...prev,
@@ -106,8 +248,6 @@ export const useGoogleAuth = (): GoogleAuthHook => {
 
       // Sign out first so the native SDK clears its cached credentials and
       // forces the account-picker to be shown every time the button is pressed.
-      // Without this, the SDK silently re-uses the last authenticated account,
-      // bypassing account selection.
       try {
         await GoogleSignin.signOut();
       } catch {
@@ -136,7 +276,6 @@ export const useGoogleAuth = (): GoogleAuthHook => {
 
       const idToken = response.data.idToken;
       if (!idToken) {
-        // null when webClientId is missing from GoogleSignin.configure()
         setState((prev) => ({
           ...prev,
           loading: false,
@@ -149,13 +288,7 @@ export const useGoogleAuth = (): GoogleAuthHook => {
       }
 
       const userInfo = GoogleAuthService.parseIdToken(idToken);
-
-      setState({
-        loading: false,
-        error: null,
-        userInfo,
-        idToken,
-      });
+      setState({ loading: false, error: null, userInfo, idToken });
     } catch (error) {
       let authError: GoogleAuthError;
 
@@ -189,7 +322,7 @@ export const useGoogleAuth = (): GoogleAuthHook => {
         idToken: null,
       }));
     }
-  }, []);
+  }, [webPromptAsync]);
 
   // Reset state
   const reset = (): void => {
@@ -205,7 +338,9 @@ export const useGoogleAuth = (): GoogleAuthHook => {
     ...state,
     promptAsync,
     reset,
-    isConfigured: GoogleAuthService.isConfigured(),
+    isConfigured: Platform.OS === 'web'
+      ? !!GOOGLE_OAUTH_CONFIG.webClientId
+      : GoogleAuthService.isConfigured(),
   };
 };
 

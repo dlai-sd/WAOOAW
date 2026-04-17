@@ -1,4 +1,4 @@
-import cpApiClient from '@/lib/cpApiClient'
+import apiClient from '@/lib/apiClient'
 
 function generateCorrelationId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -101,12 +101,12 @@ export type ArtifactStatus = {
 }
 
 export async function listCustomerDraftBatches(): Promise<DraftBatch[]> {
-  const resp = await cpApiClient.get('/cp/marketing/draft-batches')
+  const resp = await apiClient.get('/api/v1/marketing/draft-batches')
   return resp.data
 }
 
 export async function createDraftBatch(input: CreateDraftBatchInput): Promise<DraftBatch> {
-  const resp = await cpApiClient.post('/cp/marketing/draft-batches', input, {
+  const resp = await apiClient.post('/api/v1/marketing/draft-batches', input, {
     headers: { 'X-Correlation-ID': generateCorrelationId(), 'Content-Type': 'application/json' },
   })
   return resp.data
@@ -115,9 +115,9 @@ export async function createDraftBatch(input: CreateDraftBatchInput): Promise<Dr
 export async function approveDraftPost(
   postId: string
 ): Promise<{ post_id: string; review_status: string; approval_id: string }> {
-  const resp = await cpApiClient.post(
-    '/cp/marketing/draft-posts/approve',
-    { post_id: postId },
+  const resp = await apiClient.post(
+    `/api/v1/marketing/draft-posts/${postId}/approve`,
+    {},
     { headers: { 'X-Correlation-ID': generateCorrelationId(), 'Content-Type': 'application/json' } }
   )
   return resp.data
@@ -127,16 +127,16 @@ export async function rejectDraftPost(
   postId: string,
   reason?: string
 ): Promise<{ post_id: string; decision: string }> {
-  const resp = await cpApiClient.post(
-    '/cp/marketing/draft-posts/reject',
-    { post_id: postId, reason },
+  const resp = await apiClient.post(
+    `/api/v1/marketing/draft-posts/${postId}/reject`,
+    { reason },
     { headers: { 'X-Correlation-ID': generateCorrelationId(), 'Content-Type': 'application/json' } }
   )
   return resp.data
 }
 
 export async function pollDraftPostArtifactStatus(postId: string): Promise<ArtifactStatus> {
-  const resp = await cpApiClient.get(`/cp/marketing/draft-posts/${postId}/artifact-status`)
+  const resp = await apiClient.get(`/api/v1/marketing/draft-posts/${postId}/artifact-status`)
   return resp.data
 }
 
@@ -144,8 +144,8 @@ export async function createContentBatchFromTheme(
   themeBatchId: string,
   input: CreateContentFromThemeInput
 ): Promise<DraftBatch> {
-  const resp = await cpApiClient.post(
-    `/cp/marketing/draft-batches/${themeBatchId}/create-content-batch`,
+  const resp = await apiClient.post(
+    `/api/v1/marketing/draft-batches/${themeBatchId}/create-content-batch`,
     input,
     { headers: { 'X-Correlation-ID': generateCorrelationId(), 'Content-Type': 'application/json' } }
   )

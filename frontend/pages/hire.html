@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW — Hire Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-red:#ef4444;--text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark)}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .wizard{max-width:640px;margin:3rem auto;padding:2rem;background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1.5rem}
+    .wizard__title{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;margin-bottom:.5rem}
+    .trial-badge{display:inline-block;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));color:#0a0a0a;font-size:.75rem;font-weight:700;padding:.25rem .75rem;border-radius:9999px;margin-bottom:1.5rem}
+    .step-indicators{display:flex;gap:.5rem;margin-bottom:2rem}
+    .step-indicator{flex:1;height:4px;border-radius:2px;background:var(--border-dark);transition:background .3s}
+    .step-indicator.active{background:var(--color-neon-cyan)}
+    .wizard-step{display:flex;flex-direction:column;gap:1rem}
+    label{font-size:.9rem;color:var(--text-secondary);display:block;margin-bottom:.25rem}
+    input,select,textarea{width:100%;background:#0a0a0a;border:1px solid var(--border-dark);border-radius:.5rem;padding:.75rem 1rem;color:var(--text-primary);font-size:.95rem;outline:none}
+    input:focus,select:focus,textarea:focus{border-color:var(--color-neon-cyan)}
+    input[type=password]{letter-spacing:.1em}
+    .error-msg{font-size:.8rem;color:var(--status-red);margin-top:.25rem}
+    .wizard-actions{display:flex;gap:1rem;margin-top:1.5rem}
+    .btn{padding:.75rem 1.5rem;border-radius:.5rem;font-weight:600;font-size:.95rem;cursor:pointer;border:none;transition:all .2s}
+    .btn--cyan{background:var(--color-neon-cyan);color:#0a0a0a}
+    .btn--outline{background:transparent;border:1px solid var(--border-dark);color:var(--text-primary)}
+    .btn:hover{opacity:.9;transform:translateY(-1px)}
+  </style>
+</head>
+<body>
+  <header><h1>WAOOAW</h1></header>
+  <main>
+    <div class="wizard">
+      <div class="trial-badge">🚀 7-Day Free Trial — Keep Your Deliverables</div>
+      <h2 class="wizard__title">Hire an Agent</h2>
+      <div class="step-indicators">
+        <div class="step-indicator active" id="step-ind-1"></div>
+        <div class="step-indicator" id="step-ind-2"></div>
+        <div class="step-indicator" id="step-ind-3"></div>
+      </div>
+      <!-- Step 1: Confirm agent + nickname -->
+      <div class="wizard-step" id="wizard-step-1">
+        <div>
+          <label for="nickname">Agent Nickname</label>
+          <input id="nickname" type="text" placeholder="e.g. My Marketing Agent" autocomplete="off">
+          <p class="error-msg" id="nickname-error" hidden></p>
+          <p class="error-msg" id="step1-error" hidden></p>
+        </div>
+        <div class="wizard-actions">
+          <button class="btn btn--cyan" onclick="submitStep1()">Next →</button>
+        </div>
+      </div>
+      <!-- Step 2: Skill config -->
+      <div class="wizard-step" id="wizard-step-2" hidden>
+        <form id="skill-config-form">
+          <div>
+            <label for="brand_name">Brand Name</label>
+            <input id="brand_name" name="brand_name" type="text" placeholder="Your brand name">
+          </div>
+          <div>
+            <label for="tone">Tone of Voice</label>
+            <select id="tone" name="tone">
+              <option value="professional">Professional</option>
+              <option value="casual">Casual</option>
+              <option value="bold">Bold</option>
+            </select>
+          </div>
+          <div>
+            <label for="openai_api_key">OpenAI API Key</label>
+            <input id="openai_api_key" name="openai_api_key" type="password"
+                   placeholder="sk-…" autocomplete="new-password">
+          </div>
+          <p class="error-msg" id="step2-error" hidden></p>
+        </form>
+        <div class="wizard-actions">
+          <button class="btn btn--outline" onclick="goToStep(1)">← Back</button>
+          <button class="btn btn--cyan" onclick="submitStep2()">Next →</button>
+        </div>
+      </div>
+      <!-- Step 3: Schedule + approval preference -->
+      <div class="wizard-step" id="wizard-step-3" hidden>
+        <div>
+          <label for="schedule">Run Schedule</label>
+          <select id="schedule">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="manual">Manual only</option>
+          </select>
+        </div>
+        <div>
+          <label><input id="approval-toggle" type="checkbox" checked>
+            Require my approval before publishing</label>
+        </div>
+        <p class="error-msg" id="step3-error" hidden></p>
+        <div class="wizard-actions">
+          <button class="btn btn--outline" onclick="goToStep(2)">← Back</button>
+          <button class="btn btn--cyan" onclick="submitStep3()">Launch Trial 🚀</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="hire.js"></script>
+</body>
+</html>

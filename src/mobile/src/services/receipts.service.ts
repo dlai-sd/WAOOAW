@@ -4,7 +4,7 @@
  * Calls CP Backend receipt endpoints — same contract as CP Frontend.
  */
 
-import cpApiClient from '../lib/cpApiClient';
+import apiClient from '../lib/apiClient';
 
 export interface Receipt {
   id: string;
@@ -15,7 +15,7 @@ export interface Receipt {
 }
 
 export async function listReceipts(): Promise<Receipt[]> {
-  const response = await cpApiClient.get<Receipt[]>('/cp/receipts');
+  const response = await apiClient.get<Receipt[]>('/api/v1/receipts');
   const data = response.data;
   if (Array.isArray(data)) return data;
   if (Array.isArray((data as Record<string, unknown>)?.receipts)) {
@@ -25,6 +25,6 @@ export async function listReceipts(): Promise<Receipt[]> {
 }
 
 export async function getReceiptHtml(receiptId: string): Promise<string> {
-  const response = await cpApiClient.get<string>(`/cp/receipts/${receiptId}/html`);
+  const response = await apiClient.get<string>(`/api/v1/receipts/${receiptId}/html`);
   return response.data;
 }

@@ -26,16 +26,25 @@ interface APIConfig {
  * Priority: ENV variable > APP_ENV from eas.json > release channel > default (development)
  */
 export function detectEnvironment(): Environment {
-  // 1. Check explicit ENV variable (set in eas.json or .env)
-  const explicitEnv = Constants.expoConfig?.extra?.ENVIRONMENT || 
-                      process.env.EXPO_PUBLIC_ENVIRONMENT;
-  
-  if (explicitEnv && isValidEnvironment(explicitEnv)) {
-    console.log('[API Config] Environment from EXPO_PUBLIC_ENVIRONMENT:', explicitEnv);
-    return explicitEnv as Environment;
+  // 1. EXPO_PUBLIC_ENVIRONMENT is baked into the bundle at build time by
+  //    `expo export`.  Always check it first — it is explicitly set by the
+  //    person running the build and must beat the app.config.js default which
+  //    falls back to 'development' when EAS_BUILD_PROFILE is not set.
+  const pubEnv = process.env.EXPO_PUBLIC_ENVIRONMENT;
+  if (pubEnv && isValidEnvironment(pubEnv)) {
+    console.log('[API Config] Environment from EXPO_PUBLIC_ENVIRONMENT:', pubEnv);
+    return pubEnv as Environment;
   }
 
-  // 2. Check APP_ENV from eas.json build profile (legacy fallback)
+  // 2. Fall back to Constants.expoConfig.extra.ENVIRONMENT (set by EAS build
+  //    profiles via app.config.js).
+  const extraEnv = Constants.expoConfig?.extra?.ENVIRONMENT;
+  if (extraEnv && isValidEnvironment(extraEnv)) {
+    console.log('[API Config] Environment from app.config extra.ENVIRONMENT:', extraEnv);
+    return extraEnv as Environment;
+  }
+
+  // 3. Check APP_ENV from eas.json build profile (legacy fallback)
   const appEnv = process.env.APP_ENV;
   if (appEnv) {
     console.log('[API Config] Environment from APP_ENV:', appEnv);
@@ -43,7 +52,7 @@ export function detectEnvironment(): Environment {
     // All other APP_ENV values fall through to release channel check
   }
 
-  // 3. Check Expo release channel
+  // 4. Check Expo release channel
   const releaseChannel = (Constants.expoConfig?.updates as any)?.releaseChannel;
   if (releaseChannel) {
     console.log('[API Config] Environment from release channel:', releaseChannel);
@@ -52,7 +61,7 @@ export function detectEnvironment(): Environment {
     if (releaseChannel.includes('demo')) return 'demo';
   }
 
-  // 4. Default to development
+  // 5. Default to development
   console.log('[API Config] Using default environment: development');
   return 'development';
 }

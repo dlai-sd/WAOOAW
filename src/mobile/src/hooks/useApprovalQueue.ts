@@ -7,7 +7,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import cpApiClient from '../lib/cpApiClient';
+import apiClient from '../lib/apiClient';
 
 export interface DeliverableItem {
   id: string;
@@ -37,28 +37,30 @@ interface ApprovalQueueResult {
 }
 
 async function fetchApprovalQueue(hiredAgentId: string): Promise<DeliverableItem[]> {
-  const response = await cpApiClient.get<DeliverableItem[]>(
-    `/cp/hired-agents/${hiredAgentId}/approval-queue`
+  const response = await apiClient.get<DeliverableItem[]>(
+    `/api/v1/hired-agents/${hiredAgentId}/deliverables?status=pending_review`
   );
   return response.data;
 }
 
 async function approveDeliverable(hiredAgentId: string, deliverableId: string): Promise<void> {
-  await cpApiClient.post(
-    `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/approve`
+  await apiClient.post(
+    `/api/v1/deliverables/${deliverableId}/review`,
+    { decision: 'approved' }
   );
 }
 
 async function rejectDeliverable(hiredAgentId: string, deliverableId: string): Promise<void> {
-  await cpApiClient.post(
-    `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/reject`
+  await apiClient.post(
+    `/api/v1/deliverables/${deliverableId}/review`,
+    { decision: 'rejected' }
   );
 }
 
 async function rejectDeliverableWithReason(hiredAgentId: string, deliverableId: string, reason: string): Promise<void> {
-  await cpApiClient.post(
-    `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/reject`,
-    { reason }
+  await apiClient.post(
+    `/api/v1/deliverables/${deliverableId}/review`,
+    { decision: 'rejected', reason }
   );
 }
 

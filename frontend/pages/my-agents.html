@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW — My Agents</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-green:#10b981;--status-yellow:#f59e0b;--status-red:#ef4444;
+          --status-gray:#6b7280;--text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .page{max-width:900px;margin:0 auto;padding:2rem}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:1.75rem;margin-bottom:1.5rem}
+    #agent-list{display:flex;flex-direction:column;gap:1rem}
+    .agent-list-item{position:relative}
+    .agent-card{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1.5rem;padding:1.25rem 1.5rem;display:flex;align-items:center;gap:1rem;transition:all .3s}
+    .agent-card:hover{border-color:rgba(0,242,254,.3)}
+    .agent-card__avatar{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+    .agent-card__info{flex:1}
+    .agent-card__header{display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem}
+    .agent-card__name{font-family:'Space Grotesk',sans-serif;font-weight:600}
+    .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%}
+    .agent-card__specialty{font-size:.85rem;color:var(--text-secondary)}
+    .agent-card__meta{display:flex;gap:1rem;font-size:.85rem;margin-top:.25rem}
+    .agent-card__rating{color:var(--status-yellow)}
+    .agent-card__price{color:var(--color-neon-cyan)}
+    .agent-card__cta{padding:.4rem .9rem;border-radius:.4rem;background:transparent;border:1px solid var(--border-dark);color:var(--text-primary);text-decoration:none;font-size:.85rem;transition:all .2s}
+    .agent-card__cta:hover{border-color:var(--color-neon-cyan);color:var(--color-neon-cyan)}
+    .badge{font-size:.7rem;font-weight:700;padding:.2rem .5rem;border-radius:9999px;position:absolute;top:.5rem;right:.5rem}
+    .badge--approval{background:var(--status-yellow);color:#0a0a0a}
+    .flow-timeline{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;padding-bottom:.5rem}
+    .timeline-step{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:.5rem;padding:.4rem .75rem;font-size:.8rem;display:flex;align-items:center;gap:.35rem}
+    .timeline-step--running{border-color:var(--status-green)}
+    .timeline-step--failed{border-color:var(--status-red)}
+    .timeline-step--pulse{animation:pulse 1.5s infinite}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.4)}50%{box-shadow:0 0 0 4px rgba(16,185,129,0)}}
+    .timeline-arrow{color:var(--text-secondary)}
+    .deliverable-card{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:.75rem;padding:1rem;margin-bottom:.75rem}
+    .deliverable-card__type-badge{font-size:.7rem;font-weight:700;text-transform:uppercase;background:rgba(0,242,254,.1);color:var(--color-neon-cyan);padding:.2rem .5rem;border-radius:4px}
+    .deliverable-card__time{display:block;font-size:.75rem;color:var(--text-secondary);margin:.4rem 0}
+    .deliverable-card__preview{font-size:.85rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;margin-bottom:.4rem}
+    .deliverable-card__expand{background:none;border:none;color:var(--color-neon-cyan);font-size:.8rem;cursor:pointer;padding:0}
+    .deliverable-card__full{font-size:.75rem;background:#0a0a0a;border-radius:.4rem;padding:.75rem;overflow-x:auto;margin-top:.5rem;white-space:pre-wrap}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+    .error{color:var(--status-red);padding:1rem}
+    #agent-detail{margin-top:1rem}
+    .agent-detail{background:rgba(24,24,27,.5);border:1px solid var(--border-dark);border-radius:1rem;padding:1.25rem}
+    .agent-detail h3{font-size:.9rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.75rem;margin-top:.5rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW</h1>
+    <nav>
+      <a href="/marketplace">Marketplace</a>
+      <a href="/my-agents">My Agents</a>
+      <a href="/approvals">Approvals</a>
+    </nav>
+  </header>
+  <main class="page">
+    <h2>My Agents</h2>
+    <div id="agent-list">
+      <div class="empty-state" id="loading-state">Loading your agents…</div>
+    </div>
+    <div id="agent-detail" hidden></div>
+  </main>
+  <script type="module" src="my-agents.js"></script>
+</body>
+</html>
