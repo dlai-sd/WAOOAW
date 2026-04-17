@@ -218,6 +218,13 @@ Every story card MUST contain:
 - `Test cases` — table with test ID, **type** (Unit / Integration / Pact / BDD / E2E), description, assert
 - `Test commands` — copy-paste docker commands
 - `Done signal` — exact text agent puts in commit message
+- `Pre-push gate` — story card MUST end with this verbatim block:
+
+  ```bash
+  # Run before every push — catches CVEs and type errors without Docker
+  bash scripts/agent-pre-push.sh
+  # Any failure = fix before pushing. Do NOT skip security checks.
+  ```
 
 **TDD/BDD MANDATE — every story card must include:**
 
@@ -354,6 +361,15 @@ File: docs/[path/to/plan.md]
 
 Every plan's "Agent Execution Rules" section MUST include the following verbatim as the final rule:
 
+> **PRE-PUSH RULE (run before EVERY push, not just the final one):**
+>
+> ```bash
+> bash scripts/agent-pre-push.sh
+> ```
+> If any check fails: fix it before pushing. Do NOT use `--skip-audit` for security failures.
+> The script checks (without Docker): dep pinning, pip-audit CVEs, TypeScript types, ESLint, YAML syntax.
+> Checks that need Docker (coverage gate, smoke routes) will be caught by CI — add a note in the PR body.
+>
 > **EXECUTION AUDIT RULE (run after ALL epics in the iteration are complete, before opening the PR):**
 >
 > Perform this self-audit. Post the results table in the PR description.
