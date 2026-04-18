@@ -265,4 +265,318 @@ describe('useGoogleAuth Hook', () => {
       expect(result.current.idToken).toBeNull();
     });
   });
-});
+
+  describe('Prompt Async — UNEXPECTED_RESPONSE', () => {
+    it('should set UNEXPECTED_RESPONSE error when sign-in returns unknown type', async () => {
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({
+        type: 'unknown_future_type',
+        data: {},
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('UNEXPECTED_RESPONSE');
+      expect(result.current.loading).toBe(false);
+    });
+  });
+
+  describe('Prompt Async — error with unknown status code', () => {
+    it('should use error code as-is for unrecognised status codes', async () => {
+      const err = new Error('some other error');
+      (err as any).code = 'SOME_UNKNOWN_CODE';
+      (GoogleSignin.signIn as jest.Mock).mockRejectedValue(err);
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('SOME_UNKNOWN_CODE');
+      expect(result.current.loading).toBe(false);
+    });
+  });
+
+  describe('isConfigured reflects GoogleAuthService', () => {
+    it('should return isConfigured=false when service says not configured', () => {
+      (GoogleAuthService.isConfigured as jest.Mock).mockReturnValue(false);
+      const { result } = renderHook(() => useGoogleAuth());
+      expect(result.current.isConfigured).toBe(false);
+    });
+  });
+
+  describe('Prompt Async — NOT_CONFIGURED allowed in __DEV__', () => {
+    it('should proceed past NOT_CONFIGURED check in __DEV__ mode', async () => {
+      (GoogleAuthService.isConfigured as jest.Mock).mockReturnValue(false);
+      const origDev = (global as any).__DEV__;
+      (global as any).__DEV__ = true;
+
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({ type: 'cancelled' });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      // Should have proceeded past the not-configured barrier (and hit cancel)
+      expect(result.current.error?.code).toBe('USER_CANCELLED');
+      (global as any).__DEV__ = origDev;
+    });
+  });
+
+  describe('Prompt Async — signOut success path', () => {
+    it('should proceed normally when signOut resolves without error', async () => {
+      (GoogleSignin as any).signOut = jest.fn().mockResolvedValue(undefined);
+      (GoogleSignin.signIn as jest.Mock).mockResolvedValue({
+        type: 'success',
+        data: { idToken: 'fresh-token', user: {} },
+      });
+      (GoogleAuthService.parseIdToken as jest.Mock).mockReturnValue({
+        sub: 'u1', email: 'u@test.com', email_verified: true,
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+      await act(async () => { await result.current.promptAsync(); });
+
+      expect(result.current.idToken).toBe('fresh-token');
+      expect(result.current.error).toBeNull();
+    });
+  });
+
+  // ─── Web path ─────────────────────────────────────────────────────────────
+
+  describe('Web platform path', () => {
+    const originalPlatformOS = require('react-native').Platform.OS;
+
+    beforeEach(() => {
+      const Platform = require('react-native').Platform;
+      Platform.OS = 'web';
+    });
+
+    afterEach(() => {
+      const Platform = require('react-native').Platform;
+      Platform.OS = originalPlatformOS;
+    });
+
+    it('returns NOT_CONFIGURED when webClientId is empty on web', async () => {
+      const oauthConfig = require('../src/config/oauth.config');
+      const origClientId = oauthConfig.GOOGLE_OAUTH_CONFIG.webClientId;
+      oauthConfig.GOOGLE_OAUTH_CONFIG.webClientId = '';
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('NOT_CONFIGURED');
+      oauthConfig.GOOGLE_OAUTH_CONFIG.webClientId = origClientId;
+    });
+
+    it('sets SIGN_IN_ERROR when webPromptAsync throws on web', async () => {
+      // Mock expo-auth-session/providers/google to make webPromptAsync throw
+      const AuthSession = require('expo-auth-session');
+      if (!AuthSession.makeRedirectUri) {
+        AuthSession.makeRedirectUri = jest.fn(() => 'https://localhost');
+      }
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      Google.useAuthRequest = jest.fn(() => [
+        null,
+        null,
+        jest.fn().mockRejectedValue(new Error('browser error')),
+      ]);
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        await result.current.promptAsync();
+      });
+
+      expect(result.current.error?.code).toBe('SIGN_IN_ERROR');
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+
+    it('handles webResponse type cancel → USER_CANCELLED', async () => {
+      let setWebResponse: (r: any) => void = () => {};
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      const { useState: useStateMod } = require('react');
+
+      Google.useAuthRequest = jest.fn(() => {
+        const [resp, setResp] = useStateMod<any>(null);
+        setWebResponse = setResp;
+        return [null, resp, jest.fn()];
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        setWebResponse({ type: 'cancel' });
+      });
+
+      expect(result.current.error?.code).toBe('USER_CANCELLED');
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+
+    it('handles webResponse type error → SIGN_IN_ERROR', async () => {
+      let setWebResponse: (r: any) => void = () => {};
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      const { useState: useStateMod } = require('react');
+
+      Google.useAuthRequest = jest.fn(() => {
+        const [resp, setResp] = useStateMod<any>(null);
+        setWebResponse = setResp;
+        return [null, resp, jest.fn()];
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        setWebResponse({ type: 'error', error: { message: 'oauth error' } });
+      });
+
+      expect(result.current.error?.code).toBe('SIGN_IN_ERROR');
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+
+    it('handles webResponse type success with id_token → sets idToken and userInfo', async () => {
+      const mockUserInfo = { sub: 'web-user', email: 'web@test.com', email_verified: true };
+      (GoogleAuthService.parseIdToken as jest.Mock).mockReturnValue(mockUserInfo);
+
+      let setWebResponse: (r: any) => void = () => {};
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      const { useState: useStateMod } = require('react');
+
+      Google.useAuthRequest = jest.fn(() => {
+        const [resp, setResp] = useStateMod<any>(null);
+        setWebResponse = setResp;
+        return [null, resp, jest.fn()];
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      // Build a minimal fake id_token: base64url-encoded JSON payload in part[1]
+      const payloadJson = JSON.stringify({ aud: 'cid', sub: 'u', email: 'e@test.com', exp: 9999 });
+      const fakePayload = Buffer.from(payloadJson).toString('base64')
+        .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+      const fakeToken = `header.${fakePayload}.sig`;
+
+      await act(async () => {
+        setWebResponse({ type: 'success', params: { id_token: fakeToken } });
+      });
+
+      expect(result.current.idToken).toBe(fakeToken);
+      expect(result.current.error).toBeNull();
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+
+    it('handles webResponse success with no id_token → uses fallbackToken from authentication.idToken', async () => {
+      const fallbackToken = 'fallback-id-token';
+      const mockUserInfo = { sub: 'fallback-user', email: 'fallback@test.com', email_verified: true };
+      (GoogleAuthService.parseIdToken as jest.Mock).mockReturnValue(mockUserInfo);
+
+      let setWebResponse: (r: any) => void = () => {};
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      const { useState: useStateMod } = require('react');
+
+      Google.useAuthRequest = jest.fn(() => {
+        const [resp, setResp] = useStateMod<any>(null);
+        setWebResponse = setResp;
+        return [null, resp, jest.fn()];
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        setWebResponse({
+          type: 'success',
+          params: {},
+          authentication: { idToken: fallbackToken },
+        });
+      });
+
+      expect(result.current.idToken).toBe(fallbackToken);
+      expect(result.current.error).toBeNull();
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+
+    it('handles webResponse success with no id_token and no fallback → MISSING_ID_TOKEN', async () => {
+      let setWebResponse: (r: any) => void = () => {};
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      const { useState: useStateMod } = require('react');
+
+      Google.useAuthRequest = jest.fn(() => {
+        const [resp, setResp] = useStateMod<any>(null);
+        setWebResponse = setResp;
+        return [null, resp, jest.fn()];
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        setWebResponse({ type: 'success', params: {}, authentication: null });
+      });
+
+      expect(result.current.error?.code).toBe('MISSING_ID_TOKEN');
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+
+    it('handles webResponse type dismiss → USER_CANCELLED', async () => {
+      let setWebResponse: (r: any) => void = () => {};
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      const { useState: useStateMod } = require('react');
+
+      Google.useAuthRequest = jest.fn(() => {
+        const [resp, setResp] = useStateMod<any>(null);
+        setWebResponse = setResp;
+        return [null, resp, jest.fn()];
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        setWebResponse({ type: 'dismiss' });
+      });
+
+      expect(result.current.error?.code).toBe('USER_CANCELLED');
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+
+    it('ignores webResponse when Platform.OS is not web', async () => {
+      // Switch back to native and try to trigger webResponse — should be ignored
+      const Platform = require('react-native').Platform;
+      Platform.OS = 'android';
+
+      let setWebResponse: (r: any) => void = () => {};
+      const Google = require('expo-auth-session/providers/google');
+      const origUseAuthRequest = Google.useAuthRequest;
+      const { useState: useStateMod } = require('react');
+
+      Google.useAuthRequest = jest.fn(() => {
+        const [resp, setResp] = useStateMod<any>(null);
+        setWebResponse = setResp;
+        return [null, resp, jest.fn()];
+      });
+
+      const { result } = renderHook(() => useGoogleAuth());
+
+      await act(async () => {
+        setWebResponse({ type: 'cancel' });
+      });
+
+      // On android the webResponse effect early-returns — no error set
+      expect(result.current.error).toBeNull();
+      Google.useAuthRequest = origUseAuthRequest;
+    });
+  });

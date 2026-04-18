@@ -327,4 +327,173 @@ describe('SubscriptionManagementScreen', () => {
     const back = screen.queryByText(/←/) ?? screen.queryByText(/back/i);
     expect(back).toBeTruthy();
   });
+
+  it('shows error state and calls refetch on Try Again', async () => {
+    const mockRefetch = jest.fn();
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: null,
+      error: { message: 'Load failed' },
+      refetch: mockRefetch,
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByText(/could not load subscription data/i)).toBeTruthy();
+    });
+    fireEvent.press(screen.getByText('Try Again'));
+    expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('shows annual plan label for yearly duration', async () => {
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: 'ha-2',
+        status: 'active',
+        duration: 'yearly',
+        agent: { name: 'Agent' },
+        current_period_end: null,
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Annual Plan/i)).toBeTruthy();
+    });
+  });
+
+  it('shows quarterly plan label for quarterly duration', async () => {
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: 'ha-3',
+        status: 'active',
+        duration: 'quarterly',
+        agent: { name: 'Agent' },
+        current_period_end: null,
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Quarterly Plan/i)).toBeTruthy();
+    });
+  });
+
+  it('shows past_due warning in status text', async () => {
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: 'ha-4',
+        status: 'past_due',
+        duration: 'monthly',
+        agent: { name: 'Agent' },
+        current_period_end: null,
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Past due/i)).toBeTruthy();
+    });
+  });
+
+  it('shows trial end date when trial is active', async () => {
+    const trialEnd = new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString();
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: 'ha-5',
+        status: 'active',
+        duration: 'monthly',
+        agent: { name: 'Agent' },
+        trial_status: 'active',
+        trial_end_at: trialEnd,
+        current_period_end: null,
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Trial active/i)).toBeTruthy();
+    });
+  });
+
+  it('shows renewal date when current_period_end is set', async () => {
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: 'ha-6',
+        status: 'active',
+        duration: 'monthly',
+        agent: { name: 'Agent' },
+        current_period_end: '2026-05-01T00:00:00Z',
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Renews/i)).toBeTruthy();
+    });
+  });
+
+  it('calls goBack when Back is pressed', () => {
+    mockHiredAgents.mockReturnValue({ isLoading: false, data: [], error: null, refetch: jest.fn() });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    fireEvent.press(screen.getByText('← Back'));
+    expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it('pressing Renew/Upgrade calls processPayment when canRenew is true', async () => {
+    mockProcessPayment.mockResolvedValue(undefined);
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: 'ha-renew',
+        status: 'active',
+        duration: 'monthly',
+        agent: { name: 'Agent' },
+        current_period_end: null,
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('subscription-renew-cta')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByTestId('subscription-renew-cta'));
+    await waitFor(() => {
+      expect(mockProcessPayment).toHaveBeenCalledWith(expect.objectContaining({
+        agentId: 'ha-renew',
+      }));
+    });
+  });
+
+  it('does not call processPayment when hired_instance_id is missing', async () => {
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: undefined,
+        status: 'active',
+        duration: 'monthly',
+        agent: { name: 'Agent' },
+        current_period_end: null,
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<SubscriptionManagementScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('subscription-renew-cta')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByTestId('subscription-renew-cta'));
+    // canRenew is false when hired_instance_id is missing, so button is disabled
+    expect(mockProcessPayment).not.toHaveBeenCalled();
+  });
 });

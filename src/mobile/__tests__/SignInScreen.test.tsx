@@ -161,3 +161,121 @@ describe("SignInScreen", () => {
     expect(signUpButton.props.accessibilityState.disabled).toBe(true);
   });
 });
+
+describe("SignInScreen - idToken exchange", () => {
+  const mockOnSignUpPress = jest.fn();
+  const mockOnSignInSuccess = jest.fn();
+  const mockPromptAsync = jest.fn();
+  const mockReset = jest.fn();
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPromptAsync.mockResolvedValue(undefined);
+  });
+
+  it("should exchange idToken via AuthService and call login + onSignInSuccess on success", async () => {
+    (AuthService.loginWithGoogle as jest.Mock).mockResolvedValue({
+      id: "user_456",
+      email: "user@test.com",
+      name: "User Test",
+    });
+
+    mockUseGoogleAuth.mockReturnValue({
+      promptAsync: mockPromptAsync,
+      loading: false,
+      error: null,
+      idToken: "valid-id-token",
+      userInfo: null,
+      isConfigured: true,
+      reset: mockReset,
+    });
+
+    render(<SignInScreen onSignInSuccess={mockOnSignInSuccess} />);
+
+    await waitFor(() => {
+      expect(AuthService.loginWithGoogle).toHaveBeenCalledWith("valid-id-token");
+    });
+  });
+
+  it("shows 2FA alert when backend returns 2FA_REQUIRED error", async () => {
+    const twoFaError = new Error("2FA required");
+    (twoFaError as any).code = "2FA_REQUIRED";
+    (AuthService.loginWithGoogle as jest.Mock).mockRejectedValue(twoFaError);
+
+    mockUseGoogleAuth.mockReturnValue({
+      promptAsync: mockPromptAsync,
+      loading: false,
+      error: null,
+      idToken: "token-2fa",
+      userInfo: null,
+      isConfigured: true,
+      reset: mockReset,
+    });
+
+    render(<SignInScreen />);
+
+    await waitFor(() => {
+      expect(Alert.alert).toHaveBeenCalledWith(
+        "2FA Required",
+        expect.stringContaining("two-factor"),
+        expect.any(Array),
+      );
+    });
+  });
+
+  it("shows error message for generic backend authentication failure", async () => {
+    const genericError = new Error("Server error");
+    (AuthService.loginWithGoogle as jest.Mock).mockRejectedValue(genericError);
+
+    mockUseGoogleAuth.mockReturnValue({
+      promptAsync: mockPromptAsync,
+      loading: false,
+      error: null,
+      idToken: "token-fail",
+      userInfo: null,
+      isConfigured: true,
+      reset: mockReset,
+    });
+
+    const { getByText } = render(<SignInScreen />);
+
+    await waitFor(() => {
+      expect(getByText("Server error")).toBeTruthy();
+    });
+  });
+
+  it("does not show error for USER_CANCELLED oauthError", async () => {
+    mockUseGoogleAuth.mockReturnValue({
+      promptAsync: mockPromptAsync,
+      loading: false,
+      error: { code: "USER_CANCELLED", message: "User cancelled" } as any,
+      idToken: null,
+      userInfo: null,
+      isConfigured: true,
+      reset: mockReset,
+    });
+
+    const { queryByText } = render(<SignInScreen />);
+
+    // No error text shown for USER_CANCELLED
+    expect(queryByText("User cancelled")).toBeNull();
+  });
+
+  it("shows error message for non-cancellation oauthError", async () => {
+    mockUseGoogleAuth.mockReturnValue({
+      promptAsync: mockPromptAsync,
+      loading: false,
+      error: { code: "SIGN_IN_ERROR", message: "OAuth network error" } as any,
+      idToken: null,
+      userInfo: null,
+      isConfigured: true,
+      reset: mockReset,
+    });
+
+    const { getByText } = render(<SignInScreen />);
+
+    await waitFor(() => {
+      expect(getByText("OAuth network error")).toBeTruthy();
+    });
+  });
+});

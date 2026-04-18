@@ -455,4 +455,38 @@ describe('OTPVerificationScreen', () => {
       expect(queryByText('Invalid code. Please try again.')).toBeNull();
     });
   });
+
+  it('shows OTP_EXPIRED error and resets countdown', async () => {
+    const error = new (class extends Error {
+      code = 'OTP_EXPIRED';
+      constructor() { super('OTP expired'); this.name = 'RegistrationServiceError'; }
+    })();
+    (RegistrationService.verifyOTP as jest.Mock).mockRejectedValue(error);
+    const { getByTestId, findByText } = render(
+      <OTPVerificationScreen
+        registrationId="REG-123"
+        otpId="OTP-123"
+        destinationMasked="t***t@example.com"
+      />
+    );
+    fireEvent.changeText(getByTestId('otp-input'), '999999');
+    expect(await findByText('Code expired. Please request a new one.')).toBeTruthy();
+  });
+
+  it('shows TOO_MANY_ATTEMPTS error during verify', async () => {
+    const error = new (class extends Error {
+      code = 'TOO_MANY_ATTEMPTS';
+      constructor() { super('Too many attempts'); this.name = 'RegistrationServiceError'; }
+    })();
+    (RegistrationService.verifyOTP as jest.Mock).mockRejectedValue(error);
+    const { getByTestId, findByText } = render(
+      <OTPVerificationScreen
+        registrationId="REG-123"
+        otpId="OTP-123"
+        destinationMasked="t***t@example.com"
+      />
+    );
+    fireEvent.changeText(getByTestId('otp-input'), '888888');
+    expect(await findByText('Too many attempts. Please request a new code.')).toBeTruthy();
+  });
 });

@@ -142,4 +142,99 @@ describe('DigitalMarketingBriefStepCard', () => {
     render(<DigitalMarketingBriefStepCard {...BASE_PROPS} isLastStep={true} isSaving={true} />);
     expect(screen.getByText(/saving/i)).toBeTruthy();
   });
+
+  // ── Branch coverage: stepCount = 0 (progress formula false branch) ──────────
+  it('renders 0% progress when stepCount is 0', () => {
+    render(<DigitalMarketingBriefStepCard {...BASE_PROPS} stepCount={0} stepIndex={0} />);
+    // Should not crash and render 0%
+    expect(screen.getByText(/0%/)).toBeTruthy();
+  });
+
+  // ── Branch coverage: field.description truthy branches ───────────────────────
+  it('renders description text for boolean field with description', () => {
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'active', label: 'Active', type: 'boolean' as const, description: 'Enable active mode' }],
+      values: { active: true },
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    expect(screen.getByText('Enable active mode')).toBeTruthy();
+  });
+
+  it('renders description text for enum field with description', () => {
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'platform', label: 'Platform', type: 'enum' as const, options: ['A', 'B'], description: 'Pick a platform' }],
+      values: { platform: 'A' },
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    expect(screen.getByText('Pick a platform')).toBeTruthy();
+  });
+
+  it('renders description text for text field with description', () => {
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'bio', label: 'Bio', type: 'text' as const, description: 'Tell us about yourself' }],
+      values: { bio: 'hello' },
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    expect(screen.getByText('Tell us about yourself')).toBeTruthy();
+  });
+
+  // ── Branch coverage: inputValue function paths ───────────────────────────────
+  it('renders array value as joined string (inputValue array branch)', () => {
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'tags', label: 'Tags', type: 'list' as const }],
+      values: { tags: ['SEO', 'Content', 'Social'] },
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    expect(screen.getByDisplayValue('SEO, Content, Social')).toBeTruthy();
+  });
+
+  it('renders object value as JSON string (inputValue object branch)', () => {
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'config', label: 'Config', type: 'object' as const }],
+      values: { config: { key: 'value', num: 42 } },
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    expect(screen.getByDisplayValue('{"key":"value","num":42}')).toBeTruthy();
+  });
+
+  it('renders empty string for circular object (inputValue catch branch)', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'config', label: 'Config', type: 'object' as const }],
+      values: { config: circular },
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    // Falls back to '' on JSON.stringify error
+    expect(screen.getByDisplayValue('')).toBeTruthy();
+  });
+
+  it('renders empty string for undefined field value (inputValue null branch)', () => {
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'industry', label: 'Industry', type: 'text' as const }],
+      values: {}, // no value for 'industry' key → undefined
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    // undefined ?? '' → '' → String('') = ''
+    expect(screen.getByDisplayValue('')).toBeTruthy();
+  });
+
+  it('renders enum field with no current value selected (|| "" null branch)', () => {
+    const props = {
+      ...BASE_PROPS,
+      fields: [{ key: 'platform', label: 'Platform', type: 'enum' as const, options: ['YouTube', 'LinkedIn'] }],
+      values: {}, // currentValue is undefined → String(undefined || '') = String('')
+    };
+    render(<DigitalMarketingBriefStepCard {...props} />);
+    // Neither option is selected — both render, no crash
+    expect(screen.getByText('YouTube')).toBeTruthy();
+    expect(screen.getByText('LinkedIn')).toBeTruthy();
+  });
 });

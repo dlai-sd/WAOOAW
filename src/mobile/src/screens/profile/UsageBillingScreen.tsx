@@ -38,7 +38,7 @@ function InvoiceRow({ invoice }: { invoice: Invoice }) {
       : colors.warning ?? '#f59e0b';
 
   const handleDownload = async () => {
-    const baseUrl = apiClient.defaults.baseURL ?? '';
+    const baseUrl = apiClient.getInstance().defaults.baseURL ?? '';
     const url = invoice.pdf_url ?? `${baseUrl}/api/v1/invoices/${invoice.id}/html`;
     try {
       await Linking.openURL(url);
@@ -112,7 +112,7 @@ function ReceiptRow({ receipt }: { receipt: Receipt }) {
   const { colors, spacing, typography } = useTheme();
 
   const handleView = async () => {
-    const baseUrl = apiClient.defaults.baseURL ?? '';
+    const baseUrl = apiClient.getInstance().defaults.baseURL ?? '';
     try {
       await Linking.openURL(`${baseUrl}/api/v1/receipts/${receipt.id}/html`);
     } catch {

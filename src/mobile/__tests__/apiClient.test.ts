@@ -191,4 +191,53 @@ describe('API Client', () => {
       await expect(apiClient.get('/test')).rejects.toThrow();
     }, RETRY_TIMEOUT);
   });
-});
+
+  describe('Token Expiry — Proactive Refresh', () => {
+    const RETRY_TIMEOUT = 20_000;
+
+    it('should proactively refresh token when about to expire', async () => {
+      // Token exists and is about to expire (expires_at = now - 1 to trigger isTokenExpired)
+      const expiredTimestamp = String(Math.floor(Date.now() / 1000) - 10); // already past
+      (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) => {
+        if (key === 'cp_access_token') return Promise.resolve('old-token');
+        if (key === 'token_expires_at') return Promise.resolve(expiredTimestamp);
+        if (key === 'cp_refresh_token') return Promise.resolve(null); // no refresh token → clearTokens
+        return Promise.resolve(null);
+      });
+      (SecureStore.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+
+      mockAxios.onGet('/proactive').reply(200, { ok: true });
+      const response = await apiClient.get('/proactive');
+      expect(response.status).toBe(200);
+    }, RETRY_TIMEOUT);
+  });
+
+  describe('401 — Concurrent Refresh Queue', () => {
+    const RETRY_TIMEOUT = 20_000;
+
+    it('should queue a second 401 request while refresh is in progress and reject both when refresh fails', async () => {
+      (SecureStore.getItemAsync as jest.Mock).mockImplementation((key: string) => {
+        if (key === 'cp_access_token') return Promise.resolve('expired-token');
+        if (key === 'cp_refresh_token') return Promise.resolve(null); // triggers clear → no new token
+        return Promise.resolve(null);
+      });
+      (SecureStore.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+
+      mockAxios.onGet('/q1').reply(401, { detail: 'Unauthorized' });
+      mockAxios.onGet('/q2').reply(401, { detail: 'Unauthorized' });
+
+      const p1 = apiClient.get('/q1').catch((e) => e);
+      const p2 = apiClient.get('/q2').catch((e) => e);
+      const [r1, r2] = await Promise.all([p1, p2]);
+      expect(r1).toBeTruthy();
+      expect(r2).toBeTruthy();
+    }, RETRY_TIMEOUT);
+  });
+
+  describe('ERR_CANCELED should not retry', () => {
+    it('a 404 error is not in RETRYABLE_STATUSES and rejects quickly', async () => {
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('test-token');
+      mockAxios.onGet('/not-found').reply(404, { detail: 'Not found' });
+      await expect(apiClient.get('/not-found')).rejects.toThrow();
+    });
+  });

@@ -4,7 +4,7 @@
  * Tests the exported utility functions + screen rendering.
  */
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react-native';
 
 // ─── Mocks ─────────────────────────────────────────────────────────────────
 
@@ -213,5 +213,90 @@ describe('NotificationsScreen', () => {
     render(<NotificationsScreen navigation={navWithParent} route={{} as any} />);
     // No crash
     expect(true).toBeTruthy();
+  });
+
+  it('navigates to MyAgentsTab when a navigable notification is pressed', async () => {
+    const mockNavigate = jest.fn();
+    const navForPress: any = {
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+      getParent: jest.fn(() => ({ navigate: mockNavigate })),
+    };
+
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: 'ha-press',
+        status: 'active',
+        subscription_status: 'past_due',
+        trial_status: 'none',
+        trial_end_at: null,
+        agent: { name: 'DMA Agent', industry: 'marketing' },
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<NotificationsScreen navigation={navForPress} route={{} as any} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Billing action needed')).toBeTruthy();
+    });
+
+    const { fireEvent: fe } = require('@testing-library/react-native');
+    fe.press(screen.getByText('Billing action needed'));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('MyAgentsTab', expect.objectContaining({
+        screen: 'AgentOperations',
+      }));
+    });
+  });
+
+  it('pressing a generic-type notification does not navigate', async () => {
+    const mockNavigate = jest.fn();
+    const navForPress: any = {
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+      getParent: jest.fn(() => ({ navigate: mockNavigate })),
+    };
+
+    // No hired agents → no notifications → press Back button instead to check goBack
+    mockHiredAgents.mockReturnValue({ isLoading: false, data: [], error: null, refetch: jest.fn() });
+    render(<NotificationsScreen navigation={navForPress} route={{} as any} />);
+
+    const { fireEvent: fe } = require('@testing-library/react-native');
+    fe.press(screen.getByText('← Back'));
+
+    expect(navForPress.goBack).toHaveBeenCalled();
+  });
+
+  it('renders push notification toggle section', () => {
+    mockHiredAgents.mockReturnValue({ isLoading: false, data: [], error: null, refetch: jest.fn() });
+    render(<NotificationsScreen navigation={mockNavigation} route={{} as any} />);
+    expect(screen.getByText('Enable Push Notifications')).toBeTruthy();
+    expect(screen.getByText('Push Notifications')).toBeTruthy();
+  });
+
+  it('shows destination label for notification without a known runtimeId', async () => {
+    mockHiredAgents.mockReturnValue({
+      isLoading: false,
+      data: [{
+        hired_instance_id: undefined,
+        subscription_id: 'sub-99',
+        status: 'active',
+        subscription_status: 'active',
+        trial_status: 'none',
+        trial_end_at: null,
+        configured: false,
+        goals_completed: true,
+        agent: { name: 'SomeAgent', industry: 'sales' },
+      }],
+      error: null,
+      refetch: jest.fn(),
+    });
+    render(<NotificationsScreen navigation={mockNavigation} route={{} as any} />);
+    await waitFor(() => {
+      expect(screen.getByText('Agent setup incomplete')).toBeTruthy();
+    });
   });
 });

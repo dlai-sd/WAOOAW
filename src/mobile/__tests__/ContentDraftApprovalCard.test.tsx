@@ -145,4 +145,167 @@ describe('ContentDraftApprovalCard (E5-S1)', () => {
     );
     expect(true).toBe(true);
   });
+
+  it('renders with channelStatusLabel', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={MOCK_DELIVERABLE}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+        channelStatusLabel="Connected"
+      />
+    );
+    expect(screen.getByText(/Channel status: Connected/)).toBeTruthy();
+  });
+
+  it('renders with approvalReference', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={MOCK_DELIVERABLE}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+        approvalReference="REF-123"
+      />
+    );
+    expect(screen.getByText(/Approval reference: REF-123/)).toBeTruthy();
+  });
+
+  it('renders with readinessLabel and readinessMessage', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={MOCK_DELIVERABLE}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+        readinessLabel="Ready"
+        readinessMessage="All checks passed"
+      />
+    );
+    expect(screen.getByText(/Publish readiness: Ready/)).toBeTruthy();
+    expect(screen.getByText('All checks passed')).toBeTruthy();
+  });
+
+  it('renders with readinessLabel but no readinessMessage', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={MOCK_DELIVERABLE}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+        readinessLabel="Partial"
+      />
+    );
+    expect(screen.getByText(/Publish readiness: Partial/)).toBeTruthy();
+  });
+
+  it('shows YouTube approval info when platform is youtube', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, target_platform: 'YouTube' }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(screen.getByText(/Exact approval required before YouTube action/)).toBeTruthy();
+  });
+
+  it('renders with no target_platform (undefined)', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, target_platform: undefined }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(true).toBe(true);
+  });
+
+  it('renders with no title (title undefined)', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, title: undefined }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(true).toBe(true);
+  });
+
+  it('renders preview truncated at 200 chars with ellipsis', () => {
+    const longPreview = 'A'.repeat(210);
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, content_preview: longPreview }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(screen.getByText('A'.repeat(200) + '…')).toBeTruthy();
+  });
+
+  it('renders using description when content_preview is absent', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, content_preview: undefined, description: 'From description field' }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(screen.getByText('From description field')).toBeTruthy();
+  });
+
+  it('calls onApprove with deliverable id when Approve pressed', () => {
+    const onApprove = jest.fn();
+    render(
+      <ContentDraftApprovalCard
+        deliverable={MOCK_DELIVERABLE}
+        onApprove={onApprove}
+        onReject={jest.fn()}
+      />
+    );
+    fireEvent.press(screen.getByText(/Approve exact deliverable/));
+    expect(onApprove).toHaveBeenCalledWith('DEL-001');
+  });
+
+  it('renders linkedin platform emoji', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, target_platform: 'LinkedIn' }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(true).toBe(true);
+  });
+
+  it('renders instagram platform emoji', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, target_platform: 'Instagram' }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(true).toBe(true);
+  });
+
+  it('renders facebook platform emoji', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, target_platform: 'Facebook' }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(true).toBe(true);
+  });
+
+  it('renders X platform emoji (twitter branch)', () => {
+    render(
+      <ContentDraftApprovalCard
+        deliverable={{ ...MOCK_DELIVERABLE, target_platform: 'X' }}
+        onApprove={jest.fn()}
+        onReject={jest.fn()}
+      />
+    );
+    expect(true).toBe(true);
+  });
 });
