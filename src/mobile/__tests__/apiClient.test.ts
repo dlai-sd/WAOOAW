@@ -241,3 +241,5 @@ describe('API Client', () => {
       await expect(apiClient.get('/not-found')).rejects.toThrow();
     });
   });
+
+});

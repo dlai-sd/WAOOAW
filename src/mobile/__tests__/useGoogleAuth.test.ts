@@ -580,3 +580,5 @@ describe('useGoogleAuth Hook', () => {
       Google.useAuthRequest = origUseAuthRequest;
     });
   });
+
+});
