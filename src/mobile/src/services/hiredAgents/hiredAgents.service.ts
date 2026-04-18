@@ -5,7 +5,6 @@
  */
 
 import apiClient from '../../lib/apiClient';
-import cpApiClient from '../../lib/cpApiClient';
 import type {
   Deliverable,
   HiredAgentInstance,
@@ -294,8 +293,13 @@ class HiredAgentsService {
    * 
    * @returns Promise<MyAgentInstanceSummary[]> - List of hired agent summaries
    */
-  async listMyAgents(): Promise<MyAgentInstanceSummary[]> {
-    const response = await cpApiClient.get<MyAgentsSummaryResponse>('/cp/my-agents/summary');
+  async listMyAgents(customerId?: string): Promise<MyAgentInstanceSummary[]> {
+    // Plant Backend — has CORS for Codespace; CP Backend does not.
+    // customer_id is passed from the hook (read from authStore).
+    if (!customerId) return [];
+    const response = await apiClient.get<{ instances?: MyAgentInstanceSummary[] }>(
+      `/api/v1/hired-agents/by-customer/${encodeURIComponent(customerId)}`
+    );
     return response.data.instances || [];
   }
 
@@ -310,8 +314,8 @@ class HiredAgentsService {
    * @returns Promise<HiredAgentInstance> - Full hired agent instance
    */
   async getHiredAgentBySubscription(subscriptionId: string): Promise<HiredAgentInstance> {
-    const response = await cpApiClient.get<HiredAgentInstance>(
-      `/cp/hired-agents/by-subscription/${encodeURIComponent(subscriptionId)}`
+    const response = await apiClient.get<HiredAgentInstance>(
+      `/api/v1/hired-agents/by-subscription/${encodeURIComponent(subscriptionId)}`
     );
     return response.data;
   }
@@ -324,23 +328,23 @@ class HiredAgentsService {
   }
 
   async getDeliverablesByHiredAgent(hiredAgentId: string): Promise<Deliverable[]> {
-    const response = await cpApiClient.get<{ deliverables?: Deliverable[] }>(
-      `/cp/hired-agents/${encodeURIComponent(hiredAgentId)}/deliverables`
+    const response = await apiClient.get<{ deliverables?: Deliverable[] }>(
+      `/api/v1/hired-agents/${encodeURIComponent(hiredAgentId)}/deliverables`
     );
     return response.data.deliverables || [];
   }
 
   async listScheduledPosts(hiredAgentId: string): Promise<ScheduledPost[]> {
-    const response = await cpApiClient.get<{ posts?: ScheduledPost[] } | ScheduledPost[]>(
-      `/cp/campaigns/${encodeURIComponent(hiredAgentId)}/posts`
+    const response = await apiClient.get<{ posts?: ScheduledPost[] } | ScheduledPost[]>(
+      `/api/v1/campaigns/${encodeURIComponent(hiredAgentId)}/posts`
     );
     if (Array.isArray(response.data)) return response.data;
     return (response.data as { posts?: ScheduledPost[] }).posts || [];
   }
 
   async listPlatformConnections(hiredAgentId: string): Promise<PlatformConnection[]> {
-    const response = await cpApiClient.get<{ connections?: PlatformConnection[] } | PlatformConnection[]>(
-      `/cp/hired-agents/${encodeURIComponent(hiredAgentId)}/platform-connections`
+    const response = await apiClient.get<{ connections?: PlatformConnection[] } | PlatformConnection[]>(
+      `/api/v1/hired-agents/${encodeURIComponent(hiredAgentId)}/platform-connections`
     );
     if (Array.isArray(response.data)) return response.data;
     return response.data.connections || [];
@@ -358,7 +362,7 @@ class HiredAgentsService {
    * @returns Promise<TrialStatusRecord[]> - List of trial status records
    */
   async listTrialStatus(): Promise<TrialStatusRecord[]> {
-    const response = await apiClient.get<TrialStatusListResponse>('/v1/trial-status');
+    const response = await apiClient.get<TrialStatusListResponse>('/api/v1/trial-status');
     return response.data.trials || [];
   }
 
@@ -387,30 +391,18 @@ class HiredAgentsService {
    * 
    * @returns Promise<MyAgentInstanceSummary[]> - Active hired agents
    */
-  async listActiveHiredAgents(): Promise<MyAgentInstanceSummary[]> {
-    const all = await this.listMyAgents();
+  async listActiveHiredAgents(customerId?: string): Promise<MyAgentInstanceSummary[]> {
+    const all = await this.listMyAgents(customerId);
     return all.filter(agent => agent.status === 'active');
   }
 
-  /**
-   * Get agents currently in trial
-   * Filters to show only agents with active trial status
-   * 
-   * @returns Promise<MyAgentInstanceSummary[]> - Agents in trial
-   */
-  async listAgentsInTrial(): Promise<MyAgentInstanceSummary[]> {
-    const all = await this.listMyAgents();
+  async listAgentsInTrial(customerId?: string): Promise<MyAgentInstanceSummary[]> {
+    const all = await this.listMyAgents(customerId);
     return all.filter(agent => agent.trial_status === 'active');
   }
 
-  /**
-   * Get agents requiring setup (not configured or goals not completed)
-   * Useful for onboarding flows
-   * 
-   * @returns Promise<MyAgentInstanceSummary[]> - Agents needing setup
-   */
-  async listAgentsNeedingSetup(): Promise<MyAgentInstanceSummary[]> {
-    const all = await this.listMyAgents();
+  async listAgentsNeedingSetup(customerId?: string): Promise<MyAgentInstanceSummary[]> {
+    const all = await this.listMyAgents(customerId);
     return all.filter(agent => !agent.configured || !agent.goals_completed);
   }
 }

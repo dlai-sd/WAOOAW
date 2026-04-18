@@ -841,7 +841,7 @@ const HiredAgentCard = ({
               },
             ]}
           >
-            {agent.duration.charAt(0).toUpperCase() + agent.duration.slice(1)}
+            {agent.duration ? agent.duration.charAt(0).toUpperCase() + agent.duration.slice(1) : '—'}
           </Text>
         </View>
         <View style={[styles.infoRow, { flexDirection: 'row', justifyContent: 'space-between' }]}>
@@ -867,7 +867,7 @@ const HiredAgentCard = ({
               },
             ]}
           >
-            {formatDate(agent.current_period_end)}
+            {agent.current_period_end ? formatDate(agent.current_period_end) : '—'}
           </Text>
         </View>
       </View>

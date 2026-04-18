@@ -822,4 +822,371 @@ describe('MyAgentsScreen', () => {
       });
     });
   });
+
+  // ── Sort controls (hired tab only) ────────────────────────────────────────
+
+  describe('Sort Controls', () => {
+    const setupHiredAgents = () => {
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [mockHiredAgent, mockHiredAgentEnding],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+    };
+
+    it('shows sort chips in hired tab', async () => {
+      setupHiredAgents();
+      const { getByText, getByTestId } = renderScreen();
+      fireEvent.press(getByText('Hired (2)'));
+      await waitFor(() => {
+        expect(getByTestId('sort-chip-attention')).toBeTruthy();
+        expect(getByTestId('sort-chip-alphabetical')).toBeTruthy();
+        expect(getByTestId('sort-chip-recent')).toBeTruthy();
+      });
+    });
+
+    it('does not show sort chips in trials tab', () => {
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [mockTrialAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [mockTrialAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { queryByTestId } = renderScreen();
+      expect(queryByTestId('sort-chip-attention')).toBeNull();
+    });
+
+    it('switches to alphabetical sort', async () => {
+      setupHiredAgents();
+      const { getByText, getByTestId } = renderScreen();
+      fireEvent.press(getByText('Hired (2)'));
+      await waitFor(() => getByTestId('sort-chip-alphabetical'));
+      fireEvent.press(getByTestId('sort-chip-alphabetical'));
+      await waitFor(() => {
+        expect(getByTestId('agent-id-seo_specialist')).toBeTruthy();
+      });
+    });
+
+    it('switches to recent sort', async () => {
+      setupHiredAgents();
+      const { getByText, getByTestId } = renderScreen();
+      fireEvent.press(getByText('Hired (2)'));
+      await waitFor(() => getByTestId('sort-chip-recent'));
+      fireEvent.press(getByTestId('sort-chip-recent'));
+      await waitFor(() => {
+        expect(getByTestId('agent-id-seo_specialist')).toBeTruthy();
+      });
+    });
+  });
+
+  // ── Fallback navigation (no hired_instance_id) ────────────────────────────
+
+  describe('Fallback navigation', () => {
+    it('navigates to AgentDetail when agent has no hired_instance_id', async () => {
+      const noInstanceAgent: MyAgentInstanceSummary = {
+        ...mockHiredAgent,
+        subscription_id: 'sub_no_inst',
+        agent_id: 'bare_agent',
+        nickname: 'Bare Agent',
+        trial_status: 'converted',
+        hired_instance_id: undefined as unknown as string,
+      };
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [noInstanceAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getByTestId } = renderScreen();
+      fireEvent.press(getByText('Hired (1)'));
+      await waitFor(() => getByTestId('agent-card-sub_no_inst'));
+      fireEvent.press(getByTestId('agent-card-sub_no_inst'));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('AgentDetail', { agentId: 'bare_agent' });
+      });
+    });
+  });
+
+  // ── Needs-attention pill ──────────────────────────────────────────────────
+
+  describe('Attention count pill', () => {
+    it('shows correct needs-attention count in header pill', () => {
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [mockHiredAgentEnding, mockHiredAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText } = renderScreen();
+      expect(getByText('1 need attention')).toBeTruthy();
+    });
+  });
+
+  // ── Auto tab switch ───────────────────────────────────────────────────────
+
+  describe('Auto tab switch', () => {
+    it('switches to hired tab automatically when no trials but hired agents exist', async () => {
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [mockHiredAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByTestId } = renderScreen();
+      // Should auto-switch to hired tab
+      await waitFor(() => {
+        expect(getByTestId('agent-id-seo_specialist')).toBeTruthy();
+      });
+    });
+  });
+
+  // ── Status tone colour ────────────────────────────────────────────────────
+
+  describe('statusToneColor info/neutral tone', () => {
+    it('renders deliverable readiness with info tone (neonCyan) for neutral status', async () => {
+      mockGetDeliverablesByHiredAgent.mockResolvedValueOnce([
+        {
+          deliverable_id: 'DEL-info',
+          hired_instance_id: 'hire_dma_321',
+          agent_id: 'AGT-MKT-DMA-001',
+          title: 'LinkedIn post draft',
+          type: 'document',
+          review_status: 'pending_review',
+          execution_status: 'not_executed',
+          payload: {
+            destination: {
+              destination_type: 'linkedin',
+              metadata: {},
+            },
+          },
+          created_at: '2026-03-11T08:00:00Z',
+          updated_at: '2026-03-11T08:30:00Z',
+        },
+      ]);
+      mockListPlatformConnections.mockResolvedValueOnce([
+        {
+          id: 'conn-li',
+          hired_instance_id: 'hire_dma_321',
+          platform_key: 'linkedin',
+          status: 'connected',
+          created_at: '2026-01-01',
+          updated_at: '2026-01-01',
+        },
+      ]);
+
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [{ ...mockDigitalMarketingAgent, goals_completed: true }],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText } = renderScreen();
+      fireEvent.press(getByText('Hired (1)'));
+
+      // Renders without crashing — info tone path exercised via statusToneColor
+      await waitFor(() => {
+        expect(getByText('YouTube Growth Agent')).toBeTruthy();
+      });
+    });
+  });
+
+  // ── getAttentionReasons branches ─────────────────────────────────────────
+
+  describe('getAttentionReasons', () => {
+    it('no attention reasons when hired agent is fully configured with goals complete', async () => {
+      const fullyConfiguredHiredAgent: MyAgentInstanceSummary = {
+        ...mockHiredAgent,
+        subscription_id: 'sub_full',
+        agent_id: 'full_agent',
+        nickname: 'Full Agent',
+        trial_status: 'converted',
+        cancel_at_period_end: false,
+        configured: true,
+        goals_completed: true,
+        hired_instance_id: 'hire_full',
+      };
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [fullyConfiguredHiredAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText } = renderScreen();
+      fireEvent.press(getByText('Hired (1)'));
+      await waitFor(() => expect(getByText('Full Agent')).toBeTruthy());
+      // 0 needs attention count — pill should show 0
+      expect(getByText('0 need attention')).toBeTruthy();
+    });
+
+    it('shows goals-need-review reason for hired agent with goals_completed=false', async () => {
+      const incompleteGoalsAgent: MyAgentInstanceSummary = {
+        ...mockHiredAgent,
+        subscription_id: 'sub_goals',
+        agent_id: 'goals_agent',
+        nickname: 'Goals Agent',
+        trial_status: 'converted',
+        hired_instance_id: 'hire_goals',
+        cancel_at_period_end: false,
+        configured: true,
+        goals_completed: false,
+      };
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [incompleteGoalsAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText, getAllByText } = renderScreen();
+      fireEvent.press(getByText('Hired (1)'));
+      await waitFor(() => expect(getAllByText('Goals need review').length).toBeGreaterThanOrEqual(1));
+    });
+
+    it('shows runtime-configuration-incomplete reason for hired unconfigured agent', async () => {
+      const unconfiguredHiredAgent: MyAgentInstanceSummary = {
+        ...mockHiredAgent,
+        subscription_id: 'sub_unconf',
+        agent_id: 'unconf_agent',
+        nickname: 'Unconf Agent',
+        trial_status: 'converted',
+        hired_instance_id: 'hire_unconf',
+        cancel_at_period_end: false,
+        configured: false,
+        goals_completed: true,
+      };
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [unconfiguredHiredAgent],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText: getText2, getAllByText: getAll2 } = renderScreen();
+      fireEvent.press(getText2('Hired (1)'));
+      await waitFor(() => expect(getAll2('Runtime configuration incomplete').length).toBeGreaterThanOrEqual(1));
+    });
+
+    it('shows trial-goal-incomplete reason for trial agent with goals_completed=false', async () => {
+      const trialGoalIncomplete: MyAgentInstanceSummary = {
+        ...mockTrialAgent,
+        subscription_id: 'sub_tg',
+        agent_id: 'tg_agent',
+        nickname: 'TG Agent',
+        trial_status: 'active',
+        configured: true,
+        goals_completed: false,
+      };
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [trialGoalIncomplete],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [trialGoalIncomplete],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByText } = renderScreen();
+      await waitFor(() => expect(getByText('Goal setup incomplete')).toBeTruthy());
+    });
+  });
+
+  // ── trial agent without subscription_id press ─────────────────────────────
+
+  describe('Trial agent without subscription_id', () => {
+    it('falls through to AgentOperations when trial agent has no subscription_id but has hired_instance_id', async () => {
+      const trialNoSubId: MyAgentInstanceSummary = {
+        ...mockTrialAgent,
+        subscription_id: undefined as unknown as string,
+        trial_status: 'active',
+        hired_instance_id: 'hire_no_sub',
+      };
+      (useHiredAgentsModule.useHiredAgents as jest.Mock).mockReturnValue({
+        data: [trialNoSubId],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      (useHiredAgentsModule.useAgentsInTrial as jest.Mock).mockReturnValue({
+        data: [trialNoSubId],
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { getByTestId } = renderScreen();
+      await waitFor(() => getByTestId('agent-card-undefined'));
+      fireEvent.press(getByTestId('agent-card-undefined'));
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('AgentOperations', {
+          hiredAgentId: 'hire_no_sub',
+        });
+      });
+    });
+  });
 });

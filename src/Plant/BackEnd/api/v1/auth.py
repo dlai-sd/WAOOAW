@@ -18,6 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 
+# Module-level Request instance — reuses the underlying requests.Session()
+# (connection pool + TLS session) and shares the in-memory JWK cert cache
+# across all calls on this instance. Avoids a new TCP/TLS handshake to
+# googleapis.com on every verify call (saves ~50-150 ms on warm containers;
+# only the first call per cold start fetches the certs).
+_GOOGLE_REQUEST = google_requests.Request()
+
 from core.config import settings
 from core.database import get_db_session
 from core.security import (
@@ -452,7 +459,7 @@ async def google_verify_mobile(
             functools.partial(
                 google_id_token.verify_oauth2_token,
                 payload.id_token,
-                google_requests.Request(),
+                _GOOGLE_REQUEST,
                 settings.google_client_id,
             ),
         )

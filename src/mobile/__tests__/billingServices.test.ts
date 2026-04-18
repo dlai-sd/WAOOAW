@@ -5,7 +5,7 @@
 
 const mockCpGet = jest.fn();
 
-jest.mock('../src/lib/cpApiClient', () => ({
+jest.mock('../src/lib/apiClient', () => ({
   __esModule: true,
   default: {
     get: (...args: unknown[]) => mockCpGet(...args),
@@ -27,7 +27,7 @@ describe('invoices.service', () => {
     mockCpGet.mockResolvedValue({ data: mockData });
     const result = await listInvoices();
     expect(result).toEqual(mockData);
-    expect(mockCpGet).toHaveBeenCalledWith('/cp/invoices');
+    expect(mockCpGet).toHaveBeenCalledWith('/api/v1/invoices');
   });
 
   it('listInvoices handles wrapped response', async () => {
@@ -41,7 +41,7 @@ describe('invoices.service', () => {
     mockCpGet.mockResolvedValue({ data: '<html>Invoice</html>' });
     const result = await getInvoiceHtml('inv1');
     expect(result).toBe('<html>Invoice</html>');
-    expect(mockCpGet).toHaveBeenCalledWith('/cp/invoices/inv1/html');
+    expect(mockCpGet).toHaveBeenCalledWith('/api/v1/invoices/inv1/html');
   });
 });
 
@@ -55,7 +55,7 @@ describe('receipts.service', () => {
     mockCpGet.mockResolvedValue({ data: mockData });
     const result = await listReceipts();
     expect(result).toEqual(mockData);
-    expect(mockCpGet).toHaveBeenCalledWith('/cp/receipts');
+    expect(mockCpGet).toHaveBeenCalledWith('/api/v1/receipts');
   });
 
   it('listReceipts handles wrapped response', async () => {
@@ -69,6 +69,6 @@ describe('receipts.service', () => {
     mockCpGet.mockResolvedValue({ data: '<html>Receipt</html>' });
     const result = await getReceiptHtml('rec1');
     expect(result).toBe('<html>Receipt</html>');
-    expect(mockCpGet).toHaveBeenCalledWith('/cp/receipts/rec1/html');
+    expect(mockCpGet).toHaveBeenCalledWith('/api/v1/receipts/rec1/html');
   });
 });

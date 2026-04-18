@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW — Agent Marketplace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-black:#0a0a0a; --bg-card:#18181b; --color-neon-cyan:#00f2fe;
+      --color-purple:#667eea; --border-dark:rgba(255,255,255,0.08);
+      --status-green:#10b981; --status-yellow:#f59e0b; --status-red:#ef4444;
+      --status-gray:#6b7280; --text-primary:#f9fafb; --text-secondary:#9ca3af;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .marketplace{max-width:1200px;margin:0 auto;padding:2rem}
+    .marketplace__title{font-family:'Space Grotesk',sans-serif;font-size:2rem;margin-bottom:.5rem}
+    .marketplace__subtitle{color:var(--text-secondary);margin-bottom:2rem}
+    .search-bar{display:flex;gap:1rem;margin-bottom:1.5rem}
+    .search-bar input{flex:1;background:var(--bg-card);border:1px solid var(--border-dark);border-radius:.5rem;padding:.75rem 1rem;color:var(--text-primary);font-size:1rem;outline:none}
+    .search-bar input:focus{border-color:var(--color-neon-cyan)}
+    .filter-row{display:flex;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
+    .filter-row select{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:.5rem;padding:.5rem .75rem;color:var(--text-primary);font-size:.9rem;outline:none;cursor:pointer}
+    .filter-row select:focus{border-color:var(--color-neon-cyan)}
+    #agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.5rem}
+    .agent-card{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1.5rem;padding:1.5rem;display:flex;flex-direction:column;gap:1rem;transition:all .3s ease}
+    .agent-card:hover{transform:translateY(-4px);box-shadow:0 0 20px rgba(0,242,254,.15);border-color:rgba(0,242,254,.3)}
+    .agent-card__avatar{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem}
+    .agent-card__header{display:flex;align-items:center;gap:.5rem}
+    .agent-card__name{font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:600}
+    .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .agent-card__industry{font-size:.75rem;color:var(--color-neon-cyan);text-transform:uppercase;letter-spacing:.05em}
+    .agent-card__specialty{font-size:.9rem;color:var(--text-secondary)}
+    .agent-card__meta{display:flex;gap:1rem;font-size:.85rem}
+    .agent-card__rating{color:var(--status-yellow)}
+    .agent-card__price{color:var(--color-neon-cyan)}
+    .btn{display:inline-block;padding:.5rem 1rem;border-radius:.5rem;text-decoration:none;font-weight:600;font-size:.9rem;cursor:pointer;border:none;transition:all .2s ease}
+    .btn--cyan{background:var(--color-neon-cyan);color:#0a0a0a}
+    .btn--cyan:hover{opacity:.9;transform:translateY(-1px)}
+    .agent-card__cta{align-self:flex-start}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary);grid-column:1/-1}
+    .empty-state button{background:none;border:1px solid var(--border-dark);color:var(--color-neon-cyan);padding:.4rem .8rem;border-radius:.4rem;cursor:pointer}
+    .error{color:var(--status-red);text-align:center;padding:2rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW</h1>
+    <nav>
+      <a href="/marketplace">Marketplace</a>
+      <a href="/my-agents">My Agents</a>
+      <a href="/approvals">Approvals</a>
+    </nav>
+  </header>
+  <main class="marketplace">
+    <h2 class="marketplace__title">Agent Marketplace</h2>
+    <p class="marketplace__subtitle">Not tools. Not software. Actual AI workforce. Try before you hire.</p>
+    <div class="search-bar">
+      <input id="search-input" type="search" placeholder="Search agents by name or specialty…"
+             aria-label="Search agents">
+    </div>
+    <div class="filter-row">
+      <select id="filter-industry" aria-label="Filter by industry">
+        <option value="">All Industries</option>
+        <option value="marketing">Marketing</option>
+        <option value="education">Education</option>
+        <option value="sales">Sales</option>
+        <option value="finance">Finance</option>
+      </select>
+      <select id="filter-rating" aria-label="Filter by minimum rating">
+        <option value="">Any Rating</option>
+        <option value="4">4★ &amp; above</option>
+        <option value="4.5">4.5★ &amp; above</option>
+      </select>
+    </div>
+    <div id="agent-grid" role="list" aria-label="Available agents">
+      <div class="empty-state" id="loading-state">Loading agents…</div>
+    </div>
+  </main>
+  <script type="module" src="marketplace.js"></script>
+</body>
+</html>

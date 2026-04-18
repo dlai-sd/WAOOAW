@@ -108,6 +108,10 @@ module "cp_backend" {
     CP_OTP_SMTP_FROM           = "customersupport@dlaisd.com"
     CP_OTP_SMTP_STARTTLS       = "true"
     CP_OTP_SMTP_ALLOW_INSECURE = "false"
+
+    # CORS — demo allows all origins (Codespaces, localhost dev).  uat/prod are
+    # restricted to the explicit CP and Plant origins for that environment.
+    CORS_ORIGINS = local.cors_origins
   }
 
   # CP_REGISTRATION_KEY is required for CP→Plant customer upsert.
@@ -136,6 +140,13 @@ module "cp_backend" {
 locals {
   cp_api_base_url   = var.environment == "prod" ? "https://cp.waooaw.com/api" : "https://cp.${var.environment}.waooaw.com/api"
   plant_gateway_url = var.environment == "prod" ? "https://plant.waooaw.com" : "https://plant.${var.environment}.waooaw.com"
+  # demo uses "*" so Codespaces and local builds can hit the API without a fixed origin.
+  # uat/prod use explicit origin lists; never wildcard in environments with real user data.
+  cors_origins = var.environment == "demo" ? "*" : (
+    var.environment == "prod"
+    ? "https://cp.waooaw.com,https://plant.waooaw.com"
+    : "https://cp.${var.environment}.waooaw.com,https://plant.${var.environment}.waooaw.com"
+  )
 }
 
 locals {

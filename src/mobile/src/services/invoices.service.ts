@@ -4,7 +4,7 @@
  * Calls CP Backend invoice endpoints — same contract as CP Frontend.
  */
 
-import cpApiClient from '../lib/cpApiClient';
+import apiClient from '../lib/apiClient';
 
 export interface Invoice {
   id: string;
@@ -16,7 +16,7 @@ export interface Invoice {
 }
 
 export async function listInvoices(): Promise<Invoice[]> {
-  const response = await cpApiClient.get<Invoice[]>('/cp/invoices');
+  const response = await apiClient.get<Invoice[]>('/api/v1/invoices');
   const data = response.data;
   if (Array.isArray(data)) return data;
   if (Array.isArray((data as Record<string, unknown>)?.invoices)) {
@@ -26,6 +26,6 @@ export async function listInvoices(): Promise<Invoice[]> {
 }
 
 export async function getInvoiceHtml(invoiceId: string): Promise<string> {
-  const response = await cpApiClient.get<string>(`/cp/invoices/${invoiceId}/html`);
+  const response = await apiClient.get<string>(`/api/v1/invoices/${invoiceId}/html`);
   return response.data;
 }

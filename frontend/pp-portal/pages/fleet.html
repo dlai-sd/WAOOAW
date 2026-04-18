@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW PP — Fleet Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-green:#10b981;--status-yellow:#f59e0b;--status-red:#ef4444;
+          --text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .page{max-width:1100px;margin:0 auto;padding:2rem}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:1.75rem;margin-bottom:.5rem}
+    .page-subtitle{color:var(--text-secondary);margin-bottom:2rem;font-size:.9rem}
+    #fleet-grid{display:flex;flex-direction:column;gap:.75rem}
+    .fleet-row{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1rem;padding:1rem 1.5rem;display:grid;grid-template-columns:2fr 1fr 3fr 1fr auto;align-items:center;gap:1rem;transition:border-color .2s}
+    .fleet-row:hover{border-color:rgba(0,242,254,.3)}
+    .fleet-row__name{font-family:'Space Grotesk',sans-serif;font-weight:600}
+    .fleet-row__instances{font-size:.85rem;color:var(--text-secondary)}
+    .fleet-row__bars{display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.05)}
+    .fleet-bar{height:100%;transition:width .4s ease}
+    .fleet-bar--green{background:var(--status-green)}
+    .fleet-bar--yellow{background:var(--status-yellow)}
+    .fleet-bar--red{background:var(--status-red)}
+    .fleet-row__error-rate{font-size:.85rem;font-weight:600;color:var(--text-secondary);text-align:right}
+    .fleet-row__error-rate--high{color:var(--status-red)}
+    .btn{display:inline-block;padding:.4rem .9rem;border-radius:.4rem;text-decoration:none;font-weight:600;font-size:.85rem;cursor:pointer;border:none;transition:all .2s}
+    .btn--outline{background:transparent;border:1px solid var(--border-dark);color:var(--text-primary)}
+    .btn--outline:hover{border-color:var(--color-neon-cyan);color:var(--color-neon-cyan)}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+    .error{color:var(--status-red);padding:1rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW PP</h1>
+    <nav>
+      <a href="/pp/fleet">Fleet</a>
+      <a href="/pp/dlq">DLQ</a>
+    </nav>
+  </header>
+  <main class="page">
+    <h2>Fleet Dashboard</h2>
+    <p class="page-subtitle">Live status of all deployed agents. Auto-refreshes every 10 seconds.</p>
+    <div id="fleet-grid">
+      <div class="empty-state">Loading fleet…</div>
+    </div>
+  </main>
+  <script type="module" src="fleet.js"></script>
+</body>
+</html>

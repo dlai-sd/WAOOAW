@@ -726,5 +726,184 @@ describe('TrialDashboardScreen', () => {
       expect(screen.getByText(/You keep all deliverables even if you cancel the trial/)).toBeTruthy();
     });
   });
+
+  // ── Progress bar color branches ───────────────────────────────────────────
+
+  describe('Progress bar color branches', () => {
+    it('shows error color when 1 day remaining', () => {
+      const now = new Date();
+      const agent = createMockAgent({
+        trial_start_at: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_end_at: new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_status: 'active',
+      });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      expect(screen.getByText('Days Remaining')).toBeTruthy();
+    });
+
+    it('shows warning color when 2 days remaining', () => {
+      const now = new Date();
+      const agent = createMockAgent({
+        trial_start_at: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_end_at: new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_status: 'active',
+      });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      expect(screen.getByText('Days Remaining')).toBeTruthy();
+    });
+
+    it('shows 0 days when trial has passed end date', () => {
+      const now = new Date();
+      const agent = createMockAgent({
+        trial_start_at: new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_end_at: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_status: 'active',
+      });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      // daysRemaining <= 0 → displays 0, badge says "Trial Ended"
+      expect(screen.getByText(/Trial Ended/)).toBeTruthy();
+    });
+  });
+
+  // ── getDeliverableIcon branches ───────────────────────────────────────────
+
+  describe('Deliverable icon types', () => {
+    const renderWithDeliverables = (delivTypes: string[]) => {
+      const agent = createMockAgent({ configured: true, trial_status: 'active' });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+      const items = delivTypes.map((t, i) => ({
+        deliverable_id: `del_t${i}`,
+        hired_instance_id: 'hired_123',
+        agent_id: 'agent_123',
+        title: `Test ${t}`,
+        type: t,
+        url: `https://example.com/${t}`,
+        review_status: 'approved',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+      (useDeliverables as jest.Mock).mockReturnValue({ data: items, isLoading: false, error: null });
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+    };
+
+    it('renders pdf deliverable icon', () => {
+      renderWithDeliverables(['pdf']);
+      expect(screen.getByText('Test pdf')).toBeTruthy();
+    });
+
+    it('renders link deliverable icon', () => {
+      renderWithDeliverables(['link']);
+      expect(screen.getByText('Test link')).toBeTruthy();
+    });
+
+    it('renders document deliverable icon', () => {
+      renderWithDeliverables(['document']);
+      expect(screen.getByText('Test document')).toBeTruthy();
+    });
+
+    it('renders unknown deliverable type icon (default)', () => {
+      renderWithDeliverables(['video']);
+      expect(screen.getByText('Test video')).toBeTruthy();
+    });
+  });
+
+  // ── getReviewStatusBadge branches ─────────────────────────────────────────
+
+  describe('Review status badge', () => {
+    const renderWithStatus = (status: string) => {
+      const agent = createMockAgent({ configured: true, trial_status: 'active' });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+      (useDeliverables as jest.Mock).mockReturnValue({
+        data: [{
+          deliverable_id: 'del_s1',
+          hired_instance_id: 'hired_123',
+          agent_id: 'agent_123',
+          title: 'Status test',
+          type: 'document',
+          url: 'https://example.com/doc',
+          review_status: status,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }],
+        isLoading: false,
+        error: null,
+      });
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+    };
+
+    it('shows Rejected badge', () => {
+      renderWithStatus('rejected');
+      expect(screen.getAllByText(/Rejected/).length).toBeGreaterThan(0);
+    });
+
+    it('shows Revision badge for revision_requested', () => {
+      renderWithStatus('revision_requested');
+      expect(screen.getAllByText(/Revision/).length).toBeGreaterThan(0);
+    });
+
+    it('shows raw status text for unknown status', () => {
+      renderWithStatus('under_review');
+      expect(screen.getByText('under_review')).toBeTruthy();
+    });
+  });
+
+  // ── Agent without nickname ────────────────────────────────────────────────
+
+  describe('Agent without nickname', () => {
+    it('shows agent_id in header when nickname is null', () => {
+      const agent = createMockAgent({ nickname: null as unknown as string, agent_id: 'agent_no_name' });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      expect(screen.getAllByText('agent_no_name').length).toBeGreaterThan(0);
+    });
+
+    it('does not show Goals Completed row when agent is not configured', () => {
+      const agent = createMockAgent({ configured: false });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      expect(screen.queryByText('Goals Completed')).toBeNull();
+    });
+
+    it('shows goals not yet when configured but goals_completed is false', () => {
+      const agent = createMockAgent({ configured: true, goals_completed: false });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      expect(screen.getByText('— Not yet')).toBeTruthy();
+    });
+  });
+
+  // ── getStatusBadge default case ───────────────────────────────────────────
+
+  describe('Unknown trial status', () => {
+    it('shows raw trial_status for unknown status string', () => {
+      const agent = createMockAgent({ trial_status: 'unknown_status' as any });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      expect(screen.getByText(/unknown_status/)).toBeTruthy();
+    });
+  });
+
+  // ── Deliverables loading state ────────────────────────────────────────────
+
+  describe('Deliverables loading state', () => {
+    it('renders without error while deliverables are loading', () => {
+      const agent = createMockAgent({ configured: true, trial_status: 'active' });
+      (useHiredAgent as jest.Mock).mockReturnValue({ data: agent, isLoading: false, error: null, refetch: jest.fn() });
+      (useDeliverables as jest.Mock).mockReturnValue({ data: [], isLoading: true, error: null });
+
+      render(<TrialDashboardScreen navigation={mockNavigation as any} route={createRoute('sub_123') as any} />);
+      expect(screen.getByText('Deliverables')).toBeTruthy();
+    });
+  });
 });
 

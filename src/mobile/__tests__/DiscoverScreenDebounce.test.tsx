@@ -174,3 +174,103 @@ describe('DiscoverScreen debounce (MOB-PARITY-2 E2-S1)', () => {
     expect(getByTestId('loading')).toBeTruthy();
   });
 });
+
+describe('DiscoverScreen additional branch coverage', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.clearAllMocks();
+  });
+
+  it('shows error view when API returns error and no agents cached', () => {
+    mockUseAgents.mockReturnValue({
+      ...baseAgentsReturn,
+      data: undefined,
+      isLoading: false,
+      error: { message: 'Network failure' },
+    });
+    const { getByTestId } = renderDiscover();
+    expect(getByTestId('error')).toBeTruthy();
+  });
+
+  it('shows empty state when agents array is empty and not loading', () => {
+    mockUseAgents.mockReturnValue({ ...baseAgentsReturn, data: [], isLoading: false });
+    const { getByTestId } = renderDiscover();
+    expect(getByTestId('empty')).toBeTruthy();
+  });
+
+  it('filters out agents below minRating', () => {
+    const agents = [
+      { id: 'a1', name: 'High Rated', rating: 4.8, price: 10000 },
+      { id: 'a2', name: 'Low Rated', rating: 2.0, price: 8000 },
+    ];
+    mockUseAgents.mockReturnValue({ ...baseAgentsReturn, data: agents });
+    const { queryByTestId } = renderDiscover({ minRating: 4.0 });
+    expect(queryByTestId('agent-card-a1')).toBeTruthy();
+    expect(queryByTestId('agent-card-a2')).toBeNull();
+  });
+
+  it('filters out agents above maxPrice', () => {
+    const agents = [
+      { id: 'a3', name: 'Cheap', rating: 4.0, price: 5000 },
+      { id: 'a4', name: 'Expensive', rating: 4.5, price: 25000 },
+    ];
+    mockUseAgents.mockReturnValue({ ...baseAgentsReturn, data: agents });
+    const { queryByTestId } = renderDiscover({ maxPrice: 10000 });
+    expect(queryByTestId('agent-card-a3')).toBeTruthy();
+    expect(queryByTestId('agent-card-a4')).toBeNull();
+  });
+
+  it('passes both minRating and maxPrice filters correctly', () => {
+    const agents = [
+      { id: 'b1', name: 'Pass Both', rating: 4.5, price: 8000 },
+      { id: 'b2', name: 'Fail Rating', rating: 3.0, price: 8000 },
+      { id: 'b3', name: 'Fail Price', rating: 4.8, price: 20000 },
+    ];
+    mockUseAgents.mockReturnValue({ ...baseAgentsReturn, data: agents });
+    const { queryByTestId } = renderDiscover({ minRating: 4.0, maxPrice: 15000 });
+    expect(queryByTestId('agent-card-b1')).toBeTruthy();
+    expect(queryByTestId('agent-card-b2')).toBeNull();
+    expect(queryByTestId('agent-card-b3')).toBeNull();
+  });
+
+  it('filters agent without rating when minRating > 0', () => {
+    const agents = [{ id: 'c1', name: 'No Rating', price: 5000 }];
+    mockUseAgents.mockReturnValue({ ...baseAgentsReturn, data: agents });
+    const { queryByTestId } = renderDiscover({ minRating: 1.0 });
+    expect(queryByTestId('agent-card-c1')).toBeNull();
+  });
+
+  it('does not filter agents when minRating and maxPrice are 0', () => {
+    const agents = [
+      { id: 'd1', name: 'Agent One', rating: 2.0, price: 50000 },
+    ];
+    mockUseAgents.mockReturnValue({ ...baseAgentsReturn, data: agents });
+    const { getByTestId } = renderDiscover({ minRating: 0, maxPrice: 0 });
+    expect(getByTestId('agent-card-d1')).toBeTruthy();
+  });
+
+  it('deselects industry filter when same chip is pressed again', () => {
+    mockUseAgents.mockReturnValue(baseAgentsReturn);
+    const { getByText } = renderDiscover();
+    const marketingBtn = getByText('marketing');
+    fireEvent.press(marketingBtn);
+    // Verify marketing is now selected - the last call should have industry=marketing
+    let lastCall = mockUseAgents.mock.calls[mockUseAgents.mock.calls.length - 1];
+    expect((lastCall[0] as any)?.industry).toBe('marketing');
+    // Press again to deselect
+    fireEvent.press(marketingBtn);
+    lastCall = mockUseAgents.mock.calls[mockUseAgents.mock.calls.length - 1];
+    expect((lastCall[0] as any)?.industry).toBeUndefined();
+  });
+
+  it('shows agent cards when agents are returned', () => {
+    const agents = [{ id: 'e1', name: 'My Agent', rating: 4.5, price: 10000 }];
+    mockUseAgents.mockReturnValue({ ...baseAgentsReturn, data: agents });
+    const { getByTestId } = renderDiscover();
+    expect(getByTestId('agent-card-e1')).toBeTruthy();
+  });
+});

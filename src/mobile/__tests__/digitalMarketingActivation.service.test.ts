@@ -1,4 +1,4 @@
-import cpApiClient from '@/lib/cpApiClient'
+import apiClient from '@/lib/apiClient'
 import {
   getDigitalMarketingActivationWorkspace,
   upsertDigitalMarketingActivationWorkspace,
@@ -6,7 +6,7 @@ import {
   generateDigitalMarketingThemePlan,
 } from '@/services/digitalMarketingActivation.service'
 
-jest.mock('@/lib/cpApiClient', () => ({
+jest.mock('@/lib/apiClient', () => ({
   __esModule: true,
   default: {
     get: jest.fn(),
@@ -16,10 +16,10 @@ jest.mock('@/lib/cpApiClient', () => ({
   },
 }))
 
-const mockGet = (cpApiClient.get as jest.Mock)
-const mockPut = (cpApiClient.put as jest.Mock)
-const mockPatch = (cpApiClient.patch as jest.Mock)
-const mockPost = (cpApiClient.post as jest.Mock)
+const mockGet = (apiClient.get as jest.Mock)
+const mockPut = (apiClient.put as jest.Mock)
+const mockPatch = (apiClient.patch as jest.Mock)
+const mockPost = (apiClient.post as jest.Mock)
 
 const mockWorkspaceResponse = {
   hired_instance_id: 'x',

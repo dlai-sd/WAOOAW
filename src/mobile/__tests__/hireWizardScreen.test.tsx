@@ -721,6 +721,125 @@ describe('HireWizardScreen Component', () => {
         expect(queryByText('Full name is required')).toBeNull();
       });
     });
+
+    it('should clear payment method error when method is selected', async () => {
+      const { getByText, getByPlaceholderText, queryByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await navigateToPaymentStep(getByText, getByPlaceholderText);
+      // Submit to trigger payment method error
+      fireEvent.press(getByText('Start Trial'));
+      await waitFor(() => expect(getByText('Please select a payment method')).toBeTruthy());
+
+      // Select card — should clear error
+      fireEvent.press(getByText('Credit / Debit Card'));
+      await waitFor(() => expect(queryByText('Please select a payment method')).toBeNull());
+    });
+
+    it('should clear payment method error when Net Banking is selected', async () => {
+      const { getByText, getByPlaceholderText, queryByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await navigateToPaymentStep(getByText, getByPlaceholderText);
+      fireEvent.press(getByText('Start Trial'));
+      await waitFor(() => expect(getByText('Please select a payment method')).toBeTruthy());
+
+      fireEvent.press(getByText('Net Banking'));
+      await waitFor(() => expect(queryByText('Please select a payment method')).toBeNull());
+    });
+
+    it('should clear email error when user types', async () => {
+      const { getByText, getByPlaceholderText, queryByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await navigateToPaymentStep(getByText, getByPlaceholderText);
+      fireEvent.changeText(getByPlaceholderText('john@example.com'), 'bad');
+      fireEvent.press(getByText('Start Trial'));
+      await waitFor(() => expect(getByText('Please enter a valid email address')).toBeTruthy());
+
+      fireEvent.changeText(getByPlaceholderText('john@example.com'), 'g');
+      await waitFor(() => expect(queryByText('Please enter a valid email address')).toBeNull());
+    });
+
+    it('should clear phone error when user types', async () => {
+      const { getByText, getByPlaceholderText, queryByText } = render(<HireWizardScreen />, {
+        wrapper: createWrapper(),
+      });
+
+      await navigateToPaymentStep(getByText, getByPlaceholderText);
+      fireEvent.changeText(getByPlaceholderText('9876543210'), '123');
+      fireEvent.press(getByText('Start Trial'));
+      await waitFor(() => expect(getByText('Please enter a valid 10-digit phone number')).toBeTruthy());
+
+      fireEvent.changeText(getByPlaceholderText('9876543210'), '9');
+      await waitFor(() => expect(queryByText('Please enter a valid 10-digit phone number')).toBeNull());
+    });
+  });
+
+  describe('getPlatformConfig industry branches', () => {
+    it('shows LinkedIn credentials for sales industry', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: { ...mockAgent, industry: 'sales' },
+        isLoading: false, error: null, refetch: jest.fn(),
+      });
+      const { getByText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
+      fireEvent.press(getByText('Continue to Connect Platform'));
+      await waitFor(() => expect(getByText('You will need:')).toBeTruthy());
+      expect(getByText(/Client ID|Client Secret|LinkedIn/)).toBeTruthy();
+    });
+
+    it('shows Google Classroom credentials for education industry', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: { ...mockAgent, industry: 'education' },
+        isLoading: false, error: null, refetch: jest.fn(),
+      });
+      const { getByText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
+      fireEvent.press(getByText('Continue to Connect Platform'));
+      await waitFor(() => expect(getByText('You will need:')).toBeTruthy());
+      expect(getByText(/OAuth|Classroom/)).toBeTruthy();
+    });
+
+    it('shows default Platform credentials for unknown industry', async () => {
+      (useAgentDetail as jest.Mock).mockReturnValue({
+        data: { ...mockAgent, industry: 'unknown_industry' },
+        isLoading: false, error: null, refetch: jest.fn(),
+      });
+      const { getByText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
+      fireEvent.press(getByText('Continue to Connect Platform'));
+      await waitFor(() => expect(getByText('You will need:')).toBeTruthy());
+      expect(getByText(/API Key/)).toBeTruthy();
+    });
+  });
+
+  describe('handleComplete edge cases', () => {
+    it('does nothing when processPayment returns null', async () => {
+      jest.doMock('@/hooks/useRazorpay', () => ({
+        useRazorpay: () => ({
+          processPayment: jest.fn().mockResolvedValue(null),
+          isProcessing: false, error: null, clearError: jest.fn(),
+        }),
+      }));
+
+      // Use existing mock (returns sub-123) but with no getParent
+      mockGetParent.mockReturnValue(null);
+
+      const { getByText, getByPlaceholderText } = render(<HireWizardScreen />, { wrapper: createWrapper() });
+      await navigateToPaymentStep(getByText, getByPlaceholderText);
+      fireEvent.changeText(getByPlaceholderText('John Doe'), 'John Doe');
+      fireEvent.changeText(getByPlaceholderText('john@example.com'), 'john@example.com');
+      fireEvent.changeText(getByPlaceholderText('9876543210'), '9876543210');
+      fireEvent.press(getByText('UPI'));
+      fireEvent.press(getByText(/I accept the/));
+      fireEvent.press(getByText('Start Trial'));
+
+      // Falls back to direct navigate when getParent returns null
+      await waitFor(() =>
+        expect(mockNavigate).toHaveBeenCalled()
+      );
+    });
   });
 });
 

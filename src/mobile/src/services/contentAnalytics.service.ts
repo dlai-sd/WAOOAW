@@ -4,7 +4,7 @@
  * Matches CP Frontend contentAnalytics.service.ts — same endpoint contract.
  */
 
-import cpApiClient from '../lib/cpApiClient';
+import apiClient from '../lib/apiClient';
 
 export interface ContentRecommendation {
   top_dimensions: string[];
@@ -17,8 +17,8 @@ export interface ContentRecommendation {
 export async function getContentRecommendations(
   hiredAgentId: string
 ): Promise<ContentRecommendation> {
-  const response = await cpApiClient.get<ContentRecommendation>(
-    `/cp/content-recommendations/${hiredAgentId}`
+  const response = await apiClient.get<ContentRecommendation>(
+    `/api/v1/hired-agents/${hiredAgentId}/content-recommendations`
   );
   return response.data;
 }

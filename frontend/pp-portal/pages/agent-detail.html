@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW PP — Agent Detail</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-green:#10b981;--status-yellow:#f59e0b;--status-red:#ef4444;
+          --text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .page{max-width:900px;margin:0 auto;padding:2rem}
+    .back-link{font-size:.85rem;color:var(--color-neon-cyan);text-decoration:none;margin-bottom:1.5rem;display:inline-block}
+    .back-link:hover{opacity:.8}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;margin-bottom:1.5rem}
+    #flow-run-list{display:flex;flex-direction:column;gap:.75rem}
+    details.flow-run-item{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1rem;overflow:hidden}
+    details.flow-run-item[open]{border-color:rgba(0,242,254,.3)}
+    summary.flow-run-item__summary{padding:1rem 1.5rem;cursor:pointer;display:flex;align-items:center;gap:1rem;list-style:none;user-select:none}
+    summary.flow-run-item__summary::-webkit-details-marker{display:none}
+    .flow-run-item__status{font-size:.75rem;font-weight:700;padding:.2rem .6rem;border-radius:9999px;text-transform:uppercase}
+    .flow-run-item__status--completed{background:rgba(16,185,129,.15);color:var(--status-green)}
+    .flow-run-item__status--running{background:rgba(245,158,11,.15);color:var(--status-yellow)}
+    .flow-run-item__status--failed{background:rgba(239,68,68,.15);color:var(--status-red)}
+    .flow-run-item__steps{padding:.75rem 1.5rem 1.25rem}
+    .cr-row{display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;border-radius:.5rem;margin-bottom:.35rem;font-size:.875rem}
+    .cr-row--success{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2)}
+    .cr-row--running{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)}
+    .cr-row--error{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2)}
+    .cr-row--pending{background:rgba(255,255,255,.03);border:1px solid var(--border-dark)}
+    .cr-row__icon{flex-shrink:0;width:1.25rem;text-align:center}
+    .cr-row__step{flex:1;font-weight:500}
+    .cr-row__dur{font-size:.75rem;color:var(--text-secondary)}
+    .cr-row__error{font-size:.75rem;color:var(--status-red);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+    .error{color:var(--status-red);padding:1rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW PP</h1>
+    <nav>
+      <a href="/pp/fleet">Fleet</a>
+      <a href="/pp/dlq">DLQ</a>
+    </nav>
+  </header>
+  <main class="page">
+    <a href="/pp/fleet" class="back-link">← Back to Fleet</a>
+    <h2 id="agent-name">Agent Detail</h2>
+    <div id="flow-run-list">
+      <div class="empty-state">Loading flow runs…</div>
+    </div>
+  </main>
+  <script type="module" src="agent-detail.js"></script>
+</body>
+</html>

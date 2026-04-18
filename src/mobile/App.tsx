@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View, ActivityIndicator, Text } from "react-native";
+
+// On web: if this page load is the OAuth popup callback, extract the auth result,
+// post it to the parent window, and close the popup. Must be called at module level
+// (before any React render) so it runs before the app mounts.
+if (Platform.OS === "web") {
+  WebBrowser.maybeCompleteAuthSession();
+}
 import * as Font from "expo-font";
 // import * as Sentry from '@sentry/react-native'; // REMOVED for demo build
 const Sentry = { wrap: (component: React.ComponentType) => component };

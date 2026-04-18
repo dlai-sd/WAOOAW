@@ -23,7 +23,7 @@ import { useAgentVoiceOverlay } from '@/hooks/useAgentVoiceOverlay';
 import { ContentDraftApprovalCard } from '@/components/ContentDraftApprovalCard';
 import { ScheduledPostsSection } from '@/components/ScheduledPostsSection';
 import { VoiceFAB } from '@/components/voice/VoiceFAB';
-import cpApiClient from '@/lib/cpApiClient';
+import apiClient from '@/lib/apiClient';
 import type { MyAgentsStackScreenProps } from '@/navigation/types';
 import { DigitalMarketingBriefStepCard } from '@/components/DigitalMarketingBriefStepCard';
 import { DigitalMarketingBriefSummaryCard } from '@/components/DigitalMarketingBriefSummaryCard';
@@ -44,6 +44,7 @@ type AgentSkill = {
   skill_id: string;
   name?: string;
   display_name?: string;
+  skill_name?: string;   // returned by /agents/{id}/skills as Skill.name
   goal_schema?: { fields?: GoalSchemaField[] };
   goal_config?: Record<string, unknown>;
 };
@@ -146,7 +147,7 @@ function buildBriefSteps(fields: GoalSchemaField[]) {
 function getThemeDiscoverySkill(skills: AgentSkill[]): AgentSkill | null {
   return (
     skills.find((skill) => {
-      const names = [skill.display_name, skill.name]
+      const names = [skill.display_name, skill.name, skill.skill_name]
         .map((value) => String(value || '').trim().toLowerCase())
         .filter(Boolean);
       return names.some((value) => value === 'theme discovery' || value === 'theme_discovery');
@@ -378,7 +379,15 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
       setBriefError(null);
       setBriefSuccess(null);
       try {
-        const response = await cpApiClient.get(`/cp/hired-agents/${hiredAgentId}/skills`);
+        const agentId = agent?.agent_id;
+        if (!agentId) {
+          if (!cancelled) {
+            setBriefError('Agent details not loaded yet. Please try again.');
+            setBriefLoading(false);
+          }
+          return;
+        }
+        const response = await apiClient.get(`/api/v1/agents/${agentId}/skills`);
         const skills = normalizeSkillsPayload(response.data);
         const skill = getThemeDiscoverySkill(skills);
         if (!skill) {
@@ -417,12 +426,12 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [hiredAgentId, isDigitalMarketing]);
+  }, [hiredAgentId, isDigitalMarketing, agent?.agent_id]);
 
   const handlePause = async () => {
     setPauseLoading(true);
     try {
-      await cpApiClient.post(`/cp/hired-agents/${hiredAgentId}/pause`);
+      await apiClient.post(`/api/v1/hired-agents/${hiredAgentId}/pause`);
     } finally {
       setPauseLoading(false);
     }
@@ -431,7 +440,7 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
   const handleResume = async () => {
     setResumeLoading(true);
     try {
-      await cpApiClient.post(`/cp/hired-agents/${hiredAgentId}/resume`);
+      await apiClient.post(`/api/v1/hired-agents/${hiredAgentId}/resume`);
     } finally {
       setResumeLoading(false);
     }
@@ -450,9 +459,9 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
     setBriefError(null);
     setBriefSuccess(null);
     try {
-      const response = await cpApiClient.patch(
-        `/cp/hired-agents/${hiredAgentId}/skills/${themeDiscoverySkillId}/goal-config`,
-        { goal_config: briefValues }
+      const response = await apiClient.patch(
+        `/api/v1/hired-agents/${hiredAgentId}/skills/${themeDiscoverySkillId}/customer-config`,
+        { customer_fields: briefValues }
       );
       const nextValues = (response.data as { goal_config?: Record<string, unknown> } | null)?.goal_config || briefValues;
       setBriefValues(nextValues);

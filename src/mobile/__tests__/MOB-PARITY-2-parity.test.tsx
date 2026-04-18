@@ -47,7 +47,7 @@ jest.mock('@/services/hiredAgents/hiredAgents.service', () => ({
 
 const mockCpGet = jest.fn();
 const mockCpPost = jest.fn();
-jest.mock('@/lib/cpApiClient', () => ({
+jest.mock('@/lib/apiClient', () => ({
   __esModule: true,
   default: {
     get: (...args: unknown[]) => mockCpGet(...args),
@@ -110,7 +110,7 @@ const MOCK_DELIVERABLE = {
 describe('MOB-PARITY-2 parity suite (E9-S1)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCpGet.mockResolvedValue({ data: MOCK_DELIVERABLE });
+    mockCpGet.mockResolvedValue({ data: [MOCK_DELIVERABLE] });
     mockCpPost.mockResolvedValue({ data: {} });
     mockListScheduledPosts.mockResolvedValue([]);
   });

@@ -121,6 +121,13 @@ export class AuthService {
         );
         tokenResponse = response.data;
       } catch (error: any) {
+        // Log the raw backend error for debugging
+        // eslint-disable-next-line no-console
+        console.error('[AuthService] POST /auth/google/verify failed:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message,
+        });
         // Handle 2FA required error
         if (error.response?.status === 401) {
           const detail = error.response?.data?.detail;
@@ -140,8 +147,23 @@ export class AuthService {
           }
         }
 
+        // Not yet registered — Plant backend returns 404 with a clear message.
+        if (error.response?.status === 404) {
+          const detail = error.response?.data?.detail as string | undefined;
+          throw new AuthServiceError(
+            detail ?? 'No WAOOAW account found. Please register at cp.demo.waooaw.com first.',
+            AuthErrorCode.BACKEND_VERIFICATION_FAILED,
+            error
+          );
+        }
+
+        // Surface the actual HTTP status and server message so it's visible on-screen.
+        const status = error.response?.status;
+        const serverDetail = error.response?.data?.detail as string | undefined;
         throw new AuthServiceError(
-          'Backend verification failed',
+          serverDetail
+            ? `[${status}] ${serverDetail}`
+            : `Backend verification failed (HTTP ${status ?? 'no response'})`,
           AuthErrorCode.BACKEND_VERIFICATION_FAILED,
           error
         );

@@ -171,7 +171,7 @@ export function deriveActionableNotifications(
         title: 'Agent setup incomplete',
         body: 'Complete platform connection and goals so this agent can start working for you.',
         hired_instance_id: runtimeId,
-        hired_agent_id: agent.hired_instance_id ?? undefined,
+        hired_agent_id: (agent.hired_instance_id ?? undefined) as string | undefined,
         created_at: agent.trial_start_at ?? undefined,
       });
     }
@@ -187,7 +187,7 @@ export function deriveActionableNotifications(
           title: 'Trial ending soon',
           body: 'Your trial is ending in less than 3 days. Review spend and decide whether to continue.',
           hired_instance_id: runtimeId,
-          hired_agent_id: agent.hired_instance_id ?? undefined,
+          hired_agent_id: (agent.hired_instance_id ?? undefined) as string | undefined,
           created_at: agent.trial_end_at,
         });
       }
@@ -201,8 +201,8 @@ export function deriveActionableNotifications(
         title: 'Billing action needed',
         body: 'Your subscription payment is past due. Update your payment method to keep this agent running.',
         hired_instance_id: runtimeId,
-        hired_agent_id: agent.hired_instance_id ?? undefined,
-        created_at: agent.current_period_end,
+        hired_agent_id: (agent.hired_instance_id ?? undefined) as string | undefined,
+        created_at: agent.current_period_end ?? undefined,
       });
     }
   });

@@ -171,6 +171,48 @@ describe('deriveActionableNotifications (MOBILE-COMP-1 E2-S1)', () => {
     const demoIds = notifications.filter((n) => n.id.startsWith('demo-'));
     expect(demoIds).toHaveLength(0);
   });
+
+  it('does NOT produce trial-ending notification when trial_end_at is null', () => {
+    const notifications = deriveActionableNotifications([
+      { ...baseAgent, trial_status: 'active', trial_end_at: null },
+    ]);
+    const trialNotif = notifications.find((n) => n.type === 'trial_ending');
+    expect(trialNotif).toBeUndefined();
+  });
+
+  it('does NOT produce trial-ending notification when trial has already expired', () => {
+    const pastDate = new Date(Date.now() - 1000).toISOString();
+    const notifications = deriveActionableNotifications([
+      { ...baseAgent, trial_status: 'active', trial_end_at: pastDate },
+    ]);
+    const trialNotif = notifications.find((n) => n.type === 'trial_ending');
+    expect(trialNotif).toBeUndefined();
+  });
+
+  it('does NOT produce trial notification when trial_status is not active', () => {
+    const soonDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    const notifications = deriveActionableNotifications([
+      { ...baseAgent, trial_status: 'none', trial_end_at: soonDate },
+    ]);
+    const trialNotif = notifications.find((n) => n.type === 'trial_ending');
+    expect(trialNotif).toBeUndefined();
+  });
+
+  it('produces no notifications for a healthy active agent with no issues', () => {
+    const notifications = deriveActionableNotifications([{ ...baseAgent }]);
+    expect(notifications).toHaveLength(0);
+  });
+
+  it('falls back to subscription_id in notification id when hired_instance_id is absent', () => {
+    const agentNoInstance = {
+      ...baseAgent,
+      hired_instance_id: undefined as any,
+      configured: false,
+    };
+    const notifications = deriveActionableNotifications([agentNoInstance]);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].id).toContain('sub-1');
+  });
 });
 
 

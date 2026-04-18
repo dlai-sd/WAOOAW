@@ -17,7 +17,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import cpApiClient from '@/lib/cpApiClient';
+import apiClient from '@/lib/apiClient';
 import { useTheme } from '@/hooks/useTheme';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ErrorView } from '@/components/ErrorView';
@@ -27,15 +27,22 @@ import type { DeliverableItem } from '@/hooks/useApprovalQueue';
 // ─── data fetching ────────────────────────────────────────────────────────────
 
 async function fetchDeliverable(hiredAgentId: string, deliverableId: string): Promise<DeliverableItem> {
-  const response = await cpApiClient.get<DeliverableItem>(
-    `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}`
+  // Plant has no single-item GET; fetch the list and find by ID
+  const response = await apiClient.get<DeliverableItem[] | { deliverables?: DeliverableItem[] }>(
+    `/api/v1/hired-agents/${hiredAgentId}/deliverables`
   );
-  return response.data;
+  const items: DeliverableItem[] = Array.isArray(response.data)
+    ? response.data
+    : (response.data as { deliverables?: DeliverableItem[] }).deliverables ?? [];
+  const found = items.find((d) => d.id === deliverableId);
+  if (!found) throw new Error('Deliverable not found');
+  return found;
 }
 
 async function approveDeliverable(hiredAgentId: string, deliverableId: string): Promise<void> {
-  await cpApiClient.post(
-    `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/approve`
+  await apiClient.post(
+    `/api/v1/deliverables/${deliverableId}/review`,
+    { decision: 'approved' }
   );
 }
 
@@ -44,9 +51,9 @@ async function rejectDeliverableWithReason(
   deliverableId: string,
   reason: string
 ): Promise<void> {
-  await cpApiClient.post(
-    `/cp/hired-agents/${hiredAgentId}/approval-queue/${deliverableId}/reject`,
-    { reason }
+  await apiClient.post(
+    `/api/v1/deliverables/${deliverableId}/review`,
+    { decision: 'rejected', reason }
   );
 }
 

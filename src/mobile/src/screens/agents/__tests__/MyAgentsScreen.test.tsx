@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 
 import { MyAgentsScreen } from '../MyAgentsScreen'
 
@@ -48,7 +48,10 @@ jest.mock('@/components/ErrorView', () => ({
 }))
 
 jest.mock('@/components/voice/VoiceControl', () => ({
-  VoiceControl: () => null,
+  VoiceControl: (props: any) => {
+    (global as any).__myAgentsVoiceControlProps = props;
+    return null;
+  },
 }))
 
 jest.mock('@/components/voice/VoiceHelpModal', () => ({
@@ -234,5 +237,45 @@ describe('MyAgentsScreen', () => {
     )
 
     expect(rendered.UNSAFE_getByType('ScrollView').props.refreshControl).toBeTruthy()
+  })
+
+  it('voice callbacks: navigate, action, help handlers exercise branches', async () => {
+    const mockRefetch = jest.fn()
+    useHiredAgents.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: mockRefetch,
+    })
+    useAgentsInTrial.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: mockRefetch,
+    })
+
+    render(
+      <MyAgentsScreen navigation={navigation} route={{ key: 'my-agents', name: 'MyAgents' } as any} />
+    )
+
+    const callbacks = (global as any).__myAgentsVoiceControlProps?.callbacks
+    expect(callbacks).toBeTruthy()
+
+    // Trigger all voices branches
+    act(() => {
+      callbacks?.onNavigate?.('Home')
+      callbacks?.onNavigate?.('Discover')
+      callbacks?.onNavigate?.('Profile')
+      callbacks?.onNavigate?.('UnknownScreen')
+      callbacks?.onAction?.('refresh')
+      callbacks?.onAction?.('showHelp')
+      callbacks?.onAction?.('switchTab')
+      callbacks?.onAction?.('unknown')
+      callbacks?.onHelp?.()
+    })
+
+    expect(mockRefetch).toHaveBeenCalled()
   })
 })

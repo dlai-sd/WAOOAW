@@ -56,7 +56,7 @@ class RazorpayService {
    */
   async createOrder(params: PaymentParams): Promise<RazorpayOrder> {
     try {
-      const { data } = await apiClient.post('/v1/payments/create-order', {
+      const { data } = await apiClient.post('/api/v1/payments/create-order', {
         agent_id: params.agentId,
         plan_type: params.planType,
         amount: params.amount * 100, // Convert to paise
@@ -140,7 +140,7 @@ class RazorpayService {
     planType: string
   ): Promise<PaymentVerificationResponse> {
     try {
-      const { data } = await apiClient.post('/v1/payments/verify', {
+      const { data } = await apiClient.post('/api/v1/payments/verify', {
         razorpay_payment_id: paymentData.razorpay_payment_id,
         razorpay_order_id: paymentData.razorpay_order_id,
         razorpay_signature: paymentData.razorpay_signature,
@@ -187,7 +187,7 @@ class RazorpayService {
    */
   async refundPayment(paymentId: string, amount?: number): Promise<void> {
     try {
-      await apiClient.post('/v1/payments/refund', {
+      await apiClient.post('/api/v1/payments/refund', {
         payment_id: paymentId,
         amount: amount ? amount * 100 : undefined, // Convert to paise if provided
       });
@@ -204,7 +204,7 @@ class RazorpayService {
    */
   async getPaymentStatus(paymentId: string): Promise<any> {
     try {
-      const { data } = await apiClient.get(`/v1/payments/${paymentId}/status`);
+      const { data } = await apiClient.get(`/api/v1/payments/${paymentId}/status`);
       return data;
     } catch (error: any) {
       console.error('Failed to get payment status:', error);

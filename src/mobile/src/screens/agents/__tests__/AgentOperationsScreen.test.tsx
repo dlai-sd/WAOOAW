@@ -30,12 +30,23 @@ import { AgentOperationsScreen } from '../AgentOperationsScreen';
 // ── mocks ─────────────────────────────────────────────────────────────────────
 
 const mockCpApiClientPost = jest.fn().mockResolvedValue({ data: {} });
+const mockApiClientPost = jest.fn().mockResolvedValue({ data: {} });
+const mockApiClientGet = jest.fn().mockResolvedValue({ data: [] });
 
 jest.mock('@/lib/cpApiClient', () => ({
   __esModule: true,
   default: {
     get: jest.fn().mockResolvedValue({ data: {} }),
     post: (...args: unknown[]) => mockCpApiClientPost(...args),
+  },
+}));
+
+jest.mock('@/lib/apiClient', () => ({
+  __esModule: true,
+  default: {
+    get: (...args: unknown[]) => mockApiClientGet(...args),
+    post: (...args: unknown[]) => mockApiClientPost(...args),
+    patch: jest.fn().mockResolvedValue({ data: {} }),
   },
 }));
 
@@ -211,22 +222,22 @@ describe('AgentOperationsScreen (E4-S1 / E4-S3 / E4-S4)', () => {
     expect(screen.queryByTestId('ops-pause-btn')).toBeNull();
   });
 
-  it('AC5 — tapping pause calls POST /cp/hired-agents/:id/pause', async () => {
+  it('AC5 — tapping pause calls POST /api/v1/hired-agents/:id/pause', async () => {
     renderScreen('active', 'scheduler');
     await waitFor(() => screen.getByTestId('ops-pause-btn'));
     fireEvent.press(screen.getByTestId('ops-pause-btn'));
     await waitFor(() => {
-      expect(mockCpApiClientPost).toHaveBeenCalledWith('/cp/hired-agents/HIRE-001/pause');
+      expect(mockApiClientPost).toHaveBeenCalledWith('/api/v1/hired-agents/HIRE-001/pause');
     });
   });
 
-  it('AC6 — tapping resume calls POST /cp/hired-agents/:id/resume', async () => {
+  it('AC6 — tapping resume calls POST /api/v1/hired-agents/:id/resume', async () => {
     setupHooks({ status: 'paused' });
     render(<AgentOperationsScreen navigation={navigation} route={makeRoute('paused', 'scheduler')} />);
     await waitFor(() => screen.getByTestId('ops-resume-btn'));
     fireEvent.press(screen.getByTestId('ops-resume-btn'));
     await waitFor(() => {
-      expect(mockCpApiClientPost).toHaveBeenCalledWith('/cp/hired-agents/HIRE-001/resume');
+      expect(mockApiClientPost).toHaveBeenCalledWith('/api/v1/hired-agents/HIRE-001/resume');
     });
   });
 

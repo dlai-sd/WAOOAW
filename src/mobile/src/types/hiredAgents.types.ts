@@ -151,11 +151,11 @@ export interface MyAgentInstanceSummary {
   // Subscription data
   subscription_id: string;
   agent_id: string;
-  duration: SubscriptionDuration;
+  duration?: SubscriptionDuration | null;
   status: SubscriptionStatus;
-  current_period_start: string;
-  current_period_end: string;
-  cancel_at_period_end: boolean;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
+  cancel_at_period_end?: boolean | null;
 
   // Hired agent instance data (enriched from Plant)
   hired_instance_id?: string | null;

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WAOOAW PP — Dead Letter Queue</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Inter&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg-black:#0a0a0a;--bg-card:#18181b;--color-neon-cyan:#00f2fe;
+          --color-purple:#667eea;--border-dark:rgba(255,255,255,0.08);
+          --status-green:#10b981;--status-yellow:#f59e0b;--status-red:#ef4444;
+          --text-primary:#f9fafb;--text-secondary:#9ca3af}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg-black);color:var(--text-primary);font-family:'Inter',sans-serif;min-height:100vh}
+    header{padding:1rem 2rem;border-bottom:1px solid var(--border-dark);display:flex;align-items:center;gap:1rem}
+    header h1{font-family:'Space Grotesk',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--color-neon-cyan),var(--color-purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    nav a{color:var(--text-secondary);text-decoration:none;margin-left:1.5rem;font-size:.9rem}
+    nav a:hover{color:var(--color-neon-cyan)}
+    .dlq-badge{background:var(--status-red);color:#fff;font-size:.65rem;font-weight:700;padding:.15rem .4rem;border-radius:9999px;margin-left:.25rem;vertical-align:middle}
+    .page{max-width:900px;margin:0 auto;padding:2rem}
+    h2{font-family:'Space Grotesk',sans-serif;font-size:1.75rem;margin-bottom:.5rem}
+    .page-subtitle{color:var(--text-secondary);margin-bottom:2rem;font-size:.9rem}
+    #dlq-list{display:flex;flex-direction:column;gap:.75rem}
+    .dlq-item{background:var(--bg-card);border:1px solid var(--border-dark);border-radius:1.25rem;padding:1.25rem 1.5rem;display:flex;align-items:flex-start;gap:1rem}
+    .dlq-item__info{flex:1}
+    .dlq-item__id{font-family:monospace;font-size:.8rem;color:var(--text-secondary);margin-right:.5rem}
+    .dlq-item__agent{font-weight:600;font-family:'Space Grotesk',sans-serif;margin-right:.5rem}
+    .dlq-item__step{font-size:.85rem;color:var(--color-neon-cyan);margin-right:.5rem}
+    .dlq-item__failures{font-size:.8rem;color:var(--status-red);font-weight:600}
+    .dlq-item__error{font-size:.8rem;color:var(--text-secondary);margin-top:.4rem;word-break:break-word}
+    .dlq-item__actions{display:flex;gap:.5rem;flex-shrink:0;align-items:center}
+    .btn{padding:.45rem 1rem;border-radius:.4rem;font-weight:600;font-size:.85rem;cursor:pointer;border:none;transition:all .2s}
+    .btn--cyan{background:var(--color-neon-cyan);color:#0a0a0a}
+    .btn--red{background:var(--status-red);color:#fff}
+    .btn:hover{opacity:.9;transform:translateY(-1px)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .empty-state{text-align:center;padding:3rem;color:var(--text-secondary)}
+    .empty-state--celebrate{font-size:1.1rem}
+    .error{color:var(--status-red);padding:1rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WAOOAW PP</h1>
+    <nav>
+      <a href="/pp/fleet">Fleet</a>
+      <a href="/pp/dlq">DLQ
+        <span class="dlq-badge" id="dlq-badge" hidden>0</span>
+      </a>
+    </nav>
+  </header>
+  <main class="page">
+    <h2>Dead Letter Queue</h2>
+    <p class="page-subtitle">Failed tasks waiting for manual intervention. Requeue to retry or skip to discard.</p>
+    <div id="dlq-list">
+      <div class="empty-state">Loading…</div>
+    </div>
+  </main>
+  <script type="module" src="dlq.js"></script>
+</body>
+</html>

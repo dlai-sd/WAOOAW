@@ -21,7 +21,7 @@ import { ErrorView } from '../../components/ErrorView';
 import { EmptyState } from '../../components/EmptyState';
 import { useBillingData } from '../../hooks/useBillingData';
 import { useHiredAgents } from '../../hooks/useHiredAgents';
-import cpApiClient from '../../lib/cpApiClient';
+import apiClient from '../../lib/apiClient';
 import type { Invoice } from '../../services/invoices.service';
 import type { Receipt } from '../../services/receipts.service';
 
@@ -38,8 +38,8 @@ function InvoiceRow({ invoice }: { invoice: Invoice }) {
       : colors.warning ?? '#f59e0b';
 
   const handleDownload = async () => {
-    const baseUrl = cpApiClient.defaults.baseURL ?? '';
-    const url = invoice.pdf_url ?? `${baseUrl}/cp/invoices/${invoice.id}/html`;
+    const baseUrl = apiClient.getInstance().defaults.baseURL ?? '';
+    const url = invoice.pdf_url ?? `${baseUrl}/api/v1/invoices/${invoice.id}/html`;
     try {
       await Linking.openURL(url);
     } catch {
@@ -112,9 +112,9 @@ function ReceiptRow({ receipt }: { receipt: Receipt }) {
   const { colors, spacing, typography } = useTheme();
 
   const handleView = async () => {
-    const baseUrl = cpApiClient.defaults.baseURL ?? '';
+    const baseUrl = apiClient.getInstance().defaults.baseURL ?? '';
     try {
-      await Linking.openURL(`${baseUrl}/cp/receipts/${receipt.id}/html`);
+      await Linking.openURL(`${baseUrl}/api/v1/receipts/${receipt.id}/html`);
     } catch {
       // ignore
     }

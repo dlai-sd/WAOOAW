@@ -6,7 +6,7 @@ const mockCpGet = jest.fn();
 const mockCpPost = jest.fn();
 const mockCpDelete = jest.fn(() => Promise.resolve({ data: null }));
 
-jest.mock('../src/lib/cpApiClient', () => ({
+jest.mock('../src/lib/apiClient', () => ({
   __esModule: true,
   default: {
     get: (...args: unknown[]) => mockCpGet(...args),
@@ -43,7 +43,7 @@ describe('platformConnections.service', () => {
     const result = await listPlatformConnections('ha1');
 
     expect(result).toEqual(mockData);
-    expect(mockCpGet).toHaveBeenCalledWith('/cp/hired-agents/ha1/platform-connections');
+    expect(mockCpGet).toHaveBeenCalledWith('/api/v1/hired-agents/ha1/platform-connections');
   });
 
   it('listPlatformConnections handles wrapped connections response', async () => {
@@ -84,7 +84,7 @@ describe('platformConnections.service', () => {
 
     expect(result).toEqual(mockCreated);
     expect(mockCpPost).toHaveBeenCalledWith(
-      '/cp/hired-agents/ha1/platform-connections',
+      '/api/v1/hired-agents/ha1/platform-connections',
       expect.objectContaining({ platform_key: 'facebook' })
     );
   });
@@ -97,7 +97,7 @@ describe('platformConnections.service', () => {
 
     expect(result).toEqual(mockResponse);
     expect(mockCpPost).toHaveBeenCalledWith(
-      '/cp/youtube-connections/connect/start',
+      '/api/v1/customer-platform-connections/youtube/connect/start',
       { redirect_uri: 'waooaw://youtube-callback' }
     );
   });
@@ -108,7 +108,7 @@ describe('platformConnections.service', () => {
     await deletePlatformConnection('ha1', 'conn1');
 
     expect(mockCpDelete).toHaveBeenCalledWith(
-      '/cp/hired-agents/ha1/platform-connections/conn1'
+      '/api/v1/hired-agents/ha1/platform-connections/conn1'
     );
   });
 });

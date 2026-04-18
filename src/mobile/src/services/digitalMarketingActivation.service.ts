@@ -1,4 +1,4 @@
-import cpApiClient from '@/lib/cpApiClient'
+import apiClient from '@/lib/apiClient'
 
 function generateCorrelationId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -175,8 +175,8 @@ export type UpsertDigitalMarketingActivationInput = {
 export async function getDigitalMarketingActivationWorkspace(
   hiredInstanceId: string
 ): Promise<DigitalMarketingActivationResponse> {
-  const resp = await cpApiClient.get(
-    `/cp/digital-marketing-activation/${encodeURIComponent(hiredInstanceId)}`
+  const resp = await apiClient.get(
+    `/api/v1/hired-agents/${encodeURIComponent(hiredInstanceId)}/digital-marketing-activation`
   )
   return resp.data
 }
@@ -185,8 +185,8 @@ export async function upsertDigitalMarketingActivationWorkspace(
   hiredInstanceId: string,
   input: UpsertDigitalMarketingActivationInput
 ): Promise<DigitalMarketingActivationResponse> {
-  const resp = await cpApiClient.put(
-    `/cp/digital-marketing-activation/${encodeURIComponent(hiredInstanceId)}`,
+  const resp = await apiClient.put(
+    `/api/v1/hired-agents/${encodeURIComponent(hiredInstanceId)}/digital-marketing-activation`,
     input,
     { headers: { 'X-Correlation-ID': generateCorrelationId(), 'Content-Type': 'application/json' } }
   )
@@ -197,8 +197,8 @@ export async function patchDigitalMarketingActivationWorkspace(
   hiredInstanceId: string,
   patch: Record<string, unknown>
 ): Promise<DigitalMarketingActivationResponse> {
-  const resp = await cpApiClient.patch(
-    `/cp/digital-marketing-activation/${encodeURIComponent(hiredInstanceId)}`,
+  const resp = await apiClient.patch(
+    `/api/v1/hired-agents/${encodeURIComponent(hiredInstanceId)}/digital-marketing-activation`,
     patch,
     { headers: { 'X-Correlation-ID': generateCorrelationId(), 'Content-Type': 'application/json' } }
   )
@@ -209,8 +209,8 @@ export async function generateDigitalMarketingThemePlan(
   hiredInstanceId: string,
   patch: Record<string, unknown> = {}
 ): Promise<DigitalMarketingThemePlanResponse> {
-  const resp = await cpApiClient.post(
-    `/cp/digital-marketing-activation/${encodeURIComponent(hiredInstanceId)}/generate-theme-plan`,
+  const resp = await apiClient.post(
+    `/api/v1/digital-marketing-activation/${encodeURIComponent(hiredInstanceId)}/generate-theme-plan`,
     patch,
     { headers: { 'X-Correlation-ID': generateCorrelationId(), 'Content-Type': 'application/json' } }
   )

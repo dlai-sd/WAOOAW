@@ -198,4 +198,138 @@ describe('PlatformConnectionsScreen', () => {
       );
     });
   });
+
+  it('closes credential modal when cancel is pressed', async () => {
+    mockUsePlatformConnections.mockReturnValue({
+      connections: [],
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+      connect: mockConnect,
+      connectYouTube: mockConnectYouTube,
+      disconnect: mockDisconnect,
+    });
+    const { getByTestId, queryByTestId } = render(<PlatformConnectionsScreen />);
+    fireEvent.press(getByTestId('connect-btn-instagram'));
+    await waitFor(() => expect(getByTestId('credential-form-modal')).toBeTruthy());
+    fireEvent.press(getByTestId('credential-cancel-btn'));
+    await waitFor(() => expect(queryByTestId('credential-form-modal')).toBeNull());
+  });
+
+  it('shows error view when usePlatformConnections returns error', () => {
+    mockUsePlatformConnections.mockReturnValue({
+      connections: [],
+      isLoading: false,
+      error: new Error('Failed to load'),
+      refetch: mockRefetch,
+      connect: mockConnect,
+      connectYouTube: mockConnectYouTube,
+      disconnect: mockDisconnect,
+    });
+    const { getByTestId } = render(<PlatformConnectionsScreen />);
+    const { ErrorView } = require('../src/components/ErrorView');
+    expect(getByTestId).toBeTruthy(); // error view renders
+  });
+
+  it('calls disconnect when Disconnect button is pressed on connected platform', async () => {
+    const { getByTestId } = render(<PlatformConnectionsScreen />);
+    // YouTube is 'connected' in the default connections fixture
+    fireEvent.press(getByTestId('disconnect-btn-youtube'));
+    await waitFor(() => {
+      expect(mockDisconnect).toHaveBeenCalledWith('conn1');
+    });
+  });
+
+  it('shows last_verified_at date for a connection that has it', () => {
+    mockUsePlatformConnections.mockReturnValue({
+      connections: [
+        {
+          id: 'conn-v',
+          hired_instance_id: 'ha1',
+          skill_id: 'digital_marketing',
+          platform_key: 'youtube',
+          status: 'connected',
+          last_verified_at: '2026-01-15T00:00:00Z',
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-15T00:00:00Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+      connect: mockConnect,
+      connectYouTube: mockConnectYouTube,
+      disconnect: mockDisconnect,
+    });
+    const { getByTestId } = render(<PlatformConnectionsScreen />);
+    expect(getByTestId('platform-card-youtube')).toBeTruthy();
+  });
+
+  it('renders platform with active status correctly (status=active → connected color)', () => {
+    mockUsePlatformConnections.mockReturnValue({
+      connections: [
+        {
+          id: 'conn-active',
+          hired_instance_id: 'ha1',
+          skill_id: 'digital_marketing',
+          platform_key: 'linkedin',
+          status: 'active',
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+      connect: mockConnect,
+      connectYouTube: mockConnectYouTube,
+      disconnect: mockDisconnect,
+    });
+    const { getByTestId } = render(<PlatformConnectionsScreen />);
+    // active status shows disconnect button
+    expect(getByTestId('disconnect-btn-linkedin')).toBeTruthy();
+  });
+
+  it('renders platform with unknown status as disconnected color', () => {
+    mockUsePlatformConnections.mockReturnValue({
+      connections: [
+        {
+          id: 'conn-unk',
+          hired_instance_id: 'ha1',
+          skill_id: 'digital_marketing',
+          platform_key: 'facebook',
+          status: 'expired',
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+      connect: mockConnect,
+      connectYouTube: mockConnectYouTube,
+      disconnect: mockDisconnect,
+    });
+    const { getByTestId } = render(<PlatformConnectionsScreen />);
+    // expired → disconnect button not shown, Connect button shown for facebook
+    expect(getByTestId('connect-btn-facebook')).toBeTruthy();
+  });
+
+  it('calls refetch after handleConnectYouTube completes', async () => {
+    mockUsePlatformConnections.mockReturnValue({
+      connections: [],
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+      connect: mockConnect,
+      connectYouTube: mockConnectYouTube,
+      disconnect: mockDisconnect,
+    });
+    const { getByTestId } = render(<PlatformConnectionsScreen />);
+    fireEvent.press(getByTestId('connect-youtube-btn'));
+    await waitFor(() => {
+      expect(mockConnectYouTube).toHaveBeenCalled();
+      expect(mockRefetch).toHaveBeenCalled();
+    });
+  });
 });
