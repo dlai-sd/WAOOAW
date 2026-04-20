@@ -123,8 +123,8 @@ class AgentService {
    * @returns Promise<Agent>
    */
   async getAgent(agentId: string): Promise<Agent> {
-    const response = await apiClient.get<Agent>(`/api/v1/agents/${agentId}`);
-    return response.data;
+    const response = await apiClient.get<CatalogAgentResponse>(`/api/v1/catalog/agents/${encodeURIComponent(agentId)}`);
+    return catalogToAgent(response.data);
   }
 
   /**

@@ -165,6 +165,19 @@ async def list_catalog_agents(
     return [_to_catalog_response(release) for release in releases]
 
 
+@router.get("/agents/{agent_id}", response_model=CatalogAgentResponse)
+async def get_catalog_agent(
+    agent_id: str,
+    db: AsyncSession = Depends(get_read_db_session),
+) -> CatalogAgentResponse:
+    """Return the live catalog entry for a single agent by its string catalog ID (e.g. AGT-MKT-DMA-001)."""
+    repo = AgentCatalogRepository(db)
+    release = await repo.get_live_release_for_agent_id(agent_id)
+    if not release:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found in catalog.")
+    return _to_catalog_response(release)
+
+
 @router.get("/releases", response_model=list[CatalogAgentResponse])
 async def list_catalog_releases(
     db: AsyncSession = Depends(get_read_db_session),

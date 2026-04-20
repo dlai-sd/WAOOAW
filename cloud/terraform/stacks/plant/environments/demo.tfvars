@@ -1,7 +1,7 @@
 project_id    = "waooaw-oauth"
 region        = "asia-south1"
 environment   = "demo"
-min_instances = 0
+min_instances = 1
 max_instances = 10
 
 # plant_backend_image is ignored by lifecycle block in cloud-run module

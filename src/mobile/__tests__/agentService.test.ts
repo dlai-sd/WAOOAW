@@ -107,26 +107,31 @@ describe('AgentService', () => {
   });
 
   describe('getAgent', () => {
-    it('should fetch single agent by ID', async () => {
-      const mockAgent: Agent = {
+    it('should fetch single agent by ID via catalog endpoint', async () => {
+      const mockCatalogEntry = {
+        release_id: 'rel-123',
         id: 'agent-123',
-        name: 'Test Agent',
-        description: 'Test description',
-        job_role_id: 'role-1',
-        industry: 'marketing',
-        entity_type: 'agent',
-        status: 'active',
-        created_at: '2024-01-01T00:00:00Z',
-        rating: 4.5,
-        price: 12000,
+        public_name: 'Test Agent',
+        short_description: 'Test description',
+        industry_name: 'marketing',
+        job_role_label: 'Marketer',
+        monthly_price_inr: 12000,
+        trial_days: 7,
+        allowed_durations: ['monthly'],
+        supported_channels: ['youtube'],
+        agent_type_id: 'type-1',
+        lifecycle_state: 'live',
+        approved_for_new_hire: true,
+        retired_from_catalog_at: null,
       };
 
-      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockAgent });
+      (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCatalogEntry });
 
       const result = await agentService.getAgent('agent-123');
 
-      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/agents/agent-123');
-      expect(result).toEqual(mockAgent);
+      expect(apiClient.get).toHaveBeenCalledWith('/api/v1/catalog/agents/agent-123');
+      expect(result.id).toEqual('agent-123');
+      expect(result.name).toEqual('Test Agent');
     });
   });
 

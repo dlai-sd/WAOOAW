@@ -24,8 +24,10 @@ from core.database import get_db, get_read_db_session
 from core.routing import waooaw_router
 from models.agent import Agent
 from models.agent_skill import AgentSkillModel
+from models.agent_catalog import AgentCatalogReleaseModel
 from models.skill import Skill
 from models.skill_config import SkillConfigModel
+from agent_mold.registry import skill_registry
 
 router = waooaw_router(prefix="/agents", tags=["agent-skills"])
 skills_router = waooaw_router(prefix="/skills", tags=["skills"])
@@ -203,8 +205,23 @@ async def list_agent_skills(
     agent_id: str,
     db: AsyncSession = Depends(get_read_db_session),  # read replica — never primary on GETs
 ) -> List[AgentSkillResponse]:
-    """List all skills attached to an agent, ordered by ordinal."""
-    agent_uuid = await _resolve_agent_uuid(agent_id, db)
+    """List all skills attached to an agent, ordered by ordinal.
+
+    Primary path: look up agent in base_entity by UUID or external_id then return
+    linked agent_skills rows.
+
+    Catalog fallback: if the agent exists only in agent_catalog_releases (e.g. DMA
+    agents seeded without entity rows), derive the skill list from the in-memory
+    skill_registry using the visible_skills config on the AgentSpec.
+    """
+    try:
+        agent_uuid = await _resolve_agent_uuid(agent_id, db)
+    except HTTPException as exc:
+        if exc.status_code != 404:
+            raise
+        # Entity row absent — try catalog fallback.
+        return await _catalog_skills_fallback(agent_id=agent_id, db=db)
+
     result = await db.execute(
         select(AgentSkillModel, Skill)
         .join(Skill, AgentSkillModel.skill_id == Skill.id)
@@ -212,20 +229,83 @@ async def list_agent_skills(
         .order_by(AgentSkillModel.ordinal)
     )
     rows = result.all()
-    return [
-        AgentSkillResponse(
-            id=row.AgentSkillModel.id,
-            agent_id=str(row.AgentSkillModel.agent_id),
-            skill_id=str(row.AgentSkillModel.skill_id),
-            is_primary=row.AgentSkillModel.is_primary,
-            ordinal=row.AgentSkillModel.ordinal,
-            skill_name=row.Skill.name,
-            skill_category=row.Skill.category,
-            goal_schema=row.Skill.goal_schema,
-            goal_config=row.AgentSkillModel.goal_config,
+    if rows:
+        return [
+            AgentSkillResponse(
+                id=row.AgentSkillModel.id,
+                agent_id=str(row.AgentSkillModel.agent_id),
+                skill_id=str(row.AgentSkillModel.skill_id),
+                is_primary=row.AgentSkillModel.is_primary,
+                ordinal=row.AgentSkillModel.ordinal,
+                skill_name=row.Skill.name,
+                skill_category=row.Skill.category,
+                goal_schema=row.Skill.goal_schema,
+                goal_config=row.AgentSkillModel.goal_config,
+            )
+            for row in rows
+        ]
+    # Agent entity row exists but has no linked skills — try catalog fallback.
+    return await _catalog_skills_fallback(agent_id=agent_id, db=db)
+
+
+async def _catalog_skills_fallback(
+    *, agent_id: str, db: AsyncSession
+) -> List[AgentSkillResponse]:
+    """Return the visible skill list for an agent that exists only in agent_catalog_releases.
+
+    Uses the in-memory skill_registry to build synthetic AgentSkillResponse rows,
+    keyed by the visible_skills names defined in the AgentSpec for that agent_type_id.
+    """
+    # Look up the catalog entry to get agent_type_id.
+    from agent_mold.registry import AgentSpecRegistry
+    result = await db.execute(
+        select(AgentCatalogReleaseModel.agent_type_id)
+        .where(AgentCatalogReleaseModel.agent_id == agent_id)
+        .where(AgentCatalogReleaseModel.approved_for_new_hire == True)  # noqa: E712
+        .limit(1)
+    )
+    agent_type_id = result.scalar_one_or_none()
+    if not agent_type_id:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found.")
+
+    # Resolve AgentSpec to get visible_skills list.
+    spec = AgentSpecRegistry.instance().get_spec(agent_type_id)
+    visible_names: list[str] = []
+    if spec:
+        skill_dim = (spec.dimensions or {}).get("skill") or {}
+        config = skill_dim.get("config") if isinstance(skill_dim, dict) else {}
+        visible_names = list(config.get("visible_skills") or []) if isinstance(config, dict) else []
+
+    # Map visible skill names → registered skill entries.
+    responses: list[AgentSkillResponse] = []
+    for ordinal, name in enumerate(visible_names):
+        name_lower = name.lower().replace(" ", "_")
+        # Find a matching registry entry by skill_id suffix or display_name.
+        entry = next(
+            (
+                e
+                for e in skill_registry.list_all()
+                if e.name.lower().replace(" ", "_") == name_lower
+                or e.skill_id.lower().replace(".", "_").endswith(name_lower)
+            ),
+            None,
         )
-        for row in rows
-    ]
+        skill_id = entry.skill_id if entry else name_lower
+        skill_name = entry.name if entry else name
+        responses.append(
+            AgentSkillResponse(
+                id=f"{agent_id}.{skill_id}",
+                agent_id=agent_id,
+                skill_id=skill_id,
+                is_primary=(ordinal == 0),
+                ordinal=ordinal,
+                skill_name=skill_name,
+                skill_category=entry.category if entry else "technical",
+                goal_schema=entry.goal_schema if entry else None,
+                goal_config=None,
+            )
+        )
+    return responses
 
 
 @router.post("/{agent_id}/skills", response_model=AgentSkillResponse, status_code=201)
