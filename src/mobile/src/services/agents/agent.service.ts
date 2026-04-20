@@ -47,7 +47,7 @@ function catalogToAgent(c: CatalogAgentResponse): Agent {
     industry: (c.industry_name || "").toLowerCase() as Agent["industry"],
     job_role_id: "", // not in catalog; not used by AgentCard
     entity_type: "agent",
-    status: c.lifecycle_state === "live" ? "active" : "inactive",
+    status: c.lifecycle_state === "live_on_cp" ? "active" : "inactive",
     specialization: c.job_role_label,
     price: c.monthly_price_inr,
     trial_days: c.trial_days,

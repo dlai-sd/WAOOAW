@@ -18,7 +18,7 @@ import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GoogleSignInButton } from "../../components/GoogleSignInButton";
 import { useGoogleAuth } from "../../hooks/useGoogleAuth";
-import * as AppleAuthentication from 'expo-apple-authentication';
+import * as AppleAuthentication from "expo-apple-authentication";
 import AuthService from "../../services/auth.service";
 import userDataService from "../../services/userDataService";
 import { useTheme } from "../../hooks/useTheme";
@@ -71,9 +71,9 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
       await signInWithApple();
       if (onSignInSuccess) onSignInSuccess();
     } catch (error: any) {
-      if (error?.code !== 'ERR_REQUEST_CANCELED') {
-        console.error('Apple sign-in failed:', error);
-        setErrorMessage('Apple sign-in failed. Please try again.');
+      if (error?.code !== "ERR_REQUEST_CANCELED") {
+        console.error("Apple sign-in failed:", error);
+        setErrorMessage("Apple sign-in failed. Please try again.");
       }
     } finally {
       setIsSigningIn(false);
@@ -120,9 +120,14 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
 
         // Persist to AsyncStorage for next app start — fire-and-forget so
         // navigation to the dashboard is not blocked by storage write latency.
-        userDataService.saveUserData(authUser).catch((e) =>
-          console.warn('[SignInScreen] saveUserData failed (non-blocking):', e)
-        );
+        userDataService
+          .saveUserData(authUser)
+          .catch((e) =>
+            console.warn(
+              "[SignInScreen] saveUserData failed (non-blocking):",
+              e,
+            ),
+          );
 
         // Navigate to main app
         if (onSignInSuccess) {
@@ -240,17 +245,26 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                   color: colors.textSecondary,
                   fontFamily: typography.fontFamily.body,
                   fontSize: 14,
-                  textAlign: 'center',
+                  textAlign: "center",
                   marginTop: spacing.md,
                   maxWidth: 320,
                   lineHeight: 20,
                 }}
               >
-                Use mobile as your fastest decision surface for approvals, spend awareness, and agent operations.
+                Use mobile as your fastest decision surface for approvals, spend
+                awareness, and agent operations.
               </Text>
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: spacing.md, justifyContent: 'center' }}>
-                {['1-tap sign in', 'Customer-safe', 'Ops-ready'].map((pill) => (
+              <View
+                style={{
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  marginTop: spacing.md,
+                  justifyContent: "center",
+                }}
+              >
+                {["1-tap sign in", "Customer-safe", "Ops-ready"].map((pill) => (
                   <View
                     key={pill}
                     style={{
@@ -258,11 +272,19 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
                       paddingVertical: 6,
                       borderRadius: 999,
                       borderWidth: 1,
-                      borderColor: colors.textSecondary + '25',
+                      borderColor: colors.textSecondary + "25",
                       backgroundColor: colors.card,
                     }}
                   >
-                    <Text style={{ color: colors.textPrimary, fontSize: 12, fontFamily: typography.fontFamily.bodyBold }}>{pill}</Text>
+                    <Text
+                      style={{
+                        color: colors.textPrimary,
+                        fontSize: 12,
+                        fontFamily: typography.fontFamily.bodyBold,
+                      }}
+                    >
+                      {pill}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -270,28 +292,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
 
             {/* Sign In Button Section */}
             <View style={[styles.buttonSection, { marginTop: spacing.xxl }]}>
-              <View
-                style={{
-                  width: '100%',
-                  borderRadius: 16,
-                  padding: spacing.lg,
-                  borderWidth: 1,
-                  borderColor: colors.textSecondary + '20',
-                  backgroundColor: colors.card,
-                  marginBottom: spacing.lg,
-                }}
-              >
-                <Text style={{ color: colors.neonCyan, fontSize: 12, marginBottom: 6, fontFamily: typography.fontFamily.bodyBold }}>
-                  Why this screen matters
-                </Text>
-                <Text style={{ color: colors.textPrimary, fontSize: 15, fontFamily: typography.fontFamily.bodyBold, marginBottom: 4 }}>
-                  Customers should feel oriented, not dumped into OAuth.
-                </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 13, fontFamily: typography.fontFamily.body }}>
-                  Sign in is the front door to hiring, approvals, billing visibility, and profile control.
-                </Text>
-              </View>
-
               <GoogleSignInButton
                 onPress={handleGoogleSignIn}
                 loading={isLoading}
@@ -300,12 +300,16 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               />
 
               {/* Apple Sign-In (iOS only) */}
-              {Platform.OS === 'ios' && (
+              {Platform.OS === "ios" && (
                 <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                  }
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                  }
                   cornerRadius={12}
-                  style={{ width: '100%', height: 44, marginTop: 12 }}
+                  style={{ width: "100%", height: 44, marginTop: 12 }}
                   onPress={handleAppleSignIn}
                 />
               )}
