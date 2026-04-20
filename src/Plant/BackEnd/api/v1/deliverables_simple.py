@@ -18,7 +18,8 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 from uuid import uuid4
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request
+from core.database import get_read_db_session
 from core.routing import waooaw_router  # P-3
 from pydantic import BaseModel, Field
 
@@ -458,14 +459,17 @@ async def run_due_goal_drafts(body: RunDueGoalDraftsRequest) -> RunDueGoalDrafts
 
     return RunDueGoalDraftsResponse(generated=created_count, deliverable_ids=created_ids)
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 @hired_agents_router.get("/{hired_instance_id}/deliverables", response_model=DeliverablesListResponse)
 async def list_deliverables(
     hired_instance_id: str,
     customer_id: str | None = None,
     as_of: datetime | None = None,
     status: DeliverableReviewStatus | None = None,
+    db: AsyncSession = Depends(get_read_db_session),
 ) -> DeliverablesListResponse:
-    record = hired_agents_simple._by_id.get(hired_instance_id)
+    record = hired_agents_simple._by_id.get(hired_instance_id) or await hired_agents_simple._get_record_by_id(hired_instance_id=hired_instance_id, db=db)
     if not record:
         raise HTTPException(status_code=404, detail="Hired agent instance not found.")
 

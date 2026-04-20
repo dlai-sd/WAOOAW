@@ -252,7 +252,7 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.0
+          terraform_version: 1.10.5
 
       - name: Terraform fmt check (stacks + modules)
         run: terraform fmt -recursive -check cloud/terraform/stacks cloud/terraform/modules
@@ -263,7 +263,7 @@ jobs:
           set -euo pipefail
           for d in cloud/terraform/stacks/foundation cloud/terraform/stacks/cp cloud/terraform/stacks/pp cloud/terraform/stacks/plant; do
             echo "--- validate: $d"
-            (cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform validate)
+            (cd "$d" && terraform init -backend=false -input=false -upgrade >/dev/null && terraform validate)
           done
 
   docker_build_smoke:
