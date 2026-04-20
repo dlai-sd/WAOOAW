@@ -3,16 +3,16 @@
  * Branded button following Google's Sign-In branding guidelines
  */
 
-import React from 'react';
+import React from "react";
 import {
   TouchableOpacity,
   Text,
   StyleSheet,
   ActivityIndicator,
   View,
-} from 'react-native';
-import { Image } from 'expo-image';
-import { useTheme } from '../hooks/useTheme';
+} from "react-native";
+import { Image } from "expo-image";
+import { useTheme } from "../hooks/useTheme";
 
 /**
  * Google Sign In Button Props
@@ -27,7 +27,7 @@ interface GoogleSignInButtonProps {
 
 /**
  * Google Sign In Button
- * 
+ *
  * Follows Google's branding guidelines:
  * - White background
  * - Google logo on left
@@ -45,11 +45,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        disabled && styles.buttonDisabled,
-        style,
-      ]}
+      style={[styles.button, disabled && styles.buttonDisabled, style]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}
@@ -66,7 +62,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
           <View style={styles.logoContainer}>
             <Text style={styles.googleLogo}>G</Text>
           </View>
-          
+
           {/* Button Text */}
           <Text style={styles.buttonText}>Sign in with Google</Text>
         </View>
@@ -77,18 +73,18 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 8,
-    paddingVertical: 14,
+    paddingVertical: 10,
     paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    width: '100%',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    width: "100%",
     maxWidth: 400,
     // Shadow for depth
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -98,26 +94,26 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   content: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoContainer: {
     width: 24,
     height: 24,
     marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   googleLogo: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#4285F4',
+    fontWeight: "700",
+    color: "#4285F4",
   },
   buttonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#3C4043',
+    fontWeight: "600",
+    color: "#3C4043",
     letterSpacing: 0.25,
   },
 });

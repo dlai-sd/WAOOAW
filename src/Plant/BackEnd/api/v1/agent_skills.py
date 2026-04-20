@@ -261,7 +261,6 @@ async def _catalog_skills_fallback(
     result = await db.execute(
         select(AgentCatalogReleaseModel.agent_type_id)
         .where(AgentCatalogReleaseModel.agent_id == agent_id)
-        .where(AgentCatalogReleaseModel.approved_for_new_hire == True)  # noqa: E712
         .limit(1)
     )
     agent_type_id = result.scalar_one_or_none()

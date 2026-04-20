@@ -62,7 +62,7 @@ describe("AgentService", () => {
         allowed_durations: ["monthly"],
         supported_channels: ["youtube"],
         agent_type_id: "type-1",
-        lifecycle_state: "live",
+        lifecycle_state: "live_on_cp",
         approved_for_new_hire: true,
         retired_from_catalog_at: null,
       },
@@ -85,14 +85,14 @@ describe("AgentService", () => {
           ...mockCatalog[0],
           id: "a1",
           industry_name: "marketing",
-          lifecycle_state: "live",
+          lifecycle_state: "live_on_cp",
         },
         {
           ...mockCatalog[0],
           id: "a2",
           public_name: "Edu Agent",
           industry_name: "education",
-          lifecycle_state: "live",
+          lifecycle_state: "live_on_cp",
         },
       ];
       (apiClient.get as jest.Mock).mockResolvedValue({ data: multiCatalog });
@@ -104,7 +104,7 @@ describe("AgentService", () => {
       expect(result[0].industry).toBe("marketing");
     });
 
-    it("should map lifecycle_state=live to status=active", async () => {
+    it("should map lifecycle_state=live_on_cp to status=active", async () => {
       (apiClient.get as jest.Mock).mockResolvedValue({ data: mockCatalog });
 
       const result = await agentService.listAgents();
@@ -136,7 +136,7 @@ describe("AgentService", () => {
         allowed_durations: ["monthly"],
         supported_channels: ["youtube"],
         agent_type_id: "type-1",
-        lifecycle_state: "live",
+        lifecycle_state: "live_on_cp",
         approved_for_new_hire: true,
         retired_from_catalog_at: null,
       };
@@ -170,7 +170,7 @@ describe("AgentService", () => {
         allowed_durations: ["monthly"],
         supported_channels: ["youtube"],
         agent_type_id: "type-1",
-        lifecycle_state: "live",
+        lifecycle_state: "live_on_cp",
         approved_for_new_hire: true,
         retired_from_catalog_at: null,
       },
@@ -186,7 +186,7 @@ describe("AgentService", () => {
         allowed_durations: ["monthly"],
         supported_channels: [],
         agent_type_id: "type-2",
-        lifecycle_state: "live",
+        lifecycle_state: "live_on_cp",
         approved_for_new_hire: true,
         retired_from_catalog_at: null,
       },
