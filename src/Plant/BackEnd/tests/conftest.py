@@ -87,9 +87,26 @@ def test_client(monkeypatch):
 
     from fastapi.testclient import TestClient
     from main import app
+    from core.database import get_db_session, get_read_db_session
 
-    with TestClient(app) as client:
-        yield client
+    class _NullSession:
+        async def commit(self) -> None:
+            return None
+
+        async def close(self) -> None:
+            return None
+
+    async def _null_db_session():
+        yield _NullSession()
+
+    app.dependency_overrides[get_db_session] = _null_db_session
+    app.dependency_overrides[get_read_db_session] = _null_db_session
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.pop(get_db_session, None)
+        app.dependency_overrides.pop(get_read_db_session, None)
 
 
 @pytest.fixture
