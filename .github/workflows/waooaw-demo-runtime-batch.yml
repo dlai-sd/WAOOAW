@@ -1,0 +1,112 @@
+name: WAOOAW Demo Runtime Batch
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Runtime action"
+        required: true
+        type: choice
+        options: [stop, start]
+      confirm_token:
+        description: "Type STOP_DEMO_RUNTIME or START_DEMO_RUNTIME"
+        required: true
+        type: string
+      dry_run:
+        description: "Execute as dry-run (no cloud mutation)"
+        required: true
+        default: true
+        type: boolean
+      start_min_gateway:
+        description: "Start min instances for demo API gateway"
+        required: false
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: waooaw-demo-runtime-batch
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: waooaw-oauth
+  GCP_REGION: asia-south1
+  TARGET_ENVIRONMENT: demo
+
+jobs:
+  runtime_batch:
+    name: Runtime stop/start batch (demo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate action confirmation token
+        shell: bash
+        run: |
+          set -euo pipefail
+          action="${{ inputs.action }}"
+          token="${{ inputs.confirm_token }}"
+
+          if [[ "$action" == "stop" && "$token" != "STOP_DEMO_RUNTIME" ]]; then
+            echo "::error::Invalid confirm_token for stop action."
+            exit 1
+          fi
+
+          if [[ "$action" == "start" && "$token" != "START_DEMO_RUNTIME" ]]; then
+            echo "::error::Invalid confirm_token for start action."
+            exit 1
+          fi
+
+      - name: Validate GCP auth configuration
+        shell: bash
+        env:
+          HAS_WIF: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != '' }}
+          HAS_JSON_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [[ "${HAS_WIF}" == "true" ]]; then exit 0; fi
+          if [[ "${HAS_JSON_KEY}" == "true" ]]; then exit 0; fi
+          echo "::error::Missing GCP auth configuration."
+          exit 1
+
+      - name: Authenticate to Google Cloud
+        if: vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Authenticate to Google Cloud (JSON key fallback)
+        if: ${{ !(vars.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && vars.GCP_SERVICE_ACCOUNT_EMAIL != '') }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Execute demo runtime batch action
+        shell: bash
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          START_MIN_GATEWAY: ${{ inputs.start_min_gateway }}
+        run: |
+          set -euo pipefail
+          bash scripts/demo-runtime-batch.sh "${{ inputs.action }}"
+
+      - name: Summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "## Demo Runtime Batch" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Action: ${{ inputs.action }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Environment: demo" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dry run: ${{ inputs.dry_run }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Scope: CP, PP, API Gateway" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Infra mutation: none (runtime min-instances only)" >> "$GITHUB_STEP_SUMMARY"
