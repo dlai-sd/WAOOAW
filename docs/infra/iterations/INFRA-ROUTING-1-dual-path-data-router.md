@@ -164,7 +164,7 @@ PLATFORM RULES (mandatory, no exceptions):
 1. Router: always waooaw_router() from core.routing — never bare APIRouter()
 2. App deps: FastAPI() must have dependencies=[Depends(get_correlation_id), Depends(get_audit_log)]
 3. GET routes use get_read_db_session() not get_db_session()
-4. PIIMaskingFilter on every logger: logger.addFilter(PIIMaskingFilter())
+4. PiiMaskingFilter on every logger: logger.addFilter(PiiMaskingFilter())
 5. @circuit_breaker(service="...") on every external HTTP/network call
 6. No env-specific values in code, Dockerfiles, or committed .env — runtime env vars via Secret Manager only
 7. Image promotion: same Docker image promotes demo→uat→prod via injected env vars only
@@ -209,7 +209,7 @@ EXPERT PERSONAS ACTIVE:
 - Google Cloud Firestore / google-cloud-firestore Python SDK expert
 - Terraform / GCP Cloud Run expert
 
-PLATFORM RULES: same as Iteration 1 (waooaw_router, get_read_db_session, PIIMaskingFilter, circuit_breaker, no env baking).
+PLATFORM RULES: same as Iteration 1 (waooaw_router, get_read_db_session, PiiMaskingFilter, circuit_breaker, no env baking).
 
 FAIL-FAST VALIDATION GATE (run first, halt if any fails):
   ls src/Plant/BackEnd/core/datastore_router.py     ← must exist from It1
@@ -240,7 +240,7 @@ Do this BEFORE starting the next story. If interrupted, completed stories are al
 ### EXECUTION AGENT AUDIT ROUND
 Before opening the PR, verify:
 - [ ] Every new file has a module docstring
-- [ ] `PIIMaskingFilter` is added to every logger in new files
+- [ ] `PiiMaskingFilter` is added to every logger in new files
 - [ ] No hardcoded project IDs, collection names, or env-specific strings in Python code
 - [ ] `DATA_ROUTER_MODE` is read exclusively from `settings.data_router_mode` — not from `os.environ.get()`
 - [ ] All new tests pass: `docker-compose -f docker-compose.test.yml run plant-test pytest tests/ -x -v`
@@ -318,10 +318,10 @@ from __future__ import annotations
 import logging
 
 from core.config import settings
-from core.logging import PIIMaskingFilter
+from core.logging import PiiMaskingFilter
 
 logger = logging.getLogger(__name__)
-logger.addFilter(PIIMaskingFilter())
+logger.addFilter(PiiMaskingFilter())
 
 # Collections that are eligible for Firestore routing.
 # Transactional entities (customer, hired_agent, deliverable, payment) are
@@ -415,7 +415,10 @@ The Firestore path needs a thin client wrapper that applies the circuit breaker 
 3. `src/Plant/BackEnd/core/redis_client.py` — copy lazy-init pattern for the Firestore client instance
 
 **Task:**
-1. Add `google-cloud-firestore` to `src/Plant/BackEnd/requirements.txt` (or the correct requirements file).
+1. Add `google-cloud-firestore` to `src/Plant/BackEnd/requirements.txt` — **must use exact version pin** (CI rejects `>=` specifiers):
+```
+google-cloud-firestore==2.27.0
+```
 2. Create `src/Plant/BackEnd/core/firestore_client.py`:
 
 ```python
@@ -437,13 +440,12 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
-from unittest.mock import MagicMock
 
 from core.config import settings
-from core.logging import PIIMaskingFilter
+from core.logging import PiiMaskingFilter
 
 logger = logging.getLogger(__name__)
-logger.addFilter(PIIMaskingFilter())
+logger.addFilter(PiiMaskingFilter())
 
 _CIRCUIT_OPEN_THRESHOLD = 5    # consecutive failures before opening
 _CIRCUIT_RESET_SECONDS  = 30   # seconds before half-open retry
@@ -491,6 +493,7 @@ def _get_client() -> Any:
         return _fs_client
     if settings.environment in {"development", "test", "local"}:
         # Return a mock so unit tests never hit the network.
+        from unittest.mock import MagicMock  # stdlib — only imported in non-prod paths
         _fs_client = MagicMock()
         return _fs_client
     try:
@@ -546,7 +549,7 @@ async def set_document(collection: str, doc_id: str, data: dict, merge: bool = T
 - [ ] `get_document("agent_performance", "test-id")` returns `None` in test/local environment (mock path)
 - [ ] `set_document("agent_performance", "test-id", {"stat": 1})` returns `False` when circuit is open
 - [ ] No raw `google.cloud.firestore` import exists in any service file (only in `firestore_client.py`)
-- [ ] `PIIMaskingFilter` is attached to the module logger
+- [ ] `PiiMaskingFilter` is attached to the module logger
 
 **Test table:**
 
@@ -583,15 +586,14 @@ Firestore secondary write when DATA_ROUTER_MODE is dual_write, shadow_read,
 or firestore.
 
 Firestore schema (collection: agent_performance):
-  Document ID: str(hired_agent_id)
+  Document ID: str(hired_instance_id)
   Fields:
-    hired_agent_id: str
+    hired_instance_id: str
+    skill_id: str
+    platform_key: str
     stat_date: str (ISO 8601)
-    posts_count: int
-    impressions: int
-    engagements: int
-    retention_rate: float
-    response_time_minutes: float
+    metrics: dict  (mirrors the JSONB metrics column from PerformanceStatModel)
+    posts_count: int  (denormalised from metrics["posts_published"] for fast shadow compare)
     updated_at: str (ISO 8601 UTC)
 
 PII: no customer email, phone, or name is stored in Firestore documents.
@@ -605,40 +607,48 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from core.datastore_router import datastore_router
 from core.firestore_client import get_document, set_document
-from core.logging import PIIMaskingFilter
+from core.logging import PiiMaskingFilter
 
 logger = logging.getLogger(__name__)
-logger.addFilter(PIIMaskingFilter())
+logger.addFilter(PiiMaskingFilter())
 
 _FIRESTORE_COLLECTION = "agent_performance"
 
 
 def _to_firestore_doc(hired_agent_id: UUID, stat: Any) -> dict:
-    """Convert a PerformanceStat ORM row to a Firestore-safe dict (no PII)."""
+    """Convert a PerformanceStatModel ORM row to a Firestore-safe dict (no PII).
+
+    PerformanceStatModel stores all metrics inside a JSONB column called `metrics`.
+    We denormalise `posts_count` at the top level for fast shadow-compare without
+    needing to deserialise the full metrics dict on every comparison.
+    """
+    metrics: dict = stat.metrics or {} if hasattr(stat, "metrics") else {}
     return {
-        "hired_agent_id": str(hired_agent_id),
-        "stat_date": stat.stat_date.isoformat() if hasattr(stat, "stat_date") else None,
-        "posts_count": getattr(stat, "posts_count", 0),
-        "impressions": getattr(stat, "impressions", 0),
-        "engagements": getattr(stat, "engagements", 0),
-        "retention_rate": float(getattr(stat, "retention_rate", 0.0)),
-        "response_time_minutes": float(getattr(stat, "response_time_minutes", 0.0)),
+        "hired_instance_id": str(hired_agent_id),
+        "skill_id": getattr(stat, "skill_id", None),
+        "platform_key": getattr(stat, "platform_key", None),
+        "stat_date": stat.stat_date.isoformat() if hasattr(stat, "stat_date") and stat.stat_date else None,
+        "metrics": metrics,
+        # Denormalised for shadow compare — mirrors posts_published from metrics JSONB
+        "posts_count": metrics.get("posts_published", 0),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
-async def after_stat_write(hired_agent_id: UUID, stat: Any) -> None:
+async def after_stat_write(hired_agent_id: UUID, stat: Any) -> bool:
     """
-    Called after a PerformanceStat SQL write.
+    Called after a PerformanceStatModel SQL write.
     Fires an async Firestore secondary write if the routing policy requires it.
     Failures are logged but never raise — SQL path is authoritative.
+
+    Returns:
+        True  — write succeeded or routing mode is sql (no-op, treated as success)
+        False — Firestore write failed (circuit open or network error)
     """
     if not datastore_router.writes_to_firestore(_FIRESTORE_COLLECTION):
-        return
+        return True  # sql mode is a successful no-op
     doc_id = str(hired_agent_id)
     doc = _to_firestore_doc(hired_agent_id, stat)
     ok = await set_document(_FIRESTORE_COLLECTION, doc_id, doc)
@@ -647,6 +657,7 @@ async def after_stat_write(hired_agent_id: UUID, stat: Any) -> None:
             "performance_stat_router: Firestore secondary write skipped for agent=%s (circuit open or error)",
             doc_id,
         )
+    return ok
 
 
 async def read_stat_from_firestore(hired_agent_id: UUID) -> Optional[dict]:
@@ -686,27 +697,24 @@ async def read_stat_from_firestore(hired_agent_id: UUID) -> Optional[dict]:
 `src/Plant/BackEnd/services/redis_runtime.py` currently manages runtime stat updates using Redis. This story adds the `after_stat_write` call as a fire-and-forget side-effect after any SQL performance stat write, so the dual-write path activates without changing any existing write logic or API contract.
 
 **Files to read first (max 3):**
-1. `src/Plant/BackEnd/services/redis_runtime.py` — find where performance stats are written to identify the correct insertion point
+1. `src/Plant/BackEnd/api/v1/performance_stats.py` — the actual write site: `upsert_performance_stat()` function using `pg_insert` (PostgreSQL UPSERT)
 2. `src/Plant/BackEnd/services/performance_stat_router.py` — the adapter just created
-3. `src/Plant/BackEnd/api/v1/runtime_redis.py` — understand the route that triggers stat writes to ensure contract is unchanged
+3. `src/Plant/BackEnd/models/performance_stat.py` — confirm `hired_instance_id` field name used in the upsert
 
 **Task:**
-1. In `src/Plant/BackEnd/services/redis_runtime.py`, after any write operation that persists a performance stat (search for `performance_stat` or `PerformanceStat` write calls), add a fire-and-forget async call:
+1. In `src/Plant/BackEnd/api/v1/performance_stats.py`, inside the `upsert_performance_stat` async route function, add the fire-and-forget call **after** the `await db.execute(stmt)` and `await db.commit()` lines:
 
 ```python
-# Add this import at the top of redis_runtime.py (after existing imports):
+# Add these imports at the top of performance_stats.py (after existing imports):
 import asyncio
 from services.performance_stat_router import after_stat_write
 
-# Add this line immediately after any PerformanceStat SQL session.add() / session.flush() / session.commit():
-# Replace `stat` and `hired_agent_id` with the actual local variable names in that function.
-asyncio.create_task(after_stat_write(hired_agent_id, stat))
+# Add inside upsert_performance_stat(), after db.commit() (use the ORM row returned by the upsert):
+# `hired_instance_id` and `stat_row` are the local variables from that function.
+asyncio.create_task(after_stat_write(hired_instance_id, stat_row))
 ```
 
-2. If `redis_runtime.py` does not write PerformanceStat rows (it only reads/writes Redis keys), search for the actual SQL write call:
-   - `grep -rn "PerformanceStat\|performance_stat" src/Plant/BackEnd/services/ src/Plant/BackEnd/api/`
-   - Find the correct service/API file and add the `asyncio.create_task(after_stat_write(...))` call there instead.
-   - Document the file you changed in the PR description.
+2. The `stat_row` passed to `after_stat_write` must be the ORM object returned from the upsert so `_to_firestore_doc` can read `stat_row.metrics`, `stat_row.skill_id`, `stat_row.platform_key`, `stat_row.stat_date`. If the upsert returns a dict, build a simple namespace: `types.SimpleNamespace(**upsert_result_dict)` and pass that.
 
 **Acceptance criteria (all must pass):**
 - [ ] No existing test breaks after the change
@@ -739,9 +747,9 @@ The Firestore client requires `google-cloud-firestore` in the Plant BackEnd `req
 3. `.github/workflows/waooaw-ci.yml` — confirm CI matrix includes plant tests
 
 **Task:**
-1. Add to `src/Plant/BackEnd/requirements.txt`:
+1. Add to `src/Plant/BackEnd/requirements.txt` — **exact pin required** (CI dependency gate fails on `>=`):
 ```
-google-cloud-firestore>=2.16.0
+google-cloud-firestore==2.27.0
 ```
 2. Confirm `docker-compose.test.yml` `plant-test` service has `ENVIRONMENT=test` (so `_get_client()` returns mock).
 3. If `ENVIRONMENT` is not set, add it:
@@ -836,8 +844,14 @@ async def shadow_compare(hired_agent_id: UUID, sql_result: Any) -> None:
         if fs_doc is None:
             # No Firestore document yet — expected until dual_write has run once
             return
-        sql_posts = getattr(sql_result, "posts_count", None)
-        fs_posts  = fs_doc.get("posts_count")
+        # posts_count is denormalised into the Firestore doc by _to_firestore_doc();
+        # on the SQL side, posts_published lives inside the metrics JSONB column.
+        sql_posts = (
+            sql_result.metrics.get("posts_published")
+            if sql_result and hasattr(sql_result, "metrics") and sql_result.metrics
+            else None
+        )
+        fs_posts  = fs_doc.get("posts_count")  # key set by _to_firestore_doc()
         if sql_posts != fs_posts:
             firestore_drift_total.labels(collection=_FIRESTORE_COLLECTION).inc()
             logger.warning(
@@ -900,19 +914,18 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import AsyncGenerator
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.firestore_client import get_document
-from core.logging import PIIMaskingFilter
+from core.logging import PiiMaskingFilter
 from core.metrics import firestore_drift_total
-from models.performance_stat import PerformanceStat
+from models.performance_stat import PerformanceStatModel
 from services.performance_stat_router import after_stat_write, _FIRESTORE_COLLECTION
 
 logger = logging.getLogger(__name__)
-logger.addFilter(PIIMaskingFilter())
+logger.addFilter(PiiMaskingFilter())
 
 
 async def run_reconciliation_sweep(db: AsyncSession) -> dict:
@@ -922,7 +935,7 @@ async def run_reconciliation_sweep(db: AsyncSession) -> dict:
     Returns:
         dict with keys: total_checked, drifted, repaired, errors
     """
-    result = await db.execute(select(PerformanceStat))
+    result = await db.execute(select(PerformanceStatModel))
     stats = result.scalars().all()
 
     total = len(stats)
@@ -934,13 +947,14 @@ async def run_reconciliation_sweep(db: AsyncSession) -> dict:
         try:
             hired_agent_id = stat.hired_instance_id
             fs_doc = await get_document(_FIRESTORE_COLLECTION, str(hired_agent_id))
-            sql_posts = getattr(stat, "posts_count", 0)
+            # posts_published lives inside metrics JSONB; posts_count is the denormalised key in Firestore
+            sql_posts = stat.metrics.get("posts_published", 0) if stat.metrics else 0
             fs_posts  = fs_doc.get("posts_count") if fs_doc else None
             if fs_posts != sql_posts:
                 drifted += 1
                 firestore_drift_total.labels(collection=_FIRESTORE_COLLECTION).inc()
-                ok = await after_stat_write(hired_agent_id, stat)
-                if ok is not False:
+                ok: bool = await after_stat_write(hired_agent_id, stat)
+                if ok:
                     repaired += 1
         except Exception as exc:
             errors += 1
@@ -1181,7 +1195,7 @@ No code change, no deployment, no database migration required for rollback.
 
 - [ ] `DatastoreRouter` class exists in `src/Plant/BackEnd/core/datastore_router.py`
 - [ ] `FirestoreClient` with circuit breaker exists in `src/Plant/BackEnd/core/firestore_client.py`
-- [ ] `performance_stat_router.py` wires dual-write for `PerformanceStat` entity
+- [ ] `performance_stat_router.py` wires dual-write for `PerformanceStatModel` entity
 - [ ] Shadow read mode emits `waooaw_firestore_drift_total` Prometheus counter
 - [ ] Reconciliation sweep service exists and re-syncs drifted rows
 - [ ] Terraform `DATA_ROUTER_MODE` variable added to all three plant environment tfvars
