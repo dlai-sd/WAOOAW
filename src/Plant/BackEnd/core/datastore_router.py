@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 
-from core.config import settings
+import core.config as _config
 from core.logging import PiiMaskingFilter
 
 logger = logging.getLogger(__name__)
@@ -46,12 +46,14 @@ class DatastoreRouter:
     """
 
     def __init__(self) -> None:
-        self._mode = settings.data_router_mode
+        self._mode = _config.settings.data_router_mode
 
     @property
     def mode(self) -> str:
-        # Re-read each time so hot-reload of settings works in tests.
-        return settings.data_router_mode
+        # Re-read via module attribute each time so monkeypatch and env-var
+        # hot-reload both work — _config.settings is re-bound by tests and by
+        # Cloud Run env-var flips; a direct name binding would stay stale.
+        return _config.settings.data_router_mode
 
     def is_routable(self, collection: str) -> bool:
         """True if this collection participates in the routing policy."""

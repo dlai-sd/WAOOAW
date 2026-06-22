@@ -180,6 +180,9 @@ jobs:
           # requires ASGI server forwarding non-/path into scope; Cloud Run / uvicorn normalises paths before ASGI; low exposure.
           # GHSA-537c-gmf6-5ccf: cryptography wheels bundle OpenSSL < 48.0.1 — fix in cryptography 48.0.1;
           # pending coordinated upgrade across all services; no direct exploit path in current WAOOAW API surface.
+          # GHSA-4xgf-cpjx-pc3j: pydantic-settings 2.12.0 NestedSecretsSettingsSource symlink traversal via
+          # secrets_nested_subdir=True — fix in 2.14.2; WAOOAW does not use secrets_nested_subdir=True in
+          # any service config; not exploitable in current codebase; upgrade tracked with pydantic alignment window.
           pip-audit -r requirements.txt --desc on \
             --ignore-vuln CVE-2024-23342 \
              --ignore-vuln CVE-2025-62727 \
@@ -200,7 +203,8 @@ jobs:
              --ignore-vuln CVE-2026-48817 \
              --ignore-vuln CVE-2026-54283 \
              --ignore-vuln CVE-2026-54282 \
-             --ignore-vuln GHSA-537c-gmf6-5ccf || {
+             --ignore-vuln GHSA-537c-gmf6-5ccf \
+             --ignore-vuln GHSA-4xgf-cpjx-pc3j || {
             echo "::error::${{ matrix.component }} has known vulnerable dependencies — fix before merging"
             exit 1
           }
