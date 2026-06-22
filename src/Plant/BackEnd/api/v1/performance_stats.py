@@ -8,6 +8,7 @@ Query params for GET:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import date, datetime, timezone
@@ -23,6 +24,7 @@ from core.database import get_db_session, get_read_db_session
 from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 from models.performance_stat import PerformanceStatModel
+from services.performance_stat_router import after_stat_write
 
 router = waooaw_router(prefix="/hired-agents", tags=["performance-stats"])
 
@@ -141,6 +143,9 @@ async def upsert_performance_stat(
     result = await db.execute(stmt)
     await db.commit()
     stat = result.scalars().first()
+    # Fire-and-forget dual-write to Firestore if DATA_ROUTER_MODE requires it.
+    # SQL is authoritative — Firestore failure never blocks the response.
+    asyncio.create_task(after_stat_write(uuid.UUID(hired_instance_id), stat))
     logger.info(
         "Performance stat upserted: hired=%s skill=%s platform=%s date=%s",
         hired_instance_id,

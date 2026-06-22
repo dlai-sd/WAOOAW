@@ -34,6 +34,7 @@ services:
       - REDIS_URL=redis://redis-test:6379/0
       - JWT_SECRET=test-secret-key
       - SECRET_KEY=test-secret-key
+      - DATA_ROUTER_MODE=sql
       - FINANCIALS_YAML_PATH=/config/financials.yml
     depends_on:
       postgres-test:

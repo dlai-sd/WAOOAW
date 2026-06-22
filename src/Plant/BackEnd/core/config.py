@@ -116,6 +116,21 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     redis_ttl_seconds: int = 86400  # 24 hours
 
+    # Data routing — INFRA-ROUTING-1
+    data_router_mode: str = Field(
+        default="sql",
+        validation_alias=AliasChoices("DATA_ROUTER_MODE", "data_router_mode"),
+        description="Routing policy: sql | dual_write | shadow_read | firestore",
+    )
+
+    @field_validator("data_router_mode", mode="before")
+    @classmethod
+    def validate_router_mode(cls, v: object) -> str:
+        allowed = {"sql", "dual_write", "shadow_read", "firestore"}
+        if str(v) not in allowed:
+            raise ValueError(f"data_router_mode must be one of {allowed}, got '{v}'")
+        return str(v)
+
     # DMA media artifact storage
     media_artifact_store_backend: str = "local"
     media_artifact_local_root: str = "./tmp/media_artifacts"
