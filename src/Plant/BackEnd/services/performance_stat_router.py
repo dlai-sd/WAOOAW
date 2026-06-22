@@ -21,6 +21,7 @@ PII: no customer email, phone, or name is stored in Firestore documents.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -29,6 +30,7 @@ from uuid import UUID
 from core.datastore_router import datastore_router
 from core.firestore_client import get_document, set_document
 from core.logging import PiiMaskingFilter
+from core.metrics import firestore_drift_total, firestore_shadow_reads_total
 
 logger = logging.getLogger(__name__)
 logger.addFilter(PiiMaskingFilter())
@@ -87,3 +89,35 @@ async def read_stat_from_firestore(hired_agent_id: UUID) -> Optional[dict]:
     if not datastore_router.reads_from_firestore(_FIRESTORE_COLLECTION):
         return None
     return await get_document(_FIRESTORE_COLLECTION, str(hired_agent_id))
+
+
+async def shadow_compare(hired_agent_id: UUID, sql_result: Any) -> None:
+    """
+    Background task: read Firestore and compare with SQL result.
+    Emits drift metric on mismatch. Never raises — shadow mode must be invisible to callers.
+    Called via asyncio.create_task() immediately after SQL read returns.
+    """
+    if not datastore_router.shadow_mode(_FIRESTORE_COLLECTION):
+        return
+    firestore_shadow_reads_total.labels(collection=_FIRESTORE_COLLECTION).inc()
+    try:
+        fs_doc = await get_document(_FIRESTORE_COLLECTION, str(hired_agent_id))
+        if fs_doc is None:
+            # No Firestore document yet — expected until dual_write has run once
+            return
+        # posts_count is denormalised into the Firestore doc by _to_firestore_doc();
+        # on the SQL side, posts_published lives inside the metrics JSONB column.
+        sql_posts = (
+            sql_result.metrics.get("posts_published")
+            if sql_result and hasattr(sql_result, "metrics") and sql_result.metrics
+            else None
+        )
+        fs_posts = fs_doc.get("posts_count")  # key set by _to_firestore_doc()
+        if sql_posts != fs_posts:
+            firestore_drift_total.labels(collection=_FIRESTORE_COLLECTION).inc()
+            logger.warning(
+                "shadow_compare: drift detected for agent=%s sql_posts=%s fs_posts=%s",
+                str(hired_agent_id), sql_posts, fs_posts,
+            )
+    except Exception as exc:
+        logger.error("shadow_compare: error — %s", exc)
