@@ -24,7 +24,7 @@ from core.database import get_db_session, get_read_db_session
 from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
 from models.performance_stat import PerformanceStatModel
-from services.performance_stat_router import after_stat_write
+from services.performance_stat_router import after_stat_write, shadow_compare
 
 router = waooaw_router(prefix="/hired-agents", tags=["performance-stats"])
 
@@ -101,6 +101,15 @@ async def get_performance_stats(
     query = query.order_by(PerformanceStatModel.stat_date.desc()).limit(90)
     result = await db.execute(query)
     stats = result.scalars().all()
+    # Fire-and-forget shadow compare in background if DATA_ROUTER_MODE=shadow_read.
+    # SQL is authoritative — Firestore mismatch is logged as a metric, not an error.
+    if stats:
+        try:
+            asyncio.create_task(
+                shadow_compare(uuid.UUID(hired_instance_id), stats[0])
+            )
+        except ValueError:
+            pass  # hired_instance_id is not a valid UUID — skip shadow compare
     return [_to_response(s) for s in stats]
 
 

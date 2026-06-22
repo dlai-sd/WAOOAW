@@ -127,6 +127,10 @@ module "plant_backend" {
     # Campaign persistence mode — "db" enables PostgreSQL via CampaignRepository (PLANT-CONTENT-2).
     # Default "memory" keeps backward compatibility until migration 026 is applied.
     CAMPAIGN_PERSISTENCE_MODE = "memory"
+
+    # INFRA-ROUTING-1: Data routing mode (sql | dual_write | shadow_read | firestore).
+    # Default: sql — operator changes in Cloud Run console or via Terraform to activate routing.
+    DATA_ROUTER_MODE = var.data_router_mode
   }
 
   secrets = merge(

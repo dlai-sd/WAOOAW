@@ -218,6 +218,22 @@ def update_business_metrics(
         agents_available_total.labels(status='offline').set(offline_agents)
 
 
+# ========== INFRA-ROUTING-1: Firestore drift tracking ==========
+firestore_drift_total = Counter(
+    "waooaw_firestore_drift_total",
+    "Number of times Firestore read result differed from SQL result",
+    ["collection"],
+    registry=registry,
+)
+
+firestore_shadow_reads_total = Counter(
+    "waooaw_firestore_shadow_reads_total",
+    "Number of shadow read comparisons performed",
+    ["collection"],
+    registry=registry,
+)
+
+
 def record_dma_lifecycle_event(stage: str, outcome: str) -> None:
     """Record a lifecycle event for the Digital Marketing Agent runtime."""
     dma_lifecycle_events_total.labels(stage=stage, outcome=outcome).inc()
