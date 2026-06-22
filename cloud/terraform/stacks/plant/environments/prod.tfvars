@@ -29,3 +29,7 @@ payments_mode            = "razorpay"
 attach_razorpay_secrets  = true
 razorpay_key_id_secret   = "RAZORPAY_KEY_ID"     # GCP Secret Manager secret name
 razorpay_key_secret_name = "RAZORPAY_KEY_SECRET" # GCP Secret Manager secret name
+
+# INFRA-ROUTING-1: Data routing mode (sql | dual_write | shadow_read | firestore)
+# Default: sql — operator changes in Cloud Run console to activate routing.
+data_router_mode = "sql"

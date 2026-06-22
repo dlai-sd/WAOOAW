@@ -192,3 +192,13 @@ variable "razorpay_key_secret_name" {
   type        = string
   default     = "RAZORPAY_KEY_SECRET"
 }
+
+variable "data_router_mode" {
+  description = "DatastoreRouter mode: sql | dual_write | shadow_read | firestore"
+  type        = string
+  default     = "sql"
+  validation {
+    condition     = contains(["sql", "dual_write", "shadow_read", "firestore"], var.data_router_mode)
+    error_message = "data_router_mode must be one of: sql, dual_write, shadow_read, firestore"
+  }
+}
