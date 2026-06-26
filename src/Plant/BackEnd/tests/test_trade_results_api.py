@@ -45,19 +45,23 @@ def _build_app():
             self._added = []
 
         def add(self, obj):
-            # Assign a real id so refresh can work
+            import uuid
+            from datetime import datetime, timezone
+            # Apply Python-side column defaults that SQLAlchemy would normally
+            # apply during the INSERT flush (not set at object creation time).
             if not obj.id:
-                import uuid
                 obj.id = str(uuid.uuid4())
+            if not getattr(obj, "trade_date", None):
+                obj.trade_date = datetime.now(timezone.utc)
+            if not getattr(obj, "created_at", None):
+                obj.created_at = datetime.now(timezone.utc)
             self._added.append(obj)
 
         async def commit(self):
             pass
 
         async def refresh(self, obj):
-            from datetime import datetime, timezone
-            if not hasattr(obj, "trade_date") or obj.trade_date is None:
-                obj.trade_date = datetime.now(timezone.utc)
+            pass  # defaults already applied in add()
 
         async def execute(self, stmt):
             return MagicMock()
