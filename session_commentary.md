@@ -490,3 +490,28 @@ Implement the Redis creation story from `docs/plant/iterations/PLANT-REDIS-1-man
 ### Recovery hint
 If the session drops, resume on `feat/plant-redis-script-story`, inspect the latest diff for `cloud/scripts/provision-managed-redis.sh`, its test file, and the Redis plan readiness snapshot, then continue from service-wiring stories rather than re-running Redis creation.
 
+
+## [2026-06-26 UTC] TRADER-FULL-1 plan creation
+
+**Task goal:** Create self-sufficient agent-executable plan for Share Trader completion — DB credential store, connectivity validation, trade results, performance review, recommendations, mobile screens.
+
+**Branch:** `docs/trader-full-1-share-trader-complete`
+
+**Confirmed decisions:**
+- Q1: SQL + Firestore dual-write via DatastoreRouter ✅
+- Q2: Rule-based now, pluggable interface for LLM next iteration
+- Q3: Live Delta Exchange validation, ENVIRONMENT=test mock
+- Q4: Agent Context Sheet section (no new tab)
+- Q5: DB from day 1 with dual writes (FileExchangeSetupStore removed)
+
+**Plan file:** `docs/plant/iterations/TRADER-FULL-1-share-trader-complete.md`
+
+**Todos:**
+- [x] Read context + template
+- [x] Create branch docs/trader-full-1-share-trader-complete
+- [x] Write full plan (skeleton + all stories)
+- [ ] Commit plan + session commentary
+- [ ] Push branch
+- [ ] Open PR
+
+**Next save point:** After git commit + push
