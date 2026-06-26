@@ -20,9 +20,19 @@ import { useTheme } from "@/hooks/useTheme";
 import { useHiredAgentById, useDeliverables } from "@/hooks/useHiredAgents";
 import { useApprovalQueue } from "@/hooks/useApprovalQueue";
 import { useAgentVoiceOverlay } from "@/hooks/useAgentVoiceOverlay";
+import { useTradePerformance } from "@/hooks/useTradePerformance";
+import { useRecommendations } from "@/hooks/useRecommendations";
 import { ContentDraftApprovalCard } from "@/components/ContentDraftApprovalCard";
 import { ScheduledPostsSection } from "@/components/ScheduledPostsSection";
 import { VoiceFAB } from "@/components/voice/VoiceFAB";
+import {
+  TradePerformanceCard,
+  TradePerformanceCardLoading,
+} from "@/components/TradePerformanceCard";
+import {
+  RecommendationCard,
+  RecommendationCardLoading,
+} from "@/components/RecommendationCard";
 import apiClient from "@/lib/apiClient";
 import type { MyAgentsStackScreenProps } from "@/navigation/types";
 import { DigitalMarketingBriefStepCard } from "@/components/DigitalMarketingBriefStepCard";
@@ -223,6 +233,8 @@ const SECTIONS = [
   { id: "spend", title: "Trial Usage & Spend", icon: "💰" },
   { id: "recent", title: "Recent Publications", icon: "📤" },
   { id: "history", title: "Performance History", icon: "📈" },
+  { id: "trade-performance", title: "Trade Performance", icon: "📊" },
+  { id: "recommendations", title: "Agent Recommendations", icon: "💡" },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -340,6 +352,16 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
     reject,
   } = useApprovalQueue(hiredAgentId);
   const { data: allDeliverables = [] } = useDeliverables(hiredAgentId);
+
+  // TRADER-FULL-1 It2: Trade performance + recommendations
+  const {
+    data: tradePerformance,
+    loading: tradePerformanceLoading,
+  } = useTradePerformance(hiredAgentId);
+  const {
+    data: recommendations,
+    loading: recommendationsLoading,
+  } = useRecommendations(hiredAgentId);
 
   // Weekly output count — deliverables created since start of current week
   const weeklyCount = React.useMemo(() => {
@@ -1039,9 +1061,57 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
                   </View>
                 )}
 
+                {section.id === "trade-performance" && (
+                  <View>
+                    {tradePerformanceLoading ? (
+                      <TradePerformanceCardLoading />
+                    ) : tradePerformance ? (
+                      <TradePerformanceCard summary={tradePerformance} />
+                    ) : (
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontFamily: typography.fontFamily.body,
+                        }}
+                      >
+                        No trade performance data yet.
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {section.id === "recommendations" && (
+                  <View>
+                    {recommendationsLoading ? (
+                      <RecommendationCardLoading />
+                    ) : recommendations ? (
+                      <RecommendationCard
+                        recommendation={recommendations}
+                        onApply={(_hiredId, thresholds) => {
+                          // TODO: wire to skill config update
+                        }}
+                        onDismiss={() => {
+                          // TODO: dismiss state
+                        }}
+                      />
+                    ) : (
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontFamily: typography.fontFamily.body,
+                        }}
+                      >
+                        No recommendations available yet.
+                      </Text>
+                    )}
+                  </View>
+                )}
+
                 {section.id !== "approvals" &&
                   section.id !== "scheduler" &&
-                  !(section.id === "goals" && isDigitalMarketing) && (
+                  !(section.id === "goals" && isDigitalMarketing) &&
+                  section.id !== "trade-performance" &&
+                  section.id !== "recommendations" && (
                     <Text
                       style={{
                         color: colors.textSecondary,
