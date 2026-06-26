@@ -93,8 +93,10 @@ class RuleBasedRecommendationEngine(RecommendationEngine):
         buy_accuracy = sum(1 for r in buys if r.was_signal_correct) / max(len(buys), 1)
         sell_accuracy = sum(1 for r in sells if r.was_signal_correct) / max(len(sells), 1)
 
-        new_buy = buy_threshold + 5 if buy_accuracy < 0.5 else buy_threshold
-        new_sell = sell_threshold - 5 if sell_accuracy < 0.5 else sell_threshold
+        # Only adjust a threshold when there are actual signals to draw conclusions from.
+        # Without the len() guard, 0 / max(0,1) = 0.0 < 0.5 would falsely trigger adjustments.
+        new_buy = buy_threshold + 5 if len(buys) > 0 and buy_accuracy < 0.5 else buy_threshold
+        new_sell = sell_threshold - 5 if len(sells) > 0 and sell_accuracy < 0.5 else sell_threshold
 
         confidence = min(len(rows) / 20.0, 1.0)
 
