@@ -1,5 +1,5 @@
 ---
-mode: agent
+agent: agent
 description: Create a self-sufficient, agent-executable iteration plan from a product vision
 ---
 
