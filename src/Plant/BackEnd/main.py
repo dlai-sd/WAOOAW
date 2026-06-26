@@ -726,6 +726,7 @@ from api.v1.exchange_credentials import router as exchange_credentials_router  #
 from api.v1.trade_results import router as trade_results_router  # TRADER-FULL-1 S5
 from api.v1.trade_performance import router as trade_performance_router  # TRADER-FULL-1 It2 S1
 from api.v1.recommendations import router as recommendations_router  # TRADER-FULL-1 It2 S3
+from api.v1.trading_setup import router as trading_setup_router  # feat/share-trader-setup-chat
 
 if settings.enable_route_registration_logging:
     logger.info(f"api_v1_router prefix: {api_v1_router.prefix}")
@@ -743,6 +744,7 @@ app.include_router(exchange_credentials_router, prefix="/api/v1")  # TRADER-FULL
 app.include_router(trade_results_router, prefix="/api/v1")  # TRADER-FULL-1 S5
 app.include_router(trade_performance_router, prefix="/api/v1")  # TRADER-FULL-1 It2 S1
 app.include_router(recommendations_router, prefix="/api/v1")  # TRADER-FULL-1 It2 S3
+app.include_router(trading_setup_router, prefix="/api/v1")  # feat/share-trader-setup-chat
 
 if settings.enable_route_registration_logging:
     logger.info("api_v1_router mounted to app")

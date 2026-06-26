@@ -26,7 +26,7 @@ import { HomeScreen } from "../screens/home/HomeScreen";
 import { DiscoverScreen } from "../screens/discover/DiscoverScreen";
 import { AgentDetailScreen } from "../screens/discover/AgentDetailScreen";
 import { HireWizardScreen } from "../screens/hire/HireWizardScreen";
-import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen, InboxScreen, ContentAnalyticsScreen, PlatformConnectionsScreen, DMAConversationScreen, ScheduledPostsScreen, DeliverableDetailScreen } from "../screens/agents";
+import { MyAgentsScreen, TrialDashboardScreen, ActiveTrialsListScreen, HiredAgentsListScreen, AgentOperationsScreen, InboxScreen, ContentAnalyticsScreen, PlatformConnectionsScreen, DMAConversationScreen, TradingSetupScreen, ScheduledPostsScreen, DeliverableDetailScreen } from "../screens/agents";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
 import { SettingsScreen, NotificationsScreen, HelpCenterScreen, PrivacyPolicyScreen, TermsOfServiceScreen, PaymentMethodsScreen, SubscriptionManagementScreen, UsageBillingScreen } from "../screens/profile";
@@ -104,6 +104,7 @@ const MyAgentsNavigator = () => {
       <MyAgentsStack.Screen name="ContentAnalytics" component={ContentAnalyticsScreen} />
       <MyAgentsStack.Screen name="PlatformConnections" component={PlatformConnectionsScreen} />
       <MyAgentsStack.Screen name="DMAConversation" component={DMAConversationScreen} />
+      <MyAgentsStack.Screen name="TradingSetup" component={TradingSetupScreen} />
       <MyAgentsStack.Screen name="ScheduledPosts" component={ScheduledPostsScreen} />
       <MyAgentsStack.Screen name="DeliverableDetail" component={DeliverableDetailScreen} />
     </MyAgentsStack.Navigator>

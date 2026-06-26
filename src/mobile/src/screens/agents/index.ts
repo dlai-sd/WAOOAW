@@ -11,5 +11,6 @@ export { InboxScreen } from './InboxScreen';
 export { ContentAnalyticsScreen } from './ContentAnalyticsScreen';
 export { PlatformConnectionsScreen } from './PlatformConnectionsScreen';
 export { DMAConversationScreen } from './DMAConversationScreen';
+export { TradingSetupScreen } from './TradingSetupScreen';
 export { ScheduledPostsScreen } from './ScheduledPostsScreen';
 export { DeliverableDetailScreen } from './DeliverableDetailScreen';
