@@ -34,6 +34,8 @@ _ROUTABLE_COLLECTIONS = frozenset(
     {
         "agent_performance",   # PerformanceStat model → performance_stats table
         "agent_availability",  # HiredAgent status column (read-only Firestore path)
+        "exchange_credentials",   # TRADER-FULL-1 S2
+        "trade_results",          # TRADER-FULL-1 S5
     }
 )
 
