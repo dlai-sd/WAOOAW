@@ -145,6 +145,10 @@ app.include_router(cp_exchange_credentials_router, prefix="/api")
 from api.cp_trading_performance import router as cp_trading_performance_router  # noqa: E402
 app.include_router(cp_trading_performance_router, prefix="/api")
 
+# feat/share-trader-setup-chat: Trading setup chat proxy
+from api.cp_trading_setup import router as cp_trading_setup_router  # noqa: E402
+app.include_router(cp_trading_setup_router, prefix="/api")
+
 # EXEC-ENGINE-001 It-6 E14-S2: Flow-run + component-run proxy routes
 from api.cp_flow_runs import router as cp_flow_runs_router  # noqa: E402
 app.include_router(cp_flow_runs_router, prefix="/api")

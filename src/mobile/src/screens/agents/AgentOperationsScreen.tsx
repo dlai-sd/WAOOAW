@@ -200,6 +200,16 @@ function isDigitalMarketingAgent(
   );
 }
 
+function isShareTraderAgent(
+  agentId?: string | null,
+  agentTypeId?: string | null,
+): boolean {
+  return (
+    String(agentId || "").trim() === "AGT-TRD-001" ||
+    String(agentTypeId || "").trim() === "trading.share_trader.v1"
+  );
+}
+
 function normalizeSkillsPayload(data: unknown): AgentSkill[] {
   if (Array.isArray(data)) return data as AgentSkill[];
   if (Array.isArray((data as { skills?: unknown[] } | null)?.skills)) {
@@ -403,6 +413,11 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
   const [currentBriefStepIndex, setCurrentBriefStepIndex] = useState(0);
 
   const isDigitalMarketing = isDigitalMarketingAgent(
+    agent?.agent_id,
+    agent?.agent_type_id,
+  );
+
+  const isShareTrader = isShareTraderAgent(
     agent?.agent_id,
     agent?.agent_type_id,
   );
@@ -1063,6 +1078,33 @@ export const AgentOperationsScreen = ({ navigation, route }: Props) => {
 
                 {section.id === "trade-performance" && (
                   <View>
+                    {/* Configure Trading button — always visible for Share Trader agents */}
+                    {isShareTrader && (
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          {
+                            backgroundColor: colors.neonCyan + "22",
+                            marginBottom: 12,
+                          },
+                        ]}
+                        onPress={() =>
+                          navigation.navigate("TradingSetup", { hiredAgentId })
+                        }
+                        testID="configure-trading-btn"
+                        accessibilityLabel="Configure Trading"
+                      >
+                        <Text
+                          style={{
+                            color: colors.neonCyan,
+                            fontSize: 14,
+                            fontWeight: "600",
+                          }}
+                        >
+                          ⚙️ Configure Trading
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                     {tradePerformanceLoading ? (
                       <TradePerformanceCardLoading />
                     ) : tradePerformance ? (
