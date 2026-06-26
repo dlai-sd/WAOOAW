@@ -123,6 +123,13 @@ class Settings(BaseSettings):
         description="Routing policy: sql | dual_write | shadow_read | firestore",
     )
 
+    # Share Trader — recommendation engine selector (TRADER-FULL-1 It2 S2)
+    recommendation_engine: str = Field(
+        default="rule_based",
+        validation_alias=AliasChoices("RECOMMENDATION_ENGINE", "recommendation_engine"),
+        description="Recommendation engine: rule_based | llm",
+    )
+
     @field_validator("data_router_mode", mode="before")
     @classmethod
     def validate_router_mode(cls, v: object) -> str:
