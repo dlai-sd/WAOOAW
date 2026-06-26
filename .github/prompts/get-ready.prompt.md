@@ -1,5 +1,5 @@
 ---
-mode: agent
+agent: agent
 description: Bootstrap agent with full WAOOAW platform context before starting any task
 ---
 
