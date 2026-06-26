@@ -724,6 +724,8 @@ from api.v1.brand_voice import router as brand_voice_router
 from api.v1.content_analytics import router as content_analytics_router
 from api.v1.exchange_credentials import router as exchange_credentials_router  # TRADER-FULL-1 S2
 from api.v1.trade_results import router as trade_results_router  # TRADER-FULL-1 S5
+from api.v1.trade_performance import router as trade_performance_router  # TRADER-FULL-1 It2 S1
+from api.v1.recommendations import router as recommendations_router  # TRADER-FULL-1 It2 S3
 
 if settings.enable_route_registration_logging:
     logger.info(f"api_v1_router prefix: {api_v1_router.prefix}")
@@ -739,6 +741,8 @@ app.include_router(content_analytics_router, prefix="/api/v1")
 app.include_router(brand_voice_router, prefix="/api/v1")
 app.include_router(exchange_credentials_router, prefix="/api/v1")  # TRADER-FULL-1 S2
 app.include_router(trade_results_router, prefix="/api/v1")  # TRADER-FULL-1 S5
+app.include_router(trade_performance_router, prefix="/api/v1")  # TRADER-FULL-1 It2 S1
+app.include_router(recommendations_router, prefix="/api/v1")  # TRADER-FULL-1 It2 S3
 
 if settings.enable_route_registration_logging:
     logger.info("api_v1_router mounted to app")

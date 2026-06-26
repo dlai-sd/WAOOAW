@@ -97,6 +97,14 @@ jest.mock('@/components/ScheduledPostsSection', () => ({
   ScheduledPostsSection: () => null,
 }));
 
+jest.mock('@/hooks/useTradePerformance', () => ({
+  useTradePerformance: jest.fn(() => ({ data: null, loading: false, error: null })),
+}));
+
+jest.mock('@/hooks/useRecommendations', () => ({
+  useRecommendations: jest.fn(() => ({ data: null, loading: false, error: null })),
+}));
+
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 const mockRoute = {
