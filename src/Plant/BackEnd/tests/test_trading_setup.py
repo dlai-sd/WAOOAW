@@ -232,3 +232,47 @@ class TestIsShareTraderAgent:
     def test_agent_type_id_match(self):
         agent_type = "trading.share_trader.v1"
         assert agent_type == "trading.share_trader.v1"
+
+
+class TestSanitizeCollected:
+    """ST-MVP-1 S3 — encrypted blobs must not appear in API responses."""
+
+    def test_strips_encrypted_api_key(self):
+        from api.v1.trading_setup import _sanitize_collected
+        collected = {
+            "encrypted_api_key": "AQID...",
+            "encrypted_api_secret": "BQID...",
+            "default_coin": "BTC",
+            "credential_ref": "EXCH-abc",
+        }
+        safe = _sanitize_collected(collected)
+        assert "encrypted_api_key" not in safe
+        assert "encrypted_api_secret" not in safe
+        assert safe["default_coin"] == "BTC"
+        assert safe["credential_ref"] == "EXCH-abc"
+
+    def test_empty_collected_no_error(self):
+        from api.v1.trading_setup import _sanitize_collected
+        assert _sanitize_collected({}) == {}
+
+    def test_has_credentials_true_with_credential_ref(self):
+        """S3 T2 — readiness.has_credentials is True when credential_ref is stored."""
+        from api.v1.trading_setup import _readiness, TradingSetupState
+        state = TradingSetupState(
+            step="risk_limits",
+            validation_status="valid",
+            collected={"credential_ref": "EXCH-xyz"},
+        )
+        r = _readiness(state)
+        assert r["has_credentials"] is True
+
+    def test_has_credentials_true_with_encrypted_blob(self):
+        """has_credentials still True when blob is present (mid-wizard state)."""
+        from api.v1.trading_setup import _readiness, TradingSetupState
+        state = TradingSetupState(
+            step="api_secret",
+            validation_status="pending",
+            collected={"encrypted_api_key": "AQID..."},
+        )
+        r = _readiness(state)
+        assert r["has_credentials"] is True

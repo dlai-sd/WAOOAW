@@ -25,7 +25,8 @@ router = waooaw_router(prefix="/cp/exchange-credentials", tags=["cp-exchange-cre
 
 
 def _customer_id(user: User) -> str:
-    return f"CUST-{user.id}"
+    """Return canonical customer_id — plain UUID string, no prefix."""
+    return str(user.id)
 
 
 def _plant_client() -> PlantGatewayClient:

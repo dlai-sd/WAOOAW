@@ -179,12 +179,27 @@ def _readiness(state: TradingSetupState) -> dict[str, Any]:
     return {
         "configured": state.configured,
         "step": state.step,
-        "has_credentials": bool(collected.get("encrypted_api_key")),
+        "has_credentials": bool(
+            collected.get("credential_ref") or collected.get("encrypted_api_key")
+        ),
         "credentials_valid": state.validation_status == "valid",
         "has_instrument": bool(collected.get("default_coin")),
         "has_rsi_period": "rsi_period" in collected,
         "has_risk_limits": bool(collected.get("max_units_per_order")),
     }
+
+
+# ── Sensitive key filter ─────────────────────────────────────────────────────
+
+_SENSITIVE_COLLECTED_KEYS = frozenset({
+    "encrypted_api_key",
+    "encrypted_api_secret",
+})
+
+
+def _sanitize_collected(collected: dict) -> dict:
+    """Strip encrypted credential blobs from the collected dict before API response."""
+    return {k: v for k, v in collected.items() if k not in _SENSITIVE_COLLECTED_KEYS}
 
 
 def _mask_content(content: str) -> str:
@@ -378,9 +393,10 @@ async def get_trading_setup(
     state = _state_from_config(record.config)
     if state.step == "welcome" and not state.messages:
         state.messages = [_assistant_msg(_ASSISTANT_INTRO["welcome"])]
+    safe_state = state.model_copy(update={"collected": _sanitize_collected(state.collected)})
     return TradingSetupResponse(
         hired_instance_id=hired_instance_id,
-        state=state,
+        state=safe_state,
         readiness=_readiness(state),
     )
 
@@ -425,8 +441,9 @@ async def send_trading_setup_message(
     )
     await db.commit()
 
+    safe_state = state.model_copy(update={"collected": _sanitize_collected(state.collected)})
     return TradingSetupResponse(
         hired_instance_id=hired_instance_id,
-        state=state,
+        state=safe_state,
         readiness=_readiness(state),
     )

@@ -25,7 +25,8 @@ from services.exchange_setup import (
 router = waooaw_router(prefix="/cp/exchange-setup", tags=["cp-exchange-setup"])
 
 def _customer_id_from_user(user: User) -> str:
-    return f"CUST-{user.id}"
+    """Return canonical customer_id — plain UUID string, no prefix."""
+    return str(user.id)
 
 def _normalize_coin(value: str) -> str:
     return str(value or "").strip().upper()
