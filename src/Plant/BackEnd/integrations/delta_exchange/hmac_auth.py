@@ -22,9 +22,22 @@ import hmac
 import time
 from typing import Dict
 
-# Public base URL for Delta Exchange (international).
-# India-specific traffic also routes through this endpoint.
-DELTA_EXCHANGE_BASE_URL = "https://api.delta.exchange"
+# Public base URLs for Delta Exchange.
+# These are SEPARATE platforms with separate accounts — a key from one
+# will NOT work on the other.
+DELTA_EXCHANGE_BASE_URL = "https://api.delta.exchange"          # International (crypto futures)
+DELTA_EXCHANGE_INDIA_BASE_URL = "https://api.india.delta.exchange"  # India platform
+
+# Provider-string → base URL mapping.  Add new providers here as needed.
+PROVIDER_BASE_URL: dict[str, str] = {
+    "delta_exchange_india": DELTA_EXCHANGE_INDIA_BASE_URL,
+    "delta_exchange": DELTA_EXCHANGE_BASE_URL,
+}
+
+
+def base_url_for_provider(exchange_provider: str) -> str:
+    """Return the correct base URL for a given exchange_provider string."""
+    return PROVIDER_BASE_URL.get(exchange_provider, DELTA_EXCHANGE_INDIA_BASE_URL)
 
 
 def build_auth_headers(

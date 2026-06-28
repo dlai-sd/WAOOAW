@@ -163,17 +163,17 @@ async def validate_exchange_credential(
 
 @circuit_breaker(service="delta_exchange_api")
 async def _validate_exchange_live(
-    *, api_key: str, api_secret: str
+    *, api_key: str, api_secret: str, exchange_provider: str = "delta_exchange_india"
 ) -> tuple[bool, bool, dict, Optional[str]]:
     """Live Delta Exchange credential check. Returns (readable, tradeable, balance_summary, error).
 
-    Mock is active in test/development/local environments unless
-    DELTA_EXCHANGE_REAL_API=true is set (Codespace/demo opt-in).
+    Mock is active in test/development/local unless DELTA_EXCHANGE_REAL_API=true.
 
-    In real mode: two HMAC-signed calls are made —
-      1. GET /v2/wallet/balances  — confirms read access (api_key is valid)
-      2. GET /v2/profile          — confirms the key is active and retrievable
-    api_key and api_secret are NEVER logged.
+    IMPORTANT — provider-specific base URL:
+      delta_exchange_india  → https://api.india.delta.exchange
+      delta_exchange        → https://api.delta.exchange
+    These are SEPARATE platforms with separate accounts. India keys will return
+    401 invalid_api_key on the international URL and vice versa.
     """
     import os
     env = settings.environment
@@ -182,24 +182,27 @@ async def _validate_exchange_live(
     if env in mock_envs and not force_real:
         return True, True, {"mock": True, "available_balance": 100000}, None
 
-    from integrations.delta_exchange.hmac_auth import build_auth_headers, DELTA_EXCHANGE_BASE_URL
-
+    from integrations.delta_exchange.hmac_auth import build_auth_headers, base_url_for_provider
+    base = base_url_for_provider(exchange_provider)
     balances_path = "/v2/wallet/balances"
     profile_path = "/v2/profile"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # Step 1 — verify read access via wallet balances (HMAC signed)
+            # Step 1 — verify read access (HMAC signed)
             balances_resp = await client.get(
-                f"{DELTA_EXCHANGE_BASE_URL}{balances_path}",
+                f"{base}{balances_path}",
                 headers=build_auth_headers(
-                    api_key=api_key,
-                    api_secret=api_secret,
-                    method="GET",
-                    path=balances_path,
+                    api_key=api_key, api_secret=api_secret,
+                    method="GET", path=balances_path,
                 ),
             )
             if balances_resp.status_code == 401:
-                return False, False, {}, "Invalid API key or secret"
+                err_code = balances_resp.json().get("error", {}).get("code", "unknown")
+                logger.error("validate_exchange: 401 from %s error_code=%s", base, err_code)
+                return False, False, {}, (
+                    f"Invalid credentials (code={err_code}). "
+                    f"Ensure your key belongs to {exchange_provider} (→ {base})."
+                )
             if balances_resp.status_code == 403:
                 return False, False, {}, "API key lacks read permission"
             balances_resp.raise_for_status()
@@ -207,19 +210,14 @@ async def _validate_exchange_live(
 
             # Step 2 — verify the key is active
             profile_resp = await client.get(
-                f"{DELTA_EXCHANGE_BASE_URL}{profile_path}",
+                f"{base}{profile_path}",
                 headers=build_auth_headers(
-                    api_key=api_key,
-                    api_secret=api_secret,
-                    method="GET",
-                    path=profile_path,
+                    api_key=api_key, api_secret=api_secret,
+                    method="GET", path=profile_path,
                 ),
             )
             tradeable = profile_resp.status_code == 200
-
             return True, tradeable, {"balances_count": len(balances)}, None
     except Exception as exc:
-        logger.error(
-            "validate_exchange: check failed — %s", type(exc).__name__
-        )  # no key in log
+        logger.error("validate_exchange: check failed — %s", type(exc).__name__)
         return False, False, {}, str(type(exc).__name__)

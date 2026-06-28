@@ -63,9 +63,12 @@ async def _validate_instrument_live(instrument: str) -> bool:
     force_real = os.environ.get("DELTA_EXCHANGE_REAL_API", "").lower() == "true"
     if env in mock_envs and not force_real:
         return True  # mock: avoids network calls in dev/test
+    # Use Delta Exchange India URL — instruments endpoint is public (no HMAC needed).
+    from integrations.delta_exchange.hmac_auth import base_url_for_provider
+    base = base_url_for_provider("delta_exchange_india")
     async with httpx.AsyncClient(timeout=5.0) as client:
         resp = await client.get(
-            "https://api.delta.exchange/v2/products",
+            f"{base}/v2/products",
             params={"page_size": 100},
         )
         resp.raise_for_status()
@@ -330,8 +333,10 @@ async def _process_step(
             # Auto-advance to validation immediately
             api_key = _decrypt(collected["encrypted_api_key"])
             api_secret = _decrypt(collected["encrypted_api_secret"])
+            # Always use delta_exchange_india — the only supported provider in the wizard.
             readable, tradeable, _, error = await _validate_exchange_live(
-                api_key=api_key, api_secret=api_secret
+                api_key=api_key, api_secret=api_secret,
+                exchange_provider="delta_exchange_india",
             )
             if readable:
                 state.validation_status = "valid"
