@@ -91,3 +91,29 @@ def render_sms_for_event(event: NotificationEventRecord) -> RenderedSms | None:
         return RenderedSms(message=msg, template_version=TEMPLATE_VERSION)
 
     return None
+
+
+# ── Trade execution SMS template (ST-MVP-1 S9) ──────────────────────────────
+
+TRADE_EXECUTED_SMS = (
+    "WAOOAW Trade: {direction} {units} {instrument} @ {price}. "
+    "Stop-loss: {stop_loss}. Check app for full details."
+)
+
+
+def render_trade_executed_sms(
+    instrument: str,
+    direction: str,
+    units: str,
+    price: str,
+    stop_loss: str = "N/A",
+) -> RenderedSms:
+    """Render the trade_executed SMS template."""
+    msg = TRADE_EXECUTED_SMS.format(
+        instrument=instrument,
+        direction=direction,
+        units=units,
+        price=price,
+        stop_loss=stop_loss,
+    )
+    return RenderedSms(message=msg, template_version=TEMPLATE_VERSION)

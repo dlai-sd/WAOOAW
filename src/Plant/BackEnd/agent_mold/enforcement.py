@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from agent_mold.hooks import ApprovalRequiredHook, HookBus, HookStage
+from agent_mold.hooks import ApprovalRequiredHook, AutonomousModeHook, HookBus, HookStage
 from agent_mold.hooks_builtin import CredentialExpiryHook
 
 
@@ -22,4 +22,5 @@ def default_hook_bus() -> HookBus:
     bus = HookBus()
     bus.register(HookStage.PRE_TOOL_USE, ApprovalRequiredHook())
     bus.register(HookStage.PRE_PUMP, CredentialExpiryHook())
+    bus.register(HookStage.PRE_PUBLISH, AutonomousModeHook())
     return bus
