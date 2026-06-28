@@ -34,6 +34,8 @@ class TradingOrderIntent(BaseModel):
     action: str = Field(..., min_length=1)  # enter|exit
     order_type: str = Field(..., min_length=1)  # market|limit
     limit_price: Optional[float] = Field(default=None, gt=0)
+    stop_loss_price: Optional[float] = Field(default=None, gt=0)   # ST-MVP-1 S8
+    take_profit_price: Optional[float] = Field(default=None, gt=0)  # ST-MVP-1 S8
 
 
 class TradingExecutionResult(BaseModel):
@@ -59,6 +61,30 @@ class TradingExecutionContext:
     approval_id: Optional[str] = None
 
 
+def _compute_sl_tp(
+    goal_config: dict,
+    last_close: Optional[float],
+    side: str,
+) -> "tuple[Optional[float], Optional[float]]":
+    """Compute stop-loss and take-profit prices from goal_config and last close price.
+
+    Returns:
+        (stop_loss_price, take_profit_price) — either may be None if not configured.
+    """
+    if last_close is None:
+        return None, None
+    cfg = goal_config.get("customer_fields", {})
+    sl_pct = cfg.get("stop_loss_pct")
+    tp_pct = cfg.get("profit_target_pct")
+    if side == "long":
+        sl = round(last_close * (1 - sl_pct / 100), 4) if sl_pct else None
+        tp = round(last_close * (1 + tp_pct / 100), 4) if tp_pct else None
+    else:  # short
+        sl = round(last_close * (1 + sl_pct / 100), 4) if sl_pct else None
+        tp = round(last_close * (1 - tp_pct / 100), 4) if tp_pct else None
+    return sl, tp
+
+
 def execute_trading_delta_futures_manual_v1(
     playbook: SkillPlaybook,
     *,
@@ -72,6 +98,8 @@ def execute_trading_delta_futures_manual_v1(
     limit_price: Optional[float],
     ctx: TradingExecutionContext,
     delta_client: Optional[DeltaClient] = None,
+    goal_config: Optional[Dict[str, Any]] = None,
+    last_close: Optional[float] = None,
 ) -> TradingExecutionResult:
     coin_norm = coin.strip().upper()
     side_norm = side.strip().lower()
@@ -89,6 +117,9 @@ def execute_trading_delta_futures_manual_v1(
         if float(limit_price) <= 0:
             raise ValueError("limit_price must be > 0")
 
+    # Compute stop-loss and take-profit prices
+    sl_price, tp_price = _compute_sl_tp(goal_config or {}, last_close, side_norm)
+
     intent = TradingOrderIntent(
         exchange_provider=exchange_provider,
         exchange_account_id=exchange_account_id,
@@ -98,6 +129,8 @@ def execute_trading_delta_futures_manual_v1(
         action=action_norm,
         order_type=order_type,
         limit_price=None if market else float(limit_price),
+        stop_loss_price=sl_price,
+        take_profit_price=tp_price,
     )
 
     # Draft-only by default.
@@ -109,7 +142,11 @@ def execute_trading_delta_futures_manual_v1(
             intent=intent,
             executed=False,
             execution=None,
-            debug={"mode": "draft"},
+            debug={
+                "mode": "draft",
+                "stop_loss_price": sl_price,
+                "take_profit_price": tp_price,
+            },
         )
 
     if delta_client is None:
@@ -131,7 +168,12 @@ def execute_trading_delta_futures_manual_v1(
         intent=intent,
         executed=True,
         execution=execution,
-        debug={"mode": "executed", "intent_action": ctx.intent_action},
+        debug={
+            "mode": "executed",
+            "intent_action": ctx.intent_action,
+            "stop_loss_price": sl_price,
+            "take_profit_price": tp_price,
+        },
     )
 
 

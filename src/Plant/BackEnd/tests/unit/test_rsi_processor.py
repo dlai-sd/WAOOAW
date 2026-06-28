@@ -1,10 +1,13 @@
-"""Unit tests for RSIProcessor component (EXEC-ENGINE-001 E5-S2).
+"""Unit tests for RSIProcessor component (EXEC-ENGINE-001 E5-S2 + ST-MVP-1 S7).
 
 Tests:
   E5-S2-T1: Candles producing RSI < 30 → signal="BUY"
   E5-S2-T2: Candles producing RSI > 70 → signal="SELL"
   E5-S2-T3: Candles producing 30 ≤ RSI ≤ 70 → signal="HOLD"
   E5-S2-T4: Empty candles list → success=False, error_message="Insufficient data"
+  ST-S7-T1: Wilder's RSI with 20 known closes matches expected value ± 0.1
+  ST-S7-T2: BUY signal suppressed to HOLD when open_positions has a long
+  ST-S7-T3: SELL signal suppressed to HOLD when open_positions has a short
 """
 from __future__ import annotations
 
@@ -15,13 +18,17 @@ import pytest
 from components import ComponentInput, get_component
 
 
-def _make_input(candles: list[dict], rsi_period: int = 14) -> ComponentInput:
+def _make_input(
+    candles: list[dict],
+    rsi_period: int = 14,
+    open_positions: list[dict] | None = None,
+) -> ComponentInput:
     return ComponentInput(
         flow_run_id="fr-rsi-001",
         customer_id="cust-001",
         skill_config={"customer_fields": {"rsi_period": rsi_period}},
         run_context={},
-        previous_step_output={"candles": candles},
+        previous_step_output={"candles": candles, "open_positions": open_positions or []},
     )
 
 
@@ -103,3 +110,83 @@ def test_rsi_registered_after_import():
     """RSIProcessor is in the registry after module import."""
     comp = get_component("RSIProcessor")
     assert comp.component_type == "RSIProcessor"
+
+
+@pytest.mark.unit
+def test_wilder_rsi_known_value():
+    """ST-S7-T1: Wilder's RSI with 20 known closes matches expected output ± 0.1.
+
+    Using a simple all-rising sequence of 20 candles with period=14:
+    All gains, no losses → RSI should be 100.0.
+    """
+    from rsi_processor import RSIProcessor
+    proc = RSIProcessor()
+    # 20 strictly rising candles: all gains, 0 losses → RSI = 100
+    candles = [{"close": 100.0 + i} for i in range(20)]
+    rsi = proc._calculate_rsi_wilder(candles, period=14)
+    assert abs(rsi - 100.0) < 0.1, f"Expected RSI≈100 for all-rising, got {rsi}"
+
+
+@pytest.mark.unit
+def test_wilder_rsi_all_declining():
+    """Wilder's RSI with all-declining candles → RSI close to 0."""
+    from rsi_processor import RSIProcessor
+    proc = RSIProcessor()
+    candles = [{"close": 200.0 - i} for i in range(20)]
+    rsi = proc._calculate_rsi_wilder(candles, period=14)
+    assert rsi < 10.0, f"Expected RSI close to 0 for all-declining, got {rsi}"
+
+
+@pytest.mark.unit
+def test_wilder_rsi_insufficient_data():
+    """Wilder's RSI returns 50.0 when candles < period+1."""
+    from rsi_processor import RSIProcessor
+    proc = RSIProcessor()
+    candles = [{"close": 100.0 + i} for i in range(5)]
+    rsi = proc._calculate_rsi_wilder(candles, period=14)
+    assert rsi == 50.0
+
+
+@pytest.mark.unit
+def test_position_guard_buy_suppressed():
+    """ST-S7-T2: BUY signal suppressed to HOLD when open_positions has a long."""
+    from rsi_processor import RSIProcessor
+    proc = RSIProcessor()
+    # Declining candles → BUY signal without guard
+    candles = _declining_candles(20)
+    open_positions = [{"side": "long", "product_symbol": "BTC"}]
+    inp = _make_input(candles, rsi_period=14, open_positions=open_positions)
+    result = asyncio.run(proc.execute(inp))
+    assert result.success is True
+    assert result.data["signal"] == "HOLD", (
+        f"Expected HOLD (long already open), got {result.data['signal']}"
+    )
+
+
+@pytest.mark.unit
+def test_position_guard_sell_suppressed():
+    """ST-S7-T3: SELL signal suppressed to HOLD when open_positions has a short."""
+    from rsi_processor import RSIProcessor
+    proc = RSIProcessor()
+    # Rising candles → SELL signal without guard
+    candles = _rising_candles(20)
+    open_positions = [{"side": "short", "product_symbol": "BTC"}]
+    inp = _make_input(candles, rsi_period=14, open_positions=open_positions)
+    result = asyncio.run(proc.execute(inp))
+    assert result.success is True
+    assert result.data["signal"] == "HOLD", (
+        f"Expected HOLD (short already open), got {result.data['signal']}"
+    )
+
+
+@pytest.mark.unit
+def test_position_guard_no_suppression_when_empty():
+    """No position guard when open_positions is empty — signal fires normally."""
+    from rsi_processor import RSIProcessor
+    proc = RSIProcessor()
+    candles = _declining_candles(20)
+    inp = _make_input(candles, rsi_period=14, open_positions=[])
+    result = asyncio.run(proc.execute(inp))
+    assert result.success is True
+    assert result.data["signal"] == "BUY"
+

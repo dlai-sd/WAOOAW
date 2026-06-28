@@ -187,3 +187,49 @@ def test_pump_registered_after_import():
     """E5-S1-T3: get_component("DeltaExchangePump") succeeds after module import."""
     comp = get_component("DeltaExchangePump")
     assert comp.component_type == "DeltaExchangePump"
+
+
+@pytest.mark.unit
+def test_pump_fetch_open_positions_test_env():
+    """ST-S7-T3: _fetch_open_positions returns [] in test environment (no network call)."""
+    from delta_exchange_pump import DeltaExchangePump
+
+    pump = DeltaExchangePump()
+    # In test environment, settings.environment is "test" or similar — should return []
+    result = asyncio.run(pump._fetch_open_positions("BTC", "fake-api-key"))
+    assert result == [], f"Expected [] in test env, got {result}"
+
+
+@pytest.mark.unit
+def test_pump_execute_output_includes_open_positions():
+    """DeltaExchangePump.execute() output includes 'open_positions' key."""
+    from delta_exchange_pump import DeltaExchangePump
+
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"result": [{"close": 100.0}]}
+    mock_response.raise_for_status = MagicMock()
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_response)
+
+    mock_secrets = {"api_key": "test-key", "api_secret": "test-secret"}
+    mock_svc = AsyncMock()
+    mock_svc.get_secrets = AsyncMock(return_value=mock_secrets)
+
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=MagicMock())
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    pump = DeltaExchangePump()
+
+    with patch("delta_exchange_pump.httpx.AsyncClient", return_value=mock_client), \
+         patch("delta_exchange_pump._connector") as mock_connector, \
+         patch("delta_exchange_pump.ExchangeCredentialService", return_value=mock_svc):
+        mock_connector.get_session.return_value = mock_session_cm
+        result = asyncio.run(pump.execute(_make_input()))
+
+    assert result.success is True
+    assert "open_positions" in result.data
+    assert isinstance(result.data["open_positions"], list)

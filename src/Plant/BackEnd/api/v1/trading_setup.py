@@ -35,6 +35,7 @@ from services.exchange_credential_service import (
     _encrypt,
     _decrypt,
 )
+from services.scheduler_persistence_service import SchedulerPersistenceService
 
 logger = logging.getLogger(__name__)
 logger.addFilter(PiiMaskingFilter())
@@ -544,6 +545,40 @@ async def get_trading_setup(
     )
 
 
+# ── Emergency stop ──────────────────────────────────────────────────────────
+
+@router.post("/{hired_instance_id}/emergency-stop", response_model=dict)
+async def emergency_stop_trading(
+    hired_instance_id: str,
+    db=Depends(get_db_session),
+) -> dict:
+    """Pause scheduler and record emergency halt timestamp (ST-MVP-1 S10).
+
+    Sets hired_agent.config["emergency_stopped_at"] and cancels all pending
+    scheduled runs for the agent.  Returns within 60 seconds.
+    """
+    repo = HiredAgentRepository(db)
+    agent = await repo.get_by_id(hired_instance_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Hired agent not found")
+
+    stopped_at = datetime.now(timezone.utc).isoformat()
+
+    # Cancel pending scheduled runs
+    await SchedulerPersistenceService(db).pause(hired_instance_id)
+
+    # Record halt timestamp in config
+    config = dict(agent.config or {})
+    scheduler_state = dict(config.get("scheduler_state", {}))
+    scheduler_state["is_paused"] = True
+    config["scheduler_state"] = scheduler_state
+    config["emergency_stopped_at"] = stopped_at
+    agent.config = config  # keep the in-memory object in sync (also makes tests verifiable)
+    await repo.update_config(hired_instance_id, config=config)
+    await db.commit()
+
+    logger.info("emergency_stop: agent %s halted at %s", hired_instance_id, stopped_at)
+    return {"status": "stopped", "hired_agent_id": hired_instance_id, "stopped_at": stopped_at}
 @router.post("/{hired_instance_id}/trading-setup/message",
              response_model=TradingSetupResponse)
 async def send_trading_setup_message(

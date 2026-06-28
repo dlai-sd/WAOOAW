@@ -362,3 +362,26 @@ class SchedulerPersistenceService:
         )
         
         return deleted_count
+
+    async def pause(self, hired_instance_id: str) -> None:
+        """Emergency-pause all pending scheduled runs for the given hired agent.
+
+        Cancels any pending scheduled runs and logs the halt.  This is called
+        by the emergency-stop endpoint (ST-MVP-1 S10) to halt the scheduler
+        within ≤ 60 seconds of the customer tapping the panic button on mobile.
+
+        Args:
+            hired_instance_id: The hired agent instance to pause.
+        """
+        pending = self.scheduled_run_repo.get_pending_runs()
+        cancelled_count = 0
+        for run in pending:
+            if run.hired_instance_id == hired_instance_id:
+                run.mark_cancelled()
+                self.scheduled_run_repo.update(run)
+                cancelled_count += 1
+        logger.warning(
+            "scheduler_pause: cancelled %d pending run(s) for hired_instance_id=%s",
+            cancelled_count,
+            hired_instance_id,
+        )

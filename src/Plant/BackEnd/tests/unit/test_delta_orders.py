@@ -332,3 +332,89 @@ class TestDeltaOrderService:
         
         assert result.success is False
         assert result.error_code == "RATE_LIMIT"
+
+
+# ── ST-MVP-1 S8: Stop-loss and take-profit computation ───────────────────────
+
+class TestComputeSlTp:
+    """Tests for _compute_sl_tp helper in trading_executor."""
+
+    def test_long_entry_with_sl_pct(self):
+        """ST-S8-T1: Long entry with stop_loss_pct=2.5, last_close=100 → stop_loss_price=97.5."""
+        from agent_mold.skills.trading_executor import _compute_sl_tp
+
+        goal_config = {"customer_fields": {"stop_loss_pct": 2.5}}
+        sl, tp = _compute_sl_tp(goal_config, last_close=100.0, side="long")
+        assert sl == 97.5, f"Expected 97.5, got {sl}"
+        assert tp is None
+
+    def test_long_entry_with_tp_pct(self):
+        """Long entry with profit_target_pct=5.0, last_close=100 → take_profit_price=105.0."""
+        from agent_mold.skills.trading_executor import _compute_sl_tp
+
+        goal_config = {"customer_fields": {"profit_target_pct": 5.0}}
+        sl, tp = _compute_sl_tp(goal_config, last_close=100.0, side="long")
+        assert sl is None
+        assert tp == 105.0, f"Expected 105.0, got {tp}"
+
+    def test_missing_sl_pct_returns_none(self):
+        """ST-S8-T2: Missing stop_loss_pct → stop_loss_price=None."""
+        from agent_mold.skills.trading_executor import _compute_sl_tp
+
+        goal_config = {"customer_fields": {}}
+        sl, tp = _compute_sl_tp(goal_config, last_close=100.0, side="long")
+        assert sl is None
+        assert tp is None
+
+    def test_short_entry_sl_above_close(self):
+        """Short entry: stop_loss should be ABOVE the close price."""
+        from agent_mold.skills.trading_executor import _compute_sl_tp
+
+        goal_config = {"customer_fields": {"stop_loss_pct": 2.5}}
+        sl, tp = _compute_sl_tp(goal_config, last_close=100.0, side="short")
+        assert sl == 102.5, f"Expected 102.5, got {sl}"
+
+    def test_none_last_close_returns_nones(self):
+        """When last_close is None, both SL and TP are None."""
+        from agent_mold.skills.trading_executor import _compute_sl_tp
+
+        goal_config = {"customer_fields": {"stop_loss_pct": 2.5}}
+        sl, tp = _compute_sl_tp(goal_config, last_close=None, side="long")
+        assert sl is None
+        assert tp is None
+
+    def test_draft_deliverable_includes_sl_tp(self):
+        """ST-S8-T3: Draft deliverable JSON contains stop_loss_price and take_profit_price."""
+        from agent_mold.skills.trading_executor import (
+            TradingExecutionContext,
+            execute_trading_delta_futures_manual_v1,
+        )
+        from agent_mold.skills.playbook import SkillPlaybook
+
+        class _PlaybookRef:
+            class metadata:
+                playbook_id = "TRADING.DELTA.FUTURES.MANUAL.V1"
+
+        goal_config = {
+            "customer_fields": {"stop_loss_pct": 2.5, "profit_target_pct": 5.0}
+        }
+        result = execute_trading_delta_futures_manual_v1(
+            playbook=_PlaybookRef(),  # type: ignore[arg-type]
+            exchange_provider="delta_exchange_india",
+            exchange_account_id="acct-001",
+            coin="BTC",
+            units=1.0,
+            side="long",
+            action="enter",
+            market=True,
+            limit_price=None,
+            ctx=TradingExecutionContext(),
+            goal_config=goal_config,
+            last_close=100.0,
+        )
+        assert result.draft_only is True
+        assert result.intent.stop_loss_price == 97.5
+        assert result.intent.take_profit_price == 105.0
+        assert result.debug.get("stop_loss_price") == 97.5
+        assert result.debug.get("take_profit_price") == 105.0
+

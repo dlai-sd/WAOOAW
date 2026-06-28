@@ -12,5 +12,7 @@ export { ContentAnalyticsScreen } from './ContentAnalyticsScreen';
 export { PlatformConnectionsScreen } from './PlatformConnectionsScreen';
 export { DMAConversationScreen } from './DMAConversationScreen';
 export { TradingSetupScreen } from './TradingSetupScreen';
+export { TradeHistoryScreen } from './TradeHistoryScreen';
+export { TaxReportScreen } from './TaxReportScreen';
 export { ScheduledPostsScreen } from './ScheduledPostsScreen';
 export { DeliverableDetailScreen } from './DeliverableDetailScreen';

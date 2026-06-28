@@ -247,3 +247,56 @@ class ApprovalRequiredHook:
                 "message": "External action requires customer approval_id",
             },
         )
+
+
+class AutonomousModeHook:
+    """PRE_PUBLISH hook: bypasses approval gate for consented autonomous mode.
+
+    When a hired agent has autonomous_mode=True AND autonomous_consent_at set,
+    this hook injects a platform-generated approval_id so the trade executes
+    without requiring a customer approval step.
+
+    After execution the hook fires fire-and-forget notifications via
+    NotificationService (email + optionally SMS).
+
+    The hook is a no-op when autonomous_mode is False or consent is missing —
+    the normal ApprovalRequiredHook / ApprovalGateHook then handles the request.
+    """
+
+    async def __call__(self, context: dict) -> None:
+        """PRE_PUBLISH: inject platform approval when autonomous mode is consented."""
+        goal_config = context.get("goal_config", {}).get("customer_fields", {})
+        if not goal_config.get("autonomous_mode"):
+            return  # approval mode — do nothing, let ApprovalGateHook handle it
+        consent_at = goal_config.get("autonomous_consent_at")
+        if not consent_at:
+            return  # consent not recorded — treat as approval mode
+        # Inject platform approval so ApprovalGateHook passes
+        from datetime import datetime, timezone
+        context["platform_approval_id"] = (
+            f"AUTO-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        )
+        context["autonomous_execution"] = True
+
+    async def notify_after_execution(self, context: dict) -> None:
+        """Fire-and-forget post-execution notifications (email)."""
+        import asyncio
+        from services.notification_service import NotificationService
+
+        customer_email = context.get("customer_email", "")
+        trade = context.get("execution_result", {})
+        notification_ctx = {
+            "instrument": trade.get("coin", ""),
+            "direction": trade.get("side", ""),
+            "units": trade.get("units", ""),
+            "price": trade.get("limit_price", "market"),
+            "stop_loss": trade.get("stop_loss_price", "N/A"),
+        }
+        svc = NotificationService()
+        if customer_email:
+            asyncio.create_task(svc.send(  # fire-and-forget
+                channel="email",
+                destination=customer_email,
+                template="trade_executed",
+                context=notification_ctx,
+            ))

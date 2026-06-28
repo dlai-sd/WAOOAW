@@ -115,6 +115,8 @@ export type MyAgentsStackParamList = {
   PlatformConnections: { hiredAgentId: string };
   DMAConversation: { hiredAgentId: string };
   TradingSetup: { hiredAgentId: string };
+  TradeHistory: { hiredAgentId: string };
+  TaxReport: { hiredAgentId: string };
   ScheduledPosts: { hiredAgentId: string };
   DeliverableDetail: { deliverableId: string; hiredAgentId: string };
 };
