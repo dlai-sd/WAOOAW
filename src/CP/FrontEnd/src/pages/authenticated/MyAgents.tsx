@@ -960,14 +960,12 @@ function TradingAgentWorkspace({
     return (saved as TradingTab | null) || 'configure'
   })
   const [pendingCount, setPendingCount] = useState(0)
-  const [tradingReadiness, setTradingReadiness] = useState<TradingSetupReadiness | null>(null)
 
   useEffect(() => {
     let cancelled = false
     getTradingSetup(hiredInstanceId)
       .then((resp) => {
         if (cancelled) return
-        setTradingReadiness(resp.readiness)
         if (!sessionStorage.getItem(sessionKey)) {
           setTradingTab(resp.readiness?.configured ? 'performance' : 'configure')
         }
