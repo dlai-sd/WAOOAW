@@ -49,9 +49,10 @@ class DeltaExchangePump(BaseComponent):
                 success=False,
                 error_message="Credentials not found for credential_ref",
             )
-        api_key = secrets["api_key"]  # NEVER log this value
+        api_key = secrets["api_key"]      # NEVER log this value
+        api_secret = secrets["api_secret"]  # NEVER log this value
         candles = await self._fetch_candles(instrument, api_key)
-        open_positions = await self._fetch_open_positions(instrument, api_key)
+        open_positions = await self._fetch_open_positions(instrument, api_key, api_secret)
         return ComponentOutput(
             success=True,
             data={"candles": candles, "instrument": instrument, "open_positions": open_positions},
@@ -71,16 +72,34 @@ class DeltaExchangePump(BaseComponent):
             return resp.json().get("result", [])
 
     @circuit_breaker(service="delta_exchange_api")
-    async def _fetch_open_positions(self, instrument: str, api_key: str) -> list[dict]:
-        """Fetch open positions for the instrument. Returns [] in test/dev environments."""
+    async def _fetch_open_positions(
+        self, instrument: str, api_key: str, api_secret: str
+    ) -> list[dict]:
+        """Fetch open positions for the instrument using HMAC-signed request.
+
+        Mock is active in test/development/local environments unless
+        DELTA_EXCHANGE_REAL_API=true is set (Codespace/demo opt-in).
+        api_key and api_secret are NEVER logged.
+        """
+        import os
         from core.config import settings
-        if getattr(settings, "environment", "local") in {"test", "development", "local"}:
-            return []  # mock: no open positions in non-prod
+        env = getattr(settings, "environment", "local")
+        mock_envs = {"test", "development", "local"}
+        force_real = os.environ.get("DELTA_EXCHANGE_REAL_API", "").lower() == "true"
+        if env in mock_envs and not force_real:
+            return []  # mock — no network call in dev/test
+
+        from integrations.delta_exchange.hmac_auth import build_auth_headers, DELTA_EXCHANGE_BASE_URL
+        path = "/v2/positions/margined"
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
-                "https://api.delta.exchange/v2/positions/margined",
-                headers={"api-key": api_key},
-                timeout=5.0,
+                f"{DELTA_EXCHANGE_BASE_URL}{path}",
+                headers=build_auth_headers(
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    method="GET",
+                    path=path,
+                ),
             )
             resp.raise_for_status()
             positions = resp.json().get("result", [])

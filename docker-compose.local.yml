@@ -80,6 +80,13 @@ services:
       - USAGE_LEDGER_STORE_PATH=/app/data/usage_ledger.json
       - USAGE_EVENTS_STORE_PATH=/app/data/usage_events.jsonl
       - CAMPAIGN_PERSISTENCE_MODE=memory
+      # Exchange credential encryption key — set to a strong random value.
+      # Generate one: python -c "import secrets,base64; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
+      # In demo/uat/prod this MUST come from GCP Secret Manager, not this file.
+      - CP_EXCHANGE_SETUP_SECRET=${CP_EXCHANGE_SETUP_SECRET:-CHANGE_ME_generate_strong_key_see_above}
+      # Set DELTA_EXCHANGE_REAL_API=true (e.g. via .codespace/demo.env) to use real
+      # Delta Exchange API calls instead of the development mock.
+      - DELTA_EXCHANGE_REAL_API=${DELTA_EXCHANGE_REAL_API:-false}
     ports:
       - "8001:8001"
     volumes:
