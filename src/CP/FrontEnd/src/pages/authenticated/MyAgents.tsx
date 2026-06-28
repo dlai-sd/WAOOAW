@@ -1,7 +1,7 @@
 import { Card, Button, Badge, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Input, Textarea, Checkbox, Spinner } from '@fluentui/react-components'
 import { Star20Filled } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AgentSelector } from '../../components/AgentSelector'
 import { LoadingIndicator, SaveIndicator, FeedbackMessage, ValidationFeedback } from '../../components/FeedbackIndicators'
@@ -32,6 +32,9 @@ import { DigitalMarketingPublishReadinessCard } from '../../components/DigitalMa
 import { DigitalMarketingActivationWizard } from '../../components/DigitalMarketingActivationWizard'
 import { SkillsPanel } from '../../components/SkillsPanel'
 import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
+import { TradingSetupChatPanel } from '../../components/TradingSetupChatPanel'
+import { TradingReadinessCard } from '../../components/TradingReadinessCard'
+import { getTradingSetup, type TradingSetupReadiness } from '../../services/tradingSetup.service'
 import { listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
 import { getContentRecommendations, type ContentRecommendation } from '../../services/contentAnalytics.service'
@@ -907,6 +910,31 @@ export function ConfigureAgentPanel(props: {
       ) : (
         <div style={{ opacity: 0.85 }}>No configuration schema available yet for this agent.</div>
       )}
+    </div>
+  )
+}
+
+function TradingConfigureSection({ hiredInstanceId }: { hiredInstanceId: string }) {
+  const [tradingReadiness, setTradingReadiness] = useState<TradingSetupReadiness | null>(null)
+  const chatPanelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    getTradingSetup(hiredInstanceId)
+      .then((resp) => setTradingReadiness(resp.readiness))
+      .catch(() => {})
+  }, [hiredInstanceId])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: '0.75rem' }}>
+      {tradingReadiness && (
+        <TradingReadinessCard
+          readiness={tradingReadiness}
+          onConfigureCta={() => chatPanelRef.current?.scrollIntoView({ behavior: 'smooth' })}
+        />
+      )}
+      <div ref={chatPanelRef} style={{ minHeight: 400 }}>
+        <TradingSetupChatPanel hiredInstanceId={hiredInstanceId} />
+      </div>
     </div>
   )
 }
@@ -2693,6 +2721,10 @@ export default function MyAgents({
                             )
                           )
                         }}
+                      />
+                    ) : isTradingOrExchangeAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
+                      <TradingConfigureSection
+                        hiredInstanceId={String(selectedInstance.hired_instance_id || '')}
                       />
                     ) : (
                       <>
