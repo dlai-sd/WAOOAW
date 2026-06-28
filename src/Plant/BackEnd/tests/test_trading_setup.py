@@ -124,7 +124,9 @@ class TestProcessStep:
         state = TradingSetupState(step="instrument",
                                   collected={"encrypted_api_key": "x", "encrypted_api_secret": "y"})
         db = AsyncMock()
-        result = await _process_step(state, "btc", "TRD-001", db)
+        with patch("api.v1.trading_setup._validate_instrument_live",
+                   new=AsyncMock(return_value=True)):
+            result = await _process_step(state, "btc", "TRD-001", db)
         assert result.step == "rsi_period"
         assert result.collected["default_coin"] == "BTC"
 
@@ -456,3 +458,68 @@ class TestS5WizardExtension:
         assert "autonomous_consent_at" in c
         assert "risk_disclosure_accepted" in c
         assert c["credential_ref"] == "EXCH-full-test"
+
+
+class TestS6InstrumentValidation:
+    """ST-MVP-1 S6 — instrument validation: reject NIFTY/BANKNIFTY; live Delta lookup."""
+
+    @pytest.mark.asyncio
+    async def test_nifty_stays_on_instrument_step(self):
+        """NIFTY input returns error and stays on instrument step."""
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="instrument")
+        db = AsyncMock()
+        with patch("api.v1.trading_setup._validate_instrument_live",
+                   new=AsyncMock(return_value=False)):
+            result = await _process_step(state, "NIFTY", "TRD-001", db)
+        assert result.step == "instrument"
+        last_assistant = [m for m in result.messages if m.role == "assistant"][-1]
+        assert "not available on Delta Exchange India" in last_assistant.content
+        assert "BTC" in last_assistant.content
+
+    @pytest.mark.asyncio
+    async def test_banknifty_stays_on_instrument_step(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="instrument")
+        db = AsyncMock()
+        with patch("api.v1.trading_setup._validate_instrument_live",
+                   new=AsyncMock(return_value=False)):
+            result = await _process_step(state, "BANKNIFTY", "TRD-001", db)
+        assert result.step == "instrument"
+
+    @pytest.mark.asyncio
+    async def test_btc_mocked_valid_advances_to_rsi_period(self):
+        """S6 T2 — BTC input (mocked valid) advances to rsi_period."""
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="instrument")
+        db = AsyncMock()
+        with patch("api.v1.trading_setup._validate_instrument_live",
+                   new=AsyncMock(return_value=True)):
+            result = await _process_step(state, "BTC", "TRD-001", db)
+        assert result.step == "rsi_period"
+        assert result.collected["default_coin"] == "BTC"
+
+    @pytest.mark.asyncio
+    async def test_instrument_intro_has_no_nifty_or_banknifty(self):
+        """S6 acceptance criterion 1 — intro text must not mention NIFTY/BANKNIFTY."""
+        from api.v1.trading_setup import _ASSISTANT_INTRO
+        intro = _ASSISTANT_INTRO["instrument"]
+        assert "NIFTY" not in intro
+        assert "BANKNIFTY" not in intro
+        assert "BTC" in intro
+        assert "ETH" in intro
+
+    def test_validate_instrument_live_returns_true_in_test_env(self):
+        """S6 T3 — in test environment, _validate_instrument_live returns True without HTTP."""
+        import asyncio
+        from unittest.mock import patch as mock_patch
+
+        from api.v1.trading_setup import _validate_instrument_live
+
+        # Patch settings to simulate test environment
+        with mock_patch("api.v1.trading_setup.httpx.AsyncClient") as mock_client_cls:
+            # The mock should NOT be called — function must return True before HTTP
+            result = asyncio.run(_validate_instrument_live("NIFTY"))
+        assert result is True
+        # Confirm the HTTP client was never instantiated
+        mock_client_cls.assert_not_called()

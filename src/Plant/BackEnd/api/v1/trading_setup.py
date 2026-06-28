@@ -10,7 +10,8 @@ State is stored in hired_agent.config["trading_setup"] JSONB.
 
 Steps:
   welcome → api_key → api_secret → validate → instrument → rsi_period
-          → risk_limits → done
+          → risk_limits → capital_pct → leverage → autonomous_mode
+          → risk_disclosure → done
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import httpx
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +28,7 @@ from api.v1.exchange_credentials import _validate_exchange_live
 from core.database import get_db_session, get_read_db_session
 from core.logging import PiiMaskingFilter
 from core.routing import waooaw_router
+from core.security import circuit_breaker
 from repositories.hired_agent_repository import HiredAgentRepository
 from services.exchange_credential_service import (
     ExchangeCredentialService,
@@ -40,6 +43,32 @@ router = waooaw_router(prefix="/hired-agents", tags=["trading-setup"])
 
 _SETUP_KEY = "trading_setup"
 _AGENT_TYPE = "trading.share_trader.v1"
+
+
+# ── Instrument validation ────────────────────────────────────────────────────
+
+@circuit_breaker(service="delta_exchange_api")
+async def _validate_instrument_live(instrument: str) -> bool:
+    """Returns True if the instrument exists on Delta Exchange India.
+
+    In test/development/local environments, always returns True to avoid
+    network calls in CI.
+    """
+    from core.config import settings
+    if getattr(settings, "environment", "local") in {"test", "development", "local"}:
+        return True  # mock success in non-prod
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.get(
+            "https://api.delta.exchange/v2/products",
+            params={"page_size": 100},
+        )
+        resp.raise_for_status()
+        products = resp.json().get("result", [])
+        return any(
+            p.get("underlying_asset", {}).get("symbol", "").upper() == instrument.upper()
+            or p.get("symbol", "").upper().startswith(instrument.upper())
+            for p in products
+        )
 
 # ── Step definitions ────────────────────────────────────────────────────────
 
@@ -313,15 +342,24 @@ async def _process_step(
 
     # ── instrument ──
     elif step == "instrument":
-        coin = inp.upper().strip()
-        if not coin or len(coin) > 20:
-            msgs.append(_user_msg(inp))
-            msgs.append(_assistant_msg("Please enter a valid instrument symbol (e.g. BTC, NIFTY, ETH)."))
+        symbol = inp.strip().upper()
+        if not symbol:
+            msgs.append(_user_msg("[empty]"))
+            msgs.append(_assistant_msg("Please enter an instrument symbol such as BTC or ETH."))
         else:
-            collected["default_coin"] = coin
-            msgs.append(_user_msg(coin))
-            msgs.append(_assistant_msg(_ASSISTANT_INTRO["rsi_period"]))
-            state.step = "rsi_period"
+            valid = await _validate_instrument_live(symbol)
+            if not valid:
+                msgs.append(_user_msg(symbol))
+                msgs.append(_assistant_msg(
+                    f"**{symbol}** is not available on Delta Exchange India. "
+                    "Available instruments include BTC, ETH, SOL, MATIC, LINK. "
+                    "Please enter a supported symbol."
+                ))
+            else:
+                collected["default_coin"] = symbol
+                msgs.append(_user_msg(symbol))
+                msgs.append(_assistant_msg(_ASSISTANT_INTRO["rsi_period"]))
+                state.step = "rsi_period"
 
     # ── rsi_period ──
     elif step == "rsi_period":
