@@ -91,6 +91,10 @@ module "plant_backend" {
 
   cloud_sql_connection_name = module.plant_database.instance_connection_name
   vpc_connector_id          = module.vpc_connector.connector_id
+  # Route ALL egress through the VPC connector → Cloud NAT static IP.
+  # This gives Plant Backend a single fixed outbound IP that exchange API keys can whitelist.
+  # Without ALL_TRAFFIC, Delta Exchange API calls bypass the connector and use shared GCP IPs.
+  vpc_egress                = "ALL_TRAFFIC"
 
   env_vars = {
     ENVIRONMENT               = var.environment
@@ -293,4 +297,40 @@ module "networking" {
   region      = var.region
   project_id  = var.project_id
   services    = local.services
+}
+
+# ── Static egress IP for Plant Backend ──────────────────────────────────────
+# Delta Exchange India requires API keys to whitelist specific IPs.
+# GCP Cloud Run uses dynamic shared IPs by default — this block reserves a
+# static IP, routes all Plant Backend egress through it via Cloud NAT, so
+# customers only need to whitelist one fixed IP in their exchange API key.
+
+resource "google_compute_address" "plant_backend_egress_ip" {
+  name         = "waooaw-plant-egress-${var.environment}"
+  project      = var.project_id
+  region       = var.region
+  address_type = "EXTERNAL"
+  description  = "Static egress IP for Plant Backend Cloud Run. Whitelist this on Delta Exchange India API keys."
+}
+
+resource "google_compute_router" "plant_nat_router" {
+  name    = "waooaw-plant-router-${var.environment}"
+  project = var.project_id
+  region  = var.region
+  network = var.private_network_id
+}
+
+resource "google_compute_router_nat" "plant_nat" {
+  name                               = "waooaw-plant-nat-${var.environment}"
+  project                            = var.project_id
+  router                             = google_compute_router.plant_nat_router.name
+  region                             = var.region
+  nat_ip_allocate_option             = "MANUAL_ONLY"
+  nat_ips                            = [google_compute_address.plant_backend_egress_ip.self_link]
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+
+  log_config {
+    enable = false
+    filter = "ERRORS_ONLY"
+  }
 }

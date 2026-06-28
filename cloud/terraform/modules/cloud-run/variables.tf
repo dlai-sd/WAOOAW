@@ -81,6 +81,12 @@ variable "vpc_connector_id" {
   default     = null
 }
 
+variable "vpc_egress" {
+  description = "VPC egress setting: PRIVATE_RANGES_ONLY (default) or ALL_TRAFFIC. Use ALL_TRAFFIC when the service must reach the internet through a Cloud NAT with a static IP (e.g., for exchange API key IP whitelisting)."
+  type        = string
+  default     = "PRIVATE_RANGES_ONLY"
+}
+
 variable "ingress" {
   description = "Ingress settings for Cloud Run service (e.g., INGRESS_TRAFFIC_ALL, INGRESS_TRAFFIC_INTERNAL_ONLY, INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER)"
   type        = string

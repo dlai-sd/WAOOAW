@@ -7,6 +7,11 @@ locals {
   }
 }
 
+output "plant_backend_egress_ip" {
+  description = "Static egress IP for Plant Backend. Whitelist this single IP on Delta Exchange India API keys to allow Cloud Run to connect."
+  value       = google_compute_address.plant_backend_egress_ip.address
+}
+
 output "backend_negs" {
   description = "Serverless NEG info for Plant services (consumed by shared foundation load balancer stack)"
   value       = local.backend_negs
