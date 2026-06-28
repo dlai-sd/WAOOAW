@@ -986,15 +986,15 @@ function TradingAgentWorkspace({
     return () => { cancelled = true }
   }, [hiredInstanceId])
 
-  const handleTabChange = (_: unknown, data: { value: string }) => {
-    const t = data.value as TradingTab
-    setTradingTab(t)
-    sessionStorage.setItem(sessionKey, t)
-  }
+  // handleTabChange is inlined on onTabSelect below so TypeScript infers the correct SelectTabEvent/SelectTabData types automatically.
 
   return (
     <div data-testid="trading-agent-workspace">
-      <TabList selectedValue={tradingTab} onTabSelect={handleTabChange}>
+      <TabList selectedValue={tradingTab} onTabSelect={(_, data) => {
+        const t = data.value as TradingTab
+        setTradingTab(t)
+        sessionStorage.setItem(sessionKey, t)
+      }}>
         <Tab value="configure">⚙️ Configure</Tab>
         <Tab value="approvals">
           📋 Approvals {pendingCount > 0 && <Badge color="danger" size="small">{pendingCount}</Badge>}
