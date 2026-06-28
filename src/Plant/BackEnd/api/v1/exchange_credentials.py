@@ -167,19 +167,57 @@ async def _validate_exchange_live(
 ) -> tuple[bool, bool, dict, Optional[str]]:
     """Live Delta Exchange credential check. Returns (readable, tradeable, balance_summary, error).
 
-    In test/dev/local: returns mock success without network call (same pattern as FirestoreClient).
+    Mock is active in test/development/local environments unless
+    DELTA_EXCHANGE_REAL_API=true is set (Codespace/demo opt-in).
+
+    In real mode: two HMAC-signed calls are made —
+      1. GET /v2/wallet/balances  — confirms read access (api_key is valid)
+      2. GET /v2/profile          — confirms the key is active and retrievable
+    api_key and api_secret are NEVER logged.
     """
-    if settings.environment in {"test", "development", "local"}:
+    import os
+    env = settings.environment
+    mock_envs = {"test", "development", "local"}
+    force_real = os.environ.get("DELTA_EXCHANGE_REAL_API", "").lower() == "true"
+    if env in mock_envs and not force_real:
         return True, True, {"mock": True, "available_balance": 100000}, None
+
+    from integrations.delta_exchange.hmac_auth import build_auth_headers, DELTA_EXCHANGE_BASE_URL
+
+    balances_path = "/v2/wallet/balances"
+    profile_path = "/v2/profile"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                "https://api.delta.exchange/v2/wallet/balances",
-                headers={"api-key": api_key},   # api_key NEVER logged
+            # Step 1 — verify read access via wallet balances (HMAC signed)
+            balances_resp = await client.get(
+                f"{DELTA_EXCHANGE_BASE_URL}{balances_path}",
+                headers=build_auth_headers(
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    method="GET",
+                    path=balances_path,
+                ),
             )
-            resp.raise_for_status()
-            balances = resp.json().get("result", {})
-            return True, True, {"balances_count": len(balances)}, None
+            if balances_resp.status_code == 401:
+                return False, False, {}, "Invalid API key or secret"
+            if balances_resp.status_code == 403:
+                return False, False, {}, "API key lacks read permission"
+            balances_resp.raise_for_status()
+            balances = balances_resp.json().get("result", [])
+
+            # Step 2 — verify the key is active
+            profile_resp = await client.get(
+                f"{DELTA_EXCHANGE_BASE_URL}{profile_path}",
+                headers=build_auth_headers(
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    method="GET",
+                    path=profile_path,
+                ),
+            )
+            tradeable = profile_resp.status_code == 200
+
+            return True, tradeable, {"balances_count": len(balances)}, None
     except Exception as exc:
         logger.error(
             "validate_exchange: check failed — %s", type(exc).__name__

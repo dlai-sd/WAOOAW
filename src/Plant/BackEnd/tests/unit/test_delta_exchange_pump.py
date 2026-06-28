@@ -196,7 +196,7 @@ def test_pump_fetch_open_positions_test_env():
 
     pump = DeltaExchangePump()
     # In test environment, settings.environment is "test" or similar — should return []
-    result = asyncio.run(pump._fetch_open_positions("BTC", "fake-api-key"))
+    result = asyncio.run(pump._fetch_open_positions("BTC", "fake-api-key", "fake-api-secret"))
     assert result == [], f"Expected [] in test env, got {result}"
 
 

@@ -1,13 +1,44 @@
 """ExchangeCredentialService — DB-backed exchange credential store.
 
 TRADER-FULL-1 S1.
-Replaces CP's FileExchangeSetupStore. Plant is the authoritative credential store.
-EXCHANGE_SECRET_BACKEND=fernet (default) uses Fernet symmetric encryption.
-EXCHANGE_SECRET_BACKEND=secret_manager stores a GCP Secret Manager resource name prefix.
+Plant is the authoritative credential store for customer exchange API keys.
+
+## Credential storage — industry-standard two-backend design
+
+### Backend 1: Fernet symmetric encryption (default, `EXCHANGE_SECRET_BACKEND=fernet`)
+
+Used in: local, development, codespace, demo, uat
+
+- Each api_key and api_secret is encrypted with Fernet (AES-128-CBC + HMAC-SHA256).
+- The Fernet key is derived from `CP_EXCHANGE_SETUP_SECRET` env var (32+ random bytes,
+  base64-url encoded). Fall back to `SECRET_KEY` if not set — but this is insecure and
+  will produce a startup warning in non-test environments.
+- Only the encrypted blob is stored in the DB; the plaintext never touches disk.
+- Key rotation: change `CP_EXCHANGE_SETUP_SECRET` and re-run a migration script that
+  decrypts with the old key and re-encrypts with the new key.
+
+### Backend 2: GCP Secret Manager (`EXCHANGE_SECRET_BACKEND=secret_manager`)
+
+Used in: prod
+
+- At upsert time: api_key/api_secret are written to a new GCP Secret version under the
+  resource path `projects/<project>/secrets/hired-<hired_id>-delta/versions/latest`.
+- Only the resource path (the `secret_ref`) is stored in the DB — no key material at all.
+- At runtime: `get_secrets()` resolves the reference via Secret Manager API using the
+  Cloud Run service account. The raw credentials are held in memory for the duration of
+  one request and then garbage-collected.
+- Rotation: create a new Secret version in GCP; `get_secrets()` always fetches `latest`.
+
+## Security checklist (apply to every new environment)
+- [ ] `CP_EXCHANGE_SETUP_SECRET` is set to a cryptographically random 32+ byte value
+- [ ] `CP_EXCHANGE_SETUP_SECRET` lives in GCP Secret Manager, not committed env files
+- [ ] DB column `encrypted_api_key` is never returned in any GET API response
+- [ ] `api_key`/`api_secret` never appear in logs (PIIMaskingFilter covers them by key name)
 """
 from __future__ import annotations
 
 import secrets
+import warnings
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -22,6 +53,9 @@ from models.exchange_credential import ExchangeCredentialModel
 logger = get_logger(__name__)
 logger.addFilter(PiiMaskingFilter())
 
+# Weak-key sentinel — the default used when CP_EXCHANGE_SETUP_SECRET is not set.
+_WEAK_KEY_SENTINEL = "dev-secret"
+
 
 def mint_credential_ref() -> str:
     return f"EXCH-{secrets.token_urlsafe(12)}"
@@ -33,11 +67,22 @@ def _fernet():
 
     from cryptography.fernet import Fernet
 
-    secret = (
+    raw_secret = (
         getattr(settings, "cp_exchange_setup_secret", None)
-        or getattr(settings, "secret_key", "dev-secret")
+        or getattr(settings, "secret_key", _WEAK_KEY_SENTINEL)
     ).strip()
-    key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
+
+    if raw_secret == _WEAK_KEY_SENTINEL and getattr(settings, "environment", "local") != "test":
+        warnings.warn(
+            "ExchangeCredentialService: CP_EXCHANGE_SETUP_SECRET is not set. "
+            "Exchange credentials are encrypted with the fallback dev-secret which is INSECURE. "
+            "Set CP_EXCHANGE_SETUP_SECRET to a strong random value in non-test environments. "
+            "Generate one with: python -c \"import secrets, base64; "
+            "print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())\"",
+            stacklevel=2,
+        )
+
+    key = base64.urlsafe_b64encode(hashlib.sha256(raw_secret.encode()).digest())
     return Fernet(key)
 
 

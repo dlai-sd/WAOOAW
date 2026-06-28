@@ -50,14 +50,19 @@ _AGENT_TYPE = "trading.share_trader.v1"
 
 @circuit_breaker(service="delta_exchange_api")
 async def _validate_instrument_live(instrument: str) -> bool:
-    """Returns True if the instrument exists on Delta Exchange India.
+    """Returns True if the instrument exists on Delta Exchange.
 
-    In test/development/local environments, always returns True to avoid
-    network calls in CI.
+    Mock is active in test/development/local environments unless
+    DELTA_EXCHANGE_REAL_API=true is set (Codespace/demo opt-in).
+    The products endpoint is public — no authentication required.
     """
+    import os
     from core.config import settings
-    if getattr(settings, "environment", "local") in {"test", "development", "local"}:
-        return True  # mock success in non-prod
+    env = getattr(settings, "environment", "local")
+    mock_envs = {"test", "development", "local"}
+    force_real = os.environ.get("DELTA_EXCHANGE_REAL_API", "").lower() == "true"
+    if env in mock_envs and not force_real:
+        return True  # mock: avoids network calls in dev/test
     async with httpx.AsyncClient(timeout=5.0) as client:
         resp = await client.get(
             "https://api.delta.exchange/v2/products",
