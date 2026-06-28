@@ -86,3 +86,56 @@ async def get_recommendations(
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.json)
     return resp.json if isinstance(resp.json, dict) else {}
+
+
+@router.get("/history/{hired_instance_id}", response_model=Dict[str, Any])
+async def get_trade_history(
+    hired_instance_id: str,
+    page: int = 1,
+    page_size: int = 20,
+    request: Request = ...,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(_plant_client),
+) -> Dict[str, Any]:
+    """Proxy GET /api/v1/hired-agents/{id}/trade-history to Plant BackEnd (ST-MVP-1 S11)."""
+    resp = await plant.request_json(
+        method="GET",
+        path=f"api/v1/hired-agents/{hired_instance_id}/trade-history",
+        headers=_headers(request),
+        params={"page": str(page), "page_size": str(page_size)},
+    )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail=resp.json)
+    return resp.json if isinstance(resp.json, dict) else {}
+
+
+@router.get("/tax-report/{hired_instance_id}", response_model=Dict[str, Any])
+async def get_tax_report(
+    hired_instance_id: str,
+    year: int = 2026,
+    period: str = "monthly",
+    month: Optional[int] = None,
+    quarter: Optional[str] = None,
+    request: Request = ...,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(_plant_client),
+) -> Dict[str, Any]:
+    """Proxy GET /api/v1/hired-agents/{id}/tax-report to Plant BackEnd (ST-MVP-1 S12)."""
+    params: Dict[str, str] = {"year": str(year), "period": period}
+    if month is not None:
+        params["month"] = str(month)
+    if quarter is not None:
+        params["quarter"] = quarter
+    resp = await plant.request_json(
+        method="GET",
+        path=f"api/v1/hired-agents/{hired_instance_id}/tax-report",
+        headers=_headers(request),
+        params=params,
+    )
+    if resp.status_code >= 500:
+        raise HTTPException(status_code=503, detail="UPSTREAM_ERROR")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=resp.status_code, detail=resp.json)
+    return resp.json if isinstance(resp.json, dict) else {}
