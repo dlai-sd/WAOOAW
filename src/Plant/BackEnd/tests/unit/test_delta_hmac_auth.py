@@ -103,8 +103,19 @@ def test_method_case_normalised():
 
 
 def test_base_url_constant():
-    """T7: DELTA_EXCHANGE_BASE_URL points to the correct endpoint."""
-    from integrations.delta_exchange.hmac_auth import DELTA_EXCHANGE_BASE_URL
-
+    """T7: DELTA_EXCHANGE_BASE_URL and DELTA_EXCHANGE_INDIA_BASE_URL are correct."""
+    from integrations.delta_exchange.hmac_auth import (
+        DELTA_EXCHANGE_BASE_URL,
+        DELTA_EXCHANGE_INDIA_BASE_URL,
+        base_url_for_provider,
+    )
     assert DELTA_EXCHANGE_BASE_URL == "https://api.delta.exchange"
+    assert DELTA_EXCHANGE_INDIA_BASE_URL == "https://api.india.delta.exchange"
     assert not DELTA_EXCHANGE_BASE_URL.endswith("/")
+    assert not DELTA_EXCHANGE_INDIA_BASE_URL.endswith("/")
+
+    # Provider routing
+    assert base_url_for_provider("delta_exchange_india") == DELTA_EXCHANGE_INDIA_BASE_URL
+    assert base_url_for_provider("delta_exchange") == DELTA_EXCHANGE_BASE_URL
+    # Unknown provider defaults to India (the app is India-first)
+    assert base_url_for_provider("unknown_provider") == DELTA_EXCHANGE_INDIA_BASE_URL

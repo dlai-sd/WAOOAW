@@ -60,10 +60,12 @@ class DeltaExchangePump(BaseComponent):
 
     @circuit_breaker(service="delta_exchange_api")
     async def _fetch_candles(self, instrument: str, api_key: str) -> list[dict]:
-        """Fetch last 50 1m candles. API key is never logged."""
+        """Fetch last 50 1m candles from Delta Exchange India. API key is never logged."""
+        from integrations.delta_exchange.hmac_auth import base_url_for_provider
+        base = base_url_for_provider("delta_exchange_india")
         async with httpx.AsyncClient() as client:
             resp = await client.get(
-                "https://api.delta.exchange/v2/history/candles",
+                f"{base}/v2/history/candles",
                 params={"symbol": instrument, "resolution": "1m", "limit": 50},
                 headers={"api-key": api_key},
                 timeout=10.0,
@@ -89,11 +91,13 @@ class DeltaExchangePump(BaseComponent):
         if env in mock_envs and not force_real:
             return []  # mock — no network call in dev/test
 
-        from integrations.delta_exchange.hmac_auth import build_auth_headers, DELTA_EXCHANGE_BASE_URL
+        from integrations.delta_exchange.hmac_auth import build_auth_headers, base_url_for_provider
+        # Provider is always delta_exchange_india — only supported platform in the wizard.
         path = "/v2/positions/margined"
+        base = base_url_for_provider("delta_exchange_india")
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(
-                f"{DELTA_EXCHANGE_BASE_URL}{path}",
+                f"{base}{path}",
                 headers=build_auth_headers(
                     api_key=api_key,
                     api_secret=api_secret,
