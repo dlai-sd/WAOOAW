@@ -12,8 +12,10 @@ from __future__ import annotations
 import httpx
 
 from components import BaseComponent, ComponentInput, ComponentOutput, register_component
+from core.database import _connector
 from core.logging import PiiMaskingFilter, get_logger
 from core.security import circuit_breaker
+from services.exchange_credential_service import ExchangeCredentialService
 
 logger = get_logger(__name__)
 logger.addFilter(PiiMaskingFilter())
@@ -36,9 +38,6 @@ class DeltaExchangePump(BaseComponent):
                 error_message="No credential_ref configured — complete trading setup wizard first",
             )
         # Resolve secrets from DB — never log the returned key/secret values
-        from core.database import _connector
-        from services.exchange_credential_service import ExchangeCredentialService
-
         async with _connector.get_session() as session:
             svc = ExchangeCredentialService(session)
             secrets = await svc.get_secrets(credential_ref=credential_ref)

@@ -370,12 +370,12 @@ class TestS5WizardExtension:
     @pytest.mark.asyncio
     async def test_risk_disclosure_i_accept_advances_to_done(self):
         from api.v1.trading_setup import _process_step, TradingSetupState
-        from services.exchange_credential_service import ExchangeCredentialService
+        from services.exchange_credential_service import ExchangeCredentialService, _encrypt
         state = TradingSetupState(
             step="risk_disclosure",
             collected={
-                "encrypted_api_key": "enc_key",
-                "encrypted_api_secret": "enc_secret",
+                "encrypted_api_key": _encrypt("test-api-key"),
+                "encrypted_api_secret": _encrypt("test-api-secret"),
                 "default_coin": "BTC",
                 "rsi_period": 14,
                 "customer_id": "CUST-1",
