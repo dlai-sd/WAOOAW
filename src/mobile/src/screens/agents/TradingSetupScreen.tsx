@@ -6,6 +6,8 @@
  *
  * Sensitive steps (api_key, api_secret) use secureTextEntry so the OS masks
  * the input field. All masked content shows ●●●●… in the chat bubbles.
+ *
+ * Done step shows an Emergency Stop button (ST-MVP-1 S10) that halts trading.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
@@ -19,11 +21,13 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native'
 import { useTheme } from '@/hooks/useTheme'
 import {
   getTradingSetup,
   sendTradingSetupMessage,
+  emergencyStop,
   type TradingSetupMessage,
 } from '@/services/tradingSetup.service'
 import type { MyAgentsStackScreenProps } from '@/navigation/types'
@@ -43,6 +47,8 @@ export const TradingSetupScreen = ({ navigation, route }: Props) => {
   const [error, setError] = useState<string | null>(null)
   const [inputText, setInputText] = useState('')
   const [sending, setSending] = useState(false)
+  const [stoppingEmergency, setStoppingEmergency] = useState(false)
+  const [emergencyStopped, setEmergencyStopped] = useState(false)
 
   const isSecureStep = SECURE_STEPS.has(currentStep)
 
@@ -82,6 +88,31 @@ export const TradingSetupScreen = ({ navigation, route }: Props) => {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
     }
   }, [hiredAgentId, inputText, sending, isSecureStep])
+
+  const handleEmergencyStop = useCallback(() => {
+    Alert.alert(
+      '🛑 Emergency Stop',
+      'This will halt all trading immediately. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Stop Trading',
+          style: 'destructive',
+          onPress: async () => {
+            setStoppingEmergency(true)
+            try {
+              await emergencyStop(hiredAgentId)
+              setEmergencyStopped(true)
+            } catch {
+              setError('Failed to stop trading. Please try again.')
+            } finally {
+              setStoppingEmergency(false)
+            }
+          },
+        },
+      ]
+    )
+  }, [hiredAgentId])
 
   const stepLabel: Record<string, string> = {
     welcome: 'Welcome',
@@ -267,11 +298,11 @@ export const TradingSetupScreen = ({ navigation, route }: Props) => {
           </View>
         )}
 
-        {/* Done — back to agent button */}
+        {/* Done — back to agent button + emergency stop */}
         {currentStep === 'done' && (
           <View style={[s.doneBar, { borderTopColor: colors.textSecondary + '20' }]}>
             <TouchableOpacity
-              style={[s.doneBtn, { backgroundColor: colors.neonCyan }]}
+              style={[s.doneBtn, { backgroundColor: colors.neonCyan, marginBottom: 12 }]}
               onPress={() => navigation.goBack()}
               testID="trading-setup-done-btn"
             >
@@ -279,6 +310,42 @@ export const TradingSetupScreen = ({ navigation, route }: Props) => {
                 🚀 Go to Agent Dashboard
               </Text>
             </TouchableOpacity>
+            {emergencyStopped ? (
+              <View
+                style={{
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  backgroundColor: '#10b98118',
+                  borderWidth: 1,
+                  borderColor: '#10b98155',
+                }}
+              >
+                <Text style={{ color: '#10b981', fontWeight: '700', fontSize: 14 }}>
+                  ✓ Agent Halted
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[s.stopBtn, { backgroundColor: '#ef444418', borderColor: '#ef444455' }]}
+                onPress={handleEmergencyStop}
+                disabled={stoppingEmergency}
+                testID="emergency-stop-btn"
+              >
+                {stoppingEmergency ? (
+                  <ActivityIndicator color="#ef4444" size="small" />
+                ) : (
+                  <>
+                    <Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 14 }}>
+                      🛑 Emergency Stop
+                    </Text>
+                    <Text style={{ color: '#ef444499', fontSize: 11, marginTop: 2 }}>
+                      Halts all trading immediately
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </KeyboardAvoidingView>
@@ -327,5 +394,11 @@ const s = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
+  },
+  stopBtn: {
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
   },
 })

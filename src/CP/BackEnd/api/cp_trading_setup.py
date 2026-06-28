@@ -87,3 +87,25 @@ async def send_trading_setup_message(
     if resp.status_code >= 400:
         raise HTTPException(status_code=resp.status_code, detail=resp.json)
     return resp.json
+
+
+@router.post("/{hired_instance_id}/emergency-stop", response_model=Dict[str, Any])
+async def cp_emergency_stop(
+    hired_instance_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    plant: PlantGatewayClient = Depends(_plant_client),
+) -> Dict[str, Any]:
+    """Proxy emergency-stop request to Plant BackEnd (ST-MVP-1 S10). Pattern B."""
+    try:
+        resp = await plant.request_json(
+            method="POST",
+            path=f"api/v1/hired-agents/{hired_instance_id}/emergency-stop",
+            headers=_fwd(request),
+            json_body={"customer_id": _customer_id(current_user)},
+        )
+    except ServiceUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if resp.status_code >= 400:
+        raise HTTPException(status_code=resp.status_code, detail=resp.json)
+    return resp.json

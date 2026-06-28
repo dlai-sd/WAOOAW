@@ -523,3 +523,79 @@ class TestS6InstrumentValidation:
         assert result is True
         # Confirm the HTTP client was never instantiated
         mock_client_cls.assert_not_called()
+
+
+class TestS10EmergencyStop:
+    """ST-MVP-1 S10 — emergency stop endpoint tests."""
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_sets_is_paused(self):
+        """S10 T1 — POST /{id}/emergency-stop sets is_paused=True in agent config."""
+        from api.v1.trading_setup import emergency_stop_trading
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        record = MagicMock()
+        record.config = {"scheduler_state": {}}
+        record.hired_instance_id = "TRD-001"
+
+        repo = AsyncMock()
+        repo.get_by_id = AsyncMock(return_value=record)
+
+        scheduler_svc = AsyncMock()
+
+        db = AsyncMock()
+        db.commit = AsyncMock()
+
+        with patch("api.v1.trading_setup.HiredAgentRepository", return_value=repo), \
+             patch("api.v1.trading_setup.SchedulerPersistenceService", return_value=scheduler_svc):
+            result = await emergency_stop_trading("TRD-001", db=db)
+
+        assert result["status"] == "stopped"
+        assert record.config["scheduler_state"]["is_paused"] is True
+        assert "emergency_stopped_at" in record.config
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_calls_scheduler_pause(self):
+        """S10 T2 — SchedulerPersistenceService.pause() is called to cancel pending runs."""
+        from api.v1.trading_setup import emergency_stop_trading
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        record = MagicMock()
+        record.config = {}
+        record.hired_instance_id = "TRD-001"
+
+        repo = AsyncMock()
+        repo.get_by_id = AsyncMock(return_value=record)
+
+        scheduler_svc = AsyncMock()
+
+        db = AsyncMock()
+        db.commit = AsyncMock()
+
+        with patch("api.v1.trading_setup.HiredAgentRepository", return_value=repo), \
+             patch("api.v1.trading_setup.SchedulerPersistenceService", return_value=scheduler_svc):
+            await emergency_stop_trading("TRD-001", db=db)
+
+        scheduler_svc.pause.assert_called_once_with("TRD-001")
+
+    @pytest.mark.asyncio
+    async def test_emergency_stop_returns_stopped_status(self):
+        """S10 T3 — endpoint returns JSON with status=stopped."""
+        from api.v1.trading_setup import emergency_stop_trading
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        record = MagicMock()
+        record.config = {}
+        record.hired_instance_id = "TRD-777"
+
+        repo = AsyncMock()
+        repo.get_by_id = AsyncMock(return_value=record)
+        scheduler_svc = AsyncMock()
+        db = AsyncMock()
+
+        with patch("api.v1.trading_setup.HiredAgentRepository", return_value=repo), \
+             patch("api.v1.trading_setup.SchedulerPersistenceService", return_value=scheduler_svc):
+            result = await emergency_stop_trading("TRD-777", db=db)
+
+        assert result["hired_agent_id"] == "TRD-777"
+        assert result["status"] == "stopped"
