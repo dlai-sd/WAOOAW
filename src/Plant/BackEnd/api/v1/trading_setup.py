@@ -182,10 +182,22 @@ _VALIDATION_SUCCESS = (
 
 _VALIDATION_FAIL = (
     "❌ **Credential validation failed.**\n\n"
-    "The keys could not connect to Delta Exchange. Please check:\n"
+    "The keys could not connect to Delta Exchange India. Please check:\n"
+    "• **IP restriction** — the most common cause. Go to Delta Exchange India "
+    "→ Settings → API Keys → edit the key → remove the IP allowlist (leave blank to allow all IPs).\n"
     "• The API key and secret are copied correctly (no extra spaces)\n"
-    "• The key has *Read* and *Write* permissions enabled\n"
+    "• The key has *Read* and *Trade* permissions enabled\n"
     "• The key has not expired\n\n"
+    "Type your API key again to retry from Step 1."
+)
+
+_VALIDATION_FAIL_IP = (
+    "❌ **Credential validation failed — IP not whitelisted.**\n\n"
+    "Your API key has an IP restriction that is blocking our server.\n\n"
+    "**Fix (takes 1 minute):**\n"
+    "1. Log in to Delta Exchange India → **Settings** → **API Keys**\n"
+    "2. Edit this key → clear the *Allowed IPs* field (leave it blank)\n"
+    "3. Save, then type your API key again here.\n\n"
     "Type your API key again to retry from Step 1."
 )
 
@@ -345,7 +357,12 @@ async def _process_step(
                 state.step = "instrument"
             else:
                 state.validation_status = "invalid"
-                msgs.append(_assistant_msg(_VALIDATION_FAIL))
+                # Pick the most helpful failure message based on the error detail
+                if error and "ip_not_whitelisted" in error:
+                    fail_msg = _VALIDATION_FAIL_IP
+                else:
+                    fail_msg = _VALIDATION_FAIL
+                msgs.append(_assistant_msg(fail_msg))
                 collected.pop("encrypted_api_key", None)
                 collected.pop("encrypted_api_secret", None)
                 msgs.append(_assistant_msg(_ASSISTANT_INTRO["api_key"]))
