@@ -200,7 +200,10 @@ def _trading_spec(agent_id: str) -> AgentSpec:
             scheduler_class=_DefaultScheduler,
             pump_class=GoalConfigPump,
         ),
-        constraint_policy=ConstraintPolicy(),
+        constraint_policy=ConstraintPolicy(
+            max_leverage=10,
+            max_capital_pct_per_trade=20.0,
+        ),
     )
 
 

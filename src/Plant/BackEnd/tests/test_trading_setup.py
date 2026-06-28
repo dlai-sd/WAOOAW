@@ -156,7 +156,6 @@ class TestProcessStep:
     @pytest.mark.asyncio
     async def test_risk_limits_skip_uses_defaults(self):
         from api.v1.trading_setup import _process_step, TradingSetupState
-        from services.exchange_credential_service import ExchangeCredentialService
         state = TradingSetupState(
             step="risk_limits",
             collected={
@@ -168,18 +167,14 @@ class TestProcessStep:
             }
         )
         db = AsyncMock()
-        mock_rec = MagicMock()
-        mock_rec.credential_ref = "EXCH-test"
-        with patch.object(ExchangeCredentialService, "upsert", new=AsyncMock(return_value=mock_rec)), \
-             patch.object(ExchangeCredentialService, "mark_validated", new=AsyncMock()):
-            result = await _process_step(state, "skip", "TRD-001", db)
-        assert result.step == "done"
-        assert result.configured is True
+        result = await _process_step(state, "skip", "TRD-001", db)
+        # risk_limits now advances to capital_pct (S5 wizard extension)
+        assert result.step == "capital_pct"
+        assert result.configured is False
         assert result.collected["max_units_per_order"] == 1.0
         assert result.collected["max_notional_inr"] == 50000.0
-        # Raw encrypted keys must be removed from persisted state
-        assert "encrypted_api_key" not in result.collected
-        assert "encrypted_api_secret" not in result.collected
+        # Encrypted keys remain in state until risk_disclosure completes
+        assert "encrypted_api_key" in result.collected
 
     @pytest.mark.asyncio
     async def test_risk_limits_invalid_format_stays(self):
@@ -276,3 +271,188 @@ class TestSanitizeCollected:
         )
         r = _readiness(state)
         assert r["has_credentials"] is True
+
+
+class TestS5WizardExtension:
+    """ST-MVP-1 S5 — new wizard steps: capital_pct, leverage, autonomous_mode, risk_disclosure."""
+
+    @pytest.mark.asyncio
+    async def test_capital_pct_rejects_zero(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="capital_pct")
+        db = AsyncMock()
+        result = await _process_step(state, "0", "TRD-001", db)
+        assert result.step == "capital_pct"
+
+    @pytest.mark.asyncio
+    async def test_capital_pct_rejects_above_max(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="capital_pct")
+        db = AsyncMock()
+        result = await _process_step(state, "21", "TRD-001", db)
+        assert result.step == "capital_pct"
+
+    @pytest.mark.asyncio
+    async def test_capital_pct_accepts_valid(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="capital_pct")
+        db = AsyncMock()
+        result = await _process_step(state, "5", "TRD-001", db)
+        assert result.step == "leverage"
+        assert result.collected["capital_pct"] == 5.0
+
+    @pytest.mark.asyncio
+    async def test_leverage_rejects_out_of_range(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="leverage")
+        db = AsyncMock()
+        result = await _process_step(state, "201", "TRD-001", db)
+        assert result.step == "leverage"
+
+    @pytest.mark.asyncio
+    async def test_leverage_above_10_appends_warning(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="leverage")
+        db = AsyncMock()
+        result = await _process_step(state, "15", "TRD-001", db)
+        assert result.step == "autonomous_mode"
+        assert result.collected["leverage"] == 15
+        last_assistant = [m for m in result.messages if m.role == "assistant"][-1]
+        assert "Liquidation risk" in last_assistant.content
+
+    @pytest.mark.asyncio
+    async def test_leverage_within_cap_no_warning(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="leverage")
+        db = AsyncMock()
+        result = await _process_step(state, "5", "TRD-001", db)
+        assert result.step == "autonomous_mode"
+        assert result.collected["leverage"] == 5
+
+    @pytest.mark.asyncio
+    async def test_autonomous_mode_yes_sets_consent_at(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="autonomous_mode")
+        db = AsyncMock()
+        result = await _process_step(state, "yes", "TRD-001", db)
+        assert result.step == "risk_disclosure"
+        assert result.collected["autonomous_mode"] is True
+        assert result.collected.get("autonomous_consent_at") is not None
+
+    @pytest.mark.asyncio
+    async def test_autonomous_mode_no_does_not_set_consent(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="autonomous_mode")
+        db = AsyncMock()
+        result = await _process_step(state, "no", "TRD-001", db)
+        assert result.step == "risk_disclosure"
+        assert result.collected["autonomous_mode"] is False
+        assert "autonomous_consent_at" not in result.collected
+
+    @pytest.mark.asyncio
+    async def test_autonomous_mode_invalid_stays(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="autonomous_mode")
+        db = AsyncMock()
+        result = await _process_step(state, "maybe", "TRD-001", db)
+        assert result.step == "autonomous_mode"
+
+    @pytest.mark.asyncio
+    async def test_risk_disclosure_invalid_stays(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        state = TradingSetupState(step="risk_disclosure")
+        db = AsyncMock()
+        result = await _process_step(state, "thanks", "TRD-001", db)
+        assert result.step == "risk_disclosure"
+
+    @pytest.mark.asyncio
+    async def test_risk_disclosure_i_accept_advances_to_done(self):
+        from api.v1.trading_setup import _process_step, TradingSetupState
+        from services.exchange_credential_service import ExchangeCredentialService
+        state = TradingSetupState(
+            step="risk_disclosure",
+            collected={
+                "encrypted_api_key": "enc_key",
+                "encrypted_api_secret": "enc_secret",
+                "default_coin": "BTC",
+                "rsi_period": 14,
+                "customer_id": "CUST-1",
+                "max_units_per_order": 1.0,
+                "max_notional_inr": 50000.0,
+                "capital_pct": 5.0,
+                "leverage": 1,
+                "autonomous_mode": False,
+            },
+            validation_status="valid",
+        )
+        db = AsyncMock()
+        mock_rec = MagicMock()
+        mock_rec.credential_ref = "EXCH-done"
+        with patch.object(ExchangeCredentialService, "upsert", new=AsyncMock(return_value=mock_rec)), \
+             patch.object(ExchangeCredentialService, "mark_validated", new=AsyncMock()):
+            result = await _process_step(state, "I ACCEPT", "TRD-001", db)
+        assert result.step == "done"
+        assert result.configured is True
+        assert result.collected["risk_disclosure_accepted"] is True
+        assert result.collected["credential_ref"] == "EXCH-done"
+        assert "encrypted_api_key" not in result.collected
+        assert "encrypted_api_secret" not in result.collected
+
+    @pytest.mark.asyncio
+    async def test_full_10_step_wizard_produces_configured_true(self):
+        """BDD: Full 10-step wizard with all new fields produces configured=True."""
+        from api.v1.trading_setup import _process_step, TradingSetupState, _encrypt
+        from services.exchange_credential_service import ExchangeCredentialService
+        db = AsyncMock()
+
+        mock_rec = MagicMock()
+        mock_rec.credential_ref = "EXCH-full-test"
+
+        with patch("api.v1.trading_setup._validate_exchange_live",
+                   new=AsyncMock(return_value=(True, True, {}, None))), \
+             patch("api.v1.trading_setup._validate_instrument_live",
+                   new=AsyncMock(return_value=True)), \
+             patch.object(ExchangeCredentialService, "upsert", new=AsyncMock(return_value=mock_rec)), \
+             patch.object(ExchangeCredentialService, "mark_validated", new=AsyncMock()):
+
+            state = TradingSetupState(step="welcome")
+            # welcome
+            state = await _process_step(state, "start", "TRD-001", db)
+            assert state.step == "api_key"
+            # api_key
+            state = await _process_step(state, "my-api-key-123", "TRD-001", db)
+            assert state.step == "api_secret"
+            # api_secret → auto-validates → instrument
+            state = await _process_step(state, "my-api-secret-456", "TRD-001", db)
+            assert state.step == "instrument"
+            # instrument
+            state = await _process_step(state, "BTC", "TRD-001", db)
+            assert state.step == "rsi_period"
+            # rsi_period
+            state = await _process_step(state, "14", "TRD-001", db)
+            assert state.step == "risk_limits"
+            # risk_limits
+            state = await _process_step(state, "skip", "TRD-001", db)
+            assert state.step == "capital_pct"
+            # capital_pct
+            state = await _process_step(state, "5", "TRD-001", db)
+            assert state.step == "leverage"
+            # leverage
+            state = await _process_step(state, "5", "TRD-001", db)
+            assert state.step == "autonomous_mode"
+            # autonomous_mode
+            state = await _process_step(state, "yes", "TRD-001", db)
+            assert state.step == "risk_disclosure"
+            # risk_disclosure
+            state.collected["customer_id"] = "CUST-1"
+            state = await _process_step(state, "I ACCEPT", "TRD-001", db)
+
+        assert state.step == "done"
+        assert state.configured is True
+        c = state.collected
+        assert "capital_pct" in c
+        assert "leverage" in c
+        assert "autonomous_mode" in c
+        assert "autonomous_consent_at" in c
+        assert "risk_disclosure_accepted" in c
+        assert c["credential_ref"] == "EXCH-full-test"
