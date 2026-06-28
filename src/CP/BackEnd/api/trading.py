@@ -25,7 +25,8 @@ from services.plant_gateway_client import PlantGatewayClient
 router = waooaw_router(prefix="/cp/trading", tags=["cp-trading"])
 
 def _customer_id_from_user(user: User) -> str:
-    return f"CUST-{user.id}"
+    """Return canonical customer_id — plain UUID string, no prefix."""
+    return str(user.id)
 
 def get_plant_gateway_client() -> PlantGatewayClient:
     base_url = (os.getenv("PLANT_GATEWAY_URL") or "").strip().rstrip("/")

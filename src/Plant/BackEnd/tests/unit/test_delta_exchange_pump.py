@@ -1,9 +1,11 @@
-"""Unit tests for DeltaExchangePump component (EXEC-ENGINE-001 E5-S1).
+"""Unit tests for DeltaExchangePump component (EXEC-ENGINE-001 E5-S1 + ST-MVP-1 S1).
 
 Tests:
   E5-S1-T1: Mock HTTP 200 → execute() returns success=True, data["candles"] populated
   E5-S1-T2: Mock HTTP 500 → safe_execute() returns success=False, error_message non-empty
   E5-S1-T3: After module import, get_component("DeltaExchangePump") returns an instance
+  ST-S1-T2: valid credential_ref → success=True
+  ST-S1-T3: missing credential_ref → success=False with descriptive message
 """
 from __future__ import annotations
 
@@ -15,9 +17,19 @@ import pytest
 from components import ComponentInput, _REGISTRY, get_component
 
 
-def _make_input() -> ComponentInput:
+def _make_input(credential_ref: str = "EXCH-test123") -> ComponentInput:
     return ComponentInput(
         flow_run_id="fr-pump-001",
+        customer_id="cust-001",
+        skill_config={"customer_fields": {"instrument": "BTC", "credential_ref": credential_ref}},
+        run_context={},
+    )
+
+
+def _make_input_legacy() -> ComponentInput:
+    """Legacy input with delta_api_key (no credential_ref) — used for E5-S1 backward-compat tests."""
+    return ComponentInput(
+        flow_run_id="fr-pump-legacy",
         customer_id="cust-001",
         skill_config={"customer_fields": {"instrument": "NIFTY", "delta_api_key": "test-key"}},
         run_context={},
@@ -39,7 +51,7 @@ def _ensure_pump_registered():
 
 @pytest.mark.unit
 def test_pump_execute_success():
-    """E5-S1-T1: HTTP 200 → success=True, candles populated."""
+    """ST-S1-T2: valid credential_ref → success=True, candles populated."""
     from delta_exchange_pump import DeltaExchangePump
 
     mock_response = MagicMock()
@@ -51,14 +63,86 @@ def test_pump_execute_success():
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_response)
 
+    mock_secrets = {"api_key": "test-key", "api_secret": "test-secret"}
+    mock_svc = AsyncMock()
+    mock_svc.get_secrets = AsyncMock(return_value=mock_secrets)
+
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=MagicMock())
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
     pump = DeltaExchangePump()
 
-    with patch("delta_exchange_pump.httpx.AsyncClient", return_value=mock_client):
+    with patch("delta_exchange_pump.httpx.AsyncClient", return_value=mock_client), \
+         patch("delta_exchange_pump._connector") as mock_connector, \
+         patch("delta_exchange_pump.ExchangeCredentialService", return_value=mock_svc):
+        mock_connector.get_session.return_value = mock_session_cm
         result = asyncio.run(pump.execute(_make_input()))
 
     assert result.success is True
     assert result.data["candles"] == [{"close": 100.0}]
-    assert result.data["instrument"] == "NIFTY"
+    assert result.data["instrument"] == "BTC"
+
+
+@pytest.mark.unit
+def test_pump_execute_missing_credential_ref():
+    """ST-S1-T3: missing credential_ref → success=False with descriptive message."""
+    from delta_exchange_pump import DeltaExchangePump
+
+    pump = DeltaExchangePump()
+    empty_input = ComponentInput(
+        flow_run_id="fr-pump-002",
+        customer_id="cust-002",
+        skill_config={"customer_fields": {"instrument": "BTC"}},
+        run_context={},
+    )
+
+    result = asyncio.run(pump.execute(empty_input))
+
+    assert result.success is False
+    assert "credential_ref" in result.error_message.lower()
+
+
+@pytest.mark.unit
+def test_pump_execute_empty_credential_ref():
+    """ST-S1-T3 variant: empty string credential_ref → success=False."""
+    from delta_exchange_pump import DeltaExchangePump
+
+    pump = DeltaExchangePump()
+    empty_ref_input = ComponentInput(
+        flow_run_id="fr-pump-003",
+        customer_id="cust-003",
+        skill_config={"customer_fields": {"instrument": "BTC", "credential_ref": ""}},
+        run_context={},
+    )
+
+    result = asyncio.run(pump.execute(empty_ref_input))
+
+    assert result.success is False
+    assert "credential_ref" in result.error_message.lower()
+
+
+@pytest.mark.unit
+def test_pump_execute_credential_not_found():
+    """execute() with valid ref but missing DB record → success=False."""
+    from delta_exchange_pump import DeltaExchangePump
+
+    mock_svc = AsyncMock()
+    mock_svc.get_secrets = AsyncMock(return_value=None)
+
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=MagicMock())
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    pump = DeltaExchangePump()
+
+    with patch("delta_exchange_pump._connector") as mock_connector, \
+         patch("delta_exchange_pump.ExchangeCredentialService", return_value=mock_svc):
+        mock_connector.get_session.return_value = mock_session_cm
+        result = asyncio.run(pump.execute(_make_input("EXCH-missing")))
+
+    assert result.success is False
+    assert result.error_message
 
 
 @pytest.mark.unit
@@ -78,9 +162,20 @@ def test_pump_execute_http_error():
         )
     )
 
+    mock_secrets = {"api_key": "test-key", "api_secret": "test-secret"}
+    mock_svc = AsyncMock()
+    mock_svc.get_secrets = AsyncMock(return_value=mock_secrets)
+
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=MagicMock())
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
     pump = DeltaExchangePump()
 
-    with patch("delta_exchange_pump.httpx.AsyncClient", return_value=mock_client):
+    with patch("delta_exchange_pump.httpx.AsyncClient", return_value=mock_client), \
+         patch("delta_exchange_pump._connector") as mock_connector, \
+         patch("delta_exchange_pump.ExchangeCredentialService", return_value=mock_svc):
+        mock_connector.get_session.return_value = mock_session_cm
         result = asyncio.run(pump.safe_execute(_make_input()))
 
     assert result.success is False

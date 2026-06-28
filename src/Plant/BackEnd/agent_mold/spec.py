@@ -63,12 +63,16 @@ class ConstraintPolicy:
     max_tasks_per_day: hard ceiling on Scheduler triggers. 0 = no limit.
     max_position_size_inr: trading-only limit in INR. Ignored for non-trading agents.
     trial_task_limit: tasks allowed during trial period (default 10).
+    max_leverage: trading hard-cap; customer can configure up to this value (default 10).
+    max_capital_pct_per_trade: % of account balance per trade; prevents over-concentration (default 20.0).
     """
 
     approval_mode: ApprovalMode = ApprovalMode.MANUAL
     max_tasks_per_day: int = 0
     max_position_size_inr: float = 0.0
     trial_task_limit: int = 10
+    max_leverage: int = 10                   # platform hard-cap; customer configures up to this
+    max_capital_pct_per_trade: float = 20.0  # percent; prevents over-concentration
 
 
 class DimensionName(str, Enum):

@@ -85,12 +85,16 @@ export const TradingSetupScreen = ({ navigation, route }: Props) => {
 
   const stepLabel: Record<string, string> = {
     welcome: 'Welcome',
-    api_key: 'Step 1 of 6 — API Key',
-    api_secret: 'Step 2 of 6 — API Secret',
-    validate: 'Step 3 of 6 — Validating…',
-    instrument: 'Step 4 of 6 — Instrument',
-    rsi_period: 'Step 5 of 6 — RSI Period',
-    risk_limits: 'Step 6 of 6 — Risk Limits',
+    api_key: 'Step 1 of 10 — API Key',
+    api_secret: 'Step 2 of 10 — API Secret',
+    validate: 'Step 3 of 10 — Validating…',
+    instrument: 'Step 4 of 10 — Instrument',
+    rsi_period: 'Step 5 of 10 — RSI Period',
+    risk_limits: 'Step 6 of 10 — Risk Limits',
+    capital_pct: 'Step 7 of 10 — Capital Deployment',
+    leverage: 'Step 8 of 10 — Leverage',
+    autonomous_mode: 'Step 9 of 10 — Autonomous Mode',
+    risk_disclosure: 'Step 10 of 10 — Risk Disclosure',
     done: 'Setup Complete ✅',
   }
 
@@ -134,6 +138,25 @@ export const TradingSetupScreen = ({ navigation, route }: Props) => {
           <Text style={{ color: '#ef4444' }}>{error}</Text>
         </View>
       ) : null}
+
+      {/* Autonomous mode warning banner */}
+      {currentStep === 'autonomous_mode' && (
+        <View
+          style={{
+            backgroundColor: '#f59e0b18',
+            borderColor: '#f59e0b55',
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 10,
+            marginHorizontal: 16,
+            marginTop: 8,
+          }}
+        >
+          <Text style={{ color: '#f59e0b', fontSize: 12 }}>
+            ⚠️ Autonomous mode: trades will execute without your approval. You will be notified after each execution.
+          </Text>
+        </View>
+      )}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

@@ -64,7 +64,8 @@ def test_trading_draft_and_approve_execute(client, auth_headers, monkeypatch, tm
     assert draft.status_code == 200
     body = draft.json()
     assert body["agent_type"] == "trading"
-    assert body["draft"]["customer_id"].startswith("CUST-")
+    # customer_id must be a plain UUID string — no "CUST-" prefix (ST-MVP-1 S2)
+    assert not body["draft"]["customer_id"].startswith("CUST-")
 
     executed = client.post(
         "/api/cp/trading/approve-execute",
@@ -89,3 +90,65 @@ def test_trading_draft_and_approve_execute(client, auth_headers, monkeypatch, tm
     assert any("api/v1/reference-agents/AGT-TRD-DELTA-001/run" in c["path"] for c in fake.calls)
 
     app.dependency_overrides.clear()
+
+
+class TestCustomerIdFormat:
+    """ST-MVP-1 S2 — customer_id must be plain UUID, never 'CUST-<uuid>'."""
+
+    def test_draft_trade_plan_sends_plain_uuid(self, client, auth_headers, monkeypatch, tmp_path):
+        monkeypatch.setenv("CP_APPROVALS_STORE_PATH", str(tmp_path / "cp_approvals.jsonl"))
+        from main import app
+        from api.trading import get_plant_gateway_client
+
+        fake = _FakePlantClient()
+        app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+        resp = client.post(
+            "/api/cp/trading/draft-plan",
+            headers=auth_headers,
+            json={
+                "agent_id": "AGT-TRD-DELTA-001",
+                "exchange_account_id": "EXCH-1",
+                "coin": "BTC",
+                "units": 1,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+            },
+        )
+        app.dependency_overrides.clear()
+        assert resp.status_code == 200
+        customer_id = resp.json()["draft"]["customer_id"]
+        assert "CUST-" not in customer_id, f"customer_id must not contain 'CUST-': got {customer_id}"
+        # Must be parseable as UUID
+        import uuid
+        uuid.UUID(customer_id)  # raises if not a valid UUID
+
+    def test_approve_execute_sends_plain_uuid(self, client, auth_headers, monkeypatch, tmp_path):
+        monkeypatch.setenv("CP_APPROVALS_STORE_PATH", str(tmp_path / "cp_approvals.jsonl"))
+        from services import cp_approvals as approvals
+        approvals.default_cp_approval_store.cache_clear()
+        from main import app
+        from api.trading import get_plant_gateway_client
+
+        fake = _FakePlantClient()
+        app.dependency_overrides[get_plant_gateway_client] = lambda: fake
+
+        resp = client.post(
+            "/api/cp/trading/approve-execute",
+            headers=auth_headers,
+            json={
+                "agent_id": "AGT-TRD-DELTA-001",
+                "intent_action": "place_order",
+                "exchange_account_id": "EXCH-1",
+                "coin": "BTC",
+                "units": 1,
+                "side": "long",
+                "action": "enter",
+                "market": True,
+            },
+        )
+        app.dependency_overrides.clear()
+        assert resp.status_code == 200
+        customer_id = resp.json()["draft"]["customer_id"]
+        assert "CUST-" not in customer_id, f"customer_id must not contain 'CUST-': got {customer_id}"
