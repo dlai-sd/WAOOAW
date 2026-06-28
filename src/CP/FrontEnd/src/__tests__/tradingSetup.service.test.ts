@@ -54,7 +54,7 @@ describe('tradingSetup.service', () => {
     expect(spy).toHaveBeenCalledWith(
       expect.stringContaining('/cp/trading/tax-report/HIRED-001')
     )
-    const calledPath: string = spy.mock.calls[0][0]
+    const calledPath = spy.mock.calls[0][0] as string
     expect(calledPath).toContain('year=2025')
     expect(calledPath).toContain('period=monthly')
     expect(calledPath).toContain('month=3')

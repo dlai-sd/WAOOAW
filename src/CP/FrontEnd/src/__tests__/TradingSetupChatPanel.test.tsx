@@ -4,7 +4,12 @@ import { FluentProvider } from '@fluentui/react-components'
 import { waooawLightTheme } from '../theme'
 import { TradingSetupChatPanel } from '../components/TradingSetupChatPanel'
 
-const makeMockSetup = (step: string, messages = [{ role: 'assistant' as const, content: 'Welcome!', masked: false }]) => ({
+const makeMockSetup = (
+  step: string,
+  messages: { role: 'assistant' | 'user'; content: string; masked: boolean }[] = [
+    { role: 'assistant' as const, content: 'Welcome!', masked: false },
+  ]
+) => ({
   hired_instance_id: 'HIRED-1',
   state: {
     step,
