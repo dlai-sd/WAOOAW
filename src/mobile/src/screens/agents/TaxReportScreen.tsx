@@ -91,10 +91,10 @@ export const TaxReportScreen = ({ navigation, route }: Props) => {
     <SafeAreaView style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" testID="tax-report-back">
           <Text style={{ color: colors.neonCyan, fontSize: 16 }}>← Back</Text>
         </TouchableOpacity>
-        <Text style={[s.title, { color: colors.text }]}>P&L Tax Report</Text>
+        <Text style={[s.title, { color: colors.textPrimary }]}>P&L Tax Report</Text>
         <TouchableOpacity
           onPress={handleExport}
           disabled={!report || exporting}
@@ -124,6 +124,7 @@ export const TaxReportScreen = ({ navigation, route }: Props) => {
                   },
                 ]}
                 onPress={() => setPeriod(p)}
+                testID={`period-${p}`}
               >
                 <Text
                   style={{
@@ -195,9 +196,9 @@ export const TaxReportScreen = ({ navigation, route }: Props) => {
         </View>
 
         {loading ? (
-          <ActivityIndicator color={colors.neonCyan} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={colors.neonCyan} style={{ marginTop: 40 }} testID="tax-report-loading" />
         ) : error ? (
-          <View style={s.errorContainer}>
+          <View style={s.errorContainer} testID="tax-report-error">
             <Text style={{ color: '#ef4444', textAlign: 'center' }}>{error}</Text>
             <TouchableOpacity onPress={fetchReport} style={{ marginTop: 12 }}>
               <Text style={{ color: colors.neonCyan }}>Retry</Text>
@@ -206,9 +207,9 @@ export const TaxReportScreen = ({ navigation, route }: Props) => {
         ) : report ? (
           <>
             {/* Summary cards */}
-            <View style={s.summaryRow}>
+            <View style={s.summaryRow} testID="tax-report-summary">
               <View style={[s.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[s.summaryValue, { color: colors.text }]}>{report.total_trades}</Text>
+                <Text style={[s.summaryValue, { color: colors.textPrimary }]}>{report.total_trades}</Text>
                 <Text style={[s.summaryLabel, { color: colors.textSecondary }]}>Total Trades</Text>
               </View>
               <View style={[s.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -235,7 +236,7 @@ export const TaxReportScreen = ({ navigation, route }: Props) => {
 
             {/* Per-day rows */}
             {report.trades.length === 0 ? (
-              <Text style={[s.emptyText, { color: colors.textSecondary }]}>
+              <Text style={[s.emptyText, { color: colors.textSecondary }]} testID="tax-report-empty">
                 No trades for this period.
               </Text>
             ) : (
@@ -245,7 +246,7 @@ export const TaxReportScreen = ({ navigation, route }: Props) => {
                   style={[s.tradeRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                   accessibilityLabel={`Trade on ${t.date}, P&L ${t.pnl_pct}%`}
                 >
-                  <Text style={[s.tradeDateText, { color: colors.text }]}>{t.date}</Text>
+                  <Text style={[s.tradeDateText, { color: colors.textPrimary }]}>{t.date}</Text>
                   <Text
                     style={[
                       s.tradePnlText,

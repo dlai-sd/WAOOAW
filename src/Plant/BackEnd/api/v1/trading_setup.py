@@ -35,6 +35,7 @@ from services.exchange_credential_service import (
     _encrypt,
     _decrypt,
 )
+from services.scheduler_persistence_service import SchedulerPersistenceService
 
 logger = logging.getLogger(__name__)
 logger.addFilter(PiiMaskingFilter())
@@ -556,8 +557,6 @@ async def emergency_stop_trading(
     Sets hired_agent.config["emergency_stopped_at"] and cancels all pending
     scheduled runs for the agent.  Returns within 60 seconds.
     """
-    from services.scheduler_persistence_service import SchedulerPersistenceService
-
     repo = HiredAgentRepository(db)
     agent = await repo.get_by_id(hired_instance_id)
     if agent is None:
@@ -574,6 +573,7 @@ async def emergency_stop_trading(
     scheduler_state["is_paused"] = True
     config["scheduler_state"] = scheduler_state
     config["emergency_stopped_at"] = stopped_at
+    agent.config = config  # keep the in-memory object in sync (also makes tests verifiable)
     await repo.update_config(hired_instance_id, config=config)
     await db.commit()
 

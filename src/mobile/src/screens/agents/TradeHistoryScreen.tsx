@@ -70,7 +70,7 @@ export const TradeHistoryScreen = ({ navigation, route }: Props) => {
         accessibilityLabel={`Trade on ${item.stat_date}, P&L ${item.pnl_pct_avg}%`}
       >
         <View style={s.rowLeft}>
-          <Text style={[s.dateText, { color: colors.text }]}>{item.stat_date}</Text>
+          <Text style={[s.dateText, { color: colors.textPrimary }]}>{item.stat_date}</Text>
           <Text style={[s.skillText, { color: colors.textSecondary }]}>{item.skill_id}</Text>
         </View>
         <View style={s.rowRight}>
@@ -79,6 +79,7 @@ export const TradeHistoryScreen = ({ navigation, route }: Props) => {
               s.pnlText,
               { color: pnlPositive ? '#10b981' : '#ef4444' },
             ]}
+            testID={`pnl-${item.stat_date}`}
           >
             {pnlPositive ? '+' : ''}
             {item.pnl_pct_avg.toFixed(2)}%
@@ -100,17 +101,17 @@ export const TradeHistoryScreen = ({ navigation, route }: Props) => {
     <SafeAreaView style={[s.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[s.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back">
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Go back" testID="trade-history-back">
           <Text style={{ color: colors.neonCyan, fontSize: 16 }}>← Back</Text>
         </TouchableOpacity>
-        <Text style={[s.title, { color: colors.text }]}>Trade History</Text>
+        <Text style={[s.title, { color: colors.textPrimary }]}>Trade History</Text>
         <Text style={[s.totalText, { color: colors.textSecondary }]}>{total} records</Text>
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.neonCyan} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={colors.neonCyan} style={{ marginTop: 40 }} testID="trade-history-loading" />
       ) : error ? (
-        <View style={s.errorContainer}>
+        <View style={s.errorContainer} testID="trade-history-error">
           <Text style={{ color: '#ef4444', textAlign: 'center' }}>{error}</Text>
           <TouchableOpacity onPress={() => fetchPage(1)} style={{ marginTop: 12 }}>
             <Text style={{ color: colors.neonCyan }}>Retry</Text>
@@ -124,8 +125,9 @@ export const TradeHistoryScreen = ({ navigation, route }: Props) => {
           contentContainerStyle={s.list}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
+          testID="trade-history-list"
           ListEmptyComponent={
-            <Text style={[s.emptyText, { color: colors.textSecondary }]}>
+            <Text style={[s.emptyText, { color: colors.textSecondary }]} testID="trade-history-empty">
               No trade history yet. Trades will appear here once the agent executes orders.
             </Text>
           }
