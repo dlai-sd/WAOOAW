@@ -1,6 +1,39 @@
 
 ---
 
+## [2026-06-28 UTC] ST-MVP-1 — Share Trader Full Lifecycle Plan
+
+**Branch**: `docs/ST-MVP-1-share-trader-lifecycle` (to create)
+**Plan file**: `docs/CP/iterations/ST-MVP-1-share-trader-lifecycle.md` (to create)
+**Status**: Vision intake — presenting to user for confirmation
+
+### Goal
+Create a self-sufficient, agent-executable plan for the full Share Trader commercial lifecycle on CP portal: P0 bug fixes (credential bridge, customer_id, JSONB leak) + Configure (leverage, % capital, autonomous limits, risk disclosure) + Test-confirm chat + Trade execution (autonomous + approval) + Performance review + P&L / tax reports.
+
+### Checkpoint list
+- [x] Read platform context (CONTEXT_AND_INDEX.md, session_commentary.md, template)
+- [x] Full Share Trader codebase exploration (gap analysis completed)
+- [ ] Vision intake confirmed by user
+- [ ] Plan branch created
+- [ ] Plan skeleton committed
+- [ ] Story cards Iteration 1 committed
+- [ ] Story cards Iteration 2 committed
+- [ ] Push & PR created
+
+### Key P0 gaps identified
+1. Credential flow broken: setup JSONB → ExchangeCredentialService → DeltaExchangePump path missing
+2. customer_id inconsistency: `str(user.id)` vs `f"CUST-{user.id}"` across CP routes
+3. JSONB GET response leaks encrypted_api_key blob
+4. Stop-loss/take-profit wired in seed but NOT enforced by RSIProcessor or publisher
+5. RSI uses simple average not Wilder's EMA (wrong values vs every charting platform)
+6. No open-position check before new trade entry
+7. NIFTY/BANKNIFTY listed as example instruments — don't exist on Delta Exchange India
+
+### Next save point
+After user confirms vision intake → create branch → write plan skeleton → commit → write stories.
+
+---
+
 ## [2026-04-15 UTC] MOB-DMA-1 — Mobile DMA Chat & Content Parity Plan
 
 **Branch**: `docs/mob-dma-1-dma-chat-content` (to create)
