@@ -1,4 +1,4 @@
-import { Card, Button, Badge, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Input, Textarea, Checkbox, Spinner } from '@fluentui/react-components'
+import { Card, Button, Badge, Dialog, DialogBody, DialogContent, DialogSurface, DialogTitle, Select, Input, Textarea, Checkbox, Spinner, Tab, TabList } from '@fluentui/react-components'
 import { Star20Filled } from '@fluentui/react-icons'
 import { useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -34,6 +34,10 @@ import { SkillsPanel } from '../../components/SkillsPanel'
 import { PlatformConnectionsPanel } from '../../components/PlatformConnectionsPanel'
 import { TradingSetupChatPanel } from '../../components/TradingSetupChatPanel'
 import { TradingReadinessCard } from '../../components/TradingReadinessCard'
+import { TradingApprovalPanel } from '../../components/TradingApprovalPanel'
+import { TradingDashboardPanel } from '../../components/TradingDashboardPanel'
+import { TradeHistoryPanel } from '../../components/TradeHistoryPanel'
+import { TaxReportPanel } from '../../components/TaxReportPanel'
 import { getTradingSetup, type TradingSetupReadiness } from '../../services/tradingSetup.service'
 import { listPlatformConnections, type PlatformConnection } from '../../services/platformConnections.service'
 import { listPerformanceStats, type PerformanceStat } from '../../services/performanceStats.service'
@@ -56,6 +60,8 @@ import {
 } from '../../utils/youtubeOAuthFlow'
 
 type MyAgentsSection = 'configure' | 'goals' | 'skills' | 'performance'
+
+type TradingTab = 'configure' | 'approvals' | 'performance' | 'history' | 'tax-report' | 'goals'
 
 type JsonObject = Record<string, unknown>
 
@@ -935,6 +941,79 @@ function TradingConfigureSection({ hiredInstanceId }: { hiredInstanceId: string 
       <div ref={chatPanelRef} style={{ minHeight: 400 }}>
         <TradingSetupChatPanel hiredInstanceId={hiredInstanceId} />
       </div>
+    </div>
+  )
+}
+
+function TradingAgentWorkspace({
+  hiredInstanceId,
+  instance,
+  readOnly,
+}: {
+  hiredInstanceId: string
+  instance: MyAgentInstanceSummary
+  readOnly: boolean
+}) {
+  const sessionKey = `cp_trading_active_tab_${hiredInstanceId}`
+  const [tradingTab, setTradingTab] = useState<TradingTab>(() => {
+    const saved = sessionStorage.getItem(sessionKey)
+    return (saved as TradingTab | null) || 'configure'
+  })
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    getTradingSetup(hiredInstanceId)
+      .then((resp) => {
+        if (cancelled) return
+        if (!sessionStorage.getItem(sessionKey)) {
+          setTradingTab(resp.readiness?.configured ? 'performance' : 'configure')
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [hiredInstanceId, sessionKey])
+
+  useEffect(() => {
+    let cancelled = false
+    listHiredAgentDeliverables(hiredInstanceId)
+      .then((resp) => {
+        if (cancelled) return
+        const count = (resp?.deliverables ?? []).filter((d) => d.review_status === 'pending_review').length
+        setPendingCount(count)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [hiredInstanceId])
+
+  // handleTabChange is inlined on onTabSelect below so TypeScript infers the correct SelectTabEvent/SelectTabData types automatically.
+
+  return (
+    <div data-testid="trading-agent-workspace">
+      <TabList selectedValue={tradingTab} onTabSelect={(_, data) => {
+        const t = data.value as TradingTab
+        setTradingTab(t)
+        sessionStorage.setItem(sessionKey, t)
+      }}>
+        <Tab value="configure">⚙️ Configure</Tab>
+        <Tab value="approvals">
+          📋 Approvals {pendingCount > 0 && <Badge color="danger" size="small">{pendingCount}</Badge>}
+        </Tab>
+        <Tab value="performance">📈 Performance</Tab>
+        <Tab value="history">📜 History</Tab>
+        <Tab value="tax-report">📄 Tax Report</Tab>
+        <Tab value="goals">🎯 Goals</Tab>
+      </TabList>
+      {tradingTab === 'configure' && (
+        <TradingConfigureSection hiredInstanceId={hiredInstanceId} />
+      )}
+      {tradingTab === 'approvals' && <TradingApprovalPanel hiredInstanceId={hiredInstanceId} />}
+      {tradingTab === 'performance' && <TradingDashboardPanel hiredInstanceId={hiredInstanceId} />}
+      {tradingTab === 'history' && <TradeHistoryPanel hiredInstanceId={hiredInstanceId} />}
+      {tradingTab === 'tax-report' && <TaxReportPanel hiredInstanceId={hiredInstanceId} />}
+      {tradingTab === 'goals' && (
+        <GoalSettingPanel instance={instance} readOnly={readOnly} />
+      )}
     </div>
   )
 }
@@ -2574,6 +2653,7 @@ export default function MyAgents({
                 helperText={selectedReadOnlyExpired ? "This agent's trial has ended. Select another hire or review retained access." : "Select and manage your hired agents"}
               />
             </div>
+            {!isTradingOrExchangeAgent(selectedInstance?.agent_id, selectedInstance?.agent_type_id) && (
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
               <Button
                 appearance={activeSection === 'configure' ? 'primary' : 'outline'}
@@ -2604,6 +2684,7 @@ export default function MyAgents({
                 Performance
               </Button>
             </div>
+            )}
           </div>
 
           {selectedInstance ? (
@@ -2687,123 +2768,129 @@ export default function MyAgents({
               )}
 
               <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--colorNeutralStroke2)' }}>
-                {activeSection === 'configure' ? (
-                  <>
-                    <div style={{ fontWeight: 600 }}>Configure</div>
-                    <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
-                      Update this agent’s configuration and connected accounts.
-                    </div>
-
-                    {isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
-                      <DigitalMarketingActivationWizard
-                        instance={selectedInstance}
-                        readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-                        onStaleReference={async ({ subscriptionId }) => {
-                          await refreshAfterStaleSelection(subscriptionId)
-                        }}
-                        onSaved={(updated) => {
-                          setInstances((prev) =>
-                            prev.map((x) =>
-                              x.subscription_id === selectedInstance.subscription_id
-                                ? {
-                                    ...x,
-                                    nickname: updated.nickname ?? x.nickname,
-                                    configured: updated.configured ?? x.configured,
-                                    goals_completed: updated.goals_completed ?? x.goals_completed,
-                                    hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
-                                    agent_type_id: updated.agent_type_id ?? x.agent_type_id,
-                                    catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
-                                    internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
-                                    external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
-                                    catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
-                                  }
-                                : x
-                            )
-                          )
-                        }}
-                      />
-                    ) : isTradingOrExchangeAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
-                      <TradingConfigureSection
-                        hiredInstanceId={String(selectedInstance.hired_instance_id || '')}
-                      />
-                    ) : (
-                      <>
-                        <ConfigureAgentPanel
-                          instance={selectedInstance}
-                          readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-                          onSaved={(updated) => {
-                            setInstances((prev) =>
-                              prev.map((x) =>
-                                x.subscription_id === selectedInstance.subscription_id
-                                  ? {
-                                      ...x,
-                                      nickname: updated.nickname ?? x.nickname,
-                                      configured: updated.configured ?? x.configured,
-                                      goals_completed: updated.goals_completed ?? x.goals_completed,
-                                      hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
-                                      agent_type_id: updated.agent_type_id ?? x.agent_type_id,
-                                      catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
-                                      internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
-                                      external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
-                                      catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
-                                    }
-                                  : x
-                              )
-                            )
-                          }}
-                        />
-
-                        {selectedInstance.hired_instance_id && (
-                          <div style={{ marginTop: '1.25rem' }}>
-                            <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Platform Connections</div>
-                            <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', opacity: 0.75 }}>
-                              Connect external platforms your agent needs to do its work.
-                            </div>
-                            <PlatformConnectionsPanel
-                              hiredInstanceId={String(selectedInstance.hired_instance_id)}
-                              readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-                            />
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </>
-                ) : activeSection === 'goals' ? (
-                  <>
-                    <div style={{ fontWeight: 600 }}>Goal Setting</div>
-                    <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
-                      Create and manage goals for this agent. Drafts require approval before any external action.
-                    </div>
-
-                    {selectedInstance.hired_instance_id && isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) && (
-                      <div style={{ marginTop: '1rem' }}>
-                        <DigitalMarketingBriefPreview hiredInstanceId={String(selectedInstance.hired_instance_id)} />
-                      </div>
-                    )}
-
-                    <GoalSettingPanel instance={selectedInstance} readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention} />
-                  </>
-                ) : activeSection === 'skills' ? (
-                  <>
-                    <div style={{ fontWeight: 600 }}>Skills &amp; Goal Configuration</div>
-                    <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
-                      View and configure goals for each skill assigned to this agent.
-                    </div>
-                    <SkillsPanel
-                      hiredInstanceId={String(selectedInstance.hired_instance_id || '').trim()}
-                      readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
-                    />
-                  </>
+                {isTradingOrExchangeAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
+                  <TradingAgentWorkspace
+                    hiredInstanceId={String(selectedInstance.hired_instance_id || '')}
+                    instance={selectedInstance}
+                    readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                  />
                 ) : (
                   <>
-                    <div style={{ fontWeight: 600 }}>Performance</div>
-                    <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
-                      Daily activity metrics from your agent’s runs.
-                    </div>
-                    <PerformancePanel instance={selectedInstance} />
-                    {isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
-                      <PublishHistoryPanel instance={selectedInstance} />
-                    ) : null}
+                    {activeSection === 'configure' ? (
+                      <>
+                        <div style={{ fontWeight: 600 }}>Configure</div>
+                        <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
+                          Update this agent's configuration and connected accounts.
+                        </div>
+
+                        {isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
+                          <DigitalMarketingActivationWizard
+                            instance={selectedInstance}
+                            readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                            onStaleReference={async ({ subscriptionId }) => {
+                              await refreshAfterStaleSelection(subscriptionId)
+                            }}
+                            onSaved={(updated) => {
+                              setInstances((prev) =>
+                                prev.map((x) =>
+                                  x.subscription_id === selectedInstance.subscription_id
+                                    ? {
+                                        ...x,
+                                        nickname: updated.nickname ?? x.nickname,
+                                        configured: updated.configured ?? x.configured,
+                                        goals_completed: updated.goals_completed ?? x.goals_completed,
+                                        hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
+                                        agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                                        catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
+                                        internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
+                                        external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
+                                        catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
+                                      }
+                                    : x
+                                )
+                              )
+                            }}
+                          />
+                        ) : (
+                          <>
+                            <ConfigureAgentPanel
+                              instance={selectedInstance}
+                              readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                              onSaved={(updated) => {
+                                setInstances((prev) =>
+                                  prev.map((x) =>
+                                    x.subscription_id === selectedInstance.subscription_id
+                                      ? {
+                                          ...x,
+                                          nickname: updated.nickname ?? x.nickname,
+                                          configured: updated.configured ?? x.configured,
+                                          goals_completed: updated.goals_completed ?? x.goals_completed,
+                                          hired_instance_id: updated.hired_instance_id ?? x.hired_instance_id,
+                                          agent_type_id: updated.agent_type_id ?? x.agent_type_id,
+                                          catalog_release_id: updated.catalog_release_id ?? x.catalog_release_id,
+                                          internal_definition_version_id: updated.internal_definition_version_id ?? x.internal_definition_version_id,
+                                          external_catalog_version: updated.external_catalog_version ?? x.external_catalog_version,
+                                          catalog_status_at_hire: updated.catalog_status_at_hire ?? x.catalog_status_at_hire
+                                        }
+                                      : x
+                                  )
+                                )
+                              }}
+                            />
+
+                            {selectedInstance.hired_instance_id && (
+                              <div style={{ marginTop: '1.25rem' }}>
+                                <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Platform Connections</div>
+                                <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', opacity: 0.75 }}>
+                                  Connect external platforms your agent needs to do its work.
+                                </div>
+                                <PlatformConnectionsPanel
+                                  hiredInstanceId={String(selectedInstance.hired_instance_id)}
+                                  readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                                />
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
+                    ) : activeSection === 'goals' ? (
+                      <>
+                        <div style={{ fontWeight: 600 }}>Goal Setting</div>
+                        <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
+                          Create and manage goals for this agent. Drafts require approval before any external action.
+                        </div>
+
+                        {selectedInstance.hired_instance_id && isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) && (
+                          <div style={{ marginTop: '1rem' }}>
+                            <DigitalMarketingBriefPreview hiredInstanceId={String(selectedInstance.hired_instance_id)} />
+                          </div>
+                        )}
+
+                        <GoalSettingPanel instance={selectedInstance} readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention} />
+                      </>
+                    ) : activeSection === 'skills' ? (
+                      <>
+                        <div style={{ fontWeight: 600 }}>Skills &amp; Goal Configuration</div>
+                        <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
+                          View and configure goals for each skill assigned to this agent.
+                        </div>
+                        <SkillsPanel
+                          hiredInstanceId={String(selectedInstance.hired_instance_id || '').trim()}
+                          readOnly={selectedReadOnlyExpired || selectedInReadOnlyRetention}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 600 }}>Performance</div>
+                        <div style={{ marginTop: '0.25rem', opacity: 0.85 }}>
+                          Daily activity metrics from your agent's runs.
+                        </div>
+                        <PerformancePanel instance={selectedInstance} />
+                        {isDigitalMarketingAgent(selectedInstance.agent_id, selectedInstance.agent_type_id) ? (
+                          <PublishHistoryPanel instance={selectedInstance} />
+                        ) : null}
+                      </>
+                    )}
                   </>
                 )}
               </div>

@@ -3,17 +3,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CommandCentre from '../pages/authenticated/CommandCentre'
 
-const { getMyAgentsSummaryMock } = vi.hoisted(() => ({
+const { getMyAgentsSummaryMock, listHiredAgentDeliverablesMock } = vi.hoisted(() => ({
   getMyAgentsSummaryMock: vi.fn(),
+  listHiredAgentDeliverablesMock: vi.fn(),
 }))
 
 vi.mock('../services/myAgentsSummary.service', () => ({
   getMyAgentsSummary: getMyAgentsSummaryMock,
 }))
 
+vi.mock('../services/hiredAgentDeliverables.service', () => ({
+  listHiredAgentDeliverables: listHiredAgentDeliverablesMock,
+}))
+
 describe('CommandCentre', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    listHiredAgentDeliverablesMock.mockResolvedValue({ deliverables: [] })
   })
 
   it('renders live counts from the my agents summary response', async () => {
@@ -106,5 +112,59 @@ describe('CommandCentre', () => {
     await waitFor(() => {
       expect(screen.getByText('Hire your first agent from Discover to get started.')).toBeInTheDocument()
     })
+  })
+
+  it('T5 (S8): shows pending trade approvals metric card for trading instances', async () => {
+    getMyAgentsSummaryMock.mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-TRD-1',
+          agent_id: 'AGT-TRD-DELTA-001',
+          agent_type_id: 'trading.share_trader.v1',
+          hired_instance_id: 'HIRED-TRD-1',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '',
+          current_period_end: '',
+          cancel_at_period_end: false,
+        },
+      ],
+    })
+
+    listHiredAgentDeliverablesMock.mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-TRD-1',
+      deliverables: [
+        {
+          deliverable_id: 'DEL-1',
+          hired_instance_id: 'HIRED-TRD-1',
+          goal_instance_id: 'GOAL-1',
+          goal_template_id: 'trading.trade_intent_draft.v1',
+          title: 'Trade intent draft',
+          payload: {},
+          review_status: 'pending_review',
+          review_notes: null,
+          approval_id: null,
+          execution_status: 'not_executed',
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+    })
+
+    render(
+      <CommandCentre
+        onOpenBilling={vi.fn()}
+        onOpenDiscover={vi.fn()}
+        onOpenGoals={vi.fn()}
+        onOpenMyAgents={vi.fn()}
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending trade approvals')).toBeInTheDocument()
+    })
+
+    const card = screen.getByText('Pending trade approvals').closest('.stat-card') as HTMLElement
+    expect(within(card).getByText('1')).toBeInTheDocument()
   })
 })

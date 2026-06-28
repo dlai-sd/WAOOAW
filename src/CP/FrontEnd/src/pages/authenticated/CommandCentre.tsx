@@ -5,6 +5,13 @@ import {
   getMyAgentsSummary,
   type MyAgentInstanceSummary,
 } from '../../services/myAgentsSummary.service'
+import { listHiredAgentDeliverables, type Deliverable } from '../../services/hiredAgentDeliverables.service'
+
+function isTradingAgent(agentId?: string | null, agentTypeId?: string | null): boolean {
+  const id = String(agentId || '').trim().toUpperCase()
+  const type = String(agentTypeId || '').trim().toLowerCase()
+  return id.startsWith('AGT-TRD-') || type.startsWith('trading.') || type.startsWith('exchange.')
+}
 
 interface CommandCentreProps {
   onOpenDiscover: () => void
@@ -22,6 +29,7 @@ export default function CommandCentre({
   const [instances, setInstances] = useState<MyAgentInstanceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pendingTradeApprovals, setPendingTradeApprovals] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -48,6 +56,30 @@ export default function CommandCentre({
     }
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    const tradingInstances = instances.filter((x) => isTradingAgent(x.agent_id, x.agent_type_id) && x.hired_instance_id)
+    if (tradingInstances.length === 0) {
+      setPendingTradeApprovals(0)
+      return
+    }
+    Promise.all(
+      tradingInstances.map((x) =>
+        listHiredAgentDeliverables(String(x.hired_instance_id)).catch(() => ({ deliverables: [] as Deliverable[] }))
+      )
+    ).then((results) => {
+      if (cancelled) return
+      const count = results.reduce(
+        (acc, r) => acc + (r.deliverables ?? []).filter((d) => d.review_status === 'pending_review').length,
+        0
+      )
+      setPendingTradeApprovals(count)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [instances])
+
   const totalAgents = instances.length
   const inTrial = instances.filter((instance) => instance.trial_status === 'active').length
   const needsSetup = instances.filter((instance) => !instance.configured || !instance.goals_completed).length
@@ -55,12 +87,26 @@ export default function CommandCentre({
 
   const readinessCards = useMemo(
     () => [
-      { label: 'Total agents', sublabel: 'Hired agents in your workspace', value: String(totalAgents) },
-      { label: 'In trial', sublabel: 'Agents in their 7-day trial period', value: String(inTrial) },
-      { label: 'Need setup', sublabel: 'Agents waiting for configuration', value: String(needsSetup) },
-      { label: 'Configured', sublabel: 'Agents ready and producing output', value: String(configured) },
+      { label: 'Total agents', sublabel: 'Hired agents in your workspace', value: String(totalAgents), onClick: undefined as (() => void) | undefined },
+      { label: 'In trial', sublabel: 'Agents in their 7-day trial period', value: String(inTrial), onClick: undefined },
+      { label: 'Need setup', sublabel: 'Agents waiting for configuration', value: String(needsSetup), onClick: undefined },
+      { label: 'Configured', sublabel: 'Agents ready and producing output', value: String(configured), onClick: undefined },
+      {
+        label: 'Pending trade approvals',
+        sublabel: 'Trade signals waiting for your review',
+        value: String(pendingTradeApprovals),
+        highlight: pendingTradeApprovals > 0,
+        onClick: pendingTradeApprovals > 0 ? () => {
+          instances
+            .filter((x) => isTradingAgent(x.agent_id, x.agent_type_id) && x.hired_instance_id)
+            .forEach((x) => {
+              sessionStorage.setItem(`cp_trading_active_tab_${x.hired_instance_id}`, 'approvals')
+            })
+          onOpenMyAgents()
+        } : undefined,
+      },
     ],
-    [configured, inTrial, needsSetup, totalAgents]
+    [configured, inTrial, instances, needsSetup, onOpenMyAgents, pendingTradeApprovals, totalAgents]
   )
 
   const priorities = useMemo(() => {
@@ -108,8 +154,18 @@ export default function CommandCentre({
     <div className="dashboard-page">
       <div className="dashboard-stats">
         {readinessCards.map((stat) => (
-          <Card key={stat.label} className="stat-card">
-            <div className="stat-icon">{stat.value}</div>
+          <Card
+            key={stat.label}
+            className="stat-card"
+            onClick={stat.onClick}
+            style={stat.onClick ? { cursor: 'pointer' } : undefined}
+          >
+            <div
+              className="stat-icon"
+              style={'highlight' in stat && stat.highlight ? { color: '#ef4444' } : undefined}
+            >
+              {stat.value}
+            </div>
             <div className="stat-label">{stat.label}</div>
             <div className="stat-sublabel">{stat.sublabel}</div>
           </Card>

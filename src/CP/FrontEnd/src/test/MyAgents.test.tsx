@@ -74,6 +74,21 @@ vi.mock('../services/tradingSetup.service', () => ({
     readiness: { configured: false, step: 'api_key', has_credentials: false, credentials_valid: false, has_instrument: false, has_rsi_period: false, has_risk_limits: false },
   }),
   emergencyStop: vi.fn().mockResolvedValue({ status: 'stopped', stopped_at: '2026-01-01T00:00:00Z' }),
+  getTradePerformance: vi.fn().mockResolvedValue({
+    total_trades: 42,
+    win_rate: 0.65,
+    pnl_pct_avg: 2.3,
+    total_pnl: 1200.0,
+    avg_hold_time_h: 4.5,
+    last_trade_at: '2026-06-01T10:00:00Z',
+  }),
+  getRecommendations: vi.fn().mockResolvedValue({
+    recommended_rsi_period: 14,
+    confidence: 0.82,
+    rationale: 'RSI at 14 shows optimal signal timing.',
+  }),
+  getTradeHistory: vi.fn().mockResolvedValue({ rows: [], total: 0, page: 1, total_pages: 0 }),
+  getTaxReport: vi.fn().mockResolvedValue(null),
 }))
 
 
@@ -743,7 +758,7 @@ describe('MyAgents Component', () => {
     })
 
     expect(screen.getByRole('combobox')).toHaveTextContent('Active Agent')
-    expect(screen.getByRole('button', { name: 'Configure' })).not.toBeDisabled()
+    expect(screen.getByTestId('trading-agent-workspace')).toBeInTheDocument()
   })
 
   it('renders Goal Setting templates and can save a goal', async () => {
@@ -755,7 +770,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
+    fireEvent.click(screen.getByRole('tab', { name: /Goals/i }))
 
     await waitFor(() => {
       expect(listHiredAgentGoals).toHaveBeenCalled()
@@ -793,11 +808,7 @@ describe('MyAgents Component', () => {
       expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Goal Setting' }))
-
-    await waitFor(() => {
-      expect(listHiredAgentDeliverables).toHaveBeenCalled()
-    })
+    fireEvent.click(screen.getByRole('tab', { name: /Goals/i }))
 
     await waitFor(() => {
       expect(screen.getByText('Drafts (1)')).toBeInTheDocument()
@@ -1411,5 +1422,84 @@ describe('MyAgents Component', () => {
     // DMA agents go through the activation wizard — should NOT show trading chat panel
     expect(screen.queryByText('⚙️ Configure Trading')).not.toBeInTheDocument()
     expect(screen.queryByText('Connect exchange')).not.toBeInTheDocument()
+  })
+
+  // ── S8 navigation tests ──────────────────────────────────────────────────
+
+  it('T1 (S8): default tab is configure when readiness.configured is false', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-agent-workspace')).toBeInTheDocument()
+    })
+
+    // Configure tab is active by default — TradingSetupChatPanel content is visible
+    await waitFor(() => {
+      expect(screen.getByText('⚙️ Configure Trading')).toBeInTheDocument()
+    })
+    // Performance panel should NOT be mounted
+    expect(screen.queryByTestId('trading-dashboard')).not.toBeInTheDocument()
+  })
+
+  it('T2 (S8): default tab switches to performance when readiness.configured is true', async () => {
+    const tradingModule = await import('../services/tradingSetup.service')
+
+    vi.mocked(tradingModule.getTradingSetup).mockResolvedValueOnce({
+      hired_instance_id: 'HIRED-1',
+      state: {
+        step: 'done',
+        messages: [],
+        collected: {},
+        validation_status: 'valid',
+        configured: true,
+      },
+      readiness: {
+        configured: true,
+        step: 'done',
+        has_credentials: true,
+        credentials_valid: true,
+        has_instrument: true,
+        has_rsi_period: true,
+        has_risk_limits: true,
+      },
+    })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-agent-workspace')).toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-dashboard')).toBeInTheDocument()
+    })
+  })
+
+  it('T3 (S8): clicking Approvals tab renders TradingApprovalPanel', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-agent-workspace')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: /Approvals/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-approval-panel')).toBeInTheDocument()
+    })
+  })
+
+  it('T4 (S8): active tab is saved to sessionStorage on change', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('trading-agent-workspace')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: /History/i }))
+
+    await waitFor(() => {
+      expect(sessionStorage.getItem('cp_trading_active_tab_HIRED-1')).toBe('history')
+    })
   })
 })
