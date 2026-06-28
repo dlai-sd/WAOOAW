@@ -48,6 +48,35 @@ vi.mock('../services/myAgentsSummary.service', () => ({
   })
 }))
 
+vi.mock('../services/tradingSetup.service', () => ({
+  getTradingSetup: vi.fn().mockResolvedValue({
+    hired_instance_id: 'HIRED-1',
+    state: {
+      step: 'welcome',
+      messages: [{ role: 'assistant', content: 'Welcome to Share Trader!', masked: false }],
+      collected: {},
+      validation_status: 'pending',
+      configured: false,
+    },
+    readiness: {
+      configured: false,
+      step: 'welcome',
+      has_credentials: false,
+      credentials_valid: false,
+      has_instrument: false,
+      has_rsi_period: false,
+      has_risk_limits: false,
+    },
+  }),
+  sendTradingSetupMessage: vi.fn().mockResolvedValue({
+    hired_instance_id: 'HIRED-1',
+    state: { step: 'api_key', messages: [], collected: {}, validation_status: 'pending', configured: false },
+    readiness: { configured: false, step: 'api_key', has_credentials: false, credentials_valid: false, has_instrument: false, has_rsi_period: false, has_risk_limits: false },
+  }),
+  emergencyStop: vi.fn().mockResolvedValue({ status: 'stopped', stopped_at: '2026-01-01T00:00:00Z' }),
+}))
+
+
 vi.mock('../services/agentTypes.service', () => ({
   getAgentTypeDefinition: vi.fn().mockResolvedValue({
     agent_type_id: 'trading.share_trader.v1',
@@ -1337,5 +1366,50 @@ describe('MyAgents Component', () => {
     })
 
     expect(screen.getByText('YouTube connection saved for future agent use.')).toBeInTheDocument()
+  })
+
+  it('T1 (S3): trading agent renders TradingSetupChatPanel in configure section, not exchange form', async () => {
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+    })
+
+    // Default section is configure; trading agent should show chat panel, not exchange form
+    await waitFor(() => {
+      expect(screen.getByText('⚙️ Configure Trading')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText('Connect exchange')).not.toBeInTheDocument()
+  })
+
+  it('T2 (S3): DMA agent still renders DigitalMarketingActivationWizard in configure section', async () => {
+    const summaryModule = await import('../services/myAgentsSummary.service')
+
+    vi.mocked(summaryModule.getMyAgentsSummary).mockResolvedValueOnce({
+      instances: [
+        {
+          subscription_id: 'SUB-DMA-S3',
+          agent_id: 'AGT-MKT-DMA-S3',
+          duration: 'monthly',
+          status: 'active',
+          current_period_start: '2026-03-01T00:00:00Z',
+          current_period_end: '2026-04-01T00:00:00Z',
+          cancel_at_period_end: false,
+          hired_instance_id: 'HIRED-DMA-S3',
+          agent_type_id: 'marketing.digital_marketing.v1',
+        },
+      ],
+    })
+
+    renderWithProvider(<MyAgents />)
+
+    await waitFor(() => {
+      expect(screen.getByText('My Agents (1)')).toBeInTheDocument()
+    })
+
+    // DMA agents go through the activation wizard — should NOT show trading chat panel
+    expect(screen.queryByText('⚙️ Configure Trading')).not.toBeInTheDocument()
+    expect(screen.queryByText('Connect exchange')).not.toBeInTheDocument()
   })
 })
